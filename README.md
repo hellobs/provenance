@@ -31,7 +31,28 @@ pip install -r requirements.txt
 
 > 运行时用 `python live_fastapi.py` 即可。先激活环境:conda 用 `conda activate generative_agents_cn`;uv 用 `source .venv/bin/activate`(mac/linux)或 `.venv\Scripts\activate`(Windows)。
 
-### 2. 配置大模型(二选一)
+
+### 2. 角色配置工具(填表单生成角色)
+
+用网页表单配置角色(人设/职责/权限/目标),自动生成 JSON 并校验,免手写配置文件:
+
+```bash
+cd config_tool
+# 使用 generative_agents 的环境(激活后直接 python)
+# 或指定解释器路径:Windows .venv-live\Scripts\python.exe / mac·linux .venv-live/bin/python
+python app.py
+```
+
+浏览器打开 http://127.0.0.1:5002/
+
+- `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
+- `/agents` — 已配置角色列表:查看所有角色完整配置
+- 生成的角色自动写入 `generative_agents/frontend/static/assets/village/agents/`,贴图从 `agents_pool/`(25 人贴图池)按角色名哈希映射
+- 详见 `config_tool/README.md`
+
+> 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
+
+### 3. 配置大模型(二选一)
 
 - **本地 Ollama**(免费,推荐开发调试):安装 [Ollama](https://ollama.com/) 并拉取模型
   ```bash
@@ -53,7 +74,7 @@ pip install -r requirements.txt
   }
   ```
 
-### 3. 实时观看(FastAPI + WebSocket)
+### 4. 实时观看(FastAPI + WebSocket)
 
 ```bash
 cd generative_agents
@@ -62,25 +83,6 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 
 浏览器打开 http://127.0.0.1:5001/
 
-### 4. 角色配置工具(填表单生成角色)
-
-用网页表单配置角色(人设/职责/权限/目标),自动生成 JSON 并校验,免手写配置文件:
-
-```bash
-cd config_tool
-# 使用 generative_agents 的环境(激活后直接 python)
-# 或指定解释器路径:Windows .venv-live\Scripts\python.exe / mac·linux .venv-live/bin/python
-python app.py
-```
-
-浏览器打开 http://127.0.0.1:5002/
-
-- `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
-- `/agents` — 已配置角色列表:查看所有角色完整配置
-- 生成的角色自动写入 `generative_agents/frontend/static/assets/village/agents/`,贴图从 `agents_pool/`(25 人贴图池)按角色名哈希映射
-- 详见 `config_tool/README.md`
-
-> 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
 
 ## 常用参数
 
