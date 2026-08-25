@@ -13,7 +13,7 @@ cd GenerativeAgentsCN
 
 ### 1.2 configure the large language model
 
-Modify the configuration file `generative_agents/data/config.json`:
+Modify the configuration file `provenance/data/config.json`:
 1. By default, [Ollama](https://ollama.com/) is used to load local quantization models and OpenAI compatible APIs are provided. We need to first pull the quantization model and ensure that `base_url` and `model` are consistent with the actual configuration of Ollama.
 2. If you want to call other OpenAI compatible APIs, you need to change `provider` to `openai`, and modify `model`, `api_key` and `base_url` to the correct values.
 
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ## 2. Start a simulation
 
 ```
-cd generative_agents
+cd provenance
 python start.py --name sim-test --start "20240213-09:30" --step 10 --stride 10
 ```
 

@@ -5,7 +5,7 @@
 ## 功能
 
 - 智能体独立，由大模型驱动自主决策、移动、对话
-- **自研框架内核 `framework/`**:Agent 完整生命周期(思考/日程/感知/反应/对话/反思)、三因子记忆检索、可插拔存储(纯 stdlib / 向量)、提示词系统
+- **自研框架内核 `mavisframework/`**:Agent 完整生命周期(思考/日程/感知/反应/对话/反思)、三因子记忆检索、可插拔存储(纯 stdlib / 向量)、提示词系统
 - 消息契约(protocol.py),支撑实时流与客户端对接
 - 提供一种实时可视化方式:FastAPI + WebSocket 边跑边看(框架驱动),对话逐句推送
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面
@@ -19,7 +19,7 @@
 
 ```bash
 # 用 uv(更快)
-cd generative_agents
+cd provenance
 uv venv .venv --python 3.12
 uv pip install -r requirements.txt
 
@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 ```bash
 cd config_tool
-# 使用 generative_agents 的环境(激活后直接 python)
+# 使用 provenance 的环境(激活后直接 python)
 # 或指定解释器路径:Windows .venv-live\Scripts\python.exe / mac·linux .venv-live/bin/python
 python app.py
 ```
@@ -47,7 +47,7 @@ python app.py
 
 - `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
 - `/agents` — 已配置角色列表:查看所有角色完整配置
-- 生成的角色自动写入 `generative_agents/frontend/static/assets/village/agents/`,贴图从 `agents_pool/`(25 人贴图池)按角色名哈希映射
+- 生成的角色自动写入 `provenance/frontend/static/assets/village/agents/`,贴图从 `agents_pool/`(25 人贴图池)按角色名哈希映射
 - 详见 `config_tool/README.md`
 
 > 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
@@ -60,11 +60,11 @@ python app.py
   ollama pull qwen3-embedding:0.6b-q8_0
   ```
   无需改配置(默认就是 Ollama)。
-- **DeepSeek API**:在 `generative_agents/.env` 中配置
+- **DeepSeek API**:在 `provenance/.env` 中配置
   ```
   LLM_API_KEY=你的key
   ```
-  并编辑 `generative_agents/data/config.json` 的 `agent.think.llm`:
+  并编辑 `provenance/data/config.json` 的 `agent.think.llm`:
   ```json
   "llm": {
     "provider": "openai",
@@ -77,7 +77,7 @@ python app.py
 ### 4. 实时观看(FastAPI + WebSocket)
 
 ```bash
-cd generative_agents
+cd provenance
 python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
 ```
 
@@ -98,9 +98,9 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 ## 目录结构
 
 ```
-generative_agents/
+provenance/
 ├── live_fastapi.py     # ★ 实时模拟+可视化(FastAPI + WebSocket,框架驱动,唯一入口)
-├── framework/          # ★ 自研框架内核(零前端依赖,可独立运行)
+├── mavisframework/     # ★ 自研框架内核(零前端依赖,可独立运行)
 │   ├── core/           #   Agent 生命周期/记忆/日程/空间/事件/时钟/提示词
 │   ├── scene/          #   空间/碰撞/寻路
 │   ├── runtime/        #   协议(protocol.py)/LLM 适配/游戏容器/并行调度/实时压缩器
@@ -117,8 +117,8 @@ config_tool/            # ★ 角色配置工具(独立服务,填表单生成角
 ## 说明
 
 - 实时可视化走 WebSocket(`/ws`),推送框架契约消息(agent/time/chat_line/snapshot);浏览器断线 3s 后自动重连
-- 实时服务由 `framework/` 驱动(Game + Simulator + LiveCompressor)
-- 换用英文界面/提示词:改 `framework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
+- 实时服务由 `mavisframework/` 驱动(Game + Simulator + LiveCompressor)
+- 换用英文界面/提示词:改 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 - 前端 Phaser 脚本:服务端优先用 `frontend/static/vendor/phaser.min.js`(本地化,断网可用),不存在时回退 CDN;离线环境下建议下载 phaser.min.js 放入该目录
   - **首次运行前**(可选但推荐):在浏览器打开 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB),右键另存为 `frontend/static/vendor/phaser.min.js`。之后无需外网即可显示画面
 

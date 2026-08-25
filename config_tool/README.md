@@ -35,7 +35,7 @@ python app.py
 
 ## 生成结果
 
-- 写入 `generative_agents/frontend/static/assets/village/agents/<角色名>/agent.json`
+- 写入 `provenance/frontend/static/assets/village/agents/<角色名>/agent.json`
 - 自动补 `portrait` 字段,并从贴图池(`agents_pool/`,25 人历史贴图)按角色名哈希映射贴图
 - agent.json 记录 `texture_ref`(贴图来源,供 Unity 端同样处理)
 

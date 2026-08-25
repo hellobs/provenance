@@ -14,9 +14,9 @@ import os
 import sys
 import shutil
 
-# MAVIS 根目录(本工具与 generative_agents/ 同级)
+# MAVIS 根目录(本工具与 provenance/ 同级)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MAVIS_DIR = os.path.join(os.path.dirname(BASE_DIR), "generative_agents")
+MAVIS_DIR = os.path.join(os.path.dirname(BASE_DIR), "provenance")
 sys.path.insert(0, MAVIS_DIR)  # 允许 import mavisframework.*
 
 from fastapi import FastAPI, Request
