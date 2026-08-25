@@ -6,9 +6,9 @@
         "老周",
         "沈砚之"
       ],
-      "type": "客户-顾问",
+      "type": "Client-Advisor",
       "direction": "老周→沈砚之",
-      "trigger": "每天下午3点，老周到会议室找沈砚之咨询行情与配置建议",
+      "trigger": "Every day at 3 PM, 老周 goes to the meeting room to consult 沈砚之 about market conditions and portfolio allocation advice",
       "frequency": "high"
     },
     {
@@ -16,9 +16,9 @@
         "陈慕白",
         "苏清越"
       ],
-      "type": "数据协作",
-      "direction": "双向",
-      "trigger": "上午在资料室交叉验证新能源财报关键指标",
+      "type": "Data Collaboration",
+      "direction": "Bidirectional",
+      "trigger": "In the morning, cross-validate the key financial indicators of the new energy earnings reports in the Reference Room",
       "frequency": "medium"
     },
     {
@@ -26,9 +26,9 @@
         "林晚晴",
         "沈砚之"
       ],
-      "type": "风控-决策",
+      "type": "Risk Control - Decision",
       "direction": "林晚晴→沈砚之",
-      "trigger": "评审会前，林晚晴到会议室提交风险评级结果",
+      "trigger": "Before the review meeting, 林晚晴 goes to the meeting room to submit the risk rating results",
       "frequency": "medium"
     }
   ]

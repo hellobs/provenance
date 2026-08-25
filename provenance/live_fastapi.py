@@ -189,7 +189,9 @@ def run_simulation(name, sim_config, start_step, step, stride):
 
         simulator = Simulator(
             max_workers=max(1, len(game.agents)),
-            export_decisions=False,
+            export_decisions=True,
+            decisions_path=os.path.join(checkpoints_folder, "decisions.json"),
+            roles=_collect_roles(),
             story=story,
             on_story=lambda ev: manager.broadcast(ev),
         )
@@ -232,6 +234,19 @@ def _discover_agent_names():
         if names:
             return names
     return personas
+
+
+def _collect_roles() -> dict:
+    """收集 角色名 -> 职位 映射(决策导出用,来自 agent.json 的 duty.position)"""
+    roles = {}
+    for name in _discover_agent_names():
+        p = os.path.join(BASE_DIR, "frontend/static/assets/village/agents", name, "agent.json")
+        if os.path.exists(p):
+            import json as _json
+            with open(p, "r", encoding="utf-8") as f:
+                d = _json.load(f)
+            roles[name] = (d.get("duty") or {}).get("position", "")
+    return roles
 
 
 def load_initial_payload(start_datetime, stride):
@@ -332,8 +347,12 @@ if __name__ == "__main__":
         while not os.path.exists(f"results/checkpoints/{name}"):
             name = input(f"'{name}' doesn't exists, please re-enter the simulation name: ")
     else:
-        while os.path.exists(f"results/checkpoints/{name}"):
-            name = input(f"The name '{name}' already exists, please enter a new name: ")
+        if os.path.exists(f"results/checkpoints/{name}"):
+            # 存档名冲突:自动追加时间戳后缀(后台/服务化场景无 stdin,不能阻塞等输入)
+            import time as _time
+            suffix = _time.strftime("%m%d-%H%M%S")
+            name = f"{name}-{suffix}"
+            print(f"Simulation name '{args.name}' already exists, using '{name}'")
 
     checkpoints_folder = f"results/checkpoints/{name}"
     if args.resume:
