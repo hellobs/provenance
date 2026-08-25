@@ -17,10 +17,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
-from framework.config.loader import personas, load_config, load_config_from_log
-from framework.runtime.compressor import LiveCompressor
+from mavisframework.config.loader import personas, load_config, load_config_from_log
+from mavisframework.runtime.compressor import LiveCompressor
 
-from framework.runtime.protocol import AgentState, TimeMsg, ChatLineMsg, validate_message
+from mavisframework.runtime.protocol import AgentState, TimeMsg, ChatLineMsg, validate_message
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -129,10 +129,10 @@ def run_simulation(name, sim_config, start_step, step, stride):
     """后台线程运行模拟(框架驱动:framework Game + Simulator,不依赖 modules)"""
     global server, compressor
     try:
-        import framework.core.agent_core as fw_agent
-        from framework.core.timer import Timer
-        from framework.runtime.game import Game
-        from framework.runtime.simulator import Simulator
+        import mavisframework.core.agent_core as fw_agent
+        from mavisframework.core.timer import Timer
+        from mavisframework.runtime.game import Game
+        from mavisframework.runtime.simulator import Simulator
 
         fw_agent.chat_callback = on_chat_line
         checkpoints_folder = f"results/checkpoints/{name}"
@@ -213,7 +213,7 @@ def run_simulation(name, sim_config, start_step, step, stride):
         sim_state["status"] = "done"
         manager.broadcast({"type": "done"})
     except Exception as e:
-        from framework.runtime.logger import get_logger
+        from mavisframework.runtime.logger import get_logger
 
         get_logger("simulation").error(f"simulation crashed: {e}", exc_info=True)
         sim_state["status"] = "error"

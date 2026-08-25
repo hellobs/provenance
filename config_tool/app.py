@@ -17,7 +17,7 @@ import shutil
 # MAVIS 根目录(本工具与 generative_agents/ 同级)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAVIS_DIR = os.path.join(os.path.dirname(BASE_DIR), "generative_agents")
-sys.path.insert(0, MAVIS_DIR)  # 允许 import framework.*
+sys.path.insert(0, MAVIS_DIR)  # 允许 import mavisframework.*
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -26,15 +26,28 @@ from fastapi.templating import Jinja2Templates
 import uvicorn
 
 # 复用 MAVIS 的 validator(Schema 单一来源)
-from framework.config.validator import (
+from mavisframework.config.validator import (
     validate_agents, validate_relationships, validate_story,
 )
 
 app = FastAPI(title="MAVIS 角色配置工具")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-SCENARIOS_DIR = os.path.join(MAVIS_DIR, "scenarios")
-MAZE_PATH = os.path.join(MAVIS_DIR, "frontend/static/assets/village/maze.json")
+# ---------------------------------------------------------------------------
+# 路径注入(config_tool 属框架,但产物写入平台的前端资源)
+# MAVIS_ASSETS_ROOT   : 平台前端资源根(frontend/static/assets/village),默认相对路径
+# MAVIS_SCENARIOS_DIR : 业务场景目录(scenarios),默认相对路径
+# 拆仓后平台侧通过环境变量指向平台仓库对应目录即可
+# ---------------------------------------------------------------------------
+VILLAGE_ROOT = os.environ.get(
+    "MAVIS_ASSETS_ROOT",
+    os.path.join(MAVIS_DIR, "frontend", "static", "assets", "village"),
+)
+SCENARIOS_DIR = os.environ.get(
+    "MAVIS_SCENARIOS_DIR",
+    os.path.join(MAVIS_DIR, "scenarios"),
+)
+MAZE_PATH = os.path.join(VILLAGE_ROOT, "maze.json")
 
 
 def _load_maze():
@@ -179,8 +192,8 @@ def _parse_goals(text: str) -> dict:
 # - 哈希式:hash(角色名) → 池中索引,确定性(同名角色永远同一贴图)
 # - agent.json 记录 texture_ref(映射来源),供 Unity 端同样处理
 # ---------------------------------------------------------------------------
-AGENTS_ROOT = os.path.join(MAVIS_DIR, "frontend/static/assets/village/agents")
-POOL_ROOT = os.path.join(MAVIS_DIR, "frontend/static/assets/village/agents_pool")
+AGENTS_ROOT = os.path.join(VILLAGE_ROOT, "agents")
+POOL_ROOT = os.path.join(VILLAGE_ROOT, "agents_pool")
 DEFAULT_TEXTURE_SOURCE = "沈砚之"  # 兜底贴图(池空时用)
 
 
