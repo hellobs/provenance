@@ -94,9 +94,14 @@ def on_agent(name, agent_data, step, sim_time):
         conv_text = conversation_text(server.game.conversation, sim_time)
     # 读取角色类型(user/ai_tool),供前端控制台标识 AI 工具角色
     role_type = "user"
+    goal_score = None
+    goal_alignment = {}
     try:
         if server is not None and name in server.game.agents:
             role_type = getattr(server.game.agents[name], "role_type", "user") or "user"
+            _status = server.game.agents[name].status or {}
+            goal_score = _status.get("goal_score")
+            goal_alignment = _status.get("goal_alignment") or {}
     except Exception:
         pass
     msg: AgentState = {
@@ -109,6 +114,8 @@ def on_agent(name, agent_data, step, sim_time):
         "currently": agent_data.get("currently", ""),
         "conversation": conv_text,
         "role_type": role_type,
+        "goal_score": goal_score,
+        "goal_alignment": goal_alignment,
     }
     if description:
         msg["description"] = description

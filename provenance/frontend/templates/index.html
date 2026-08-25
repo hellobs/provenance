@@ -7,7 +7,7 @@
 <div id="sim-clock" style="position: fixed; left: 16px; top: 60px; z-index: 100;
     background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
     padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);">🕒 <span id="sim-clock-time">--:--</span></div>
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><span id="sim-clock-time">--:--</span></div>
 
 <!-- Story event banner (shown when an event is injected) -->
 <div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -15,46 +15,56 @@
     padding: 10px 18px; font-size: 14px; color: #a00; font-weight: bold; display: none;
     box-shadow: 0 4px 16px rgba(0,0,0,0.25); max-width: 60%; text-align: center;"></div>
 
-<!-- Chat log panel (HTML, scrollable, speaker highlighted) -->
-<div id="chat-panel" style="position: fixed; right: 16px; top: 16px; width: 340px; max-height: 65vh;
-    background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 100; font-size: 13px;
-    display: flex; flex-direction: column; overflow: hidden;">
-    <div style="padding: 10px 14px; font-weight: bold; font-size: 14px; background: #f6f6f6;
-        border-bottom: 1px solid #e2e2e2; color: #333;">💬 Chat Log</div>
-    <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; max-height: calc(65vh - 42px);
-        line-height: 1.7; color: #333; flex: 1;"></div>
+<!-- Right column: chat log (top, collapsible) + goal adjustment panel (below, not adjacent) -->
+<div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
+    display: flex; flex-direction: column; gap: 12px;">
+
+    <!-- Chat log panel (HTML, scrollable, speaker highlighted, collapsible) -->
+    <div id="chat-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
+        display: flex; flex-direction: column; overflow: hidden;">
+        <div id="chat-header" style="padding: 10px 14px; font-weight: bold; font-size: 14px; background: #f6f6f6;
+            border-bottom: 1px solid #e2e2e2; color: #333; cursor: pointer; user-select: none;
+            display:flex; justify-content:space-between; align-items:center;">
+            <span>Chat Log</span>
+            <span id="chat-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; max-height: 50vh;
+            line-height: 1.7; color: #333;"></div>
+    </div>
+
+    <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
+    <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
+        display: flex; flex-direction: column; overflow: hidden; max-height: 45vh;">
+        <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
+            border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
+            display:flex; justify-content:space-between; align-items:center;" id="goals-header">
+            <span>Goals (live adjust)</span>
+            <span id="goals-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="goals-body" style="padding: 8px 12px; overflow-y: auto; flex: 1; line-height: 1.6;">
+            <div style="color:#999;">Loading goals...</div>
+        </div>
+    </div>
 </div>
 
-<!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
-<div id="goals-panel" style="position: fixed; left: 16px; bottom: 16px; width: 320px; max-height: 40vh;
-    background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 150; font-size: 12px;
-    display: flex; flex-direction: column; overflow: hidden;">
-    <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
-        border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
-        display:flex; justify-content:space-between; align-items:center;" id="goals-header">
-        <span>🎯 Goals (live adjust)</span>
-        <span id="goals-toggle" style="color:#888;">Collapse ▾</span>
-    </div>
-    <div id="goals-body" style="padding: 8px 12px; overflow-y: auto; flex: 1; line-height: 1.6;">
-        <div style="color:#999;">Loading goals...</div>
-    </div>
-</div>
+<!-- Left column: developer console -->
+<div style="position: fixed; left: 16px; top: 120px; width: 320px; z-index: 150;">
 
-<!-- Developer console (live message stream, collapsible, scrollable) -->
-<div id="dev-console" style="position: fixed; left: 16px; top: 120px; width: 320px; max-height: 55vh; z-index: 200;
-    background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
-    font-size: 11px; color: #ccc; font-family: Consolas, monospace;
-    display: flex; flex-direction: column; overflow: hidden;">
-    <div id="dev-console-header" style="display:flex; justify-content:space-between; align-items:center;
-        padding: 6px 10px; background: #222; cursor: pointer; user-select: none; flex-shrink: 0;">
-        <span style="font-weight:bold; color:#4af;">🛠 Developer Console</span>
-        <span id="dev-console-toggle" style="color:#888;">Collapse ▾</span>
-    </div>
-    <div id="dev-console-body" style="padding: 6px 10px; overflow-y: scroll; flex: 1; line-height: 1.5;
-        max-height: calc(55vh - 34px); scrollbar-width: thin; scrollbar-color: #666 #222;">
-        <div style="color:#888;">Console ready, waiting for messages...</div>
+    <!-- Developer console (live message stream, collapsible, scrollable) -->
+    <div id="dev-console" style="background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
+        font-size: 11px; color: #ccc; font-family: Consolas, monospace;
+        display: flex; flex-direction: column; overflow: hidden; max-height: 40vh;">
+        <div id="dev-console-header" style="display:flex; justify-content:space-between; align-items:center;
+            padding: 6px 10px; background: #222; cursor: pointer; user-select: none; flex-shrink: 0;">
+            <span style="font-weight:bold; color:#4af;">Developer Console</span>
+            <span id="dev-console-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="dev-console-body" style="padding: 6px 10px; overflow-y: scroll; flex: 1; line-height: 1.5;
+            max-height: calc(40vh - 34px); scrollbar-width: thin; scrollbar-color: #666 #222;">
+            <div style="color:#888;">Console ready, waiting for messages...</div>
+        </div>
     </div>
 </div>
 

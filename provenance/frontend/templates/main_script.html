@@ -38,13 +38,13 @@
 		shown_chats[t] = true;
 		let el = document.getElementById("chat-content");
 		if (!el) return;
-		let html = `<div style="margin-top:8px; color:#999; font-size:12px;">🕒 ${t}</div>`;
+		let html = `<div style="margin-top:8px; color:#999; font-size:12px;">${t}</div>`;
 		let lines = String(text).split("\n");
 		for (let line of lines) {
 			line = line.trim();
 			if (!line) continue;
 			if (line.startsWith("Location:")) {
-				html += `<div style="color:#aaa; font-size:12px; margin:2px 0;">📍 ${line.slice(9)}</div>`;
+				html += `<div style="color:#aaa; font-size:12px; margin:2px 0;">${line.slice(9)}</div>`;
 			} else {
 				let idx = line.indexOf(": ");
 				if (idx > 0) {
@@ -175,6 +175,9 @@
 				var isAI = msg.role_type === "ai_tool";
 				devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
 				moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
+				if (typeof msg.goal_score === "number") {
+					goalsShowScore(msg.name, msg.goal_score, msg.action || "", msg.goal_alignment || {});
+				}
 				if (msg.conversation) {
 					Object.assign(all_movement["conversation"], msg.conversation);
 					// live mode: dialogues are already shown line-by-line via chat_line; do not append again
@@ -206,7 +209,7 @@
 				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));
 				var banner = document.getElementById("story-banner");
 				if (banner) {
-					banner.innerHTML = "🔔 【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#666;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
+					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#666;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
 					banner.style.display = "block";
 					setTimeout(function() { banner.style.display = "none"; }, 8000);
 				}
@@ -270,7 +273,7 @@
 		}
 
 		let act = (action || "").trim();
-		if (act.includes("睡觉")) act = "😴 " + act;
+		if (act.includes("睡觉") || act.toLowerCase().includes("sleep")) act = "Sleeping: " + act;
 		pronunciatios[name].setText(name + ": " + (act.length > 20 ? act.substring(0, 20) + "..." : act));
 
 		if (document.getElementById("agent_desc__" + name)) {
@@ -652,14 +655,16 @@
 			var names = Object.keys(goals);
 			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
 			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
+			html += '<div style="font-size:10px; color:#666; margin:2px 0;">Goal score: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
 			for (var j = 0; j < names.length; j++) {
 				var g = names[j];
 				var w = Math.round((goals[g] || 0) * 100);
 				html += '<div style="display:flex; align-items:center; gap:6px; margin:3px 0;">';
-				html += '<span style="flex:1; color:#555; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + goalsEscape(g) + '</span>';
-				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:90px;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
-				html += '<span style="width:32px; text-align:right; color:#333;" data-weight-for="' + goalsEscape(g) + '">' + w + '%</span>';
-				html += '<button class="del-btn" style="padding:1px 6px; font-size:10px;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">✕</button>';
+				html += '<span style="flex:0 0 auto; width:170px; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g) + '">' + goalsEscape(g) + '</span>';
+				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:70px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
+				html += '<span style="width:30px; text-align:right; color:#333; flex:0 0 auto;" data-weight-for="' + goalsEscape(g) + '">' + w + '%</span>';
+				html += '<span style="width:56px; text-align:right; font-size:10px; flex:0 0 auto;" data-align-for="' + goalsEscape(g) + '" title="alignment of current action with this goal">align: --</span>';
+				html += '<button class="del-btn" style="padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">Remove</button>';
 				html += '</div>';
 			}
 			html += '<div style="margin-top:4px; display:flex; gap:4px;">';
@@ -716,7 +721,41 @@
 		}, 400);
 	}
 
+	// Show live goal score + per-goal alignment for an agent (via WebSocket agent messages)
+	function goalsShowScore(agentName, score, actionText, alignment) {
+		var el = document.querySelector('[data-score-for="' + agentName + '"]');
+		if (el) {
+			var s = Math.round(score * 100) / 100;
+			el.textContent = s.toFixed(2);
+			el.style.color = score >= 0.5 ? "#070" : (score >= 0.35 ? "#a60" : "#a00");
+		}
+		var ae = document.querySelector('[data-score-action-for="' + agentName + '"]');
+		if (ae) {
+			ae.textContent = actionText ? "· " + actionText.slice(0, 24) : "";
+		}
+		// per-goal alignment: action vs each goal
+		if (alignment) {
+			for (var g in alignment) {
+				var ae2 = document.querySelector('[data-align-for="' + g + '"]');
+				if (ae2) {
+					var v = alignment[g];
+					var txt = "align: " + (Math.round(v * 100) / 100).toFixed(2);
+					ae2.textContent = txt;
+					ae2.style.color = v >= 0.5 ? "#070" : (v >= 0.35 ? "#a60" : "#a00");
+				}
+			}
+		}
+	}
+
 	document.addEventListener("DOMContentLoaded", function() {
+		// chat log collapse toggle
+		var ch = document.getElementById("chat-header");
+		var ct = document.getElementById("chat-toggle");
+		if (ch && ct) ch.onclick = function() {
+			var body = document.getElementById("chat-content");
+			if (body.style.display === "none") { body.style.display = "block"; ct.textContent = "Collapse ▾"; }
+			else { body.style.display = "none"; ct.textContent = "Expand ▸"; }
+		};
 		// collapse toggle
 		var gh = document.getElementById("goals-header");
 		var gt = document.getElementById("goals-toggle");
