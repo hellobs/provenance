@@ -1,20 +1,20 @@
-[简体中文](./README.md) | English
+# Provenance
 
-# Provenance — Generative Agent Simulation Platform
+English | [简体中文](./README.md)
 
 A multi-agent simulation platform built on the self-developed
-[mavisframework](https://github.com/hellobs/mavis) engine, for demonstrating
+[mavisframework](https://github.com/hellobs/mavis) engine, demonstrating
 "AI value formation is observable and governable" (Global Trust Challenge).
-Scenario: investment advisory (secondary market) — agents make decisions, move,
-and converse autonomously, with every step configurable, explainable, and
-visualizable in real time.
+The application scenario is investment advisory (secondary market): agents
+make decisions, move and converse autonomously within a spatial environment,
+with every step configurable, explainable and visualizable in real time.
 
-## Architecture
+## 1. Architecture
 
 ```
 Provenance (platform, this repo)
 ├── provenance/          # platform core
-│   ├── live_fastapi.py  # ★ real-time simulation + visualization (FastAPI + WebSocket, single entry)
+│   ├── live_fastapi.py  # real-time simulation + visualization (FastAPI + WebSocket, single entry)
 │   ├── frontend/        # Phaser frontend + texture pool (agents_pool/)
 │   ├── scenarios/       # business scenario configs (investment: roles/relations/story)
 │   ├── data/            # configs & prompts
@@ -23,32 +23,30 @@ Provenance (platform, this repo)
 ```
 
 The platform and the engine are separated: **mavisframework** lives in
-[hellobs/mavis](https://github.com/hellobs/mavis); this platform depends on it via
-`mavisframework==1.0.0` in `requirements.txt`. The role configuration tool
+[hellobs/mavis](https://github.com/hellobs/mavis); this platform depends on it
+via `mavisframework==1.0.0` in `requirements.txt`. The role configuration tool
 (config_tool) also belongs to the engine repo.
 
-## Quick Start
-
-### 1. Environment
+## 2. Environment
 
 Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/):
 
 ```bash
-# with uv (faster)
+# uv
 cd provenance
 uv venv .venv --python 3.12
 uv pip install -r requirements.txt
 
-# or with conda
+# conda
 conda create -n provenance python=3.12
 conda activate provenance
 pip install -r requirements.txt
 ```
 
-> `requirements.txt` depends on `mavisframework==1.0.0`. Build the engine wheel
-> first (see next section).
+`requirements.txt` depends on `mavisframework==1.0.0`. Build the engine wheel
+first (see next section).
 
-### 2. Install the engine (mavisframework)
+## 3. Install the Engine
 
 ```bash
 # Option A: build wheel from source and install (recommended, verified stable)
@@ -56,22 +54,30 @@ git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis && uv build && uv pip install dist/mavisframework-1.0.0-py3-none-any.whl
 cd ../provenance
 
-# Option B: editable install (for engine development; note the import quirk
-# documented in the engine README)
+# Option B: editable install (for engine development; see the engine README for the import quirk)
 # uv pip install -e ../mavis
 ```
 
-### 3. Configure the LLM (choose one)
+## 4. Configure the LLM (choose one)
 
 - **Local Ollama** (free, recommended for development): install
   [Ollama](https://ollama.com/) and pull models
+
   ```bash
   ollama pull qwen3:4b-instruct-2507-q4_K_M
   ollama pull qwen3-embedding:0.6b-q8_0
   ```
-  No config change needed (Ollama is the default).
-- **DeepSeek API**: configure `LLM_API_KEY` in `provenance/.env`, and edit
-  `provenance/data/config.json` → `agent.think.llm`:
+
+  No configuration change needed (Ollama is the default).
+
+- **DeepSeek API**: configure `LLM_API_KEY` in `provenance/.env`
+
+  ```
+  LLM_API_KEY=your-key
+  ```
+
+  and edit `provenance/data/config.json` → `agent.think.llm`:
+
   ```json
   "llm": {
     "provider": "openai",
@@ -81,7 +87,7 @@ cd ../provenance
   }
   ```
 
-### 4. Run the live simulation (FastAPI + WebSocket)
+## 5. Run the Live Simulation
 
 ```bash
 cd provenance/provenance
@@ -90,25 +96,31 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 
 Open http://127.0.0.1:5001/ in a browser.
 
-### 5. Configure roles (config_tool, in the engine repo)
+## 6. Role Configuration
 
-Roles/relations/story are configured through web forms (no hand-written JSON).
-The tool lives in the mavis repo:
+Roles, relations and story are configured through web forms (no hand-written
+JSON). The tool lives in the engine repo:
 
 ```bash
 cd ../mavis/config_tool
 python app.py
 ```
 
-Open http://127.0.0.1:5002/ — see `../mavis/config_tool/README.md` for details.
+Open http://127.0.0.1:5002/
 
-> config_tool writes into this platform's `provenance/frontend/static/assets/village/agents/`
-> and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
-> `MAVIS_SCENARIOS_DIR`). Restart the simulation server (5001) after adding roles.
+- `/` — role configuration form (generates validated JSON)
+- `/relationships` — relation input (appended to relationships.json)
+- `/story` — story input (appended to story.json)
+- `/agents` — list of configured roles
 
-## Run Options
+See `../mavis/config_tool/角色字段清单.md` for the field list. config_tool
+writes into this platform's `provenance/frontend/static/assets/village/agents/`
+and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
+`MAVIS_SCENARIOS_DIR`). Restart the simulation server (5001) after adding roles.
 
-| option | description |
+## 7. Run Options
+
+| Option | Description |
 |---|---|
 | `--name` | simulation name (unique; checkpoints stored per name) |
 | `--start` | starting time |
@@ -117,26 +129,31 @@ Open http://127.0.0.1:5002/ — see `../mavis/config_tool/README.md` for details
 | `--resume` | resume from a checkpoint |
 | `--port` | server port |
 
-## Notes
+## 8. Notes
 
-- Real-time visualization via WebSocket (`/ws`) pushing engine contract messages
-  (agent/time/chat_line/snapshot); browsers auto-reconnect after 3s of disconnect
+- Real-time visualization via WebSocket (`/ws`) pushing engine contract
+  messages (agent/time/chat_line/snapshot); browsers auto-reconnect after 3s
+  of disconnect
 - The live service is driven by mavisframework (Game + Simulator + LiveCompressor)
 - Decision export: `decisions.json` (time/role/action/others/importance) for
-  governance platforms & expert UI
-- Phaser script: the server prefers the local `frontend/static/vendor/phaser.min.js`
-  (works offline) and falls back to CDN. For offline use, download
-  `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js` (~1.3MB) into
-  that folder before first run
+  governance platforms and expert UI
+- Phaser script: the server prefers the local
+  `frontend/static/vendor/phaser.min.js` (works offline) and falls back to CDN.
+  For offline use, download
+  `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js` (~1.3MB)
+  into that folder before first run
+- Localization: modify the engine's `mavisframework/prompt/scratch.py` and
+  frontend copy; no logic changes required
 
-## References
+## 9. Custom Maps
 
-### Paper
+1. Follow the maze.py logic in the original generative_agents project to
+   support tiled-exported json/csv files
+2. Follow the existing maze.json format to merge tiled exports
+   (maze_meta_info.json, collision_maze.csv, sector_maze.csv) into a new maze.json
+3. Use the map annotation tool: https://github.com/jiejieje/tiled_to_maze.json
 
-[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
+## 10. References
 
-### Code
-
-- [mavisframework (self-developed engine)](https://github.com/hellobs/mavis)
-- [Generative Agents (original)](https://github.com/joonspk-research/generative_agents)
-- [wounderland](https://github.com/Archermmt/wounderland)
+- Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
+- Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
