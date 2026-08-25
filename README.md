@@ -49,7 +49,12 @@ pip install -r requirements.txt
 ```
 
 > 需要 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/)。
-> 框架可编辑安装(开发框架时即时生效)见框架 README;注意其记录的 editable import 异常。
+>
+> **开发/协作期可改用可编辑安装**(改框架代码即时生效,框架更新后 `git pull` 即可,无需重装):
+> ```bash
+> uv pip install -e ../mavis   # 或 pip install -e ../mavis
+> ```
+> 可编辑安装与 wheel 安装二选一,均可正常使用(详见框架 README 的版本管理章节)。
 
 ## 3. 配置大模型(二选一)
 

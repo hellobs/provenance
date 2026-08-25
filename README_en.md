@@ -53,8 +53,15 @@ pip install -r requirements.txt
 ```
 
 > Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/).
-> For engine development, editable install is described in the engine README
-> (note the documented import quirk).
+>
+> **For development/collaboration you may use editable install instead**
+> (framework code changes take effect immediately; after framework updates just
+> `git pull` — no reinstall needed):
+> ```bash
+> uv pip install -e ../mavis   # or pip install -e ../mavis
+> ```
+> Editable and wheel installs are interchangeable (see the Versioning section
+> of the engine README).
 
 ## 3. Configure the LLM (choose one)
 
