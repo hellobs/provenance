@@ -24,7 +24,7 @@ from mavisframework.runtime.protocol import AgentState, TimeMsg, ChatLineMsg, va
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = FastAPI(title="Generative Agents Live (FastAPI)")
+app = FastAPI(title="Provenance Live (FastAPI)")
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(BASE_DIR, "frontend/static")),
