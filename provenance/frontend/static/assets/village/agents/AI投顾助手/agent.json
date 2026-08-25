@@ -24,8 +24,8 @@
     ]
   },
   "goals": {
-    "服务用户": 0.5,
-    "风险提示": 0.5
+    "Serve Users": 0.5,
+    "Risk Alerting": 0.5
   },
   "scratch": {
     "age": "1",

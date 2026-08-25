@@ -12,7 +12,7 @@ from typing import Dict, List
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
@@ -123,6 +123,70 @@ def on_step(config):
 def on_chat_line(speaker, text):
     msg: ChatLineMsg = {"type": "chat_line", "speaker": speaker, "text": text}
     manager.broadcast(msg)
+
+
+@app.get("/api/goals")
+async def get_goals():
+    """返回当前所有角色的目标权重(供前端调节面板初始化)"""
+    global server
+    result = {}
+    if server is not None and server.game is not None:
+        for name, agent in server.game.agents.items():
+            result[name] = dict(getattr(agent.scratch.config, "get", lambda k, d=None: d)("goals", {}) or {})
+    # 服务未启动时也返回 agent.json 里已配置的
+    if not result:
+        agents_root = os.path.join(BASE_DIR, "frontend/static/assets/village/agents")
+        if os.path.isdir(agents_root):
+            for n in sorted(os.listdir(agents_root)):
+                p = os.path.join(agents_root, n, "agent.json")
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as f:
+                        import json as _json
+                        result[n] = _json.load(f).get("goals", {})
+    return JSONResponse({"ok": True, "goals": result})
+
+
+@app.post("/api/goals")
+async def update_goals(request: Request):
+    """更新某角色的目标权重:热更新运行中的 Agent + 持久化到 agent.json"""
+    global server
+    body = await request.json()
+    name = str(body.get("name", "")).strip()
+    goals = body.get("goals")
+    if not name:
+        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
+    if not isinstance(goals, dict) or not goals:
+        return JSONResponse({"ok": False, "errors": ["goals 应为非空 dict(目标:权重)"]})
+    # 校验权重总和为 1(容差 1e-6)
+    try:
+        total = sum(float(v) for v in goals.values())
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "errors": ["goals 权重值必须都是数字"]})
+    if abs(total - 1.0) > 1e-6:
+        return JSONResponse({"ok": False, "errors": [f"goals 权重总和应为 1,得到 {round(total, 4)}"]})
+
+    errors = []
+    # 1) 热更新运行中的 Agent(即时生效)
+    if server is not None and server.game is not None and name in server.game.agents:
+        try:
+            server.game.agents[name].set_goals(goals)
+        except Exception as e:
+            errors.append(f"热更新失败: {e}")
+    # 2) 持久化到 agent.json(重启保留)
+    agent_json_path = os.path.join(BASE_DIR, "frontend/static/assets/village/agents", name, "agent.json")
+    if os.path.exists(agent_json_path):
+        try:
+            with open(agent_json_path, "r", encoding="utf-8") as f:
+                import json as _json
+                data = _json.load(f)
+            data["goals"] = goals
+            with open(agent_json_path, "w", encoding="utf-8") as f:
+                _json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            errors.append(f"持久化失败: {e}")
+    if errors:
+        return JSONResponse({"ok": False, "errors": errors})
+    return JSONResponse({"ok": True, "name": name, "goals": goals})
 
 
 def run_simulation(name, sim_config, start_step, step, stride):

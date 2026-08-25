@@ -61,7 +61,7 @@
     ]
   },
   "goals": {
-    "策略稳健": 0.7,
-    "风险规避": 0.3
+    "Strategy Stability": 0.7,
+    "Risk Aversion": 0.3
   }
 }

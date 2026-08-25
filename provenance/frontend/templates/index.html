@@ -26,6 +26,22 @@
         line-height: 1.7; color: #333; flex: 1;"></div>
 </div>
 
+<!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
+<div id="goals-panel" style="position: fixed; left: 16px; bottom: 16px; width: 320px; max-height: 40vh;
+    background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 150; font-size: 12px;
+    display: flex; flex-direction: column; overflow: hidden;">
+    <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
+        border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
+        display:flex; justify-content:space-between; align-items:center;" id="goals-header">
+        <span>🎯 Goals (live adjust)</span>
+        <span id="goals-toggle" style="color:#888;">Collapse ▾</span>
+    </div>
+    <div id="goals-body" style="padding: 8px 12px; overflow-y: auto; flex: 1; line-height: 1.6;">
+        <div style="color:#999;">Loading goals...</div>
+    </div>
+</div>
+
 <!-- Developer console (live message stream, collapsible, scrollable) -->
 <div id="dev-console" style="position: fixed; left: 16px; top: 120px; width: 320px; max-height: 55vh; z-index: 200;
     background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;

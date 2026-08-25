@@ -60,7 +60,7 @@
     ]
   },
   "goals": {
-    "收益最大化": 0.7,
-    "风险规避": 0.3
+    "Maximize Returns": 0.7,
+    "Risk Aversion": 0.3
   }
 }

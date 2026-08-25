@@ -626,4 +626,145 @@
 			}
 		}
 	}
+
+	// ================= Goals live adjustment =================
+	// Load current goals and render per-agent sliders; changes POST to /api/goals
+	// (hot-updates the running agent + persists to agent.json).
+	var goalsData = {};   // agent -> {goalName: weight}
+	var goalsTimer = null;
+
+	function goalsEscape(s) {
+		return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+	}
+
+	function goalsRender() {
+		var body = document.getElementById("goals-body");
+		if (!body) return;
+		var agents = Object.keys(goalsData).sort();
+		if (agents.length === 0) {
+			body.innerHTML = '<div style="color:#999;">No roles configured.</div>';
+			return;
+		}
+		var html = "";
+		for (var i = 0; i < agents.length; i++) {
+			var a = agents[i];
+			var goals = goalsData[a] || {};
+			var names = Object.keys(goals);
+			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
+			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
+			for (var j = 0; j < names.length; j++) {
+				var g = names[j];
+				var w = Math.round((goals[g] || 0) * 100);
+				html += '<div style="display:flex; align-items:center; gap:6px; margin:3px 0;">';
+				html += '<span style="flex:1; color:#555; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + goalsEscape(g) + '</span>';
+				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:90px;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
+				html += '<span style="width:32px; text-align:right; color:#333;" data-weight-for="' + goalsEscape(g) + '">' + w + '%</span>';
+				html += '<button class="del-btn" style="padding:1px 6px; font-size:10px;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">✕</button>';
+				html += '</div>';
+			}
+			html += '<div style="margin-top:4px; display:flex; gap:4px;">';
+			html += '<input type="text" placeholder="Add goal" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
+			html += '<button class="del-btn" style="background:#2d6cdf; padding:2px 8px; font-size:10px;" data-add-goal="' + goalsEscape(a) + '">+</button>';
+			html += '</div>';
+			html += '<div style="font-size:10px; color:#888;">Sum: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
+			html += '</div>';
+		}
+		body.innerHTML = html;
+		goalsUpdateSums();
+	}
+
+	function goalsUpdateSums() {
+		var agents = Object.keys(goalsData);
+		for (var i = 0; i < agents.length; i++) {
+			var a = agents[i];
+			var sum = 0;
+			var goals = goalsData[a] || {};
+			for (var g in goals) sum += goals[g];
+			var el = document.querySelector('[data-sum-for="' + a + '"]');
+			if (el) {
+				el.textContent = (Math.round(sum * 100) / 100).toFixed(2);
+				el.style.color = Math.abs(sum - 1) < 0.001 ? "#070" : "#a00";
+			}
+		}
+	}
+
+	function goalsNormalize(agentName) {
+		// Re-normalize weights to sum to 1 (keep relative proportions)
+		var goals = goalsData[agentName] || {};
+		var total = 0;
+		for (var g in goals) total += goals[g];
+		if (total <= 0) return;
+		for (var g in goals) goals[g] = goals[g] / total;
+		goalsData[agentName] = goals;
+	}
+
+	function goalsPush(agentName) {
+		var goals = goalsData[agentName] || {};
+		if (Object.keys(goals).length === 0) return;
+		goalsNormalize(agentName);
+		goalsRender();
+		// debounce 400ms
+		if (goalsTimer) clearTimeout(goalsTimer);
+		goalsTimer = setTimeout(function() {
+			fetch("/api/goals", {
+				method: "POST",
+				headers: {"Content-Type": "application/json"},
+				body: JSON.stringify({name: agentName, goals: goalsData[agentName]})
+			}).then(function(r) { return r.json(); }).then(function(out) {
+				if (!out.ok) console.warn("goals update failed:", out.errors);
+			}).catch(function(e) { console.warn("goals update error:", e); });
+		}, 400);
+	}
+
+	document.addEventListener("DOMContentLoaded", function() {
+		// collapse toggle
+		var gh = document.getElementById("goals-header");
+		var gt = document.getElementById("goals-toggle");
+		if (gh && gt) gh.onclick = function() {
+			var body = document.getElementById("goals-body");
+			if (body.style.display === "none") { body.style.display = "block"; gt.textContent = "Collapse ▾"; }
+			else { body.style.display = "none"; gt.textContent = "Expand ▸"; }
+		};
+		// load goals
+		fetch("/api/goals").then(function(r) { return r.json(); }).then(function(out) {
+			if (out.ok && out.goals) { goalsData = out.goals; goalsRender(); }
+		}).catch(function() {});
+		// event delegation on goals-body
+		var body = document.getElementById("goals-body");
+		if (!body) return;
+		body.addEventListener("input", function(e) {
+			if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
+				var a = e.target.getAttribute("data-agent");
+				var g = e.target.getAttribute("data-goal");
+				if (a && g && goalsData[a]) {
+					goalsData[a][g] = parseInt(e.target.value, 10) / 100;
+					goalsNormalize(a);
+					goalsRender();
+					goalsPush(a);
+				}
+			}
+		});
+		body.addEventListener("click", function(e) {
+			var t = e.target;
+			// add goal
+			if (t && t.getAttribute && t.getAttribute("data-add-goal") !== null) {
+				var a = t.getAttribute("data-add-goal");
+				var input = body.querySelector('[data-new-goal="' + a + '"]');
+				var name = input ? input.value.trim() : "";
+				if (!name) return;
+				if (!goalsData[a]) goalsData[a] = {};
+				goalsData[a][name] = 0;
+				goalsPush(a);
+			}
+			// delete goal
+			if (t && t.getAttribute && t.getAttribute("data-del-goal") !== null) {
+				var a2 = t.getAttribute("data-del-agent");
+				var g2 = t.getAttribute("data-del-goal");
+				if (a2 && g2 && goalsData[a2]) {
+					delete goalsData[a2][g2];
+					goalsPush(a2);
+				}
+			}
+		});
+	});
 </script>

@@ -61,7 +61,7 @@
     ]
   },
   "goals": {
-    "风险规避": 0.9,
-    "业务推进": 0.1
+    "Risk Aversion": 0.9,
+    "Business Advancement": 0.1
   }
 }

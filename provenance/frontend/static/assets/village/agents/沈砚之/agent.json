@@ -61,7 +61,7 @@
     ]
   },
   "goals": {
-    "收益稳健": 0.6,
-    "风险规避": 0.4
+    "Steady Returns": 0.6,
+    "Risk Aversion": 0.4
   }
 }
