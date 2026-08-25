@@ -27,38 +27,36 @@ The platform and the engine are separated: **mavisframework** lives in
 via `mavisframework==1.0.0` in `requirements.txt`. The role configuration tool
 (config_tool) also belongs to the engine repo.
 
-## 2. Environment
+## 2. Environment & Engine Setup
 
-Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/):
+The platform depends on `mavisframework==1.0.0` (not on PyPI; built from
+source). Execute in order:
 
 ```bash
+# 2.1 Clone the engine repo and build the wheel
+git clone git@github.com:hellobs/mavis.git ../mavis
+cd ../mavis
+uv build                              # produces dist/mavisframework-1.0.0-py3-none-any.whl
+cd ../provenance
+
+# 2.2 Create the environment and install dependencies (uv or conda)
 # uv
-cd provenance
 uv venv .venv --python 3.12
+uv pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
+pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 
-`requirements.txt` depends on `mavisframework==1.0.0`. Build the engine wheel
-first (see next section).
+> Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/).
+> For engine development, editable install is described in the engine README
+> (note the documented import quirk).
 
-## 3. Install the Engine
-
-```bash
-# Option A: build wheel from source and install (recommended, verified stable)
-git clone git@github.com:hellobs/mavis.git ../mavis
-cd ../mavis && uv build && uv pip install dist/mavisframework-1.0.0-py3-none-any.whl
-cd ../provenance
-
-# Option B: editable install (for engine development; see the engine README for the import quirk)
-# uv pip install -e ../mavis
-```
-
-## 4. Configure the LLM (choose one)
+## 3. Configure the LLM (choose one)
 
 - **Local Ollama** (free, recommended for development): install
   [Ollama](https://ollama.com/) and pull models
@@ -87,7 +85,7 @@ cd ../provenance
   }
   ```
 
-## 5. Run the Live Simulation
+## 4. Run the Live Simulation
 
 ```bash
 cd provenance/provenance
@@ -96,7 +94,7 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 
 Open http://127.0.0.1:5001/ in a browser.
 
-## 6. Role Configuration
+## 5. Role Configuration
 
 Roles, relations and story are configured through web forms (no hand-written
 JSON). The tool lives in the engine repo:
@@ -118,7 +116,7 @@ writes into this platform's `provenance/frontend/static/assets/village/agents/`
 and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
 `MAVIS_SCENARIOS_DIR`). Restart the simulation server (5001) after adding roles.
 
-## 7. Run Options
+## 6. Run Options
 
 | Option | Description |
 |---|---|
@@ -129,7 +127,7 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
 | `--resume` | resume from a checkpoint |
 | `--port` | server port |
 
-## 8. Notes
+## 7. Notes
 
 - Real-time visualization via WebSocket (`/ws`) pushing engine contract
   messages (agent/time/chat_line/snapshot); browsers auto-reconnect after 3s
@@ -145,7 +143,7 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
 - Localization: modify the engine's `mavisframework/prompt/scratch.py` and
   frontend copy; no logic changes required
 
-## 9. Custom Maps
+## 8. Custom Maps
 
 1. Follow the maze.py logic in the original generative_agents project to
    support tiled-exported json/csv files
@@ -153,7 +151,7 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
    (maze_meta_info.json, collision_maze.csv, sector_maze.csv) into a new maze.json
 3. Use the map annotation tool: https://github.com/jiejieje/tiled_to_maze.json
 
-## 10. References
+## 9. References
 
 - Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)

@@ -1,7 +1,11 @@
-openai==2.15.0
-llama-index==0.14.12
-llama-index-embeddings-huggingface==0.6.1
-llama-index-embeddings-ollama==0.8.6
-llama-index-embeddings-openai==0.5.1
-Flask==3.1.2
-magentic==0.41.0
+# Provenance 平台运行依赖(Python 3.12)
+# 框架:mavisframework(独立仓库 hellobs/mavis,先构建 wheel 再安装)
+mavisframework==1.0.0
+
+# 实时服务(FastAPI + WebSocket)
+fastapi>=0.110
+uvicorn>=0.29
+websockets>=12.0
+
+# 可选:向量记忆检索(默认 SimpleStore 纯 stdlib 不需要;要用向量才装)
+# llama-index>=0.10

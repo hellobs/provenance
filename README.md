@@ -24,37 +24,34 @@ Provenance(平台,本仓库)
 `requirements.txt` 中的 `mavisframework==1.0.0` 依赖它。角色配置工具
 (config_tool)亦属框架仓库。
 
-## 2. 环境准备
+## 2. 环境准备与框架安装
 
-需要 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/):
+平台依赖框架 `mavisframework==1.0.0`(不在 PyPI,需从源码构建)。按顺序执行:
 
 ```bash
+# 2.1 克隆框架仓库并构建 wheel(装进平台环境)
+git clone git@github.com:hellobs/mavis.git ../mavis
+cd ../mavis
+uv build                              # 生成 dist/mavisframework-1.0.0-py3-none-any.whl
+cd ../provenance
+
+# 2.2 创建环境并安装依赖(uv 或 conda)
 # uv
-cd provenance
 uv venv .venv --python 3.12
+uv pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
+pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 
-`requirements.txt` 依赖 `mavisframework==1.0.0`,安装前需先构建框架 wheel(见下一节)。
+> 需要 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/)。
+> 框架可编辑安装(开发框架时即时生效)见框架 README;注意其记录的 editable import 异常。
 
-## 3. 安装框架依赖
-
-```bash
-# 方式 A:从源码构建 wheel 并安装(推荐,已验证稳定)
-git clone git@github.com:hellobs/mavis.git ../mavis
-cd ../mavis && uv build && uv pip install dist/mavisframework-1.0.0-py3-none-any.whl
-cd ../provenance
-
-# 方式 B:可编辑安装(开发框架时即时生效;注意框架 README 中记录的 import 异常)
-# uv pip install -e ../mavis
-```
-
-## 4. 配置大模型(二选一)
+## 3. 配置大模型(二选一)
 
 - **本地 Ollama**(免费,推荐开发调试):安装 [Ollama](https://ollama.com/) 并拉取模型
 
@@ -82,7 +79,7 @@ cd ../provenance
   }
   ```
 
-## 5. 实时模拟
+## 4. 实时模拟
 
 ```bash
 cd provenance/provenance
@@ -91,7 +88,7 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 
 浏览器打开 http://127.0.0.1:5001/
 
-## 6. 角色配置
+## 5. 角色配置
 
 角色/关系/剧情通过网页表单配置(免手写 JSON)。工具位于框架仓库:
 
@@ -112,7 +109,7 @@ python app.py
 (可通过环境变量 `MAVIS_ASSETS_ROOT` / `MAVIS_SCENARIOS_DIR` 覆盖)。
 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
 
-## 7. 运行参数
+## 6. 运行参数
 
 | 参数 | 说明 |
 |---|---|
@@ -123,7 +120,7 @@ python app.py
 | `--resume` | 从断点续跑 |
 | `--port` | 服务端口 |
 
-## 8. 说明
+## 7. 说明
 
 - 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);浏览器断线 3 秒后自动重连
 - 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
@@ -131,13 +128,13 @@ python app.py
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 
-## 9. 修改地图
+## 8. 修改地图
 
 1. 参考原始 generative_agents 项目中 maze.py 的逻辑,修改现有代码以兼容 tiled 编辑器导出的 json/csv 数据文件
 2. 参考现有 maze.json 格式,编写代码合并 tiled 导出的 maze_meta_info.json、collision_maze.csv、sector_maze.csv 等文件,为新地图生成 maze.json
 3. 使用地图标注工具:https://github.com/jiejieje/tiled_to_maze.json
 
-## 10. 参考资料
+## 9. 参考资料
 
 - 论文:[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - 代码:[mavisframework(自研框架)](https://github.com/hellobs/mavis) / [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
