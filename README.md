@@ -1,15 +1,24 @@
-# MAVIS 生成式多智能体框架
+# Provenance — 生成式智能体仿真平台
 
-基于斯坦福 AI 小镇(Generative Agents)重构的实现,用于多智能体仿真与可视化。
+基于自研 [mavisframework](https://github.com/hellobs/mavis) 框架构建的多智能体仿真平台。
+面向"AI 价值形成过程可解释、可治理"的演示(Global Trust Challenge),场景为投资咨询(二级市场):
+智能体在空间里自主决策、移动、对话,每一步可配置、可解释、可实时可视化。
 
-## 功能
+## 架构
 
-- 智能体独立，由大模型驱动自主决策、移动、对话
-- **自研框架内核 `mavisframework/`**:Agent 完整生命周期(思考/日程/感知/反应/对话/反思)、三因子记忆检索、可插拔存储(纯 stdlib / 向量)、提示词系统
-- 消息契约(protocol.py),支撑实时流与客户端对接
-- 提供一种实时可视化方式:FastAPI + WebSocket 边跑边看(框架驱动),对话逐句推送
-- 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面
-- 支持 API 与本地 Ollama
+```
+Provenance(平台,本仓库)
+├── provenance/          # 平台本体
+│   ├── live_fastapi.py  # ★ 实时模拟 + 可视化(FastAPI + WebSocket,唯一入口)
+│   ├── frontend/        # 可视化前端(Phaser + 贴图池 agents_pool/)
+│   ├── scenarios/       # 业务场景配置(investment: 角色/关系/剧情)
+│   ├── data/            # 配置与提示词
+│   └── results/         # 存档与决策留痕(decisions.json)
+└── 依赖 mavisframework  # 框架(独立仓库 hellobs/mavis,以 wheel 安装)
+```
+
+**平台与框架分离**:框架(mavisframework)独立维护于 [hellobs/mavis](https://github.com/hellobs/mavis),
+平台通过 `requirements.txt` 中的 `mavisframework==1.0.0` 依赖它。角色配置工具(config_tool)也属框架仓库。
 
 ## 快速开始
 
@@ -24,33 +33,26 @@ uv venv .venv --python 3.12
 uv pip install -r requirements.txt
 
 # 或使用 conda
-conda create -n generative_agents_cn python=3.12
-conda activate generative_agents_cn
+conda create -n provenance python=3.12
+conda activate provenance
 pip install -r requirements.txt
 ```
 
-> 运行时用 `python live_fastapi.py` 即可。先激活环境:conda 用 `conda activate generative_agents_cn`;uv 用 `source .venv/bin/activate`(mac/linux)或 `.venv\Scripts\activate`(Windows)。
+> `requirements.txt` 依赖 `mavisframework==1.0.0`。安装前需先构建框架 wheel(见下节)。
 
+### 2. 安装框架依赖(mavisframework)
 
-### 2. 角色配置工具(填表单生成角色)
-
-用网页表单配置角色(人设/职责/权限/目标),自动生成 JSON 并校验,免手写配置文件:
+框架在独立仓库,先克隆/构建:
 
 ```bash
-cd config_tool
-# 使用 provenance 的环境(激活后直接 python)
-# 或指定解释器路径:Windows .venv-live\Scripts\python.exe / mac·linux .venv-live/bin/python
-python app.py
+# 方式 A:从源码构建 wheel 并安装(推荐,已验证稳定)
+git clone git@github.com:hellobs/mavis.git ../mavis
+cd ../mavis && uv build && uv pip install dist/mavisframework-1.0.0-py3-none-any.whl
+cd ../provenance
+
+# 方式 B:可编辑安装(开发框架时即时生效;注意当前环境 editable 有 import 怪癖,见框架 README)
+# uv pip install -e ../mavis
 ```
-
-浏览器打开 http://127.0.0.1:5002/
-
-- `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
-- `/agents` — 已配置角色列表:查看所有角色完整配置
-- 生成的角色自动写入 `provenance/frontend/static/assets/village/agents/`,贴图从 `agents_pool/`(25 人贴图池)按角色名哈希映射
-- 详见 `config_tool/README.md`
-
-> 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
 
 ### 3. 配置大模型(二选一)
 
@@ -77,12 +79,32 @@ python app.py
 ### 4. 实时观看(FastAPI + WebSocket)
 
 ```bash
-cd provenance
+cd provenance/provenance
 python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
 ```
 
 浏览器打开 http://127.0.0.1:5001/
 
+### 5. 角色配置(config_tool,属框架仓库)
+
+角色/关系/剧情通过网页表单配置(免手写 JSON)。工具在 mavis 仓库:
+
+```bash
+cd ../mavis/config_tool
+python app.py
+```
+
+浏览器打开 http://127.0.0.1:5002/
+
+- `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
+- `/relationships` — 关系录入(追加到 relationships.json)
+- `/story` — 剧情录入(追加到 story.json)
+- `/agents` — 已配置角色列表
+- 字段清单见 `../mavis/config_tool/角色字段清单.md`
+
+> config_tool 产物默认写入本平台的 `provenance/frontend/static/assets/village/agents/` 与
+> `provenance/scenarios/`(通过环境变量 `MAVIS_ASSETS_ROOT` / `MAVIS_SCENARIOS_DIR` 可覆盖)。
+> 新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
 
 ## 常用参数
 
@@ -95,40 +117,22 @@ python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --ste
 | `--resume` | 从断点续跑 |
 | `--port` | 服务端口 |
 
-## 目录结构
-
-```
-provenance/
-├── live_fastapi.py     # ★ 实时模拟+可视化(FastAPI + WebSocket,框架驱动,唯一入口)
-├── mavisframework/     # ★ 自研框架内核(零前端依赖,可独立运行)
-│   ├── core/           #   Agent 生命周期/记忆/日程/空间/事件/时钟/提示词
-│   ├── scene/          #   空间/碰撞/寻路
-│   ├── runtime/        #   协议(protocol.py)/LLM 适配/游戏容器/并行调度/实时压缩器
-│   ├── output/         #   决策导出(decisions.json)
-│   └── config/         #   场景配置加载 + 模拟配置(新开/续跑)
-├── scenarios/          # 业务场景配置(investment: 人物关系/剧情事件)
-├── frontend/           # 可视化前端(Phaser + 贴图池 agents_pool/)
-├── data/               # 配置与提示词
-└── results/            # 存档与回放数据
-
-config_tool/            # ★ 角色配置工具(独立服务,填表单生成角色 JSON)
-```
-
 ## 说明
 
 - 实时可视化走 WebSocket(`/ws`),推送框架契约消息(agent/time/chat_line/snapshot);浏览器断线 3s 后自动重连
-- 实时服务由 `mavisframework/` 驱动(Game + Simulator + LiveCompressor)
-- 换用英文界面/提示词:改 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
+- 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
+- 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面
 - 前端 Phaser 脚本:服务端优先用 `frontend/static/vendor/phaser.min.js`(本地化,断网可用),不存在时回退 CDN;离线环境下建议下载 phaser.min.js 放入该目录
   - **首次运行前**(可选但推荐):在浏览器打开 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB),右键另存为 `frontend/static/vendor/phaser.min.js`。之后无需外网即可显示画面
+- 换用英文界面/提示词:改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 
 ## 修改地图
 
-创建新地图，有以下几种方案：
+创建新地图,有以下几种方案:
 
-1. 参考原始generative_agents项目中maze.py的逻辑，修改现有代码，以便兼容tiled编辑器导出的json和csv数据文件；
-2. 参考现有的maze.json格式，编写代码用于合并tiled编辑器导出的maze_meta_info.json、collision_maze.csv、sector_maze.csv等文件，为新地图生成maze.json。
-3. `jiejieje`开发了一款地图标注工具: https://github.com/jiejieje/tiled_to_maze.json
+1. 参考原始 generative_agents 项目中 maze.py 的逻辑,修改现有代码,以便兼容 tiled 编辑器导出的 json 和 csv 数据文件;
+2. 参考现有的 maze.json 格式,编写代码用于合并 tiled 编辑器导出的 maze_meta_info.json、collision_maze.csv、sector_maze.csv 等文件,为新地图生成 maze.json。
+3. `jiejieje` 开发了一款地图标注工具: https://github.com/jiejieje/tiled_to_maze.json
 
 ## 参考资料
 
@@ -138,6 +142,6 @@ config_tool/            # ★ 角色配置工具(独立服务,填表单生成角
 
 ### 代码
 
-[Generative Agents](https://github.com/joonspk-research/generative_agents)
-
-[wounderland](https://github.com/Archermmt/wounderland)
+- [mavisframework(自研框架)](https://github.com/hellobs/mavis)
+- [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents)
+- [wounderland](https://github.com/Archermmt/wounderland)
