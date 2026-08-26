@@ -175,6 +175,8 @@
 				var isAI = msg.role_type === "ai_tool";
 				devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
 				moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
+				// 记录角色类型(AI 工具 vs 人,面板徽标用)
+				if (msg.role_type) roleTypes[msg.name] = msg.role_type;
 				// IVD 核心观测:记录价值倾向演变(按模拟时间去重,阶梯=行动变化点)
 				if (msg.value_tendency && Object.keys(msg.value_tendency).length > 0) {
 					tendencyRecord(msg.name, msg.time || "", msg.value_tendency);
@@ -636,6 +638,7 @@
 	var goalsData = {};    // agent -> {goalName: weight}  治理约束(可调)
 	var tendencyData = {}; // agent -> {goalName: weight}  价值倾向(只读,内化结果)
 	var interventionsData = []; // 专家干预审计(曲线竖线标记)
+	var roleTypes = {};    // agent -> "ai_tool" / "user"
 	var selectedAgent = "";      // 当前详情视图选中的角色
 	var goalsTimer = null;
 
@@ -667,9 +670,15 @@
 		var tend = tendencyData[a] || {};
 		var names = Object.keys(goals);
 		html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
+		// 角色类型徽标:AI 工具(制度内建)→ 起点=约束;人(体验形成)→ 起点=均匀
+		var isAITool = roleTypes[a] === "ai_tool";
+		html += '<div style="display:flex; align-items:center; gap:6px;">';
 		html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-		// 核心观测:价值倾向(内化)演变曲线(大图)
-		html += '<div style="margin:4px 0;"><canvas data-tend-chart-for="' + goalsEscape(a) + '" width="356" height="150" style="width:100%; height:150px; border:1px solid #e8e8e8; border-radius:4px; background:#fcfcfc; display:block;"></canvas></div>';
+		html += '<span style="font-size:9px; padding:0 6px; border-radius:8px; ' + (isAITool ? 'background:#e8f0fe; color:#2d6cdf;' : 'background:#f0f0f0; color:#666;') + ';">' + (isAITool ? "AI 工具·制度内建" : "人·体验形成") + '</span>';
+		html += '</div>';
+		// 核心观测:价值倾向(内化)演变曲线(大图,支持横向滚动)
+		// canvas 固定高度,宽度按数据点数动态撑开,外层容器横向滚动
+		html += '<div style="margin:4px 0; overflow-x:auto; border:1px solid #e8e8e8; border-radius:4px; background:#fcfcfc;"><canvas data-tend-chart-for="' + goalsEscape(a) + '" width="356" height="150" style="height:150px; display:block;"></canvas></div>';
 		// 曲线图例
 		html += '<div style="font-size:10px; color:#666; margin:0 0 4px; line-height:1.5;" data-tend-legend-for="' + goalsEscape(a) + '"></div>';
 		// 导出按钮
@@ -825,20 +834,31 @@
 		return map;
 	}
 
-	function drawTendencyChart(agentName, cvOverride) {
+	function drawTendencyChart(agentName, cvOverride, opts) {
+		opts = opts || {};
+		var scale = opts.scale || 1;
 		var cv = cvOverride || document.querySelector('[data-tend-chart-for="' + agentName + '"]');
 		if (!cv) return;
-		var ctx = cv.getContext("2d");
-		var w = cv.width, h = cv.height;
-		ctx.clearRect(0, 0, w, h);
 		var hist = tendencyHistory[agentName] || [];
+		var PX = 10;  // 每个数据点最小像素宽(横向滚动由此撑开)
+		var minW = 356;
+		var cw = Math.max(minW, Math.max(1, hist.length) * PX);
+		// 实时视图:按点数动态设宽(容器横向滚动);导出视图:宽度已在调用处按 scale 设好
+		if (!opts.export && cv.width !== cw) cv.width = cw;
+		var w = cv.width / scale;
+		var h = cv.height / scale;
+		var ctx = cv.getContext("2d");
+		// 背景:实时用透明(容器底色),导出用纯白
+		if (opts.export) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+		else { ctx.clearRect(0, 0, w, h); }
 		if (hist.length === 0) {
 			ctx.fillStyle = "#888"; ctx.font = "12px sans-serif";
 			ctx.fillText("等待倾向数据...", 8, 18);
 			return;
 		}
-		// 绘图区:顶部留 24px(刻度),底部留 22px(X 轴时间)
-		var top = 26, bottom = 22;
+		// 绘图区:导出模式顶部留标题,底部留图例
+		var top = opts.export ? 44 : 26;
+		var bottom = opts.export ? 46 : 22;
 		var plotH = h - top - bottom;
 		var yOf = function(v) { return top + (1 - v) * plotH; };
 		var n = hist.length;
@@ -856,6 +876,15 @@
 		ctx.fillText("1.0", 2, top - 8);
 		ctx.fillText("0.5", 2, yOf(0.5) + 4);
 		ctx.fillText("0", 2, h - bottom - 2);
+		// 导出模式:标题行(角色名 + 时间范围)
+		if (opts.export) {
+			ctx.fillStyle = "#333"; ctx.font = "bold 15px sans-serif";
+			ctx.fillText(agentName + " — 价值倾向演变(内化)", 4, 22);
+			ctx.font = "11px sans-serif"; ctx.fillStyle = "#777";
+			var t0 = String(hist[0].t || "").slice(9);
+			var t1 = String(hist[n - 1].t || "").slice(9);
+			ctx.fillText("时间: " + t0 + " ~ " + t1, 4, 38);
+		}
 		// 约束期望虚线:每个目标一条(同色虚线,表示制度期望基准)
 		for (var cg = 0; cg < names.length; cg++) {
 			var cgoal = names[cg];
@@ -926,24 +955,43 @@
 				ctx.fillText(label, bx, by);
 			}
 		}
-		// X 轴:底部时间刻度(起/中/末,替代右上角标注)
+		// X 轴:底部时间刻度(最多 6 个,均匀分布;只显示 HH:MM)
 		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.moveTo(2, h - bottom); ctx.lineTo(w - 2, h - bottom); ctx.stroke();
 		ctx.fillStyle = "#555"; ctx.font = "bold 10px sans-serif";
 		ctx.textAlign = "center";
-		var labels = [0];
-		if (n > 3) labels.push(Math.floor((n - 1) / 2));
-		if (n > 1) labels.push(n - 1);
+		var tickN = Math.min(6, n);
 		var drawn = {};
-		for (var li = 0; li < labels.length; li++) {
-			var idx = labels[li];
+		for (var tk = 0; tk < tickN; tk++) {
+			var idx = Math.round(tk * (n - 1) / Math.max(1, tickN - 1));
 			var tRaw = String(hist[idx].t || "");
-			var tShort = tRaw.length >= 16 ? tRaw.slice(9) : tRaw;  // "09:30"
+			var tShort = tRaw.length > 9 ? tRaw.slice(9) : tRaw;  // 只显示 "HH:MM"
 			if (drawn[tShort]) continue;
 			drawn[tShort] = true;
 			ctx.fillText(tShort, xOf(idx), h - 7);
 		}
 		ctx.textAlign = "left";
+		// 导出模式:底部图例行
+		if (opts.export) {
+			ctx.font = "11px sans-serif";
+			var lx = 4;
+			for (var lg = 0; lg < names.length; lg++) {
+				var lgoal = names[lg];
+				ctx.fillStyle = colors[lgoal];
+				ctx.fillRect(lx, h - 18, 10, 10);
+				ctx.fillStyle = "#333";
+				var ltxt = " " + lgoal;
+				ctx.fillText(ltxt, lx + 13, h - 8);
+				lx += 13 + ctx.measureText(ltxt).width + 16;
+			}
+			// 约束期望图例
+			ctx.fillStyle = "#888";
+			ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4;
+			ctx.beginPath(); ctx.moveTo(lx, h - 13); ctx.lineTo(lx + 20, h - 13); ctx.stroke();
+			ctx.setLineDash([]);
+			ctx.fillStyle = "#333";
+			ctx.fillText(" 约束期望", lx + 24, h - 8);
+		}
 	}
 
 	function updateTendencyLegend(agentName) {
@@ -960,20 +1008,21 @@
 		leg.innerHTML = parts.join("　");
 	}
 
-	// 导出倾向曲线为 PNG(高分辨率:2x 缩放绘制)
+	// 导出倾向曲线为 PNG(高分辨率:2x 缩放绘制,含标题/图例/时间轴)
 	function exportTendencyChart(agentName) {
-		var cv = document.querySelector('[data-tend-chart-for="' + agentName + '"]');
-		if (!cv) return;
 		var scale = 2;
+		var hist = tendencyHistory[agentName] || [];
+		var PX = 10, minW = 356;
+		var cw = Math.max(minW, Math.max(1, hist.length) * PX);
+		// 高度:实时 150 + 导出标题/图例行 46
+		var ch = 150 + 46;
 		var out = document.createElement("canvas");
-		out.width = cv.width * scale;
-		out.height = cv.height * scale;
+		out.width = cw * scale;
+		out.height = ch * scale;
 		var octx = out.getContext("2d");
-		// 白底 + 2x 缩放(高分辨率导出)
-		octx.fillStyle = "#ffffff";
-		octx.fillRect(0, 0, out.width, out.height);
 		octx.scale(scale, scale);
-		drawTendencyChart(agentName, out);
+		// export 模式:纯白底 + 动态宽 + 标题 + 底部图例
+		drawTendencyChart(agentName, out, { export: true, scale: scale });
 		var a = document.createElement("a");
 		a.download = "倾向演变_" + agentName + ".png";
 		a.href = out.toDataURL("image/png");
