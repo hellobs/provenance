@@ -175,8 +175,9 @@
 				var isAI = msg.role_type === "ai_tool";
 				devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
 				moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
-				if (typeof msg.goal_score === "number") {
-					goalsShowScore(msg.name, msg.goal_score, msg.action || "", msg.goal_alignment || {});
+				// IVD 核心观测:记录价值倾向演变(按模拟时间去重,阶梯=行动变化点)
+				if (msg.value_tendency && Object.keys(msg.value_tendency).length > 0) {
+					tendencyRecord(msg.name, msg.time || "", msg.value_tendency);
 				}
 				if (msg.conversation) {
 					Object.assign(all_movement["conversation"], msg.conversation);
@@ -656,9 +657,11 @@
 			var names = Object.keys(goals);
 			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
 			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-			html += '<div style="font-size:10px; color:#666; margin:2px 0;">约束对齐(当前行动): <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
-			// 价值倾向(内化结果,只读展示)
-			// 只显示该角色约束内的目标(制度期望 → 内化对照);约束外不展示
+			// 核心观测:价值倾向(内化)演变曲线(只显示约束内目标;阶梯 = 行动变化点)
+			html += '<div style="margin:2px 0;"><canvas data-tend-chart-for="' + goalsEscape(a) + '" width="340" height="72" style="width:100%; height:72px; border:1px solid #e8e8e8; border-radius:4px; background:#fcfcfc; display:block;"></canvas></div>';
+			// 曲线图例:目标 → 颜色(与曲线一致)
+			html += '<div style="font-size:9px; color:#666; margin:0 0 4px; line-height:1.5;" data-tend-legend-for="' + goalsEscape(a) + '"></div>';
+			// 价值倾向当前值(只读文本快照)
 			var tnames = [];
 			for (var tk in tend) {
 				if (goals[tk] !== undefined) tnames.push(tk);
@@ -679,7 +682,6 @@
 				html += '<span style="flex:1 1 100px; min-width:60px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g) + '">' + goalsEscape(g) + '</span>';
 				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:64px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
 				html += '<span style="width:30px; text-align:right; color:#333; flex:0 0 auto;" data-weight-for="' + goalsEscape(g) + '">' + w + '%</span>';
-				html += '<span style="width:48px; text-align:right; font-size:10px; flex:0 0 auto;" data-align-for="' + goalsEscape(g) + '" title="当前行动与这个目标的对齐度">对齐: --</span>';
 				html += '<button class="del-btn" style="margin-left:auto; padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">移除</button>';
 				html += '</div>';
 			}
@@ -692,6 +694,11 @@
 		}
 		body.innerHTML = html;
 		goalsUpdateSums();
+		// canvas 是新生成的,重绘已有倾向历史 + 图例
+		for (var ri = 0; ri < agents.length; ri++) {
+			drawTendencyChart(agents[ri]);
+			updateTendencyLegend(agents[ri]);
+		}
 	}
 
 	function goalsUpdateSums() {
@@ -737,30 +744,104 @@
 		}, 400);
 	}
 
-	// Show live goal score + per-goal alignment for an agent (via WebSocket agent messages)
-	function goalsShowScore(agentName, score, actionText, alignment) {
-		var el = document.querySelector('[data-score-for="' + agentName + '"]');
-		if (el) {
-			var s = Math.round(score * 100) / 100;
-			el.textContent = s.toFixed(2);
-			el.style.color = score >= 0.5 ? "#070" : (score >= 0.35 ? "#a60" : "#a00");
+	// ================= 价值倾向演变曲线(核心观测对象) =================
+	// tendencyHistory[agent] = [{t: "20250213-09:30", v: {goal: weight}}]
+	var tendencyHistory = {};
+	var TEND_COLORS = ["#2d6cdf", "#e07b39", "#2f9e44", "#c92a2a", "#9c36b5", "#0b7285"];
+
+	// 按模拟时间去重记录倾向;同时间更新、新时间追加(阶梯=行动变化点)
+	function tendencyRecord(agentName, timeStr, tendency) {
+		if (!agentName || !tendency) return;
+		var hist = tendencyHistory[agentName] || (tendencyHistory[agentName] = []);
+		var last = hist.length > 0 ? hist[hist.length - 1] : null;
+		if (last && last.t === timeStr) {
+			last.v = tendency;  // 同一时间刷新(去重)
+		} else {
+			hist.push({ t: timeStr || "", v: tendency });
+			if (hist.length > 200) hist.shift();
 		}
-		var ae = document.querySelector('[data-score-action-for="' + agentName + '"]');
-		if (ae) {
-			ae.textContent = actionText ? "· " + actionText.slice(0, 24) : "";
+		drawTendencyChart(agentName);
+		updateTendencyLegend(agentName);
+	}
+
+	function tendencyGoalColors(agentName) {
+		// 该角色约束内目标的固定配色(与图例一致)
+		var goals = goalsData[agentName] || {};
+		var names = Object.keys(goals).sort();
+		var map = {};
+		for (var i = 0; i < names.length; i++) map[names[i]] = TEND_COLORS[i % TEND_COLORS.length];
+		return map;
+	}
+
+	function drawTendencyChart(agentName) {
+		var cv = document.querySelector('[data-tend-chart-for="' + agentName + '"]');
+		if (!cv) return;
+		var ctx = cv.getContext("2d");
+		var w = cv.width, h = cv.height;
+		ctx.clearRect(0, 0, w, h);
+		var hist = tendencyHistory[agentName] || [];
+		if (hist.length === 0) {
+			ctx.fillStyle = "#aaa"; ctx.font = "10px sans-serif";
+			ctx.fillText("等待倾向数据...", 6, 14);
+			return;
 		}
-		// per-goal alignment: action vs each goal
-		if (alignment) {
-			for (var g in alignment) {
-				var ae2 = document.querySelector('[data-align-for="' + g + '"]');
-				if (ae2) {
-					var v = alignment[g];
-					var txt = "对齐: " + (Math.round(v * 100) / 100).toFixed(2);
-					ae2.textContent = txt;
-					ae2.style.color = v >= 0.5 ? "#070" : (v >= 0.35 ? "#a60" : "#a00");
-				}
+		// 网格:0 / 0.5 / 1
+		ctx.strokeStyle = "#ececec"; ctx.lineWidth = 1;
+		for (var gy = 0; gy <= 2; gy++) {
+			var y = h - 4 - (gy / 2) * (h - 10);
+			ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(w - 2, y); ctx.stroke();
+		}
+		ctx.fillStyle = "#bbb"; ctx.font = "8px sans-serif";
+		ctx.fillText("1.0", 2, 12);
+		ctx.fillText("0", 2, h - 4);
+		var n = hist.length;
+		var xOf = function(i) { return 2 + (n === 1 ? 0 : i / (n - 1)) * (w - 6); };
+		var colors = tendencyGoalColors(agentName);
+		var names = Object.keys(colors);
+		for (var g = 0; g < names.length; g++) {
+			var goal = names[g];
+			ctx.strokeStyle = colors[goal];
+			ctx.lineWidth = 1.6;
+			ctx.beginPath();
+			var started = false;
+			for (var i = 0; i < n; i++) {
+				var v = hist[i].v[goal];
+				if (v === undefined) continue;
+				var x = xOf(i), y = h - 4 - v * (h - 10);
+				if (!started) { ctx.moveTo(x, y); started = true; }
+				else ctx.lineTo(x, y);
+			}
+			if (started) ctx.stroke();
+			// 最新值圆点
+			var lastV = hist[n - 1].v[goal];
+			if (lastV !== undefined) {
+				ctx.fillStyle = colors[goal];
+				ctx.beginPath();
+				ctx.arc(xOf(n - 1), h - 4 - lastV * (h - 10), 2.5, 0, Math.PI * 2);
+				ctx.fill();
 			}
 		}
+		// 最新时间标注(右上)
+		if (hist[n - 1].t) {
+			ctx.fillStyle = "#999"; ctx.font = "8px sans-serif";
+			var tStr = String(hist[n - 1].t).slice(5);
+			ctx.textAlign = "right";
+			ctx.fillText(tStr, w - 4, 12);
+			ctx.textAlign = "left";
+		}
+	}
+
+	function updateTendencyLegend(agentName) {
+		var leg = document.querySelector('[data-tend-legend-for="' + agentName + '"]');
+		if (!leg) return;
+		var colors = tendencyGoalColors(agentName);
+		var names = Object.keys(colors);
+		if (names.length === 0) { leg.innerHTML = ""; return; }
+		var parts = [];
+		for (var i = 0; i < names.length; i++) {
+			parts.push('<span style="color:' + colors[names[i]] + ';">■</span> ' + goalsEscape(names[i]));
+		}
+		leg.innerHTML = parts.join("　");
 	}
 
 	document.addEventListener("DOMContentLoaded", function() {

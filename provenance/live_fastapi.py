@@ -96,10 +96,12 @@ def on_agent(name, agent_data, step, sim_time):
     role_type = "user"
     goal_score = None
     goal_alignment = {}
+    value_tendency = {}
     try:
         if server is not None and name in server.game.agents:
             role_type = getattr(server.game.agents[name], "role_type", "user") or "user"
-            _status = server.game.agents[name].status or {}
+            _agent = server.game.agents[name]
+            _status = _agent.status or {}
             goal_alignment = _status.get("goal_alignment") or {}
             # IVD:约束是"期望基准",与当下行动的逐目标对齐度做加权和,
             # 得到"行动对制度约束的整体对齐度"(前端 Constraint alignment 指标)
@@ -109,6 +111,8 @@ def on_agent(name, agent_data, step, sim_time):
                 if cons:
                     vals = [w * goal_alignment.get(g, 0.0) for g, w in cons.items()]
                     goal_score = sum(vals)
+            # 核心观测对象:价值倾向(内化结果)演变,供前端曲线绘制
+            value_tendency = _agent.get_tendency() or {}
     except Exception:
         pass
     msg: AgentState = {
@@ -123,6 +127,8 @@ def on_agent(name, agent_data, step, sim_time):
         "role_type": role_type,
         "goal_score": goal_score,
         "goal_alignment": goal_alignment,
+        "value_tendency": value_tendency,
+        "time": sim_time,
     }
     if description:
         msg["description"] = description
