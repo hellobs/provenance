@@ -688,14 +688,14 @@
 			// 约束条(灰) + 倾向条(彩色) 并排
 			html += '<div style="flex:1; display:flex; flex-direction:column; gap:1px;">';
 			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:#999; font-size:9px;">约束</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div style="width:' + wbar + '%; height:7px; background:#bbb; border-radius:3px;"></div></div><span style="flex:0 0 30px; text-align:right; color:#777; font-size:9px;">' + wbar + '%</span></div>';
-			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:' + color + '; font-size:9px;">倾向</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div style="width:' + tvbar + '%; height:7px; background:' + color + '; border-radius:3px;"></div></div><span style="flex:0 0 30px; text-align:right; font-size:9px; color:#333;">' + (tv !== null ? tvbar + '%' : '--') + '</span></div>';
+			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:' + color + '; font-size:9px;">倾向</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div data-tend-fill-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="width:' + tvbar + '%; height:7px; background:' + color + '; border-radius:3px;"></div></div><span data-tend-pct-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 30px; text-align:right; font-size:9px; color:#333;">' + (tv !== null ? tvbar + '%' : '--') + '</span></div>';
 			html += '</div>';
 			// Δ 变化量
 			if (tv !== null) {
 				var dTxt = (delta >= 0 ? "+" : "") + (Math.round(delta * 1000) / 10) + "pp";
-				html += '<span style="flex:0 0 46px; text-align:right; font-size:9px; color:' + (Math.abs(delta) < 0.01 ? "#999" : (delta > 0 ? "#e07b39" : "#2f9e44")) + ';">Δ ' + dTxt + '</span>';
+				html += '<span data-tend-delta-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 46px; text-align:right; font-size:9px; color:' + (Math.abs(delta) < 0.01 ? "#999" : (delta > 0 ? "#e07b39" : "#2f9e44")) + ';">Δ ' + dTxt + '</span>';
 			} else {
-				html += '<span style="flex:0 0 46px; text-align:right; font-size:9px; color:#aaa;">Δ --</span>';
+				html += '<span data-tend-delta-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 46px; text-align:right; font-size:9px; color:#aaa;">Δ --</span>';
 			}
 			html += '</div>';
 		}
@@ -782,8 +782,36 @@
 			hist.push({ t: timeStr || "", v: tendency });
 			if (hist.length > 200) hist.shift();
 		}
+		// 同步当前倾向快照(文本/对照条数据源),局部刷新,不整页重绘(避免打断滑条)
+		tendencyData[agentName] = tendency;
 		drawTendencyChart(agentName);
 		updateTendencyLegend(agentName);
+		updateTendencyBars(agentName);
+	}
+
+	// 局部更新"约束 vs 倾向"对照条的倾向值 + Δ(仅当前详情角色可见时)
+	function updateTendencyBars(agentName) {
+		if (selectedAgent !== agentName) return;
+		var tend = tendencyData[agentName] || {};
+		var goals = goalsData[agentName] || {};
+		for (var g in goals) {
+			var tv = tend[g];
+			if (tv === undefined) continue;
+			var key = goalsEscape(agentName) + "_" + goalsEscape(g);
+			var fill = document.querySelector('[data-tend-fill-for="' + key + '"]');
+			var pct = document.querySelector('[data-tend-pct-for="' + key + '"]');
+			var dlt = document.querySelector('[data-tend-delta-for="' + key + '"]');
+			var tvbar = Math.round(tv * 100);
+			if (fill) fill.style.width = tvbar + "%";
+			if (pct) pct.textContent = tvbar + "%";
+			if (dlt) {
+				var w = goals[g] || 0;
+				var delta = tv - w;
+				var dTxt = (delta >= 0 ? "+" : "") + (Math.round(delta * 1000) / 10) + "pp";
+				dlt.textContent = "Δ " + dTxt;
+				dlt.style.color = Math.abs(delta) < 0.01 ? "#999" : (delta > 0 ? "#e07b39" : "#2f9e44");
+			}
+		}
 	}
 
 	function tendencyGoalColors(agentName) {
@@ -803,24 +831,44 @@
 		ctx.clearRect(0, 0, w, h);
 		var hist = tendencyHistory[agentName] || [];
 		if (hist.length === 0) {
-			ctx.fillStyle = "#aaa"; ctx.font = "10px sans-serif";
-			ctx.fillText("等待倾向数据...", 6, 14);
+			ctx.fillStyle = "#888"; ctx.font = "12px sans-serif";
+			ctx.fillText("等待倾向数据...", 8, 18);
 			return;
 		}
-		// 网格:0 / 0.25 / 0.5 / 0.75 / 1
-		ctx.strokeStyle = "#ececec"; ctx.lineWidth = 1;
-		for (var gy = 0; gy <= 4; gy++) {
-			var y = h - 16 - (gy / 4) * (h - 24);
-			ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(w - 2, y); ctx.stroke();
-		}
-		ctx.fillStyle = "#bbb"; ctx.font = "9px sans-serif";
-		ctx.fillText("1.0", 2, 14);
-		ctx.fillText("0.5", 2, h / 2 - 16 + 2);
-		ctx.fillText("0", 2, h - 16);
+		// 绘图区:顶部留 22px 放刻度/标注,底部留 18px
+		var top = 24, bottom = 18;
+		var plotH = h - top - bottom;
+		var yOf = function(v) { return top + (1 - v) * plotH; };
 		var n = hist.length;
 		var xOf = function(i) { return 2 + (n === 1 ? 0 : i / (n - 1)) * (w - 6); };
 		var colors = tendencyGoalColors(agentName);
 		var names = Object.keys(colors);
+		var goals = goalsData[agentName] || {};
+		// 网格:0 / 0.25 / 0.5 / 0.75 / 1
+		ctx.strokeStyle = "#e6e6e6"; ctx.lineWidth = 1;
+		for (var gy = 0; gy <= 4; gy++) {
+			var y = yOf(gy / 4);
+			ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(w - 2, y); ctx.stroke();
+		}
+		ctx.fillStyle = "#777"; ctx.font = "bold 10px sans-serif";
+		ctx.fillText("1.0", 2, top - 6);
+		ctx.fillText("0.5", 2, yOf(0.5) + 4);
+		ctx.fillText("0", 2, h - 6);
+		// 约束期望虚线:每个目标一条(同色虚线,表示制度期望基准)
+		// 图例右侧说明"…=约束期望"
+		for (var cg = 0; cg < names.length; cg++) {
+			var cgoal = names[cg];
+			var cw = goals[cgoal] || 0;
+			if (cw <= 0) continue;
+			ctx.strokeStyle = colors[cgoal];
+			ctx.globalAlpha = 0.5;
+			ctx.lineWidth = 1.4;
+			ctx.setLineDash([6, 4]);
+			var cy = yOf(cw);
+			ctx.beginPath(); ctx.moveTo(2, cy); ctx.lineTo(w - 2, cy); ctx.stroke();
+			ctx.setLineDash([]);
+			ctx.globalAlpha = 1;
+		}
 		// 干预竖线:该角色的 interventions(按 sim_time 匹配 x 轴)
 		var ivs = (interventionsData || []).filter(function(iv) {
 			return iv.agent === agentName && iv.sim_time;
@@ -830,12 +878,12 @@
 			for (var ii = 0; ii < n; ii++) {
 				if (String(hist[ii].t) === ivTime) {
 					var ivx = xOf(ii);
-					ctx.strokeStyle = "rgba(224,123,57,0.55)"; ctx.lineWidth = 1.5;
+					ctx.strokeStyle = "rgba(224,123,57,0.7)"; ctx.lineWidth = 1.6;
 					ctx.setLineDash([4, 3]);
-					ctx.beginPath(); ctx.moveTo(ivx, 10); ctx.lineTo(ivx, h - 16); ctx.stroke();
+					ctx.beginPath(); ctx.moveTo(ivx, top - 4); ctx.lineTo(ivx, h - bottom); ctx.stroke();
 					ctx.setLineDash([]);
-					ctx.fillStyle = "#e07b39"; ctx.font = "8px sans-serif";
-					ctx.fillText("干预", ivx + 3, 12);
+					ctx.fillStyle = "#e07b39"; ctx.font = "bold 9px sans-serif";
+					ctx.fillText("干预", ivx + 3, top - 4);
 					break;
 				}
 			}
@@ -844,30 +892,38 @@
 		for (var g = 0; g < names.length; g++) {
 			var goal = names[g];
 			ctx.strokeStyle = colors[goal];
-			ctx.lineWidth = 2;
+			ctx.lineWidth = 2.2;
 			ctx.beginPath();
 			var started = false;
 			for (var i = 0; i < n; i++) {
 				var v = hist[i].v[goal];
 				if (v === undefined) continue;
-				var x = xOf(i), y = h - 16 - v * (h - 24);
+				var x = xOf(i), y = yOf(v);
 				if (!started) { ctx.moveTo(x, y); started = true; }
 				else ctx.lineTo(x, y);
 			}
 			if (started) ctx.stroke();
-			// 最新值圆点 + 末值标注
+			// 最新值圆点 + 末值标注(白底黑字,清晰可读)
 			var lastV = hist[n - 1].v[goal];
 			if (lastV !== undefined) {
-				var lx = xOf(n - 1), ly = h - 16 - lastV * (h - 24);
+				var lx = xOf(n - 1), ly = yOf(lastV);
 				ctx.fillStyle = colors[goal];
-				ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
-				ctx.font = "bold 9px sans-serif";
-				ctx.fillText(Math.round(lastV * 100) + "%", Math.max(2, lx - 22), ly - 6);
+				ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+				var label = Math.round(lastV * 100) + "%";
+				ctx.font = "bold 10px sans-serif";
+				var tw = ctx.measureText(label).width;
+				var bx = Math.max(2, Math.min(lx - tw - 8, w - tw - 4));
+				var by = ly - 16;
+				if (by < 6) by = ly + 10;
+				ctx.fillStyle = "rgba(255,255,255,0.9)";
+				ctx.fillRect(bx - 2, by - 9, tw + 4, 13);
+				ctx.fillStyle = colors[goal];
+				ctx.fillText(label, bx, by);
 			}
 		}
 		// 最新时间标注(右上)
 		if (hist[n - 1].t) {
-			ctx.fillStyle = "#999"; ctx.font = "9px sans-serif";
+			ctx.fillStyle = "#555"; ctx.font = "bold 10px sans-serif";
 			var tStr = String(hist[n - 1].t).slice(5);
 			ctx.textAlign = "right";
 			ctx.fillText(tStr, w - 4, 14);
@@ -885,6 +941,7 @@
 		for (var i = 0; i < names.length; i++) {
 			parts.push('<span style="color:' + colors[names[i]] + ';">■</span> ' + goalsEscape(names[i]));
 		}
+		parts.push('<span style="color:#999;">┅</span> 约束期望');
 		leg.innerHTML = parts.join("　");
 	}
 
