@@ -159,9 +159,11 @@ async def get_goals():
         constraints = gov.all_constraints()
     # 倾向来自运行中 Agent 的 value_tendency
     tendency = {}
+    role_types = {}
     if server is not None and server.game is not None:
         for name, agent in server.game.agents.items():
             tendency[name] = agent.get_tendency()
+            role_types[name] = getattr(agent, "role_type", "user") or "user"
     # 专家干预记录(供曲线画"干预时刻"竖线)
     interventions = []
     iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
@@ -176,6 +178,7 @@ async def get_goals():
         "goals": constraints,       # 治理约束(期望,面板可调)
         "tendency": tendency,       # 价值倾向(内化结果,只读)
         "interventions": interventions,  # 专家干预审计(曲线竖线标记)
+        "role_types": role_types,   # 角色类型(ai_tool/user,面板徽标)
     })
 
 
