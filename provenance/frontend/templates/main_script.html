@@ -656,7 +656,7 @@
 			var names = Object.keys(goals);
 			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
 			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-			html += '<div style="font-size:10px; color:#666; margin:2px 0;">约束对齐: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
+			html += '<div style="font-size:10px; color:#666; margin:2px 0;">约束对齐(当前行动): <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
 			// 价值倾向(内化结果,只读展示)
 			// 只显示该角色约束内的目标(制度期望 → 内化对照);约束外不展示
 			var tnames = [];
