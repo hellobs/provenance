@@ -645,7 +645,7 @@
 		if (!body) return;
 		var agents = Object.keys(goalsData).sort();
 		if (agents.length === 0) {
-			body.innerHTML = '<div style="color:#999;">No roles configured.</div>';
+			body.innerHTML = '<div style="color:#999;">未配置角色。</div>';
 			return;
 		}
 		var html = "";
@@ -656,34 +656,38 @@
 			var names = Object.keys(goals);
 			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
 			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-			html += '<div style="font-size:10px; color:#666; margin:2px 0;">Constraint alignment: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
+			html += '<div style="font-size:10px; color:#666; margin:2px 0;">约束对齐: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
 			// 价值倾向(内化结果,只读展示)
-			var tnames = Object.keys(tend);
+			// 只显示该角色约束内的目标(制度期望 → 内化对照);约束外不展示
+			var tnames = [];
+			for (var tk in tend) {
+				if (goals[tk] !== undefined) tnames.push(tk);
+			}
 			if (tnames.length > 0) {
 				var tparts = [];
 				for (var ti = 0; ti < tnames.length; ti++) {
 					tparts.push(goalsEscape(tnames[ti]) + ": " + Math.round(tend[tnames[ti]] * 100) + "%");
 				}
-				html += '<div style="font-size:10px; color:#2d6cdf; margin:2px 0;">Value tendency (internalized): ' + tparts.join(", ") + '</div>';
+				html += '<div style="font-size:10px; color:#2d6cdf; margin:2px 0;">价值倾向(内化): ' + tparts.join(", ") + '</div>';
 			} else {
-				html += '<div style="font-size:10px; color:#aaa; margin:2px 0;">Value tendency: not yet formed</div>';
+				html += '<div style="font-size:10px; color:#aaa; margin:2px 0;">价值倾向:尚未形成</div>';
 			}
 			for (var j = 0; j < names.length; j++) {
 				var g = names[j];
 				var w = Math.round((goals[g] || 0) * 100);
-				html += '<div style="display:flex; align-items:center; gap:6px; margin:3px 0;">';
-				html += '<span style="flex:0 0 auto; width:170px; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g) + '">' + goalsEscape(g) + '</span>';
-				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:70px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
+				html += '<div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:3px 0;">';
+				html += '<span style="flex:1 1 100px; min-width:60px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g) + '">' + goalsEscape(g) + '</span>';
+				html += '<input type="range" min="0" max="100" value="' + w + '" style="width:64px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g) + '">';
 				html += '<span style="width:30px; text-align:right; color:#333; flex:0 0 auto;" data-weight-for="' + goalsEscape(g) + '">' + w + '%</span>';
-				html += '<span style="width:56px; text-align:right; font-size:10px; flex:0 0 auto;" data-align-for="' + goalsEscape(g) + '" title="alignment of current action with this goal">align: --</span>';
-				html += '<button class="del-btn" style="padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">Remove</button>';
+				html += '<span style="width:48px; text-align:right; font-size:10px; flex:0 0 auto;" data-align-for="' + goalsEscape(g) + '" title="当前行动与这个目标的对齐度">对齐: --</span>';
+				html += '<button class="del-btn" style="margin-left:auto; padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g) + '" data-del-agent="' + goalsEscape(a) + '">移除</button>';
 				html += '</div>';
 			}
 			html += '<div style="margin-top:4px; display:flex; gap:4px;">';
-			html += '<input type="text" placeholder="Add goal" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
+			html += '<input type="text" placeholder="添加目标" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
 			html += '<button class="del-btn" style="background:#2d6cdf; padding:2px 8px; font-size:10px;" data-add-goal="' + goalsEscape(a) + '">+</button>';
 			html += '</div>';
-			html += '<div style="font-size:10px; color:#888;">Sum: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
+			html += '<div style="font-size:10px; color:#888;">合计: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
 			html += '</div>';
 		}
 		body.innerHTML = html;
@@ -751,7 +755,7 @@
 				var ae2 = document.querySelector('[data-align-for="' + g + '"]');
 				if (ae2) {
 					var v = alignment[g];
-					var txt = "align: " + (Math.round(v * 100) / 100).toFixed(2);
+					var txt = "对齐: " + (Math.round(v * 100) / 100).toFixed(2);
 					ae2.textContent = txt;
 					ae2.style.color = v >= 0.5 ? "#070" : (v >= 0.35 ? "#a60" : "#a00");
 				}
