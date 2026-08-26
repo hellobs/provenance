@@ -63,5 +63,9 @@
   "goals": {
     "Research Rigor": 0.7,
     "Timeliness": 0.3
+  },
+  "initial_tendency": {
+    "Research Rigor": 0.85,
+    "Timeliness": 0.15
   }
 }

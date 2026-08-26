@@ -63,5 +63,9 @@
   "goals": {
     "Strategy Stability": 0.7,
     "Risk Aversion": 0.3
+  },
+  "initial_tendency": {
+    "Strategy Stability": 0.8,
+    "Risk Aversion": 0.2
   }
 }

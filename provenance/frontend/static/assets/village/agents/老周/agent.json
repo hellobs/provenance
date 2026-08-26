@@ -6,6 +6,10 @@
     17
   ],
   "currently": "Lao Zhou is watching today's market closely, hesitating whether to add to his position.",
+  "initial_tendency": {
+    "Maximize Returns": 0.8,
+    "Risk Aversion": 0.2
+  },
   "scratch": {
     "age": 56,
     "innate": "Enthusiastic, talkative, and emotional",

@@ -862,7 +862,7 @@
 		var plotH = h - top - bottom;
 		var yOf = function(v) { return top + (1 - v) * plotH; };
 		var n = hist.length;
-		var xOf = function(i) { return 2 + (n === 1 ? 0 : i / (n - 1)) * (w - 6); };
+		var xOf = function(i) { return 30 + (n === 1 ? 0 : i / (n - 1)) * (w - 60); };
 		var colors = tendencyGoalColors(agentName);
 		var names = Object.keys(colors);
 		var goals = goalsData[agentName] || {};
@@ -870,12 +870,17 @@
 		ctx.strokeStyle = "#dcdcdc"; ctx.lineWidth = 1;
 		for (var gy = 0; gy <= 4; gy++) {
 			var y = yOf(gy / 4);
-			ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(w - 2, y); ctx.stroke();
+			ctx.beginPath(); ctx.moveTo(30, y); ctx.lineTo(w - 30, y); ctx.stroke();
 		}
+		// Y 轴线
+		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.moveTo(30, top); ctx.lineTo(30, h - bottom); ctx.stroke();
 		ctx.fillStyle = "#555"; ctx.font = "bold 11px sans-serif";
-		ctx.fillText("1.0", 2, top - 8);
-		ctx.fillText("0.5", 2, yOf(0.5) + 4);
-		ctx.fillText("0", 2, h - bottom - 2);
+		ctx.textAlign = "right";
+		ctx.fillText("1.0", 27, top - 8);
+		ctx.fillText("0.5", 27, yOf(0.5) + 4);
+		ctx.fillText("0", 27, h - bottom - 2);
+		ctx.textAlign = "left";
 		// 导出模式:标题行(角色名 + 时间范围)
 		if (opts.export) {
 			ctx.fillStyle = "#333"; ctx.font = "bold 15px sans-serif";
@@ -895,7 +900,7 @@
 			ctx.lineWidth = 1.6;
 			ctx.setLineDash([6, 4]);
 			var cy = yOf(cw);
-			ctx.beginPath(); ctx.moveTo(2, cy); ctx.lineTo(w - 2, cy); ctx.stroke();
+			ctx.beginPath(); ctx.moveTo(30, cy); ctx.lineTo(w - 30, cy); ctx.stroke();
 			ctx.setLineDash([]);
 			ctx.globalAlpha = 1;
 		}
@@ -957,9 +962,8 @@
 		}
 		// X 轴:底部时间刻度(最多 6 个,均匀分布;只显示 HH:MM)
 		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
-		ctx.beginPath(); ctx.moveTo(2, h - bottom); ctx.lineTo(w - 2, h - bottom); ctx.stroke();
+		ctx.beginPath(); ctx.moveTo(30, h - bottom); ctx.lineTo(w - 30, h - bottom); ctx.stroke();
 		ctx.fillStyle = "#555"; ctx.font = "bold 10px sans-serif";
-		ctx.textAlign = "center";
 		var tickN = Math.min(6, n);
 		var drawn = {};
 		for (var tk = 0; tk < tickN; tk++) {
@@ -968,6 +972,10 @@
 			var tShort = tRaw.length > 9 ? tRaw.slice(9) : tRaw;  // 只显示 "HH:MM"
 			if (drawn[tShort]) continue;
 			drawn[tShort] = true;
+			// 首尾刻度左/右对齐防裁剪,中间居中
+			if (tk === 0) ctx.textAlign = "left";
+			else if (tk === tickN - 1) ctx.textAlign = "right";
+			else ctx.textAlign = "center";
 			ctx.fillText(tShort, xOf(idx), h - 7);
 		}
 		ctx.textAlign = "left";

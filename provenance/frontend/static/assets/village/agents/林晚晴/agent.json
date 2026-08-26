@@ -63,5 +63,9 @@
   "goals": {
     "Risk Aversion": 0.9,
     "Business Advancement": 0.1
+  },
+  "initial_tendency": {
+    "Risk Aversion": 0.85,
+    "Business Advancement": 0.15
   }
 }

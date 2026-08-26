@@ -63,5 +63,9 @@
   "goals": {
     "Steady Returns": 0.6,
     "Risk Aversion": 0.4
+  },
+  "initial_tendency": {
+    "Steady Returns": 0.75,
+    "Risk Aversion": 0.25
   }
 }
