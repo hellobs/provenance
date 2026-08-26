@@ -162,10 +162,20 @@ async def get_goals():
     if server is not None and server.game is not None:
         for name, agent in server.game.agents.items():
             tendency[name] = agent.get_tendency()
+    # 专家干预记录(供曲线画"干预时刻"竖线)
+    interventions = []
+    iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+    if os.path.exists(iv_path):
+        try:
+            with open(iv_path, "r", encoding="utf-8") as f:
+                interventions = json.load(f)
+        except Exception:
+            interventions = []
     return JSONResponse({
         "ok": True,
         "goals": constraints,       # 治理约束(期望,面板可调)
-        "tendency": tendency,      # 价值倾向(内化结果,只读)
+        "tendency": tendency,       # 价值倾向(内化结果,只读)
+        "interventions": interventions,  # 专家干预审计(曲线竖线标记)
     })
 
 
@@ -205,6 +215,12 @@ async def update_goals(request: Request):
     # 2) 记录干预审计(可审计链)
     try:
         import time as _time, datetime
+        # 干预时刻对应的模拟时间(供前端曲线画竖线)
+        sim_time = ""
+        try:
+            sim_time = server.game._timer.get_date("%Y%m%d-%H:%M")
+        except Exception:
+            pass
         audit_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
         audit = []
         if os.path.exists(audit_path):
@@ -212,6 +228,7 @@ async def update_goals(request: Request):
                 audit = json.load(f)
         audit.append({
             "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "sim_time": sim_time,
             "agent": name,
             "old_constraints": old,
             "new_constraints": goals,

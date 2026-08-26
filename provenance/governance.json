@@ -13,8 +13,8 @@
       "Risk Aversion": 0.4
     },
     "老周": {
-      "Risk Aversion": 0.4,
-      "Maximize Returns": 0.6
+      "Maximize Returns": 0.7,
+      "Risk Aversion": 0.3
     },
     "苏清越": {
       "Strategy Stability": 0.7,
