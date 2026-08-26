@@ -631,9 +631,9 @@
 	}
 
 	// ================= Goals live adjustment =================
-	// Load current goals and render per-agent sliders; changes POST to /api/goals
-	// (hot-updates the running agent + persists to agent.json).
-	var goalsData = {};   // agent -> {goalName: weight}
+	// Load governance constraints (editable) + value tendency (read-only) from /api/goals
+	var goalsData = {};    // agent -> {goalName: weight}  治理约束(可调)
+	var tendencyData = {}; // agent -> {goalName: weight}  价值倾向(只读,内化结果)
 	var goalsTimer = null;
 
 	function goalsEscape(s) {
@@ -652,10 +652,22 @@
 		for (var i = 0; i < agents.length; i++) {
 			var a = agents[i];
 			var goals = goalsData[a] || {};
+			var tend = tendencyData[a] || {};
 			var names = Object.keys(goals);
 			html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
 			html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-			html += '<div style="font-size:10px; color:#666; margin:2px 0;">Goal score: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
+			html += '<div style="font-size:10px; color:#666; margin:2px 0;">Constraint alignment: <span data-score-for="' + goalsEscape(a) + '" style="font-weight:bold; color:#888;">--</span> <span data-score-action-for="' + goalsEscape(a) + '" style="color:#aaa;"></span></div>';
+			// 价值倾向(内化结果,只读展示)
+			var tnames = Object.keys(tend);
+			if (tnames.length > 0) {
+				var tparts = [];
+				for (var ti = 0; ti < tnames.length; ti++) {
+					tparts.push(goalsEscape(tnames[ti]) + ": " + Math.round(tend[tnames[ti]] * 100) + "%");
+				}
+				html += '<div style="font-size:10px; color:#2d6cdf; margin:2px 0;">Value tendency (internalized): ' + tparts.join(", ") + '</div>';
+			} else {
+				html += '<div style="font-size:10px; color:#aaa; margin:2px 0;">Value tendency: not yet formed</div>';
+			}
 			for (var j = 0; j < names.length; j++) {
 				var g = names[j];
 				var w = Math.round((goals[g] || 0) * 100);
@@ -764,9 +776,9 @@
 			if (body.style.display === "none") { body.style.display = "block"; gt.textContent = "Collapse ▾"; }
 			else { body.style.display = "none"; gt.textContent = "Expand ▸"; }
 		};
-		// load goals
+		// load governance constraints + value tendency
 		fetch("/api/goals").then(function(r) { return r.json(); }).then(function(out) {
-			if (out.ok && out.goals) { goalsData = out.goals; goalsRender(); }
+			if (out.ok && out.goals) { goalsData = out.goals; tendencyData = out.tendency || {}; goalsRender(); }
 		}).catch(function() {});
 		// event delegation on goals-body
 		var body = document.getElementById("goals-body");

@@ -1,0 +1,28 @@
+{
+  "roles": {
+    "AI投顾助手": {
+      "Serve Users": 0.5,
+      "Risk Alerting": 0.5
+    },
+    "林晚晴": {
+      "Risk Aversion": 0.9,
+      "Business Advancement": 0.1
+    },
+    "沈砚之": {
+      "Steady Returns": 0.6,
+      "Risk Aversion": 0.4
+    },
+    "老周": {
+      "Risk Aversion": 0.4,
+      "Maximize Returns": 0.6
+    },
+    "苏清越": {
+      "Strategy Stability": 0.7,
+      "Risk Aversion": 0.3
+    },
+    "陈慕白": {
+      "Research Rigor": 0.7,
+      "Timeliness": 0.3
+    }
+  }
+}

@@ -100,8 +100,15 @@ def on_agent(name, agent_data, step, sim_time):
         if server is not None and name in server.game.agents:
             role_type = getattr(server.game.agents[name], "role_type", "user") or "user"
             _status = server.game.agents[name].status or {}
-            goal_score = _status.get("goal_score")
             goal_alignment = _status.get("goal_alignment") or {}
+            # IVD:约束是"期望基准",与当下行动的逐目标对齐度做加权和,
+            # 得到"行动对制度约束的整体对齐度"(前端 Constraint alignment 指标)
+            _gov = getattr(server.game, "governance", None)
+            if _gov is not None and goal_alignment:
+                cons = _gov.get_constraints(name)
+                if cons:
+                    vals = [w * goal_alignment.get(g, 0.0) for g, w in cons.items()]
+                    goal_score = sum(vals)
     except Exception:
         pass
     msg: AgentState = {
@@ -134,28 +141,36 @@ def on_chat_line(speaker, text):
 
 @app.get("/api/goals")
 async def get_goals():
-    """返回当前所有角色的目标权重(供前端调节面板初始化)"""
+    """返回所有角色的治理约束(期望)与价值倾向(内化结果)"""
     global server
-    result = {}
+    # 约束来自 governance.json(制度层)
+    from mavisframework.runtime.governance import Governance
+    gov_path = os.path.join(BASE_DIR, "governance.json")
+    constraints = {}
+    if os.path.exists(gov_path):
+        gov = Governance()
+        gov.load(gov_path)
+        constraints = gov.all_constraints()
+    # 倾向来自运行中 Agent 的 value_tendency
+    tendency = {}
     if server is not None and server.game is not None:
         for name, agent in server.game.agents.items():
-            result[name] = dict(getattr(agent.scratch.config, "get", lambda k, d=None: d)("goals", {}) or {})
-    # 服务未启动时也返回 agent.json 里已配置的
-    if not result:
-        agents_root = os.path.join(BASE_DIR, "frontend/static/assets/village/agents")
-        if os.path.isdir(agents_root):
-            for n in sorted(os.listdir(agents_root)):
-                p = os.path.join(agents_root, n, "agent.json")
-                if os.path.exists(p):
-                    with open(p, "r", encoding="utf-8") as f:
-                        import json as _json
-                        result[n] = _json.load(f).get("goals", {})
-    return JSONResponse({"ok": True, "goals": result})
+            tendency[name] = agent.get_tendency()
+    return JSONResponse({
+        "ok": True,
+        "goals": constraints,       # 治理约束(期望,面板可调)
+        "tendency": tendency,      # 价值倾向(内化结果,只读)
+    })
 
 
 @app.post("/api/goals")
 async def update_goals(request: Request):
-    """更新某角色的目标权重:热更新运行中的 Agent + 持久化到 agent.json"""
+    """更新某角色的治理约束(专家设定期望目标权重)
+
+    IVD 语义:约束存在于 governance.json(制度层),不写入 agent.json(AI 本体)。
+    记录干预审计(interventions.json):时间/角色/旧值→新值。
+    约束不直接注入 prompt——仅作为客观后果反馈的对照基准。
+    """
     global server
     body = await request.json()
     name = str(body.get("name", "")).strip()
@@ -163,37 +178,46 @@ async def update_goals(request: Request):
     if not name:
         return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
     if not isinstance(goals, dict) or not goals:
-        return JSONResponse({"ok": False, "errors": ["goals 应为非空 dict(目标:权重)"]})
+        return JSONResponse({"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]})
     # 校验权重总和为 1(容差 1e-6)
     try:
         total = sum(float(v) for v in goals.values())
     except (TypeError, ValueError):
-        return JSONResponse({"ok": False, "errors": ["goals 权重值必须都是数字"]})
+        return JSONResponse({"ok": False, "errors": ["约束权重值必须都是数字"]})
     if abs(total - 1.0) > 1e-6:
-        return JSONResponse({"ok": False, "errors": [f"goals 权重总和应为 1,得到 {round(total, 4)}"]})
+        return JSONResponse({"ok": False, "errors": [f"约束权重总和应为 1,得到 {round(total, 4)}"]})
 
-    errors = []
-    # 1) 热更新运行中的 Agent(即时生效)
-    if server is not None and server.game is not None and name in server.game.agents:
-        try:
-            server.game.agents[name].set_goals(goals)
-        except Exception as e:
-            errors.append(f"热更新失败: {e}")
-    # 2) 持久化到 agent.json(重启保留)
-    agent_json_path = os.path.join(BASE_DIR, "frontend/static/assets/village/agents", name, "agent.json")
-    if os.path.exists(agent_json_path):
-        try:
-            with open(agent_json_path, "r", encoding="utf-8") as f:
-                import json as _json
-                data = _json.load(f)
-            data["goals"] = goals
-            with open(agent_json_path, "w", encoding="utf-8") as f:
-                _json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            errors.append(f"持久化失败: {e}")
-    if errors:
-        return JSONResponse({"ok": False, "errors": errors})
-    return JSONResponse({"ok": True, "name": name, "goals": goals})
+    # 1) 写 governance.json(制度层,非 AI 本体)
+    from mavisframework.runtime.governance import Governance
+    gov_path = os.path.join(BASE_DIR, "governance.json")
+    gov = Governance()
+    if os.path.exists(gov_path):
+        gov.load(gov_path)
+    old = gov.get_constraints(name)
+    gov.set_constraints(name, goals)  # set_constraints 内已 save
+
+    # 2) 记录干预审计(可审计链)
+    try:
+        import time as _time, datetime
+        audit_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+        audit = []
+        if os.path.exists(audit_path):
+            with open(audit_path, "r", encoding="utf-8") as f:
+                audit = json.load(f)
+        audit.append({
+            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "agent": name,
+            "old_constraints": old,
+            "new_constraints": goals,
+            "operator": "expert",
+        })
+        os.makedirs(os.path.dirname(audit_path), exist_ok=True)
+        with open(audit_path, "w", encoding="utf-8") as f:
+            json.dump(audit, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        pass  # 审计失败不阻断主流程
+
+    return JSONResponse({"ok": True, "name": name, "constraints": goals})
 
 
 def run_simulation(name, sim_config, start_step, step, stride):
@@ -248,7 +272,18 @@ def run_simulation(name, sim_config, start_step, step, stride):
         if llm_cfg.get("concurrency", 0) <= 0:
             llm_cfg["concurrency"] = max(1, agent_count)
 
-        game = Game(name, "frontend/static", sim_config, conversation, timer=timer)
+        # IVD:挂接治理约束 + 客观后果反馈
+        # governance.json 在 BASE_DIR(平台根),提供期望目标权重
+        from mavisframework.runtime.governance import Governance
+        from mavisframework.runtime.consequence import ConsequenceEngine
+        gov_path = os.path.join(BASE_DIR, "governance.json")
+        governance = Governance()
+        if os.path.exists(gov_path):
+            governance.load(gov_path)
+        consequence = ConsequenceEngine()
+
+        game = Game(name, "frontend/static", sim_config, conversation, timer=timer,
+                    governance=governance, consequence_fn=consequence.feedback)
         game.reset_game()
 
         # 薄封装,让 on_agent 能读到 server.game.conversation
