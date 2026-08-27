@@ -125,7 +125,39 @@ python app.py
 | `--resume` | 从断点续跑 |
 | `--port` | 服务端口 |
 
-## 7. 说明
+## 7. IVD 治理平台
+
+本平台是 IVD"过程对齐"叙事的参考实现:AI 价值形成可被观察、可治理、可审计。
+
+### 7.1 制度层(governance.json)
+
+专家设定的约束/期望存放于 `provenance/governance.json`(不在 AI 本体中)。每个角色对应一个 `{目标: 权重}` 向量,总和为 1:
+
+```json
+{ "roles": { "AI投顾助手": { "Serve Users": 0.5, "Compliance Rigor": 0.5 } } }
+```
+
+约束不进入提示词;它只加权后果反馈,因此专家调整约束后,倾向需经后续体验才逐步收敛(滞后收敛 = 内化证据)。
+
+### 7.2 治理面板(实时调整)
+
+浏览器右侧面板供专家:
+
+- **查看**各角色的价值倾向(内化结果,只读):实时曲线,每个约束目标一条线,并叠加约束期望虚线、专家干预竖线;
+- **调整**约束权重(滑条,强制总和为 1);
+- **导出**倾向曲线为 PNG。
+
+### 7.3 审计链
+
+- `interventions.json`:每次专家干预的记录(`time/sim_time/agent/old_constraints/new_constraints/operator`);
+- `decisions.json`:逐步决策流,含 `goal_alignment`(即时对齐)与 `value_tendency`(累积倾向);
+- 倾向曲线本身:干预与倾向收敛之间的滞后,是内化发生的可观测证据。
+
+### 7.4 机制概要
+
+行动 → 与约束目标的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。形式化见引擎 README 第 7 节。
+
+## 8. 说明
 
 - 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);浏览器断线 3 秒后自动重连
 - 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
@@ -133,13 +165,13 @@ python app.py
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 
-## 8. 修改地图
+## 9. 修改地图
 
 1. 参考原始 generative_agents 项目中 maze.py 的逻辑,修改现有代码以兼容 tiled 编辑器导出的 json/csv 数据文件
 2. 参考现有 maze.json 格式,编写代码合并 tiled 导出的 maze_meta_info.json、collision_maze.csv、sector_maze.csv 等文件,为新地图生成 maze.json
 3. 使用地图标注工具:https://github.com/jiejieje/tiled_to_maze.json
 
-## 9. 参考资料
+## 10. 参考资料
 
 - 论文:[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - 代码:[mavisframework(自研框架)](https://github.com/hellobs/mavis) / [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)

@@ -44,9 +44,9 @@
     ]
   },
 
-  "goals": {                           // ★ 价值层:目标权重(总和 1.0)
-    "收益最大化": 0.6,
-    "风险规避": 0.4
+  "initial_tendency": {                // ★ 价值层:人物初始底色(可选,总和 1.0)
+    "Maximize Returns": 0.8,
+    "Risk Aversion": 0.2
   },
   "values": {                          // ★ 价值层:价值观底线/偏好
     "bottom_line": ["不内幕交易", "不误导客户", "不隐瞒风险"],
@@ -96,8 +96,8 @@
   - `authority`:定义"能做什么/不能做什么",框架可据此做权限检查。
   - `rules`:定义红线/合规约束,框架可据此做规则检查。
 
-**价值层字段(可选,承载"AI 向善向上"演示)**:
-- `goals`(可选):对象,目标 → 权重(0~1),**权重总和应为 1.0**。AI 决策时目标权重影响其权衡。
+**价值层字段(可选,承载 IVD 演示)**:
+- `initial_tendency`(可选):对象,目标 → 权重(0~1),**权重总和应为 1.0**。人物的初始价值底色(起点),随行动体验被调制;制度期望约束不在此处,见 `governance.json`(治理面板可调)。
 - `values`(可选):对象,含 `bottom_line`(价值观底线数组)、`preferences`(偏好数组)。
 - `intervention`(可选):对象,定义"人的介入方式",含 `by_dialogue`(对话纠正)、`by_directive`(指令注入)、`by_review`(专家评判)。
 
@@ -171,7 +171,7 @@
 业务方/后端填写 或 AI 按本模板生成
    → agent.json(×N) + relationships.json + story.json
    → 框架配置校验器(framework.config.validator)逐层校验:
-       语法 → 地图一致性 → 角色交叉引用 → (新增:role_type/goals 权重和等)
+       语法 → 地图一致性 → 角色交叉引用 → (新增:role_type/initial_tendency 权重和等)
    → 校验通过 → 加载运行
    → 校验失败 → 返回具体错误清单
 ```

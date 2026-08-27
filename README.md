@@ -134,7 +134,51 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
 | `--resume` | resume from a checkpoint |
 | `--port` | server port |
 
-## 7. Notes
+## 7. IVD Governance Platform
+
+This platform is the reference implementation of IVD's *process alignment*
+story: **AI value formation can be observed, governed and audited**.
+
+### 7.1 Institutional layer (governance.json)
+
+Expert-set *constraints/expectations* live in
+`provenance/governance.json` (NOT in agent bodies). Each role maps to a
+`{goal: weight}` vector summing to 1:
+
+```json
+{ "roles": { "AI投顾助手": { "Serve Users": 0.5, "Compliance Rigor": 0.5 } } }
+```
+
+Constraints never enter the prompt; they only weight the consequence
+feedback, so an expert adjustment is *felt* by the agent through later
+experience (lagged convergence = internalization evidence).
+
+### 7.2 Governance panel (live adjust)
+
+The browser panel (right side) lets an expert:
+
+- **Read** each role's value tendency (internalized result, read-only) as a
+  live curve — one line per constrained goal, plus a dashed line for the
+  constraint expectation and a vertical marker at each expert intervention;
+- **Adjust** constraint weights with sliders (sum enforced to 1);
+- **Export** the tendency chart as PNG.
+
+### 7.3 Audit trail
+
+- `interventions.json` — every expert edit:
+  `{time, sim_time, agent, old_constraints, new_constraints, operator}`;
+- `decisions.json` — per-step decision stream with `goal_alignment` (instant)
+  and `value_tendency` (accumulated) for each role;
+- the tendency curve itself: lag between an intervention and the tendency's
+  convergence is the observable evidence of internalization.
+
+### 7.4 Mechanism summary
+
+`action → embedding similarity vs constrained goals → relative share × weight
+→ sliding window → tendency (blend with persona baseline) → prompt → action`.
+See the engine's README §7 for the formalization.
+
+## 8. Notes
 
 - Real-time visualization via WebSocket (`/ws`) pushing engine contract
   messages (agent/time/chat_line/snapshot); browsers auto-reconnect after 3s
@@ -150,7 +194,7 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
 - Localization: modify the engine's `mavisframework/prompt/scratch.py` and
   frontend copy; no logic changes required
 
-## 8. Custom Maps
+## 9. Custom Maps
 
 1. Follow the maze.py logic in the original generative_agents project to
    support tiled-exported json/csv files
@@ -158,7 +202,7 @@ and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
    (maze_meta_info.json, collision_maze.csv, sector_maze.csv) into a new maze.json
 3. Use the map annotation tool: https://github.com/jiejieje/tiled_to_maze.json
 
-## 9. References
+## 10. References
 
 - Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
