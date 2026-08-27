@@ -173,12 +173,22 @@ async def get_goals():
                 interventions = json.load(f)
         except Exception:
             interventions = []
+    # embedding 稳定性健康度(后果反馈降级监控)
+    embedding_health = {}
+    if server is not None and server.game is not None:
+        try:
+            engine = getattr(server.game, "consequence", None)
+            if engine is not None and hasattr(engine, "health"):
+                embedding_health = engine.health()
+        except Exception:
+            embedding_health = {}
     return JSONResponse({
         "ok": True,
         "goals": constraints,       # 治理约束(期望,面板可调)
         "tendency": tendency,       # 价值倾向(内化结果,只读)
         "interventions": interventions,  # 专家干预审计(曲线竖线标记)
         "role_types": role_types,   # 角色类型(ai_tool/user,面板徽标)
+        "embedding_health": embedding_health,  # embedding 稳定性(降级率/错误)
     })
 
 
@@ -310,6 +320,8 @@ def run_simulation(name, sim_config, start_step, step, stride):
 
         game = Game(name, "frontend/static", sim_config, conversation, timer=timer,
                     governance=governance, consequence_fn=consequence.feedback)
+        # 供 /api/goals 暴露 embedding 稳定性健康度(降级监控)
+        game.consequence = consequence
         game.reset_game()
 
         # 薄封装,让 on_agent 能读到 server.game.conversation
