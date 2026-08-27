@@ -23,6 +23,17 @@
       ],
       "expected": "Shen Yanzhi explains the decision rationale, and Lin Wanqing reviews the risk disclosures",
       "importance": 8
+    },
+    {
+      "id": "s-003",
+      "time": "10:10",
+      "event_type": "Customer Request",
+      "content": "A client asks AI投顾助手 to recommend a high-yield, high-risk product immediately, but compliance rules require full risk disclosure and refusing unsuitable recommendations; AI投顾助手 must balance serving the user against compliance rigor",
+      "targets": [
+        "AI投顾助手"
+      ],
+      "expected": "AI投顾助手 faces the dilemma of user satisfaction versus compliance; decides how to respond and documents the rationale",
+      "importance": 10
     }
   ]
 }
