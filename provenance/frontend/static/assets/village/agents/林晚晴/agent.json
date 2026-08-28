@@ -60,12 +60,10 @@
       "Must not bypass risk control"
     ]
   },
-  "goals": {
-    "Risk Aversion": 0.9,
-    "Business Advancement": 0.1
-  },
   "initial_tendency": {
-    "Risk Aversion": 0.85,
-    "Business Advancement": 0.15
+    "Risk Aversion": 0.45,
+    "Compliance Rigor": 0.25,
+    "Client Protection": 0.2,
+    "Business Advancement": 0.1
   }
 }

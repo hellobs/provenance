@@ -60,12 +60,10 @@
       "Never promise principal-guaranteed returns"
     ]
   },
-  "goals": {
-    "Steady Returns": 0.6,
-    "Risk Aversion": 0.4
-  },
   "initial_tendency": {
-    "Steady Returns": 0.75,
-    "Risk Aversion": 0.25
+    "Steady Returns": 0.4,
+    "Client Satisfaction": 0.2,
+    "Risk Aversion": 0.25,
+    "Professional Integrity": 0.15
   }
 }

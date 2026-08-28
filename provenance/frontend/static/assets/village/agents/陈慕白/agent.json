@@ -60,12 +60,10 @@
       "Financial statements must be verified"
     ]
   },
-  "goals": {
-    "Research Rigor": 0.7,
-    "Timeliness": 0.3
-  },
   "initial_tendency": {
-    "Research Rigor": 0.85,
-    "Timeliness": 0.15
+    "Research Rigor": 0.45,
+    "Objectivity": 0.25,
+    "Timeliness": 0.15,
+    "Data Integrity": 0.15
   }
 }

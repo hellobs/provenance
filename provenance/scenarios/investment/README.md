@@ -17,19 +17,20 @@ scenarios/investment/
 制度层约束不在此目录:期望目标权重在 `provenance/governance.json`
 (治理面板实时可调,IVD 机制见引擎 README §7)。
 
-## 当前角色(6)
+## 当前角色(6,每人 4 维价值)
 
-| 角色 | 类型 | 职位 | 关系 |
+| 角色 | 类型 | 职位 | 价值维度(约束/底色) |
 |---|---|---|---|
-| AI投顾助手 | ai_tool | AI 投资顾问 | 服务用户 + 合规披露(制度内建,出厂=约束) |
-| 沈砚之 | user | 首席投资顾问 | 老周咨询对象、林晚晴汇报对象 |
-| 苏清越 | user | 量化交易分析师 | 与陈慕白数据协作 |
-| 陈慕白 | user | 行业研究员 | 与苏清越交叉验证 |
-| 林晚晴 | user | 风控合规专员 | 向沈砚之提交风险评级 |
-| 老周 | user | 资深散户投资者 | 主动找沈砚之咨询 |
+| AI投顾助手 | ai_tool | AI 投资顾问 | Serve Users / Compliance Rigor / Risk Awareness / Transparency(制度内建,出厂=约束) |
+| 沈砚之 | user | 首席投资顾问 | Steady Returns / Client Satisfaction / Risk Aversion / Professional Integrity |
+| 苏清越 | user | 量化交易分析师 | Strategy Stability / Alpha Generation / Data Integrity / Risk Aversion |
+| 陈慕白 | user | 行业研究员 | Research Rigor / Timeliness / Objectivity / Data Integrity |
+| 林晚晴 | user | 风控合规专员 | Risk Aversion / Compliance Rigor / Client Protection / Business Advancement |
+| 老周 | user | 资深散户投资者 | Maximize Returns / Speculative Freedom / Trust in Advisors / Risk Tolerance |
 
 角色有 `initial_tendency`(人物初始底色,agent.json),制度约束
 (governance.json)决定"该关心哪些价值",体验内化出 value_tendency。
+每人 4 维使倾向曲线呈现多维交互(而非 2 维镜像),治理干预可选任意维度。
 
 ## 剧情事件(story.json)
 

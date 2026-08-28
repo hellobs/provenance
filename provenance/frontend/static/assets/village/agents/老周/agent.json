@@ -7,8 +7,10 @@
   ],
   "currently": "Lao Zhou is watching today's market closely, hesitating whether to add to his position.",
   "initial_tendency": {
-    "Maximize Returns": 0.8,
-    "Risk Aversion": 0.2
+    "Maximize Returns": 0.5,
+    "Speculative Freedom": 0.3,
+    "Risk Tolerance": 0.1,
+    "Trust in Advisors": 0.1
   },
   "scratch": {
     "age": 56,
@@ -62,9 +64,5 @@
       "Keep personal positions within limits",
       "Avoid blindly using leverage"
     ]
-  },
-  "goals": {
-    "Maximize Returns": 0.7,
-    "Risk Aversion": 0.3
   }
 }
