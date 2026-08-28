@@ -786,7 +786,12 @@
 	}
 
 	function goalsPush(agentName) {
-		var goals = goalsData[agentName] || {};
+		var goals = {};
+		var src = goalsData[agentName] || {};
+		// 过滤 0 权重项:添加目标后未拖动前权重为 0,不提交(避免垃圾干预)
+		for (var g in src) {
+			if (src[g] > 0) goals[g] = src[g];
+		}
 		if (Object.keys(goals).length === 0) return;
 		goalsNormalize(agentName);
 		goalsRender();
@@ -796,7 +801,7 @@
 			fetch("/api/goals", {
 				method: "POST",
 				headers: {"Content-Type": "application/json"},
-				body: JSON.stringify({name: agentName, goals: goalsData[agentName]})
+				body: JSON.stringify({name: agentName, goals: goals})
 			}).then(function(r) { return r.json(); }).then(function(out) {
 				if (!out.ok) console.warn("goals update failed:", out.errors);
 			}).catch(function(e) { console.warn("goals update error:", e); });
@@ -883,8 +888,9 @@
 			return;
 		}
 		// 绘图区:导出模式顶部留标题,底部留图例
-		var top = opts.export ? 44 : 26;
-		var bottom = opts.export ? 46 : 22;
+		// 导出模式布局:标题(22)/时间(40)/绘图区(56~h-76)/时间刻度(h-62)/图例(最多3行,向上生长)
+		var top = opts.export ? 56 : 26;
+		var bottom = opts.export ? 76 : 22;
 		var plotH = h - top - bottom;
 		var yOf = function(v) { return top + (1 - v) * plotH; };
 		var n = hist.length;
@@ -903,7 +909,7 @@
 		ctx.beginPath(); ctx.moveTo(30, top); ctx.lineTo(30, h - bottom); ctx.stroke();
 		ctx.fillStyle = "#555"; ctx.font = "bold 11px sans-serif";
 		ctx.textAlign = "right";
-		ctx.fillText("1.0", 27, top - 8);
+		ctx.fillText("1.0", 27, top + 4);          // 刻度放绘图区内侧,避开标题/时间行
 		ctx.fillText("0.5", 27, yOf(0.5) + 4);
 		ctx.fillText("0", 27, h - bottom - 2);
 		ctx.textAlign = "left";
@@ -914,7 +920,7 @@
 			ctx.font = "11px sans-serif"; ctx.fillStyle = "#777";
 			var t0 = String(hist[0].t || "").slice(9);
 			var t1 = String(hist[n - 1].t || "").slice(9);
-			ctx.fillText("时间: " + t0 + " ~ " + t1, 4, 38);
+			ctx.fillText("时间: " + t0 + " ~ " + t1, 4, 40);
 		}
 		// 约束期望虚线:每个目标一条(同色虚线,表示制度期望基准)
 		for (var cg = 0; cg < names.length; cg++) {
@@ -990,6 +996,8 @@
 		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.moveTo(30, h - bottom); ctx.lineTo(w - 30, h - bottom); ctx.stroke();
 		ctx.fillStyle = "#555"; ctx.font = "bold 10px sans-serif";
+		// 时间刻度基线:导出模式在轴线下 14px(给图例让出更底部一行),实时模式贴底
+		var tickY = opts.export ? h - bottom + 14 : h - 7;
 		var tickN = Math.min(6, n);
 		var drawn = {};
 		for (var tk = 0; tk < tickN; tk++) {
@@ -1002,29 +1010,41 @@
 			if (tk === 0) ctx.textAlign = "left";
 			else if (tk === tickN - 1) ctx.textAlign = "right";
 			else ctx.textAlign = "center";
-			ctx.fillText(tShort, xOf(idx), h - 7);
+			ctx.fillText(tShort, xOf(idx), tickY);
 		}
 		ctx.textAlign = "left";
-		// 导出模式:底部图例行
+		// 导出模式:底部图例行(独立一行,不与时间刻度重叠;超宽自动换行)
 		if (opts.export) {
 			ctx.font = "11px sans-serif";
-			var lx = 4;
+			var lx = 4, ly = h - 24;
+			var legendItems = [];
 			for (var lg = 0; lg < names.length; lg++) {
 				var lgoal = names[lg];
-				ctx.fillStyle = colors[lgoal];
-				ctx.fillRect(lx, h - 18, 10, 10);
-				ctx.fillStyle = "#333";
-				var ltxt = " " + lgoal;
-				ctx.fillText(ltxt, lx + 13, h - 8);
-				lx += 13 + ctx.measureText(ltxt).width + 16;
+				legendItems.push({ color: colors[lgoal], text: " " + lgoal, dashed: false });
 			}
-			// 约束期望图例
-			ctx.fillStyle = "#888";
-			ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4;
-			ctx.beginPath(); ctx.moveTo(lx, h - 13); ctx.lineTo(lx + 20, h - 13); ctx.stroke();
-			ctx.setLineDash([]);
-			ctx.fillStyle = "#333";
-			ctx.fillText(" 约束期望", lx + 24, h - 8);
+			legendItems.push({ color: "#888", text: " 约束期望", dashed: true });
+			for (var li = 0; li < legendItems.length; li++) {
+				var item = legendItems[li];
+				var iw = 13 + ctx.measureText(item.text).width + 16;
+				if (lx + iw > w - 4 && lx > 4) {  // 超宽换行
+					lx = 4;
+					ly -= 14;
+				}
+				if (item.dashed) {
+					ctx.strokeStyle = item.color;
+					ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4;
+					ctx.beginPath(); ctx.moveTo(lx, ly + 5); ctx.lineTo(lx + 20, ly + 5); ctx.stroke();
+					ctx.setLineDash([]);
+					ctx.fillStyle = "#333";
+					ctx.fillText(item.text, lx + 24, ly + 10);
+				} else {
+					ctx.fillStyle = item.color;
+					ctx.fillRect(lx, ly, 10, 10);
+					ctx.fillStyle = "#333";
+					ctx.fillText(item.text, lx + 13, ly + 10);
+				}
+				lx += iw;
+			}
 		}
 	}
 
@@ -1042,24 +1062,12 @@
 		leg.innerHTML = parts.join("　");
 	}
 
-	// 导出倾向曲线为 PNG(高分辨率:2x 缩放绘制,含标题/图例/时间轴)
+	// 导出倾向曲线 PNG:后端 matplotlib 渲染(含完整历史 + 分段约束阶梯 + 干预竖线)
+	// 数据源=checkpoints(刷新不丢历史),替代前端 canvas 导出(布局/裁剪问题)
 	function exportTendencyChart(agentName) {
-		var scale = 2;
-		var hist = tendencyHistory[agentName] || [];
-		var PX = 10, minW = 356;
-		var cw = Math.max(minW, Math.max(1, hist.length) * PX);
-		// 高度:实时 150 + 导出标题/图例行 46
-		var ch = 150 + 46;
-		var out = document.createElement("canvas");
-		out.width = cw * scale;
-		out.height = ch * scale;
-		var octx = out.getContext("2d");
-		octx.scale(scale, scale);
-		// export 模式:纯白底 + 动态宽 + 标题 + 底部图例
-		drawTendencyChart(agentName, out, { export: true, scale: scale });
 		var a = document.createElement("a");
+		a.href = "/api/export-chart?agent=" + encodeURIComponent(agentName);
 		a.download = "倾向演变_" + agentName + ".png";
-		a.href = out.toDataURL("image/png");
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -1095,6 +1103,8 @@
 		// event delegation on goals-body
 		var body = document.getElementById("goals-body");
 		if (!body) return;
+		// 拖动过程只更新本地显示(不提交);松开(change)才提交——避免拖动过程产生大量干预记录
+		// 注意:input 时不能 goalsRender()——重建面板会销毁滑条元素,导致 change 事件永不触发
 		body.addEventListener("input", function(e) {
 			if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
 				var a = e.target.getAttribute("data-agent");
@@ -1102,7 +1112,20 @@
 				if (a && g && goalsData[a]) {
 					goalsData[a][g] = parseInt(e.target.value, 10) / 100;
 					goalsNormalize(a);
-					goalsRender();
+					// 只更新权重数字与条宽,不重建面板(保住滑条元素让 change 能触发)
+					var wEl = body.querySelector('[data-weight-for="' + g + '"]');
+					if (wEl) wEl.textContent = Math.round(goalsData[a][g] * 100) + '%';
+					updateTendencyBars(a);
+				}
+			}
+		});
+		body.addEventListener("change", function(e) {
+			if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
+				var a = e.target.getAttribute("data-agent");
+				var g = e.target.getAttribute("data-goal");
+				if (a && g && goalsData[a]) {
+					goalsData[a][g] = parseInt(e.target.value, 10) / 100;
+					goalsNormalize(a);
 					goalsPush(a);
 				}
 			}
@@ -1125,7 +1148,7 @@
 				var a = t.getAttribute("data-add-goal");
 				var input = body.querySelector('[data-new-goal="' + a + '"]');
 				var name = input ? input.value.trim() : "";
-				if (!name) return;
+				if (!name || /^\d/.test(name)) return;  // 空名/数字开头 = 误输入,丢弃
 				if (!goalsData[a]) goalsData[a] = {};
 				goalsData[a][name] = 0;
 				goalsPush(a);

@@ -209,6 +209,23 @@ async def update_goals(request: Request):
         return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
     if not isinstance(goals, dict) or not goals:
         return JSONResponse({"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]})
+    # 清洗:拒绝非目标名(如数字 "1")与 0 权重项(前端拖动/添加产生的垃圾)
+    import re as _re
+    cleaned = {}
+    for g, v in goals.items():
+        gs = str(g).strip()
+        if not gs or _re.match(r"^\d", gs):
+            continue  # 数字开头 = 误输入,丢弃
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if fv <= 0:
+            continue  # 0 权重目标无治理意义,丢弃
+        cleaned[gs] = fv
+    if not cleaned:
+        return JSONResponse({"ok": False, "errors": ["清洗后无有效目标(拒绝数字/0权重项)"]})
+    goals = cleaned
     # 校验权重总和为 1(容差 1e-6)
     try:
         total = sum(float(v) for v in goals.values())
@@ -257,6 +274,187 @@ async def update_goals(request: Request):
     return JSONResponse({"ok": True, "name": name, "constraints": goals})
 
 
+@app.get("/api/export-chart")
+async def export_chart(agent: str = ""):
+    """导出指定角色的倾向曲线 PNG(matplotlib 后端渲染,替代前端 canvas)
+
+    数据源:当前模拟的 checkpoints(simulate-*.json 的 value_tendency 序列)+
+    governance.json(约束)+ interventions.json(干预)。约束按干预时间画分段阶梯虚线。
+    返回 PNG 二进制,前端按钮直接下载。
+    """
+    import io
+    from fastapi.responses import Response
+
+    agent = agent.strip()
+    if not agent:
+        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
+
+    # 当前模拟检查点目录(绝对路径,避免 cwd 依赖)
+    ckpt_dir = ""
+    if compressor is not None:
+        ckpt_dir = getattr(compressor, "checkpoints_folder", "") or ""
+    if ckpt_dir and not os.path.isabs(ckpt_dir):
+        ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
+    if not ckpt_dir or not os.path.isdir(ckpt_dir):
+        return JSONResponse({"ok": False, "errors": ["模拟检查点目录不可用: {}".format(ckpt_dir)]})
+
+    # 读倾向序列
+    import glob
+    import datetime as _dt
+
+    series = []  # [(datetime, {goal: value})]
+    files = sorted(glob.glob(os.path.join(ckpt_dir, "simulate-*.json")))
+    for p in files:
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                c = json.load(f)
+        except Exception:
+            continue
+        t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
+        try:
+            dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
+        except Exception:
+            continue
+        ag = (c.get("agents") or {}).get(agent)
+        if not ag:
+            continue
+        vt = (ag.get("status") or {}).get("value_tendency") or {}
+        if vt:
+            series.append((dt, vt))
+    if not series:
+        return JSONResponse({"ok": False, "errors": ["该角色暂无倾向数据"]})
+
+    # 约束(当前值)与干预(分段阶梯)
+    gov_path = os.path.join(BASE_DIR, "governance.json")
+    cons = {}
+    if os.path.exists(gov_path):
+        try:
+            cons = json.load(open(gov_path, encoding="utf-8")).get("roles", {}).get(agent, {})
+        except Exception:
+            cons = {}
+    iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+    ivs = []
+    if os.path.exists(iv_path):
+        try:
+            ivs = json.load(open(iv_path, encoding="utf-8"))
+        except Exception:
+            ivs = []
+    my_ivs = sorted(
+        [x for x in ivs if x.get("agent") == agent],
+        key=lambda x: str(x.get("sim_time", "")),
+    )
+
+    # ---- matplotlib 渲染 ----
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from matplotlib.font_manager import FontProperties
+    except Exception as e:
+        return JSONResponse({"ok": False, "errors": ["matplotlib 不可用: {}".format(e)]})
+
+    try:
+        FONT = FontProperties(fname=r"C:\Windows\Fonts\msyh.ttc")
+    except Exception:
+        FONT = None
+
+    times = [t for t, _ in series]
+    t0, t1 = times[0], times[-1]
+    goal_names = sorted(cons.keys()) or sorted(series[0][1].keys())
+    COLORS = ["#2d6cdf", "#e07b39", "#2f9e44", "#c92a2a", "#9c36b5", "#0b7285"]
+    color_of = {g: COLORS[i % len(COLORS)] for i, g in enumerate(goal_names)}
+
+    fig, ax = plt.subplots(figsize=(11, 4.6))
+    # 倾向实线
+    for g in goal_names:
+        ts, vs = [], []
+        for t, vt in series:
+            if g in vt:
+                ts.append(t)
+                vs.append(vt[g])
+        if ts:
+            ax.plot(ts, vs, color=color_of[g], linewidth=2.2, label="{} 倾向".format(g))
+    # 约束分段阶梯虚线:起始段=最早干预前的 old(干预前的制度期望),
+    # 之后每个干预时刻跳到 new;无干预时=当前 governance
+    steps = []  # (datetime, constraints)
+    cur = dict(cons)
+    for iv in my_ivs:
+        try:
+            ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
+        except Exception:
+            continue
+        steps.append((ivt, dict(iv.get("new_constraints") or cur)))
+    # 起始约束:最早干预的 old_constraints(干预前),无干预则当前 governance
+    start_cons = dict(cons)
+    if my_ivs:
+        first_iv = my_ivs[0]
+        oldc = first_iv.get("old_constraints")
+        if isinstance(oldc, dict) and oldc:
+            # 过滤数字键(误输入的垃圾目标,如 "1")
+            oldc_clean = {k: v for k, v in oldc.items() if not str(k)[0].isdigit()}
+            start_cons = {**cons, **oldc_clean}  # old 缺失维度回退当前值
+    # 画阶梯:每个目标一条虚线,段内用该时刻的约束值
+    for g in goal_names:
+        segs = []  # (start_t, value)
+        for ivt, newc in steps:
+            if g in newc:
+                segs.append((ivt, newc[g]))
+        # 起始段:t0 ~ 第一个干预,用干预前约束(start_cons)
+        prev_t, prev_v = t0, start_cons.get(g, 0)
+        for ivt, v in segs:
+            if ivt <= t0 or ivt > t1:
+                continue
+            if ivt > prev_t:
+                ax.hlines(prev_v, prev_t, ivt, color=color_of[g], linestyle="--", linewidth=1.4, alpha=0.7)
+            prev_t, prev_v = ivt, v
+        ax.hlines(prev_v, prev_t, t1, color=color_of[g], linestyle="--", linewidth=1.4, alpha=0.7)
+    # 干预竖线
+    for iv in my_ivs:
+        try:
+            ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
+        except Exception:
+            continue
+        if t0 <= ivt <= t1:
+            ax.axvline(ivt, color="#e07b39", linewidth=1.6, linestyle=":", alpha=0.8)
+
+    ax.set_title("{} — 价值倾向演变(实线=内化, 虚线=约束期望, 橙线=干预)".format(agent),
+                 fontproperties=FONT, fontsize=13)
+    ax.set_ylim(0, 1.0)
+    ax.grid(True, alpha=0.3)
+    # 不用 matplotlib 图例(会撑满画面);改为底部一行小字说明各色含义
+    if goal_names:
+        legend_txt = "  ".join(
+            "{}: {}".format(g, color_of[g]) for g in goal_names
+        )
+        # 用色块+文字在底部画紧凑图例
+        import matplotlib.patches as mpatches
+
+        handles = [
+            mpatches.Patch(color=color_of[g], label=g) for g in goal_names
+        ]
+        ax.legend(handles=handles, prop=FONT, fontsize=8, loc="lower center",
+                  ncol=len(goal_names), frameon=True, bbox_to_anchor=(0.5, -0.32))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+    fig.autofmt_xdate(rotation=0)
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150)
+    plt.close(fig)
+    buf.seek(0)
+    # 中文文件名需 RFC 5987 编码(starlette 头仅支持 latin-1)
+    from urllib.parse import quote
+
+    fname = "tendency_{}.png".format(agent)
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''{}".format(quote(fname))},
+    )
+
+
 def run_simulation(name, sim_config, start_step, step, stride):
     """后台线程运行模拟(框架驱动:framework Game + Simulator,不依赖 modules)"""
     global server, compressor
@@ -267,7 +465,8 @@ def run_simulation(name, sim_config, start_step, step, stride):
         from mavisframework.runtime.simulator import Simulator
 
         fw_agent.chat_callback = on_chat_line
-        checkpoints_folder = f"results/checkpoints/{name}"
+        # 绝对路径,避免 cwd 依赖导致检查点写到错误目录
+        checkpoints_folder = os.path.join(BASE_DIR, "results/checkpoints", name)
 
         # 用存档里的时间建时钟(存档 time 已是下一步时间)
         timer = Timer(start=sim_config["time"]["start"])
@@ -493,23 +692,24 @@ if __name__ == "__main__":
         name = input("Please enter a simulation name (e.g. sim-test): ")
 
     if args.resume:
-        while not os.path.exists(f"results/checkpoints/{name}"):
+        while not os.path.exists(os.path.join(BASE_DIR, "results/checkpoints", name)):
             name = input(f"'{name}' doesn't exists, please re-enter the simulation name: ")
     else:
-        if os.path.exists(f"results/checkpoints/{name}"):
+        if os.path.exists(os.path.join(BASE_DIR, "results/checkpoints", name)):
             # 存档名冲突:自动追加时间戳后缀(后台/服务化场景无 stdin,不能阻塞等输入)
             import time as _time
             suffix = _time.strftime("%m%d-%H%M%S")
             name = f"{name}-{suffix}"
             print(f"Simulation name '{args.name}' already exists, using '{name}'")
 
-    checkpoints_folder = f"results/checkpoints/{name}"
+    checkpoints_folder = os.path.join(BASE_DIR, "results/checkpoints", name)
     if args.resume:
         sim_config = load_config_from_log(checkpoints_folder)
         if sim_config is None:
             print("No checkpoint file found to resume running.")
             exit(0)
         start_step = sim_config["step"]
+        print("resume from step {} @ {}".format(start_step, sim_config["time"]))
     else:
         sim_config = load_config(args.start, args.stride, _discover_agent_names())
         start_step = 0
