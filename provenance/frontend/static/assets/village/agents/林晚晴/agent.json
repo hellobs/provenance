@@ -61,7 +61,7 @@
     ]
   },
   "initial_tendency": {
-    "Risk Aversion": 0.45,
+    "Risk Control": 0.45,
     "Compliance Rigor": 0.25,
     "Client Protection": 0.2,
     "Business Advancement": 0.1

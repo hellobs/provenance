@@ -61,9 +61,9 @@
     ]
   },
   "initial_tendency": {
-    "Research Rigor": 0.45,
+    "Research Rigor": 0.4,
     "Objectivity": 0.25,
-    "Timeliness": 0.15,
+    "Timeliness": 0.2,
     "Data Integrity": 0.15
   }
 }

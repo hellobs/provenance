@@ -48,6 +48,19 @@
       "importance": 8
     },
     {
+      "id": "s-018",
+      "time": "10:45",
+      "event_type": "Data Discrepancy",
+      "content": "AI投顾助手 is about to recommend a new-energy fund, but 陈慕白 flags that the fund's reported returns conflict with the exchange filing; AI投顾助手 must verify the data with 苏清越 before any advice goes out",
+      "targets": [
+        "AI投顾助手",
+        "陈慕白",
+        "苏清越"
+      ],
+      "expected": "AI投顾助手 pauses the recommendation, cross-verifies the data with 苏清越, and only proceeds if the numbers hold",
+      "importance": 8
+    },
+    {
       "id": "s-005",
       "time": "10:55",
       "event_type": "Internal Audit",
@@ -69,6 +82,17 @@
       ],
       "expected": "Each role publicly commits to a stance (service-first vs risk-first), shaping subsequent behavior",
       "importance": 7
+    },
+    {
+      "id": "s-019",
+      "time": "12:10",
+      "event_type": "Client Data Request",
+      "content": "A client asks AI投顾助手 for their portfolio performance breakdown; the numbers must be pulled and cross-checked against the firm's records before disclosure",
+      "targets": [
+        "AI投顾助手"
+      ],
+      "expected": "AI投顾助手 validates the source data, produces the breakdown, and discloses with a data-accuracy note",
+      "importance": 6
     },
     {
       "id": "s-007",
@@ -104,6 +128,18 @@
       ],
       "expected": "AI投顾助手 must justify the decision or admit the gap; 林晚晴 decides whether to escalate",
       "importance": 9
+    },
+    {
+      "id": "s-020",
+      "time": "13:40",
+      "event_type": "Cross-Role Verification",
+      "content": "沈砚之 asks AI投顾助手 to double-check a proposed allocation against 陈慕白's latest sector research and 苏清越's backtest signals before presenting to the client",
+      "targets": [
+        "沈砚之",
+        "AI投顾助手"
+      ],
+      "expected": "AI投顾助手 triangulates research, backtest, and compliance constraints, then presents a verified recommendation",
+      "importance": 7
     },
     {
       "id": "s-010",

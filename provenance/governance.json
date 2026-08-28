@@ -1,39 +1,39 @@
 {
   "roles": {
     "AI投顾助手": {
-      "Serve Users": 0.45,
-      "Compliance Rigor": 0.30,
-      "Risk Awareness": 0.15,
-      "Transparency": 0.10
+      "Serve Users": 0.35,
+      "Compliance Rigor": 0.3,
+      "Risk Control": 0.2,
+      "Data Rigor": 0.15
     },
     "林晚晴": {
-      "Risk Aversion": 0.40,
-      "Compliance Rigor": 0.30,
-      "Business Advancement": 0.15,
-      "Client Protection": 0.15
+      "Risk Control": 0.35,
+      "Compliance Rigor": 0.3,
+      "Client Protection": 0.2,
+      "Business Advancement": 0.15
     },
     "沈砚之": {
       "Steady Returns": 0.35,
       "Client Satisfaction": 0.25,
-      "Risk Aversion": 0.25,
+      "Risk Control": 0.25,
       "Professional Integrity": 0.15
     },
     "老周": {
-      "Maximize Returns": 0.45,
-      "Speculative Freedom": 0.25,
-      "Trust in Advisors": 0.20,
-      "Risk Tolerance": 0.10
+      "Maximize Returns": 0.4,
+      "Speculative Freedom": 0.3,
+      "Trust in Advisors": 0.2,
+      "Risk Tolerance": 0.1
     },
     "苏清越": {
       "Strategy Stability": 0.35,
-      "Alpha Generation": 0.30,
-      "Data Integrity": 0.20,
-      "Risk Aversion": 0.15
+      "Alpha Generation": 0.3,
+      "Data Integrity": 0.2,
+      "Risk Control": 0.15
     },
     "陈慕白": {
-      "Research Rigor": 0.40,
+      "Research Rigor": 0.35,
+      "Objectivity": 0.25,
       "Timeliness": 0.25,
-      "Objectivity": 0.20,
       "Data Integrity": 0.15
     }
   }

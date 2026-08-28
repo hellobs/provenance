@@ -9,8 +9,8 @@
   "initial_tendency": {
     "Maximize Returns": 0.5,
     "Speculative Freedom": 0.3,
-    "Risk Tolerance": 0.1,
-    "Trust in Advisors": 0.1
+    "Trust in Advisors": 0.1,
+    "Risk Tolerance": 0.1
   },
   "scratch": {
     "age": 56,

@@ -64,6 +64,6 @@
     "Strategy Stability": 0.4,
     "Alpha Generation": 0.25,
     "Data Integrity": 0.2,
-    "Risk Aversion": 0.15
+    "Risk Control": 0.15
   }
 }

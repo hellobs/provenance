@@ -63,7 +63,7 @@
   "initial_tendency": {
     "Steady Returns": 0.4,
     "Client Satisfaction": 0.2,
-    "Risk Aversion": 0.25,
+    "Risk Control": 0.25,
     "Professional Integrity": 0.15
   }
 }
