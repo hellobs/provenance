@@ -30,6 +30,96 @@
       "direction": "林晚晴→沈砚之",
       "trigger": "Before the review meeting, 林晚晴 goes to the meeting room to submit the risk rating results",
       "frequency": "medium"
+    },
+    {
+      "agents": [
+        "老周",
+        "AI投顾助手"
+      ],
+      "type": "Client - AI Service",
+      "direction": "Bidirectional",
+      "trigger": "老周 frequently asks AI投顾助手 for quick recommendations during trading hours; AI投顾助手 responds with suitability-constrained advice",
+      "frequency": "high"
+    },
+    {
+      "agents": [
+        "林晚晴",
+        "AI投顾助手"
+      ],
+      "type": "Compliance Oversight",
+      "direction": "林晚晴→AI投顾助手",
+      "trigger": "After each round of advice, 林晚晴 reviews AI投顾助手's disclosure records and suitability checks, flagging gaps",
+      "frequency": "high"
+    },
+    {
+      "agents": [
+        "沈砚之",
+        "AI投顾助手"
+      ],
+      "type": "Advisory Coordination",
+      "direction": "Bidirectional",
+      "trigger": "沈砚之 routes complex client cases to AI投顾助手 for preliminary analysis, then reviews the output before final advice",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "苏清越",
+        "AI投顾助手"
+      ],
+      "type": "Signal Feed",
+      "direction": "苏清越→AI投顾助手",
+      "trigger": "苏清越 pushes quantitative signals and backtest results to AI投顾助手 so recommendations stay evidence-based",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "陈慕白",
+        "AI投顾助手"
+      ],
+      "type": "Research Feed",
+      "direction": "陈慕白→AI投顾助手",
+      "trigger": "陈慕白 shares sector research and data-verification results with AI投顾助手 before any recommendation touches a covered name",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "老周",
+        "林晚晴"
+      ],
+      "type": "Client - Compliance",
+      "direction": "Bidirectional",
+      "trigger": "When 老周 complains about rejected aggressive requests, 林晚晴 explains the suitability rules to him",
+      "frequency": "low"
+    },
+    {
+      "agents": [
+        "沈砚之",
+        "苏清越"
+      ],
+      "type": "Strategy Review",
+      "direction": "Bidirectional",
+      "trigger": "沈砚之 asks 苏清越 to re-run backtests when market regimes change; 苏清越 reports whether the strategy still holds",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "沈砚之",
+        "陈慕白"
+      ],
+      "type": "Research Direction",
+      "direction": "沈砚之→陈慕白",
+      "trigger": "沈砚之 directs 陈慕白 on which sectors to deep-dive for the weekly outlook",
+      "frequency": "low"
+    },
+    {
+      "agents": [
+        "林晚晴",
+        "苏清越"
+      ],
+      "type": "Model Risk Review",
+      "direction": "林晚晴→苏清越",
+      "trigger": "林晚晴 requests the backtest methodology and assumptions before approving any quant-driven advice",
+      "frequency": "low"
     }
   ]
 }
