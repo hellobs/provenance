@@ -1,11 +1,15 @@
-# Provenance 平台运行依赖(Python 3.12)
+﻿# Provenance 平台运行依赖(Python 3.12)
 # 框架:mavisframework(独立仓库 hellobs/mavis,先构建 wheel 再安装)
 mavisframework==1.0.0
 
-# 实时服务(FastAPI + WebSocket)
+# 实时服务(FastAPI + WebSocket + 模板渲染)
 fastapi>=0.110
 uvicorn>=0.29
 websockets>=12.0
+jinja2>=3.1
+
+# 导出倾向曲线 PNG(export-chart 接口,matplotlib 渲染)
+matplotlib>=3.8
 
 # 可选:向量记忆检索(默认 SimpleStore 纯 stdlib 不需要;要用向量才装)
 # llama-index>=0.10
