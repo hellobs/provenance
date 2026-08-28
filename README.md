@@ -34,7 +34,10 @@ source). Execute in order:
 
 ```bash
 # 2.1 Clone the engine repo and build the wheel
-git clone git@github.com:hellobs/mavis.git ../mavis
+# HTTPS (recommended for read-only, no SSH key needed):
+git clone https://github.com/hellobs/mavis.git ../mavis
+#   or SSH (requires a configured SSH key added to your GitHub account):
+# git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
 uv build                              # produces dist/mavisframework-1.0.0-py3-none-any.whl
 cd ../provenance

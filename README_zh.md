@@ -30,7 +30,9 @@ Provenance(平台,本仓库)
 
 ```bash
 # 2.1 克隆框架仓库并构建 wheel(装进平台环境)
-git clone git@github.com:hellobs/mavis.git ../mavis
+# 推荐 HTTPS(无需 SSH 密钥);若已配置 SSH 密钥也可用 SSH 方式
+git clone https://github.com/hellobs/mavis.git ../mavis
+# 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
 uv build                              # 生成 dist/mavisframework-1.0.0-py3-none-any.whl
 cd ../provenance
