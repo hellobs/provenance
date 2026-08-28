@@ -8,6 +8,7 @@ import os
 import json
 import queue
 import threading
+import asyncio
 from typing import Dict, List
 
 import uvicorn
@@ -455,7 +456,7 @@ async def index(request: Request):
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    q: "asyncio.Queue" = __import__("asyncio").Queue()
+    q: "asyncio.Queue" = asyncio.Queue()
     manager.register(ws, q)
     # 初始消息:确认连接 + 快照(追赶进度)
     await ws.send_json({"type": "init"})
@@ -463,8 +464,12 @@ async def ws_endpoint(ws: WebSocket):
         await ws.send_json(compressor.snapshot())
     try:
         while True:
-            data = await q.get()
-            await ws.send_json(data)
+            try:
+                data = await asyncio.wait_for(q.get(), timeout=5.0)
+                await ws.send_json(data)
+            except asyncio.TimeoutError:
+                # 心跳:每 5 秒一条,保持连接活跃,客户端据此判断连接健康
+                await ws.send_json({"type": "ping"})
     except WebSocketDisconnect:
         manager.unregister(ws)
     except Exception:

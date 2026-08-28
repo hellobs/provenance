@@ -164,12 +164,14 @@
 	// Live mode: receive simulation pushes over WebSocket, drive agent movement directly (protocol in framework/runtime/protocol.py)
 	if (live_mode) {
 		let sse_state = "connecting";
+		let lastMsgTs = Date.now();  // 最后收到消息的时间(服务端每 5 秒发心跳)
 		let ws = new WebSocket("ws://" + location.host + "/ws");
 		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); };
 		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setTimeout(function() { location.reload(); }, 3000); };
 		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); };
 		// (WebSocket disconnect is handled by onclose: reload page after 3s to reconnect)
 		ws.onmessage = function(e) {
+			lastMsgTs = Date.now();  // 任意消息(含心跳)都视为连接健康
 			const msg = JSON.parse(e.data);
 			if (msg.type === "agent") {
 				var isAI = msg.role_type === "ai_tool";
@@ -220,6 +222,30 @@
 			// diagnostics: expose connection state
 			window.__sse_state = sse_state;
 		};
+
+		// ---- 连接健康看门狗(失焦回来后页面卡住,不用手动刷新) ----
+		// 原因:WS 半开死连接(onclose 不触发)时页面静默停在旧状态;
+		// 浏览器对后台标签页节流/冻结定时器,回焦检查是唯一可靠时机。
+		var wsReloads = 0, wsLastReload = 0;
+		function wsDeadRecover(reason) {
+			var now = Date.now();
+			if (now - wsLastReload < 10000) wsReloads++; else wsReloads = 0;
+			wsLastReload = now;
+			if (wsReloads > 6) return;  // 服务端长时间不可用,停止循环刷新
+			devLog("sys", reason + ", reloading");
+			location.reload();
+		}
+		// 前台定时检查:超过 20 秒没有任何消息(心跳 5 秒一次,正常不会触发)→ 判定连接已死
+		setInterval(function() {
+			if (document.visibilityState === "hidden") return;  // 后台交给 visibilitychange
+			if (Date.now() - lastMsgTs > 20000) wsDeadRecover("No data for 20s");
+		}, 5000);
+		// 回焦立即检查:连接不是 OPEN 就重载(浏览器冻结期间 onclose 不会触发)
+		document.addEventListener("visibilitychange", function() {
+			if (document.visibilityState === "visible" && ws.readyState !== WebSocket.OPEN) {
+				wsDeadRecover("WebSocket not OPEN on focus return");
+			}
+		});
 	}
 
 	function setCurrentTime(t) {
