@@ -6,7 +6,7 @@ A multi-agent simulation platform built on the self-developed
 [mavisframework](https://github.com/hellobs/mavis) engine, demonstrating
 "AI value formation is observable and governable" (Global Trust Challenge).
 The application scenario is investment advisory (secondary market): agents
-make decisions, move and converse autonomously within a spatial environment,
+make context-based judgments, move and converse within a spatial environment,
 with every step configurable, explainable and visualizable in real time.
 
 ## 1. Architecture
