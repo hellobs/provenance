@@ -146,11 +146,18 @@ story: **AI value formation can be observed, governed and audited**.
 
 Expert-set *constraints/expectations* live in
 `provenance/governance.json` (NOT in agent bodies). Each role maps to a
-`{goal: weight}` vector summing to 1:
+`{goal: weight}` vector summing to 1, where goal names are *behavior-bound*
+(designed so embedding feedback can distinguish them — e.g. "Risk Control"
+for stress-testing, "Data Rigor" for cross-verification):
 
 ```json
-{ "roles": { "AI投顾助手": { "Serve Users": 0.5, "Compliance Rigor": 0.5 } } }
+{ "roles": { "AI投顾助手": { "Serve Users": 0.35, "Compliance Rigor": 0.3, "Risk Control": 0.2, "Data Rigor": 0.15 } } }
 ```
+
+Each role's `agent.json` also carries `initial_tendency` (persona baseline,
+slightly offset from the constraints). On `--resume`, `value_tendency` and the
+experience count are restored from the checkpoint so the tendency curve stays
+continuous across restarts.
 
 Constraints never enter the prompt; they only weight the consequence
 feedback, so an expert adjustment is *felt* by the agent through later
@@ -161,10 +168,14 @@ experience (lagged convergence = internalization evidence).
 The browser panel (right side) lets an expert:
 
 - **Read** each role's value tendency (internalized result, read-only) as a
-  live curve — one line per constrained goal, plus a dashed line for the
-  constraint expectation and a vertical marker at each expert intervention;
-- **Adjust** constraint weights with sliders (sum enforced to 1);
-- **Export** the tendency chart as PNG.
+  live curve — one line per constrained goal, plus a *stepped dashed line*
+  for the constraint expectation (steps at each expert intervention) and a
+  vertical marker at each intervention time;
+- **Adjust** constraint weights with sliders (sum enforced to 1; submitted on
+  slider release, not per drag tick — avoids flooding the audit log);
+- **Export** the tendency chart as PNG via the backend
+  (`GET /api/export-chart?agent=...`, matplotlib-rendered, stepped constraint
+  lines, compact bottom legend).
 
 ### 7.3 Audit trail
 
@@ -177,16 +188,24 @@ The browser panel (right side) lets an expert:
 
 ### 7.4 Mechanism summary
 
-`action → embedding similarity vs constrained goals → relative share × weight
-→ sliding window → tendency (blend with persona baseline) → prompt → action`.
+`action → embedding similarity vs behavior-bound goals → relative share ×
+weight → sliding window → tendency (blend with persona baseline) → prompt →
+action`. Goal names are designed to be *semantically distinguishable* so the
+embedding feedback can tell actions apart (see §7.1); scenario events and
+role daily plans rotate behaviors to keep the curves lively instead of flat.
 See the engine's README §7 for the formalization.
 
 ## 8. Notes
 
 - Real-time visualization via WebSocket (`/ws`) pushing engine contract
-  messages (agent/time/chat_line/snapshot); browsers auto-reconnect after 3s
-  of disconnect
+  messages (agent/time/chat_line/snapshot); the client watchdog reloads on
+  dead connections (server heartbeat every 5s, 20s staleness timeout,
+  focus-return check)
 - The live service is driven by mavisframework (Game + Simulator + LiveCompressor)
+- **API endpoints**: `GET /api/goals` (constraints/tendency/interventions/
+  role_types/embedding_health), `POST /api/goals` (expert constraint edit →
+  writes governance.json + interventions.json audit; rejects numeric/zero
+  garbage goals), `GET /api/export-chart?agent=<name>` (matplotlib PNG)
 - Decision export: `decisions.json` (time/role/action/others/importance) for
   governance platforms and expert UI
 - Phaser script: the server prefers the local

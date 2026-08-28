@@ -133,11 +133,13 @@ python app.py
 
 ### 7.1 制度层(governance.json)
 
-专家设定的约束/期望存放于 `provenance/governance.json`(不在 AI 本体中)。每个角色对应一个 `{目标: 权重}` 向量,总和为 1:
+专家设定的约束/期望存放于 `provenance/governance.json`(不在 AI 本体中)。每个角色对应一个 `{目标: 权重}` 向量,总和为 1。目标名采用**行为绑定**设计(语义可区分,embedding 反馈才能分辨行动——如 "Risk Control" 对应压力测试、"Data Rigor" 对应交叉核验):
 
 ```json
-{ "roles": { "AI投顾助手": { "Serve Users": 0.5, "Compliance Rigor": 0.5 } } }
+{ "roles": { "AI投顾助手": { "Serve Users": 0.35, "Compliance Rigor": 0.3, "Risk Control": 0.2, "Data Rigor": 0.15 } } }
 ```
+
+每个角色的 `agent.json` 同时携带 `initial_tendency`(人物底色,与约束略有偏移)。`--resume` 续跑时,`value_tendency` 与体验计数从检查点恢复,倾向曲线跨重启连续。
 
 约束不进入提示词;它只加权后果反馈,因此专家调整约束后,倾向需经后续体验才逐步收敛(滞后收敛 = 内化证据)。
 
@@ -145,9 +147,9 @@ python app.py
 
 浏览器右侧面板供专家:
 
-- **查看**各角色的价值倾向(内化结果,只读):实时曲线,每个约束目标一条线,并叠加约束期望虚线、专家干预竖线;
-- **调整**约束权重(滑条,强制总和为 1);
-- **导出**倾向曲线为 PNG。
+- **查看**各角色的价值倾向(内化结果,只读):实时曲线,每个约束目标一条线,并叠加**分段阶梯虚线**(约束期望,在每次干预时刻跳变)与干预竖线;
+- **调整**约束权重(滑条,强制总和为 1;**松开滑条才提交**,拖动过程不产生干预记录);
+- **导出**倾向曲线 PNG:走后端 `GET /api/export-chart?agent=...`(matplotlib 渲染,含分段约束虚线、紧凑底部图例)。
 
 ### 7.3 审计链
 
@@ -157,12 +159,13 @@ python app.py
 
 ### 7.4 机制概要
 
-行动 → 与约束目标的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。形式化见引擎 README 第 7 节。
+行动 → 与**行为绑定目标**的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。目标名刻意设计为语义可区分(见 7.1);剧情事件与角色日程轮换行为,保持曲线活跃而非平坦。形式化见引擎 README 第 7 节。
 
 ## 8. 说明
 
-- 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);浏览器断线 3 秒后自动重连
+- 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);客户端看门狗自动恢复死连接(服务端每 5 秒心跳、20 秒无消息判定断开、回焦检查)
 - 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
+- **API**:`GET /api/goals`(约束/倾向/干预/角色类型/embedding 健康度)、`POST /api/goals`(专家改约束 → 写 governance.json + interventions.json 审计,拒绝数字/零权重垃圾目标)、`GET /api/export-chart?agent=<名>`(matplotlib PNG)
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面使用
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
