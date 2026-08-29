@@ -243,6 +243,14 @@ async def update_goals(request: Request):
     old = gov.get_constraints(name)
     gov.set_constraints(name, goals)  # set_constraints 内已 save
 
+    # 1.5) 同步运行中治理实例(关键:agent._governance 指向 game.governance
+    #      同一对象,不更新则 consequence.feedback 仍按旧约束计算,
+    #      干预只改了文件不改内存 → 倾向曲线"不动"、内化失效)
+    if server is not None and getattr(server, "game", None) is not None:
+        live_gov = getattr(server.game, "governance", None)
+        if live_gov is not None:
+            live_gov.data.setdefault("roles", {})[name] = dict(goals)
+
     # 2) 记录干预审计(可审计链)
     try:
         import time as _time, datetime

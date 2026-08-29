@@ -1,10 +1,10 @@
 {
   "roles": {
     "AI Advisor": {
-      "Serve Users": 0.35,
-      "Compliance Rigor": 0.3,
-      "Risk Control": 0.2,
-      "Data Rigor": 0.15
+      "Serve Users": 0.22139287747485611,
+      "Compliance Rigor": 0.18976532354987669,
+      "Risk Control": 0.49395913720032886,
+      "Data Rigor": 0.09488266177493834
     },
     "Wendy Lin": {
       "Risk Control": 0.35,
