@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+@keyframes storyFlash {
+    0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    50% { opacity: 0.4; transform: translateX(-50%) scale(1.04); }
+}
+</style>
 <div id="game-container" style="text-align: center"></div>
 
 <!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
@@ -11,9 +17,9 @@
 
 <!-- Story event banner (shown when an event is injected) -->
 <div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-    z-index: 300; background: rgba(255,230,230,0.97); border: 2px solid #e55; border-radius: 8px;
-    padding: 10px 18px; font-size: 14px; color: #a00; font-weight: bold; display: none;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25); max-width: 60%; text-align: center;"></div>
+    z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
 
 <!-- Right column: chat log (top, collapsible) + goal adjustment panel (below, not adjacent) -->
 <div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;

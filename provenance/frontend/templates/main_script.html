@@ -210,13 +210,17 @@
 				devLog("event", "Error: " + (msg.message || ""));
 				sim_error = msg.message || "Simulation error";
 			} else if (msg.type === "story") {
-				// Story event injection: highlight in console
+				// Story event injection: highlight in console + red banner flash
 				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));
 				var banner = document.getElementById("story-banner");
 				if (banner) {
-					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#666;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
+					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#ffe0e0;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
 					banner.style.display = "block";
-					setTimeout(function() { banner.style.display = "none"; }, 8000);
+					// 闪烁强调(三次),然后保持显示 12 秒
+					banner.style.animation = "none";
+					void banner.offsetWidth;  // 重置动画
+					banner.style.animation = "storyFlash 0.5s ease-in-out 3";
+					setTimeout(function() { banner.style.display = "none"; }, 12000);
 				}
 			}
 			// diagnostics: expose connection state
