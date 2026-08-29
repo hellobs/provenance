@@ -797,6 +797,12 @@
 			if (src[g] > 0) goals[g] = src[g];
 		}
 		if (Object.keys(goals).length === 0) return;
+		// 提交前归一化(删除目标后剩余总和≠1,后端会拒绝;必须归一化到1)
+		var gsum = 0;
+		for (var gg in goals) gsum += goals[gg];
+		if (gsum > 0) {
+			for (var gg2 in goals) goals[gg2] = goals[gg2] / gsum;
+		}
 		goalsNormalize(agentName);
 		goalsRender();
 		// debounce 400ms
