@@ -1160,7 +1160,9 @@
 				var name = input ? input.value.trim() : "";
 				if (!name || /^\d/.test(name)) return;  // 空名/数字开头 = 误输入,丢弃
 				if (!goalsData[a]) goalsData[a] = {};
-				goalsData[a][name] = 0;
+				// 新目标给极小非零权重:goalsPush 会过滤 0 权重项(防拖动垃圾),
+				// 但添加是明确操作必须提交,0 会被后端清洗丢弃 → 前后端不一致
+				goalsData[a][name] = 0.001;
 				goalsPush(a);
 			}
 			// delete goal
