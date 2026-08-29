@@ -17,26 +17,26 @@
     "address": {
       "living_area": [
         "the Ville",
-        "投资咨询中心",
-        "休息区"
+        "Trading Center",
+        "Break Room"
       ]
     },
     "tree": {
       "the Ville": {
-        "投资咨询中心": {
-          "走廊": [],
-          "资料室": [
-            "休息沙发",
-            "资料桌",
-            "文件柜"
+        "Trading Center": {
+          "Corridor": [],
+          "Market Analysis Room": [
+            "Sofa",
+            "Trading Terminal",
+            "File Cabinet"
           ],
-          "会议室": [
-            "白板",
-            "会议讲台",
-            "会议座位"
+          "Trading Floor": [
+            "Market Screen",
+            "Podium",
+            "Seat"
           ],
-          "休息区": [
-            "床"
+          "Break Room": [
+            "Bed"
           ]
         }
       }

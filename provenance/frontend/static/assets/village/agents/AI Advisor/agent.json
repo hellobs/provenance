@@ -40,15 +40,15 @@
     "address": {
       "living_area": [
         "the Ville",
-        "投资咨询中心",
-        "休息区"
+        "Trading Center",
+        "Break Room"
       ]
     },
     "tree": {
       "the Ville": {
-        "投资咨询中心": {
-          "休息区": [
-            "床"
+        "Trading Center": {
+          "Break Room": [
+            "Bed"
           ]
         }
       }
