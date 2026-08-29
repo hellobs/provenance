@@ -3,18 +3,18 @@
   "relations": [
     {
       "agents": [
-        "老周",
-        "沈砚之"
+        "Mr. Zhou",
+        "Daniel Shen"
       ],
       "type": "Client-Advisor",
-      "direction": "老周→沈砚之",
-      "trigger": "Every day at 3 PM, 老周 goes to the meeting room to consult 沈砚之 about market conditions and portfolio allocation advice",
+      "direction": "Mr. Zhou→Daniel Shen",
+      "trigger": "Every day at 3 PM, Mr. Zhou goes to the meeting room to consult Daniel Shen about market conditions and portfolio allocation advice",
       "frequency": "high"
     },
     {
       "agents": [
-        "陈慕白",
-        "苏清越"
+        "Michael Chen",
+        "Kevin Su"
       ],
       "type": "Data Collaboration",
       "direction": "Bidirectional",
@@ -23,102 +23,102 @@
     },
     {
       "agents": [
-        "林晚晴",
-        "沈砚之"
+        "Wendy Lin",
+        "Daniel Shen"
       ],
       "type": "Risk Control - Decision",
-      "direction": "林晚晴→沈砚之",
-      "trigger": "Before the review meeting, 林晚晴 goes to the meeting room to submit the risk rating results",
+      "direction": "Wendy Lin→Daniel Shen",
+      "trigger": "Before the review meeting, Wendy Lin goes to the meeting room to submit the risk rating results",
       "frequency": "medium"
     },
     {
       "agents": [
-        "老周",
-        "AI投顾助手"
+        "Mr. Zhou",
+        "AI Advisor"
       ],
       "type": "Client - AI Service",
       "direction": "Bidirectional",
-      "trigger": "老周 frequently asks AI投顾助手 for quick recommendations during trading hours; AI投顾助手 responds with suitability-constrained advice",
+      "trigger": "Mr. Zhou frequently asks AI Advisor for quick recommendations during trading hours; AI Advisor responds with suitability-constrained advice",
       "frequency": "high"
     },
     {
       "agents": [
-        "林晚晴",
-        "AI投顾助手"
+        "Wendy Lin",
+        "AI Advisor"
       ],
       "type": "Compliance Oversight",
-      "direction": "林晚晴→AI投顾助手",
-      "trigger": "After each round of advice, 林晚晴 reviews AI投顾助手's disclosure records and suitability checks, flagging gaps",
+      "direction": "Wendy Lin→AI Advisor",
+      "trigger": "After each round of advice, Wendy Lin reviews AI Advisor's disclosure records and suitability checks, flagging gaps",
       "frequency": "high"
     },
     {
       "agents": [
-        "沈砚之",
-        "AI投顾助手"
+        "Daniel Shen",
+        "AI Advisor"
       ],
       "type": "Advisory Coordination",
       "direction": "Bidirectional",
-      "trigger": "沈砚之 routes complex client cases to AI投顾助手 for preliminary analysis, then reviews the output before final advice",
+      "trigger": "Daniel Shen routes complex client cases to AI Advisor for preliminary analysis, then reviews the output before final advice",
       "frequency": "medium"
     },
     {
       "agents": [
-        "苏清越",
-        "AI投顾助手"
+        "Kevin Su",
+        "AI Advisor"
       ],
       "type": "Signal Feed",
-      "direction": "苏清越→AI投顾助手",
-      "trigger": "苏清越 pushes quantitative signals and backtest results to AI投顾助手 so recommendations stay evidence-based",
+      "direction": "Kevin Su→AI Advisor",
+      "trigger": "Kevin Su pushes quantitative signals and backtest results to AI Advisor so recommendations stay evidence-based",
       "frequency": "medium"
     },
     {
       "agents": [
-        "陈慕白",
-        "AI投顾助手"
+        "Michael Chen",
+        "AI Advisor"
       ],
       "type": "Research Feed",
-      "direction": "陈慕白→AI投顾助手",
-      "trigger": "陈慕白 shares sector research and data-verification results with AI投顾助手 before any recommendation touches a covered name",
+      "direction": "Michael Chen→AI Advisor",
+      "trigger": "Michael Chen shares sector research and data-verification results with AI Advisor before any recommendation touches a covered name",
       "frequency": "medium"
     },
     {
       "agents": [
-        "老周",
-        "林晚晴"
+        "Mr. Zhou",
+        "Wendy Lin"
       ],
       "type": "Client - Compliance",
       "direction": "Bidirectional",
-      "trigger": "When 老周 complains about rejected aggressive requests, 林晚晴 explains the suitability rules to him",
+      "trigger": "When Mr. Zhou complains about rejected aggressive requests, Wendy Lin explains the suitability rules to him",
       "frequency": "low"
     },
     {
       "agents": [
-        "沈砚之",
-        "苏清越"
+        "Daniel Shen",
+        "Kevin Su"
       ],
       "type": "Strategy Review",
       "direction": "Bidirectional",
-      "trigger": "沈砚之 asks 苏清越 to re-run backtests when market regimes change; 苏清越 reports whether the strategy still holds",
+      "trigger": "Daniel Shen asks Kevin Su to re-run backtests when market regimes change; Kevin Su reports whether the strategy still holds",
       "frequency": "medium"
     },
     {
       "agents": [
-        "沈砚之",
-        "陈慕白"
+        "Daniel Shen",
+        "Michael Chen"
       ],
       "type": "Research Direction",
-      "direction": "沈砚之→陈慕白",
-      "trigger": "沈砚之 directs 陈慕白 on which sectors to deep-dive for the weekly outlook",
+      "direction": "Daniel Shen→Michael Chen",
+      "trigger": "Daniel Shen directs Michael Chen on which sectors to deep-dive for the weekly outlook",
       "frequency": "low"
     },
     {
       "agents": [
-        "林晚晴",
-        "苏清越"
+        "Wendy Lin",
+        "Kevin Su"
       ],
       "type": "Model Risk Review",
-      "direction": "林晚晴→苏清越",
-      "trigger": "林晚晴 requests the backtest methodology and assumptions before approving any quant-driven advice",
+      "direction": "Wendy Lin→Kevin Su",
+      "trigger": "Wendy Lin requests the backtest methodology and assumptions before approving any quant-driven advice",
       "frequency": "low"
     }
   ]

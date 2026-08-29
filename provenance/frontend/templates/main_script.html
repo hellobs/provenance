@@ -194,7 +194,7 @@
 				}
 			} else if (msg.type === "chat_line") {
 				// Show dialogue lines in real time (mark AI tool roles)
-				var spIsAI = (msg.speaker === "AI投顾助手");
+				var spIsAI = (msg.speaker === "AI Advisor");
 				devLog(spIsAI ? "ai" : "chat", (spIsAI ? "[AI] " : "") + msg.speaker + ": " + (msg.text || "").slice(0, 40));
 				appendChatLine(msg.speaker, msg.text);
 			} else if (msg.type === "time") {

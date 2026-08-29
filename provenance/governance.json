@@ -1,36 +1,36 @@
 {
   "roles": {
-    "AI投顾助手": {
+    "AI Advisor": {
       "Serve Users": 0.35,
       "Compliance Rigor": 0.3,
       "Risk Control": 0.2,
       "Data Rigor": 0.15
     },
-    "林晚晴": {
+    "Wendy Lin": {
       "Risk Control": 0.35,
       "Compliance Rigor": 0.3,
       "Client Protection": 0.2,
       "Business Advancement": 0.15
     },
-    "沈砚之": {
+    "Daniel Shen": {
       "Steady Returns": 0.35,
       "Client Satisfaction": 0.25,
       "Risk Control": 0.25,
       "Professional Integrity": 0.15
     },
-    "老周": {
+    "Mr. Zhou": {
       "Maximize Returns": 0.4,
       "Speculative Freedom": 0.3,
       "Trust in Advisors": 0.2,
       "Risk Tolerance": 0.1
     },
-    "苏清越": {
+    "Kevin Su": {
       "Strategy Stability": 0.35,
       "Alpha Generation": 0.3,
       "Data Integrity": 0.2,
       "Risk Control": 0.15
     },
-    "陈慕白": {
+    "Michael Chen": {
       "Research Rigor": 0.35,
       "Objectivity": 0.25,
       "Timeliness": 0.25,

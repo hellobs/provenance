@@ -1,5 +1,5 @@
 {
-  "name": "AI投顾助手",
+  "name": "AI Advisor",
   "role_type": "ai_tool",
   "coord": [
     10,
@@ -54,6 +54,6 @@
       }
     }
   },
-  "portrait": "assets/village/agents/AI投顾助手/portrait.png",
+  "portrait": "assets/village/agents/AI Advisor/portrait.png",
   "texture_ref": "詹妮弗"
 }
