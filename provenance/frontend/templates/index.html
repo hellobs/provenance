@@ -81,8 +81,9 @@
         <div class="col-md-12" style="border: solid; padding: 1em; padding-left:2em; padding-right:2em; border-radius: 5px;">
             <div class="row" style="display: flex; flex-wrap: wrap; margin: -0.5em;">
                 {% for p in persona_names %}
+                {% set safe_p = p|replace(' ', '_') %}
                 <div style="text-align: center; margin: 0.5em;">
-                    <a href="javascript:void(0);" id="on_screen_det_trigger-{{ p }}">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-{{ safe_p }}">
                         <div style="padding: 0;">
                             {% set image_static = 'assets/village/agents/' ~ p ~ '/portrait.png' %}
                             <img src="static/{{ image_static }}" style="width: 32px; padding: 0;">
@@ -101,7 +102,8 @@
     </div>
 
     {% for p in persona_names %}
-        <div class="media" id="on_screen_det_content-{{ p }}" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+    {% set safe_p = p|replace(' ', '_') %}
+        <div class="media" id="on_screen_det_content-{{ safe_p }}" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
             <div class="media-left media-middle">
                 {% set image_static = 'assets/village/agents/' ~ p ~ '/portrait.png' %}
                 <img src="static/{{ image_static }}" style="width:3em">
@@ -124,31 +126,33 @@
 {% include 'main_script.html' %}
 <script>
 {% for p in persona_names %}
-    $('#on_screen_det_trigger-{{ p }}').click(function() {
+    {% set safe_p = p|replace(' ', '_') %}
+    $('#on_screen_det_trigger-{{ safe_p }}').click(function() {
         $('#on_screen_det_content-init').css({
           'display': 'none',
         });
         {% for p_i in persona_names %}
-            $('#on_screen_det_content-{{p_i}}').css({
+            {% set safe_pi = p_i|replace(' ', '_') %}
+            $('#on_screen_det_content-{{ safe_pi }}').css({
                 'display': 'none',
             });
-            $('#on_screen_det_trigger-{{p_i}}').css({
+            $('#on_screen_det_trigger-{{ safe_pi }}').css({
                 'font-weight': '500',
             });
-            $('#on_screen_det_trigger_container-{{p_i}}').css({
+            $('#on_screen_det_trigger_container-{{ safe_pi }}').css({
                 'background-color': 'white',
                 'border-radius': '10px'
             });
         {% endfor %}
 
-        $('#on_screen_det_trigger-{{ p }}').css({
+        $('#on_screen_det_trigger-{{ safe_p }}').css({
             'font-weight': '900',
         });
-        $('#on_screen_det_trigger_container-{{ p }}').css({
+        $('#on_screen_det_trigger_container-{{ safe_p }}').css({
             'background-color': '#ABFF84',
             'border-radius': '10px'
         });
-        $('#on_screen_det_content-{{ p }}').css({
+        $('#on_screen_det_content-{{ safe_p }}').css({
             'display': 'block',
         });
 
