@@ -183,6 +183,9 @@ provenance/frontend/static/assets/village/tilemap/*.exported.json
 # 决策导出产物(由 checkpoints 生成,不入库)
 decisions_*.json
 
+# 前端冒烟测试渲染产物(pytest 生成,CI 用,不入库)
+tests/_pages/
+
 # Python 打包产物(uv build / setuptools)
 dist/
 build/
