@@ -173,9 +173,7 @@ _tmp_test/
 # 新生成的模拟回放数据（内置的 example 已追踪，不受影响）
 results/compressed/
 
-# Tiled 编辑器工作文件(tilemap.json 是运行时文件,已入库;其余为编辑中间产物)
-provenance/frontend/static/assets/village/tilemap/*.tmx
-provenance/frontend/static/assets/village/tilemap/*.tsx
+# Tiled 编辑器工作文件(tilemap.json/.tmx 是运行时与编辑底图,已入库;其余为中间产物)
 provenance/frontend/static/assets/village/tilemap/*.bak
 provenance/frontend/static/assets/village/tilemap/_debug_err.txt
 provenance/frontend/static/assets/village/tilemap/finance_extras.jpg
