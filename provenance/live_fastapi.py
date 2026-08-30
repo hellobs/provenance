@@ -868,17 +868,35 @@ async def ws_endpoint(ws: WebSocket):
     await ws.send_json({"type": "init"})
     if compressor is not None and compressor.started:
         await ws.send_json(compressor.snapshot())
+
+    # 独立心跳任务:每 5 秒无条件发 ping,不依赖队列是否为空。
+    # 旧实现只在 q 超时才发 ping——模拟突发式推送(每步 6 角色批量)的
+    # 空档期(建日程/LLM 慢)可能超过客户端看门狗容忍,导致误判断线重载。
+    stop_hb = asyncio.Event()
+
+    async def heartbeat():
+        try:
+            while not stop_hb.is_set():
+                await asyncio.sleep(5.0)
+                try:
+                    await ws.send_json({"type": "ping"})
+                except Exception:
+                    return
+        except asyncio.CancelledError:
+            pass
+
+    hb_task = asyncio.create_task(heartbeat())
     try:
         while True:
-            try:
-                data = await asyncio.wait_for(q.get(), timeout=5.0)
-                await ws.send_json(data)
-            except asyncio.TimeoutError:
-                # 心跳:每 5 秒一条,保持连接活跃,客户端据此判断连接健康
-                await ws.send_json({"type": "ping"})
+            data = await q.get()
+            await ws.send_json(data)
     except WebSocketDisconnect:
-        manager.unregister(ws)
+        pass
     except Exception:
+        pass
+    finally:
+        stop_hb.set()
+        hb_task.cancel()
         manager.unregister(ws)
 
 
