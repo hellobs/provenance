@@ -18,8 +18,13 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-# 确保可 import live_fastapi(其内部用相对包导入)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 确保可 import live_fastapi(它位于仓库的 provenance/ 子目录)
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+_REPO = os.path.dirname(_this_dir)                      # D:\zzr\provenance
+_PKG = os.path.join(_REPO, "provenance")                # D:\zzr\provenance\provenance
+for _p in (_PKG, _REPO):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import live_fastapi as lf
 

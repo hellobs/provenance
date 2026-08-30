@@ -212,10 +212,15 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
 
 ## 9. 说明
 
-- 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);客户端看门狗自动恢复死连接(服务端每 5 秒心跳、20 秒无消息判定断开、回焦检查)
+- 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);客户端看门狗自动恢复死连接。服务端**独立心跳任务**每 5 秒无条件发送(asyncio 定时,不依赖队列空——建日程等纯 LLM 空档期也可靠),客户端 20 秒无消息判定断开 + 回焦检查
 - 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
-- **API**:`GET /api/goals`(约束/倾向/干预/角色类型/embedding 健康度)、`POST /api/goals`(专家改约束 → 写 governance.json + interventions.json 审计,拒绝数字/零权重垃圾目标)、`GET /api/export-chart?agent=<名>`(matplotlib PNG)
+- **API**:
+  - `GET /api/goals` — 约束/倾向/干预(按 `simulation` 字段仅返回当前模拟)/角色类型/embedding 健康度
+  - `POST /api/goals` — 专家改约束 → 写 governance.json + interventions.json 审计(带 `simulation` 标记);拒绝数字/零权重垃圾目标;权重和须为 1
+  - `GET /api/export-chart?agent=<名>` — matplotlib 倾向曲线 PNG
+  - `GET /api/explain?agent=<名>` — 可解释性面板:倾向构成分解(α 混合)/体验窗口明细(行动·对齐度·反馈)/干预因果链(每次干预后的倾向迁移量)。checkpoint 序列加载按目录 mtime 缓存
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面使用
+- **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;引擎测试在 mavis 仓库 `tests/`
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 - **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(端口 5002,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)

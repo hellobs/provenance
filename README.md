@@ -260,13 +260,28 @@ live simulation.
 
 - Real-time visualization via WebSocket (`/ws`) pushing engine contract
   messages (agent/time/chat_line/snapshot); the client watchdog reloads on
-  dead connections (server heartbeat every 5s, 20s staleness timeout,
-  focus-return check)
+  dead connections. Server sends an independent heartbeat every 5s
+  (asyncio task, not queue-driven — reliable even during long LLM-only
+  gaps such as schedule building); client 20s staleness timeout +
+  focus-return check
 - The live service is driven by mavisframework (Game + Simulator + LiveCompressor)
-- **API endpoints**: `GET /api/goals` (constraints/tendency/interventions/
-  role_types/embedding_health), `POST /api/goals` (expert constraint edit →
-  writes governance.json + interventions.json audit; rejects numeric/zero
-  garbage goals), `GET /api/export-chart?agent=<name>` (matplotlib PNG)
+- **API endpoints**:
+  - `GET /api/goals` — constraints/tendency/interventions (scoped to the
+    current simulation via `simulation` field)/role_types/embedding_health
+  - `POST /api/goals` — expert constraint edit → writes governance.json +
+    interventions.json audit (with `simulation` tag); rejects numeric/zero
+    garbage goals; sum must equal 1
+  - `GET /api/export-chart?agent=<name>` — matplotlib PNG of tendency curve
+  - `GET /api/explain?agent=<name>` — explainability panel: tendency
+    decomposition (α blend), experience window details (action/alignment/
+    feedback), intervention causal chain (tendency shift after each
+    intervention). Checkpoint series loading is cached by directory mtime.
+- Decision export: `decisions.json` (time/role/action/others/importance) for
+  governance platforms and expert UI
+- **Tests**: `tests/test_live_api.py` (pytest, fake server injection, no
+  real simulation/LLM needed) covers goals read/write, intervention scoping,
+  explain three layers, export error handling. Engine tests live in the
+  mavis repo (`tests/`).
 - Decision export: `decisions.json` (time/role/action/others/importance) for
   governance platforms and expert UI
 - Phaser script: the server prefers the local
