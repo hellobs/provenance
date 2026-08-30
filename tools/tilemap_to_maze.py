@@ -82,12 +82,12 @@ def rect_to_tiles(rect, tile_size):
     return [(x, y) for x in range(x0, x1) for y in range(y0, y1)]
 
 
-def auto_gid_map(tilemap, sector_layers, arena_layers, object_layers):
+def auto_gid_map(tilemap, sector_layers, arena_layers, object_layers, world=""):
     """自动生成 gid 映射表(名称待填)"""
     sectors = collect_layer_gids(tilemap, sector_layers)
     arenas = collect_layer_gids(tilemap, arena_layers)
     objects = collect_layer_gids(tilemap, object_layers)
-    out = {"world": "", "sector": {}, "arena": {}, "object": {}}
+    out = {"world": world, "sector": {}, "arena": {}, "object": {}}
     for gid in sorted(sectors):
         out["sector"][str(gid)] = {"name": "SECTOR_" + str(gid),
                                     "tiles": len(sectors[gid])}
@@ -120,24 +120,24 @@ def build_maze(tilemap, gid_map, sector_layers, arena_layers, object_layers,
     if room_rects:
         # sector 矩形:名字即 sector 名,覆盖区域提供 sector 归属
         # room 矩形:名字即 arena 名,覆盖区域提供 arena 归属
+        # 注意:address 不含 world 前缀——引擎 Tile 会自动 [world] + address
+        # 预计算矩形 → tile 集合(避免双重循环内重复换算)
+        sector_tiles = [(srect["name"], set(rect_to_tiles(srect, tile_size)))
+                        for srect in sector_rects]
+        room_tiles = [(rrect["name"], set(rect_to_tiles(rrect, tile_size)))
+                      for rrect in room_rects]
         tiles = []
         for y in range(h):
             for x in range(w):
-                addr = [world_name]
-                sector = None
-                for srect in sector_rects:
-                    if (x, y) in rect_to_tiles(srect, tile_size):
-                        sector = srect["name"]
+                addr = []
+                for name, tset in sector_tiles:
+                    if (x, y) in tset:
+                        addr.append(name)
                         break
-                arena = None
-                for rrect in room_rects:
-                    if (x, y) in rect_to_tiles(rrect, tile_size):
-                        arena = rrect["name"]
+                for name, tset in room_tiles:
+                    if (x, y) in tset:
+                        addr.append(name)
                         break
-                if sector:
-                    addr.append(sector)
-                if arena:
-                    addr.append(arena)
                 tiles.append({"coord": [x, y], "address": addr})
         return {
             "world": world_name,
@@ -159,21 +159,29 @@ def build_maze(tilemap, gid_map, sector_layers, arena_layers, object_layers,
     arena_names = {int(k): v["name"] for k, v in gid_map.get("arena", {}).items()}
     object_names = {int(k): v["name"] for k, v in gid_map.get("object", {}).items()}
 
+    # 预计算:每个 gid 的 tile 集合(避免双重循环内列表查找)
+    sector_sets = {g: set(ts) for g, ts in sector_gids.items()}
+    arena_sets = {g: set(ts) for g, ts in arena_gids.items()}
+    object_sets = {g: set(ts) for g, ts in object_gids.items()}
+
     # 每格:最全地址 = sector + arena + object(缺则降级)
     # 注意:address 不含 world 前缀——引擎 Tile 会自动 [world] + address
     tiles = []
     for y in range(h):
         for x in range(w):
             addr = []
-            sector = sector_names.get(next((g for g in sector_gids if (x, y) in sector_gids[g]), 0))
-            arena = arena_names.get(next((g for g in arena_gids if (x, y) in arena_gids[g]), 0))
-            obj = object_names.get(next((g for g in object_gids if (x, y) in object_gids[g]), 0))
-            if sector:
-                addr.append(sector)
-            if arena:
-                addr.append(arena)
-            if obj:
-                addr.append(obj)
+            for g, tset in sector_sets.items():
+                if (x, y) in tset:
+                    addr.append(sector_names.get(g, ""))
+                    break
+            for g, tset in arena_sets.items():
+                if (x, y) in tset:
+                    addr.append(arena_names.get(g, ""))
+                    break
+            for g, tset in object_sets.items():
+                if (x, y) in tset:
+                    addr.append(object_names.get(g, ""))
+                    break
             tiles.append({"coord": [x, y], "address": addr})
 
     return {
@@ -205,6 +213,7 @@ def main():
     p.add_argument("--sector-rect-layers", nargs="+", default=[],
                    help="对象层(矩形=区域/父级,对象名=区域名)")
     p.add_argument("--tiled", default="", help="Tiled 可执行文件路径(输入是 .tmx 时用于导出 json)")
+    p.add_argument("--world", default="the Ville", help="世界名(引擎 tile_address_keys 的 world 层)")
     args = p.parse_args()
 
     if not os.path.exists(args.input):
@@ -236,7 +245,8 @@ def main():
     tilemap = load_json(args.input)
 
     if args.auto_gid_map:
-        out = auto_gid_map(tilemap, args.sector_layers, args.arena_layers, args.object_layers)
+        out = auto_gid_map(tilemap, args.sector_layers, args.arena_layers,
+                           args.object_layers, world=args.world)
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
         print("已生成 gid 映射表: {}".format(args.output))
@@ -247,13 +257,18 @@ def main():
         gid_map = load_json(args.gid_map)
     else:
         print("警告: 未提供 --gid-map,将用占位名称生成(建议先 --auto-gid-map 生成并填写)。")
-        gid_map = auto_gid_map(tilemap, args.sector_layers, args.arena_layers, args.object_layers)
+        gid_map = auto_gid_map(tilemap, args.sector_layers, args.arena_layers,
+                               args.object_layers, world=args.world)
+    if not gid_map.get("world"):
+        gid_map["world"] = args.world
 
-    maze = build_maze(tilemap, gid_map, args.sector_layers, args.arena_layers, args.object_layers)
+    maze = build_maze(tilemap, gid_map, args.sector_layers, args.arena_layers,
+                      args.object_layers, room_layers=args.room_layers,
+                      sector_rect_layers=args.sector_rect_layers)
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(maze, f, ensure_ascii=False, indent=2)
     total = len(maze["tiles"])
-    addressed = sum(1 for t in maze["tiles"] if len(t["address"]) > 1)
+    addressed = sum(1 for t in maze["tiles"] if t.get("address"))
     print("完成: {} → {}".format(args.input, args.output))
     print("地图 {w}x{h}, tile {ts}px, 共 {total} 格, 其中 {addressed} 格有语义地址".format(
         w=maze["map"]["width"], h=maze["map"]["height"], ts=maze["tile_size"],
