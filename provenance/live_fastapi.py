@@ -166,12 +166,15 @@ async def get_goals():
             tendency[name] = agent.get_tendency()
             role_types[name] = getattr(agent, "role_type", "user") or "user"
     # 专家干预记录(供曲线画"干预时刻"竖线)
+    # 跨模拟隔离:interventions.json 全局共享,只返回当前模拟的干预
+    # (旧记录无 simulation 字段 = 其他模拟/旧数据,不显示——避免"标了干预却不动"误导)
     interventions = []
+    current_sim = sim_state.get("name", "")
     iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
     if os.path.exists(iv_path):
         try:
-            with open(iv_path, "r", encoding="utf-8") as f:
-                interventions = json.load(f)
+            all_iv = json.load(open(iv_path, encoding="utf-8"))
+            interventions = [x for x in all_iv if x.get("simulation") == current_sim]
         except Exception:
             interventions = []
     # embedding 稳定性健康度(后果反馈降级监控)
@@ -185,9 +188,10 @@ async def get_goals():
             embedding_health = {}
     return JSONResponse({
         "ok": True,
+        "simulation": current_sim,  # 当前模拟名(前端过滤干预归属)
         "goals": constraints,       # 治理约束(期望,面板可调)
         "tendency": tendency,       # 价值倾向(内化结果,只读)
-        "interventions": interventions,  # 专家干预审计(曲线竖线标记)
+        "interventions": interventions,  # 专家干预审计(仅当前模拟,曲线竖线标记)
         "role_types": role_types,   # 角色类型(ai_tool/user,面板徽标)
         "embedding_health": embedding_health,  # embedding 稳定性(降级率/错误)
     })
@@ -287,14 +291,15 @@ async def explain_agent(agent: str = ""):
             v = (ag.get("status") or {}).get("value_tendency") or {}
             if v:
                 series.append((dt, v))
-        # 干预记录(该角色的,按 sim_time 排序)
+        # 干预记录(该角色的、当前模拟的,按 sim_time 排序)
         iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
         my_ivs = []
         if os.path.exists(iv_path):
             try:
                 ivs = json.load(open(iv_path, encoding="utf-8"))
                 my_ivs = sorted(
-                    [x for x in ivs if x.get("agent") == agent],
+                    [x for x in ivs if x.get("agent") == agent
+                     and x.get("simulation") == sim_state.get("name", "")],
                     key=lambda x: str(x.get("sim_time", "")),
                 )
             except Exception:
@@ -421,6 +426,7 @@ async def update_goals(request: Request):
         audit.append({
             "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "sim_time": sim_time,
+            "simulation": sim_state.get("name", ""),  # 干预归属的模拟(跨模拟隔离)
             "agent": name,
             "old_constraints": old,
             "new_constraints": goals,
@@ -501,7 +507,7 @@ async def export_chart(agent: str = ""):
         except Exception:
             ivs = []
     my_ivs = sorted(
-        [x for x in ivs if x.get("agent") == agent],
+        [x for x in ivs if x.get("agent") == agent and x.get("simulation") == sim_state.get("name", "")],
         key=lambda x: str(x.get("sim_time", "")),
     )
 
@@ -713,6 +719,7 @@ def run_simulation(name, sim_config, start_step, step, stride):
             on_story=lambda ev: manager.broadcast(ev),
         )
         sim_state["status"] = "running"
+        sim_state["name"] = name  # 当前模拟名(干预记录归属,跨模拟隔离)
         if step <= 0:
             while True:
                 simulator.simulate(

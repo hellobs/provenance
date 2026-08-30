@@ -88,8 +88,15 @@
 	const wantScene = !embedMode || embedMode === "scene";
 	let game = null;
 	if (wantScene) {
-		const gameWidth = Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864);
-		const gameHeight = Math.max(240, window.innerHeight || 768);
+		// 独立页面:固定 864x768(与原版一致,场景居中);
+		// scene 嵌入模式:自适应 iframe 容器尺寸
+		const isEmbedScene = embedMode === "scene";
+		const gameWidth = isEmbedScene
+			? Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864)
+			: 864;
+		const gameHeight = isEmbedScene
+			? Math.max(240, window.innerHeight || 768)
+			: 768;
 		const config = {
 			type: Phaser.AUTO,
 			backgroundColor: "#e8e8e8",
