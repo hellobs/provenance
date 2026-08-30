@@ -1,4 +1,4 @@
-<script type="text/javascript">
+﻿<script type="text/javascript">
 	// Initialize variables from Flask context
 	let step = {{ step|tojson }};
 	let step_size = {{ sec_per_step|tojson }} * 1000; // Convert to milliseconds
@@ -334,30 +334,30 @@
 		this.load.crossOrigin = "";
 
 		// Load images
-		this.load.image("blocks_1", "static/assets/village/tilemap/blocks_1.png");
-		this.load.image("walls", "static/assets/village/tilemap/Room_Builder_32x32.png");
-		this.load.image("interiors_pt1", "static/assets/village/tilemap/interiors_pt1.png");
-		this.load.image("interiors_pt2", "static/assets/village/tilemap/interiors_pt2.png");
-		this.load.image("interiors_pt3", "static/assets/village/tilemap/interiors_pt3.png");
-		this.load.image("interiors_pt4", "static/assets/village/tilemap/interiors_pt4.png");
-		this.load.image("interiors_pt5", "static/assets/village/tilemap/interiors_pt5.png");
-		this.load.image("CuteRPG_Field_B", "static/assets/village/tilemap/CuteRPG_Field_B.png");
-		this.load.image("CuteRPG_Field_C", "static/assets/village/tilemap/CuteRPG_Field_C.png");
-		this.load.image("CuteRPG_Harbor_C", "static/assets/village/tilemap/CuteRPG_Harbor_C.png");
-		this.load.image("CuteRPG_Village_B", "static/assets/village/tilemap/CuteRPG_Village_B.png");
-		this.load.image("CuteRPG_Forest_B", "static/assets/village/tilemap/CuteRPG_Forest_B.png");
-		this.load.image("CuteRPG_Desert_C", "static/assets/village/tilemap/CuteRPG_Desert_C.png");
-		this.load.image("CuteRPG_Mountains_B", "static/assets/village/tilemap/CuteRPG_Mountains_B.png");
-		this.load.image("CuteRPG_Desert_B", "static/assets/village/tilemap/CuteRPG_Desert_B.png");
-		this.load.image("CuteRPG_Forest_C", "static/assets/village/tilemap/CuteRPG_Forest_C.png");
+		this.load.image("blocks_1", "/static/assets/village/tilemap/blocks_1.png");
+		this.load.image("walls", "/static/assets/village/tilemap/Room_Builder_32x32.png");
+		this.load.image("interiors_pt1", "/static/assets/village/tilemap/interiors_pt1.png");
+		this.load.image("interiors_pt2", "/static/assets/village/tilemap/interiors_pt2.png");
+		this.load.image("interiors_pt3", "/static/assets/village/tilemap/interiors_pt3.png");
+		this.load.image("interiors_pt4", "/static/assets/village/tilemap/interiors_pt4.png");
+		this.load.image("interiors_pt5", "/static/assets/village/tilemap/interiors_pt5.png");
+		this.load.image("CuteRPG_Field_B", "/static/assets/village/tilemap/CuteRPG_Field_B.png");
+		this.load.image("CuteRPG_Field_C", "/static/assets/village/tilemap/CuteRPG_Field_C.png");
+		this.load.image("CuteRPG_Harbor_C", "/static/assets/village/tilemap/CuteRPG_Harbor_C.png");
+		this.load.image("CuteRPG_Village_B", "/static/assets/village/tilemap/CuteRPG_Village_B.png");
+		this.load.image("CuteRPG_Forest_B", "/static/assets/village/tilemap/CuteRPG_Forest_B.png");
+		this.load.image("CuteRPG_Desert_C", "/static/assets/village/tilemap/CuteRPG_Desert_C.png");
+		this.load.image("CuteRPG_Mountains_B", "/static/assets/village/tilemap/CuteRPG_Mountains_B.png");
+		this.load.image("CuteRPG_Desert_B", "/static/assets/village/tilemap/CuteRPG_Desert_B.png");
+		this.load.image("CuteRPG_Forest_C", "/static/assets/village/tilemap/CuteRPG_Forest_C.png");
 
 		// Load tilemap JSON
-		this.load.tilemapTiledJSON("map", "static/assets/village/tilemap/tilemap.json");
+		this.load.tilemapTiledJSON("map", "/static/assets/village/tilemap/tilemap.json");
 
 		// Load persona atlases (player/camera follows the first character's texture)
 		for (var p in persona_names) {
-			image_static = "static/assets/village/agents/" + p + "/texture.png";
-			this.load.atlas(p, image_static, filename="static/assets/village/agents/sprite.json");
+			image_static = "/static/assets/village/agents/" + p + "/texture.png";
+			this.load.atlas(p, image_static, filename="/static/assets/village/agents/sprite.json");
 		}
 	}
 
@@ -1383,3 +1383,4 @@
 		});
 	});
 </script>
+

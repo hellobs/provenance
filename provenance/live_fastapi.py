@@ -829,9 +829,11 @@ async def _render_index(request: Request, embed: str = ""):
     play_speed = 2 ** speed
     payload = load_initial_payload(sim_state["start_time"], sim_state["stride"])
     # Phaser 脚本:本地 vendor 优先(断网可用),否则回退 CDN
+    # 注意:必须用绝对路径(/static/...)——相对路径在 /embed/* 子路径下
+    # 会被解析成 /embed/static/... 导致 404(独立页 / 恰好正常掩盖了问题)
     local_phaser = os.path.join(BASE_DIR, "frontend/static/vendor/phaser.min.js")
     if os.path.exists(local_phaser):
-        phaser_src = "static/vendor/phaser.min.js"
+        phaser_src = "/static/vendor/phaser.min.js"
     else:
         phaser_src = "https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"
     return templates.TemplateResponse(
