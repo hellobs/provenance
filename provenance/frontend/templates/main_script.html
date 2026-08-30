@@ -109,7 +109,10 @@
 	};
 
 	// Create Phaser game instance
-	const game = new Phaser.Game(config);
+	// 仅独立页面与 scene 嵌入模式创建场景;goals/explain 是纯面板页,
+	// 不加载场景(避免 iframe 里多个 Phaser 实例互相干扰/初始化失败)
+	const wantScene = !embedMode || embedMode === "scene";
+	const game = wantScene ? new Phaser.Game(config) : null;
 	let cursors;
 	let player;
 
@@ -179,19 +182,22 @@
 			const msg = JSON.parse(e.data);
 			if (msg.type === "agent") {
 				var isAI = msg.role_type === "ai_tool";
-				devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
-				moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
+				// 场景驱动仅在 scene/独立页执行;面板模式只消费倾向数据
+				if (wantScene) {
+					devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
+					moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
+				}
 				// 记录角色类型(AI 工具 vs 人,面板徽标用)
 				if (msg.role_type) roleTypes[msg.name] = msg.role_type;
 				// IVD 核心观测:记录价值倾向演变(按模拟时间去重,阶梯=行动变化点)
 				if (msg.value_tendency && Object.keys(msg.value_tendency).length > 0) {
 					tendencyRecord(msg.name, msg.time || "", msg.value_tendency);
 				}
-				if (msg.conversation) {
+				if (msg.conversation && wantScene) {
 					Object.assign(all_movement["conversation"], msg.conversation);
 					// live mode: dialogues are already shown line-by-line via chat_line; do not append again
 				}
-				if (msg.description) {
+				if (msg.description && wantScene) {
 					for (const n in msg.description) {
 						all_movement["description"][n] = msg.description[n];
 					}
@@ -206,7 +212,8 @@
 				setCurrentTime(msg.time);
 			} else if (msg.type === "snapshot") {
 				devLog("sys", "Snapshot: " + Object.keys(msg.agents || {}).length + " agents, time " + msg.time);
-				applySnapshot(msg.agents, msg.time);
+				if (wantScene) applySnapshot(msg.agents, msg.time);
+				else if (msg.time) setCurrentTime(msg.time);
 			} else if (msg.type === "done") {
 				devLog("sys", "Simulation finished");
 				sim_finished = true;
