@@ -22,8 +22,12 @@ from mavisframework.config.loader import personas, load_config, load_config_from
 from mavisframework.runtime.compressor import LiveCompressor
 
 from mavisframework.runtime.protocol import AgentState, TimeMsg, ChatLineMsg, validate_message
+from mavisframework.runtime.logger import get_logger
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 模块级日志:各处 except 容错统一走这里,不再静默吞错
+log = get_logger("provenance.live", level="info")
 
 app = FastAPI(title="Provenance Live (FastAPI)")
 app.mount(
@@ -114,8 +118,9 @@ def on_agent(name, agent_data, step, sim_time):
                     goal_score = sum(vals)
             # 核心观测对象:价值倾向(内化结果)演变,供前端曲线绘制
             value_tendency = _agent.get_tendency() or {}
-    except Exception:
-        pass
+    except Exception as e:
+        # 尽力而为:推送消息失败不应中断广播;记日志便于定位(不刷堆栈,高频路径)
+        log.debug("on_agent 读取角色状态失败(name={}): {}".format(name, e))
     msg: AgentState = {
         "type": "agent",
         "name": agent_state["name"],
@@ -175,7 +180,8 @@ async def get_goals():
         try:
             all_iv = json.load(open(iv_path, encoding="utf-8"))
             interventions = [x for x in all_iv if x.get("simulation") == current_sim]
-        except Exception:
+        except Exception as e:
+            log.warning("读取 interventions.json 失败: {}".format(e))
             interventions = []
     # embedding 稳定性健康度(后果反馈降级监控)
     embedding_health = {}
@@ -184,7 +190,8 @@ async def get_goals():
             engine = getattr(server.game, "consequence", None)
             if engine is not None and hasattr(engine, "health"):
                 embedding_health = engine.health()
-        except Exception:
+        except Exception as e:
+            log.warning("读取 embedding 健康度失败: {}".format(e))
             embedding_health = {}
     return JSONResponse({
         "ok": True,
@@ -302,7 +309,8 @@ async def explain_agent(agent: str = ""):
                      and x.get("simulation") == sim_state.get("name", "")],
                     key=lambda x: str(x.get("sim_time", "")),
                 )
-            except Exception:
+            except Exception as e:
+                log.warning("explain 读取 interventions.json 失败: {}".format(e))
                 my_ivs = []
         # 对每次干预:记录干预前最近倾向 + 干预后 2 小时倾向(量化内化滞后)
         for iv in my_ivs:
@@ -416,8 +424,8 @@ async def update_goals(request: Request):
         sim_time = ""
         try:
             sim_time = server.game._timer.get_date("%Y%m%d-%H:%M")
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("读取模拟时间失败,干预 sim_time 留空: {}".format(e))
         audit_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
         audit = []
         if os.path.exists(audit_path):
@@ -436,7 +444,8 @@ async def update_goals(request: Request):
         with open(audit_path, "w", encoding="utf-8") as f:
             json.dump(audit, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        pass  # 审计失败不阻断主流程
+        # 审计失败不阻断主流程,但必须记录——干预无审计会破坏可审计链
+        log.error("写入干预审计失败(agent={}): {}".format(name, e), exc_info=True)
 
     return JSONResponse({"ok": True, "name": name, "constraints": goals})
 
@@ -497,14 +506,16 @@ async def export_chart(agent: str = ""):
     if os.path.exists(gov_path):
         try:
             cons = json.load(open(gov_path, encoding="utf-8")).get("roles", {}).get(agent, {})
-        except Exception:
+        except Exception as e:
+            log.warning("export-chart 读取 governance.json 失败: {}".format(e))
             cons = {}
     iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
     ivs = []
     if os.path.exists(iv_path):
         try:
             ivs = json.load(open(iv_path, encoding="utf-8"))
-        except Exception:
+        except Exception as e:
+            log.warning("export-chart 读取 interventions.json 失败: {}".format(e))
             ivs = []
     my_ivs = sorted(
         [x for x in ivs if x.get("agent") == agent and x.get("simulation") == sim_state.get("name", "")],
