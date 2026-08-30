@@ -385,23 +385,33 @@ async def export_chart(agent: str = ""):
             ax.plot(ts, vs, color=color_of[g], linewidth=2.2, label="{} 倾向".format(g))
     # 约束分段阶梯虚线:起始段=最早干预前的 old(干预前的制度期望),
     # 之后每个干预时刻跳到 new;无干预时=当前 governance
+    # 注意:interventions.json 是全局共享的(跨模拟),只取落在本图时间
+    # 范围内的干预参与阶梯——图外的旧模拟干预不应用于本图的起始约束
+    # (否则橙色 RC 虚线会画在旧模拟的 old_constraints 上,与前端不一致)
     steps = []  # (datetime, constraints)
-    cur = dict(cons)
+    in_range_ivs = []  # 图内干预(用于起始约束选择)
     for iv in my_ivs:
         try:
             ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
         except Exception:
             continue
         steps.append((ivt, dict(iv.get("new_constraints") or cur)))
-    # 起始约束:最早干预的 old_constraints(干预前),无干预则当前 governance
+        if t0 <= ivt <= t1:
+            in_range_ivs.append(iv)
+    # 起始约束:图内有干预 → 最早图内干预的 old_constraints(干预前);
+    # 图内无干预 → 当前 governance(图外旧干预不属于本模拟,不得污染)
     start_cons = dict(cons)
-    if my_ivs:
-        first_iv = my_ivs[0]
+    if in_range_ivs:
+        first_iv = in_range_ivs[0]
         oldc = first_iv.get("old_constraints")
         if isinstance(oldc, dict) and oldc:
             # 过滤数字键(误输入的垃圾目标,如 "1")
             oldc_clean = {k: v for k, v in oldc.items() if not str(k)[0].isdigit()}
-            start_cons = {**cons, **oldc_clean}  # old 缺失维度回退当前值
+            # 只保留当前约束维度内的目标(维度对齐:old 可能是旧模拟的 4 维,
+            # 当前约束 3 维;跨维度混合会让虚线缺线/错位)
+            start_cons = {
+                k: v for k, v in {**cons, **oldc_clean}.items() if k in cons
+            }
     # 画阶梯:每个目标一条虚线,段内用该时刻的约束值
     for g in goal_names:
         segs = []  # (start_t, value)
