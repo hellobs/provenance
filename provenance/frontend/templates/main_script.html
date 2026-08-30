@@ -1,4 +1,4 @@
-﻿<script type="text/javascript">
+<script type="text/javascript">
 	// Initialize variables from Flask context
 	let step = {{ step|tojson }};
 	let step_size = {{ sec_per_step|tojson }} * 1000; // Convert to milliseconds
@@ -566,11 +566,13 @@
 			player.body.setVelocityY(camera_speed);
 		}
 
-		let curr_focused_persona = document.getElementById("temp_focus").textContent;
+		// 点击角色后镜头跟随(仅独立页有 temp_focus;embed 模式无该元素)
+		let _focusEl = document.getElementById("temp_focus");
+		let curr_focused_persona = _focusEl ? _focusEl.textContent : "";
 		if (curr_focused_persona != "") {
 			player.body.x = personas[curr_focused_persona].body.x;
 			player.body.y = personas[curr_focused_persona].body.y;
-			document.getElementById("temp_focus").innerHTML = "";
+			if (_focusEl) _focusEl.innerHTML = "";
 		}
 
 		if (live_mode && (sim_finished || sim_error)) {
