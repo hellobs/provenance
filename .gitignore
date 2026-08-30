@@ -177,6 +177,8 @@ results/compressed/
 provenance/frontend/static/assets/village/tilemap/*.bak
 provenance/frontend/static/assets/village/tilemap/_debug_err.txt
 provenance/frontend/static/assets/village/tilemap/finance_extras.jpg
+# tilemap_to_maze 工具自动导出的中间产物(等价于 tilemap.json,不入库)
+provenance/frontend/static/assets/village/tilemap/*.exported.json
 
 # 决策导出产物(由 checkpoints 生成,不入库)
 decisions_*.json
