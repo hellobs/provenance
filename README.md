@@ -1,4 +1,4 @@
-﻿# Provenance
+# Provenance
 
 English | [简体中文](./README_zh.md)
 
@@ -276,6 +276,11 @@ live simulation.
   into that folder before first run
 - Localization: modify the engine's `mavisframework/prompt/scratch.py` and
   frontend copy; no logic changes required
+- **Role/scenario config tool**: agents, relationships and story events are
+  generated via the form-based tool `config_tool` (port 5002, lives in the
+  [mavis](https://github.com/hellobs/mavis) repo, `config_tool/`); it writes
+  directly into this platform's `agents/` and `scenarios/` directories (see
+  `config_tool/README.md`).
 
 ## 10. Custom Maps
 
@@ -283,10 +288,14 @@ live simulation.
    support tiled-exported json/csv files
 2. Follow the existing maze.json format to merge tiled exports
    (maze_meta_info.json, collision_maze.csv, sector_maze.csv) into a new maze.json
-3. Use the map annotation tool: https://github.com/jiejieje/tiled_to_maze.json
+3. **Recommended**: use the bundled converter `tools/tilemap_to_maze.py`
+   (CLI, no external deps) — converts a Tiled `.tmx`/`.json` map into
+   `maze.json` directly (see `tools/tilemap_to_maze_README.md`). The legacy
+   GUI tool is at https://github.com/jiejieje/tiled_to_maze.json
 
 ## 11. References
 
 - Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
+- Map tool: `tools/tilemap_to_maze.py` (bundled) / [tiled_to_maze (legacy GUI)](https://github.com/jiejieje/tiled_to_maze.json)
 

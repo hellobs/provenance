@@ -1,4 +1,4 @@
-﻿# Provenance
+# Provenance
 
 [English](./README.md) | 简体中文
 
@@ -218,12 +218,13 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面使用
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
+- **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(端口 5002,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)
 
 ## 10. 修改地图
 
 1. 参考原始 generative_agents 项目中 maze.py 的逻辑,修改现有代码以兼容 tiled 编辑器导出的 json/csv 数据文件
 2. 参考现有 maze.json 格式,编写代码合并 tiled 导出的 maze_meta_info.json、collision_maze.csv、sector_maze.csv 等文件,为新地图生成 maze.json
-3. 使用地图标注工具:https://github.com/jiejieje/tiled_to_maze.json
+3. **推荐**:使用随仓库携带的转换工具 `tools/tilemap_to_maze.py`(纯 CLI、无外部依赖)——直接把 Tiled 的 `.tmx`/`.json` 地图转换为 `maze.json`(详见 `tools/tilemap_to_maze_README.md`)。旧 GUI 工具见 https://github.com/jiejieje/tiled_to_maze.json
 
 ## 11. 参考资料
 

@@ -265,6 +265,12 @@ Tiled 提供两种语义标注手段,本工具分别对应两种生成模式。
 ## 10. 参考
 
 - Tiled 官方文档:https://doc.mapeditor.org/
-- 引擎消费点:`mavisframework/scene/maze.py`(寻路与空间检索)
+- 引擎消费点:`mavisframework/scene/maze.py`(寻路与空间检索),引擎仓库
+  [hellobs/mavis](https://github.com/hellobs/mavis)
+- 平台仓库:[hellobs/provenance](https://github.com/hellobs/provenance)
+  (本工具随平台 `tools/` 目录分发)
 - 前端渲染:`provenance/frontend/templates/main_script.html`(preload/create)
+- 角色/场景配置工具:引擎仓库 `config_tool/`(端口 5002,表单生成
+  agent.json/relationships.json/story.json)
+- Unity 版前端(已冻结):[hellobs/Multi-Model-AI-Visualization-and-Interactive-Simulation-Platform](https://github.com/hellobs/Multi-Model-AI-Visualization-and-Interactive-Simulation-Platform)
 - 旧工具(参考):https://github.com/jiejieje/tiled_to_maze
