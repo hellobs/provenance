@@ -6,10 +6,16 @@
     0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
     50% { opacity: 0.4; transform: translateX(-50%) scale(1.04); }
 }
+/* 嵌入模式:铺满容器,无页面留白 */
+{% if embed %}
+body { margin: 0; overflow: hidden; }
+#game-container { width: 100vw; height: 100vh; }
+{% endif %}
 </style>
 <div id="game-container" style="text-align: center"></div>
 
 <!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
+{% if embed != "goals" and embed != "explain" %}
 <div id="sim-clock" style="position: fixed; left: 16px; top: 60px; z-index: 100;
     background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
     padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
@@ -20,12 +26,16 @@
     z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
     padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
+{% endif %}
 
 <!-- Right column: chat log (top, collapsible) + goal adjustment panel (below, not adjacent) -->
+{% if embed != "scene" %}
 <div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
     display: flex; flex-direction: column; gap: 12px;">
+{% endif %}
 
     <!-- Chat log panel (HTML, scrollable, speaker highlighted, collapsible) -->
+    {% if embed != "scene" and embed != "goals" and embed != "explain" %}
     <div id="chat-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
         display: flex; flex-direction: column; overflow: hidden;">
@@ -38,8 +48,10 @@
         <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; max-height: 50vh;
             line-height: 1.7; color: #333;"></div>
     </div>
+    {% endif %}
 
     <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
+    {% if embed != "scene" %}
     <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
         display: flex; flex-direction: column; overflow: hidden; max-height: 45vh;">
@@ -53,9 +65,14 @@
             <div style="color:#999;">Loading goals...</div>
         </div>
     </div>
+    {% endif %}
+
+{% if embed != "scene" %}
 </div>
+{% endif %}
 
 <!-- Left column: developer console -->
+{% if embed != "scene" and embed != "goals" and embed != "explain" %}
 <div style="position: fixed; left: 16px; top: 120px; width: 320px; z-index: 150;">
 
     <!-- Developer console (live message stream, collapsible, scrollable) -->
@@ -81,7 +98,9 @@
 #dev-console-body::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
 #dev-console-body::-webkit-scrollbar-thumb:hover { background: #888; }
 </style>
+{% endif %}
 
+{% if embed != "scene" and embed != "goals" and embed != "explain" %}
 <div>
     <div class="row">
         <div class="col-md-12" style="border: solid; padding: 1em; padding-left:2em; padding-right:2em; border-radius: 5px;">
@@ -124,6 +143,7 @@
         </div>
     {% endfor %}
 </div>
+{% endif %}
 
 {% endblock content %}
 

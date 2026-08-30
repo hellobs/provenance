@@ -1,4 +1,4 @@
-# Provenance
+﻿# Provenance
 
 [English](./README.md) | 简体中文
 
@@ -161,7 +161,56 @@ python app.py
 
 行动 → 与**行为绑定目标**的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。目标名刻意设计为语义可区分(见 7.1);剧情事件与角色日程轮换行为,保持曲线活跃而非平坦。形式化见引擎 README 第 7 节。
 
-## 8. 说明
+### 7.5 可解释性面板(`/api/explain`)
+
+`GET /api/explain?agent=<角色名>` 返回三层解释,回答"该角色的价值倾向为什么是当前值":
+
+1. **构成分解** — `倾向 = α×人物底色 + (1−α)×体验窗口均值`(逐目标,含 α 与累计体验次数);
+2. **窗口明细** — 最近体验逐条展示(行动描述、逐目标对齐度、反馈值),解释哪些行动把倾向拉向哪;
+3. **干预因果链** — 每次专家干预的约束跳变、干预前/后 2 小时倾向、量化迁移量(内化滞后证据)。
+
+前端通过每个角色的"解释倾向成因"按钮展示。
+
+## 8. 部署与嵌入
+
+### 8.1 运行依赖
+
+| 组件 | 说明 |
+|---|---|
+| Python 3.12 + venv | `pip install -r requirements.txt` + 构建/安装 mavis wheel |
+| 大模型 | 本地 Ollama(qwen3-instruct + qwen3-embedding)**或** OpenAI 兼容 API(data/config.json 配置,见第 3 节) |
+| 前端资源 | 已本地化(`static/vendor/`:phaser/jquery/bootstrap)——无 CDN 依赖,可离线/内网部署 |
+
+### 8.2 启动服务
+
+```bash
+# 在 provenance/provenance 目录下
+python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
+# 全新模拟:去掉 --resume(从配置日期开始);--step 0 = 无限运行
+```
+
+对外部平台嵌入时,建议用反向代理(nginx/caddy)提供 HTTPS。服务自包含(FastAPI + WS + 静态资源),无需构建步骤。
+
+### 8.3 嵌入外部平台(iframe)
+
+服务提供**嵌入专用路由**——复用同一 WebSocket/数据,隐藏无关 UI 的精简页。任意 Web 平台(如治理看板)用 `<iframe>` 引用即可;iframe 内的页面自行连接自己的 WS,无需配置 CORS。
+
+| 路由 | 内容 |
+|---|---|
+| `/embed/scene` | 仅 Phaser 场景(无浮动面板)——用于"仿真画面"位置 |
+| `/embed/goals` | 仅治理面板(滑条 + 倾向曲线 + 解释按钮) |
+| `/embed/explain` | 治理面板并自动展开解释面板 |
+
+示例(React/Next.js):
+
+```jsx
+<iframe src="https://sim.example.com/embed/scene" style={{width:'100%',height:'480px',border:0}} />
+<iframe src="https://sim.example.com/embed/goals" style={{width:'380px',height:'70vh',border:0}} />
+```
+
+部署形态:provenance 独立域名运行,宿主平台 iframe 嵌入。两套代码库相互独立,共享同一实时模拟。
+
+## 9. 说明
 
 - 实时可视化通过 WebSocket(`/ws`)推送框架契约消息(agent/time/chat_line/snapshot);客户端看门狗自动恢复死连接(服务端每 5 秒心跳、20 秒无消息判定断开、回焦检查)
 - 实时服务由 mavisframework(Game + Simulator + LiveCompressor)驱动
@@ -170,13 +219,14 @@ python app.py
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 
-## 9. 修改地图
+## 10. 修改地图
 
 1. 参考原始 generative_agents 项目中 maze.py 的逻辑,修改现有代码以兼容 tiled 编辑器导出的 json/csv 数据文件
 2. 参考现有 maze.json 格式,编写代码合并 tiled 导出的 maze_meta_info.json、collision_maze.csv、sector_maze.csv 等文件,为新地图生成 maze.json
 3. 使用地图标注工具:https://github.com/jiejieje/tiled_to_maze.json
 
-## 10. 参考资料
+## 11. 参考资料
 
 - 论文:[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - 代码:[mavisframework(自研框架)](https://github.com/hellobs/mavis) / [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
+

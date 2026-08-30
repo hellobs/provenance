@@ -796,6 +796,30 @@ def load_initial_payload(start_datetime, stride):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    return await _render_index(request, embed="")
+
+
+@app.get("/embed", response_class=HTMLResponse)
+@app.get("/embed/scene", response_class=HTMLResponse)
+@app.get("/embed/goals", response_class=HTMLResponse)
+@app.get("/embed/explain", response_class=HTMLResponse)
+async def embed_index(request: Request):
+    """嵌入模式(供外部治理平台 iframe 引用):
+    - /embed/scene   : 仅 Phaser 场景(无浮动面板,嵌入 canvas 位)
+    - /embed/goals   : 仅治理约束面板(约束滑条+倾向曲线+解释)
+    - /embed/explain : 倾向成因解释面板(构成分解+窗口明细+干预因果链)
+    共享同一 WebSocket/数据源;通过 URL 参数控制 index.html 面板显隐。
+    """
+    path = request.url.path.rstrip("/")
+    mode = "scene"
+    if path.endswith("goals"):
+        mode = "goals"
+    elif path.endswith("explain"):
+        mode = "explain"
+    return await _render_index(request, embed=mode)
+
+
+async def _render_index(request: Request, embed: str = ""):
     speed = int(request.query_params.get("speed", 0))
     zoom = float(request.query_params.get("zoom", 0))
     if speed < 0:
@@ -820,6 +844,7 @@ async def index(request: Request):
             "zoom": zoom,
             "live_mode": True,
             "phaser_src": phaser_src,
+            "embed": embed,
             **payload,
         },
     )

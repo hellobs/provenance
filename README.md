@@ -1,4 +1,4 @@
-# Provenance
+﻿# Provenance
 
 English | [简体中文](./README_zh.md)
 
@@ -195,7 +195,68 @@ embedding feedback can tell actions apart (see §7.1); scenario events and
 role daily plans rotate behaviors to keep the curves lively instead of flat.
 See the engine's README §7 for the formalization.
 
-## 8. Notes
+### 7.5 Explainability panel (`/api/explain`)
+
+`GET /api/explain?agent=<name>` returns three explanation layers for why a
+role's value tendency is what it is:
+
+1. **Decomposition** — `tendency = α×persona baseline + (1−α)×experience
+   window mean`, per goal, with α and cumulative experience count;
+2. **Window details** — recent experiences (action description, per-goal
+   alignment, feedback) that drove the internalization;
+3. **Intervention chain** — each expert intervention with constraint jump,
+   tendency before/after 2h, and the quantified shift (lagged internalization
+   evidence).
+
+The browser panel shows these via the *"解释倾向成因"* button per role.
+
+## 8. Deploy & Embed
+
+### 8.1 Runtime requirements
+
+| Component | Notes |
+|---|---|
+| Python 3.12 + venv | `pip install -r requirements.txt` + build/install mavis wheel |
+| LLM | Local Ollama (qwen3-instruct + qwen3-embedding) **or** OpenAI-compatible API (set in `data/config.json`, see §3) |
+| Frontend assets | Vendored locally (`static/vendor/`: phaser/jquery/bootstrap) — no CDN dependency |
+
+### 8.2 Running a server
+
+```bash
+# from provenance/provenance
+python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
+# fresh sim (no --resume) starts at the configured date; --step 0 = run forever
+```
+
+Behind a reverse proxy (nginx/caddy) for HTTPS when embedding into an
+external platform. The service is self-contained (FastAPI + WS + static);
+no build step needed.
+
+### 8.3 Embedding into another platform (iframe)
+
+The service exposes dedicated *embed routes* — slim pages that reuse the same
+WebSocket/data but hide unrelated UI. Embed via `<iframe>` from any web
+platform (e.g. a governance dashboard); iframe pages connect their own WS, so
+no CORS setup is required.
+
+| Route | Content |
+|---|---|
+| `/embed/scene` | Phaser canvas only (no floating panels) — for a "simulation" slot |
+| `/embed/goals` | Governance panel only (sliders + tendency curve + explain button) |
+| `/embed/explain` | Governance panel with the explanation panel auto-expanded |
+
+Example (React/Next.js):
+
+```jsx
+<iframe src="https://sim.example.com/embed/scene" style={{width:'100%',height:'480px',border:0}} />
+<iframe src="https://sim.example.com/embed/goals" style={{width:'380px',height:'70vh',border:0}} />
+```
+
+Deployment topology: run provenance on its own domain; the host platform
+embeds it. This keeps the two codebases independent while sharing the same
+live simulation.
+
+## 9. Notes
 
 - Real-time visualization via WebSocket (`/ws`) pushing engine contract
   messages (agent/time/chat_line/snapshot); the client watchdog reloads on
@@ -216,7 +277,7 @@ See the engine's README §7 for the formalization.
 - Localization: modify the engine's `mavisframework/prompt/scratch.py` and
   frontend copy; no logic changes required
 
-## 9. Custom Maps
+## 10. Custom Maps
 
 1. Follow the maze.py logic in the original generative_agents project to
    support tiled-exported json/csv files
@@ -224,7 +285,8 @@ See the engine's README §7 for the formalization.
    (maze_meta_info.json, collision_maze.csv, sector_maze.csv) into a new maze.json
 3. Use the map annotation tool: https://github.com/jiejieje/tiled_to_maze.json
 
-## 10. References
+## 11. References
 
 - Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
+

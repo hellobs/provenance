@@ -764,6 +764,12 @@
 		goalsUpdateSums();
 		drawTendencyChart(a);
 		updateTendencyLegend(a);
+		// 嵌入模式:explain → 自动展开当前角色解释面板;goals → 收起其他列
+		var embedMode = document.body.getAttribute("data-embed") || "";
+		if (embedMode === "explain") {
+			var eb = body.querySelector('[data-explain-for="' + goalsEscape(a) + '"]');
+			if (eb) eb.click();
+		}
 	}
 
 	function goalsUpdateSums() {
