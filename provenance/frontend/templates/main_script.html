@@ -80,11 +80,15 @@
 	let paused = false;
 
 	// Phaser configuration
+	// embed 模式(scene 嵌入 iframe):自适应容器尺寸;独立页面:固定 864x768
+	const embedMode = document.body.getAttribute("data-embed") || "";
+	const gameWidth = embedMode ? Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864) : 864;
+	const gameHeight = embedMode ? Math.max(240, window.innerHeight || 768) : 768;
 	const config = {
 		type: Phaser.AUTO,
 		backgroundColor: "#e8e8e8",
-        width: 864,
-        height: 768,
+        width: gameWidth,
+        height: gameHeight,
 		parent: "game-container",
         mode: Phaser.Scale.NONE,
 		pixelArt: true,
@@ -466,6 +470,28 @@
 				}
 			).setDepth(3);
 			pronunciatios[persona_name].alpha = 0.7;
+
+			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
+			// (宿主(如仝牧治理平台)可通过 window.addEventListener("message") 接收,
+			//  事件 data = {type:"provenance.agentClick", name, time})
+			new_sprite.setInteractive({ useHandCursor: true });
+			new_sprite.on("pointerdown", (function (pname) {
+				return function () {
+					var payload = {
+						type: "provenance.agentClick",
+						name: pname,
+						time: document.getElementById("sim-clock-time") ? document.getElementById("sim-clock-time").textContent : ""
+					};
+					if (embedMode) {
+						// 嵌入模式:通知宿主;同时自己也尝试触发页面内选中(若有面板)
+						try { window.parent.postMessage(payload, "*"); } catch (e) {}
+					}
+					// 页面内联动:若有 on_screen_det_trigger 则触发(独立页行为)
+					var safe = pname.replace(/ /g, "_");
+					var trig = document.getElementById("on_screen_det_trigger-" + safe);
+					if (trig) trig.click();
+				};
+			})(persona_name));
 		}
 
 		// Create animations
@@ -1063,6 +1089,81 @@
 				}
 				lx += iw;
 			}
+		}
+		// 悬停 tooltip:鼠标移到曲线区域,显示最近数据点的各目标值 + 干预信息
+		// (仅实时视图启用;导出视图是静态 PNG 无交互)
+		if (!opts.export && cv && typeof cv._tendHoverInit === "undefined") {
+			cv._tendHoverInit = true;
+			var _hist = hist;
+			var _colors = colors;   // 捕获当前目标配色
+			var _ivs = ivs;         // 捕获当前角色的干预列表
+			var _agent = agentName;
+			var _cv = cv;
+			var _scale = scale;
+			cv.addEventListener("mousemove", function (e) {
+				var rect = _cv.getBoundingClientRect();
+				var mx = (e.clientX - rect.left) * (_cv.width / rect.width);
+				var my = (e.clientY - rect.top) * (_cv.height / rect.height);
+				// 找到最近的点(按 x 距离)
+				var nn = _hist.length;
+				if (nn === 0) return;
+				var best = -1, bd = 1e9;
+				var plotW = (_cv.width / _scale) - 60;
+				for (var pi = 0; pi < nn; pi++) {
+					var px = 30 + (nn === 1 ? 0 : pi / (nn - 1)) * plotW;
+					var d = Math.abs(px - mx);
+					if (d < bd) { bd = d; best = pi; }
+				}
+				if (best < 0) return;
+				// 判断是否在绘图区(避免贴边也触发)
+				var topR = 26, bottomR = 22;
+				var hR = (_cv.height / _scale) - topR - bottomR;
+				if (mx < 30 || mx > 30 + plotW || my < topR || my > topR + hR) return;
+				// 重绘 + 画 tooltip
+				drawTendencyChart(_agent, _cv, opts);
+				var px = 30 + (nn === 1 ? 0 : best / (nn - 1)) * plotW;
+				var toolLines = [];
+				var pt = String(_hist[best].t || "");
+				toolLines.push(pt.slice(9) || pt);
+				var goalArr = Object.keys(_colors);
+				for (var tg = 0; tg < goalArr.length; tg++) {
+					var tgGoal = goalArr[tg];
+					var tv = _hist[best].v[tgGoal];
+					if (tv !== undefined) toolLines.push(tgGoal + ": " + Math.round(tv * 1000) / 10 + "%");
+				}
+				// 该时刻是否有干预
+				for (var ivj = 0; ivj < _ivs.length; ivj++) {
+					if (String(_ivs[ivj].sim_time) === pt) { toolLines.push("▲ 干预时刻"); break; }
+				}
+				// 绘制 tooltip 白底框
+				var tctx = _cv.getContext("2d");
+				tctx.font = "10px sans-serif";
+				var boxW = 0;
+				for (var tl = 0; tl < toolLines.length; tl++) {
+					var tw2 = tctx.measureText(toolLines[tl]).width;
+					if (tw2 > boxW) boxW = tw2;
+				}
+				boxW += 12;
+				var boxH = toolLines.length * 13 + 8;
+				var bx2 = Math.min(px + 12, 30 + plotW - boxW - 2);
+				if (bx2 < 4) bx2 = 4;
+				var by2 = Math.max(4, my - boxH - 6);
+				tctx.fillStyle = "rgba(255,255,255,0.95)";
+				tctx.strokeStyle = "rgba(0,0,0,0.25)";
+				tctx.lineWidth = 1;
+				tctx.fillRect(bx2, by2, boxW, boxH);
+				tctx.strokeRect(bx2, by2, boxW, boxH);
+				tctx.fillStyle = "#333";
+				for (var tl2 = 0; tl2 < toolLines.length; tl2++) {
+					tctx.fillText(toolLines[tl2], bx2 + 6, by2 + 12 + tl2 * 13);
+				}
+				// 时间轴上的定位圆点
+				tctx.fillStyle = "#e07b39";
+				tctx.beginPath(); tctx.arc(px, my, 3.5, 0, Math.PI * 2); tctx.fill();
+			});
+			cv.addEventListener("mouseleave", function () {
+				drawTendencyChart(_agent, _cv, opts);
+			});
 		}
 	}
 

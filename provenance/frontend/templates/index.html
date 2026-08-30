@@ -6,10 +6,10 @@
     0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
     50% { opacity: 0.4; transform: translateX(-50%) scale(1.04); }
 }
-/* 嵌入模式:铺满容器,无页面留白 */
+/* 嵌入模式:适配 iframe 容器尺寸(非全屏),高度由内容撑开 */
 {% if embed %}
-body { margin: 0; overflow: hidden; }
-#game-container { width: 100vw; height: 100vh; }
+body { margin: 0; }
+#game-container { width: 100%; min-height: 300px; }
 {% endif %}
 </style>
 <div id="game-container" style="text-align: center"></div>
