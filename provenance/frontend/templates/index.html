@@ -148,9 +148,12 @@ body { margin: 0; }
 {% endblock content %}
 
 {% block js_content %}
+{% if embed != "goals" and embed != "explain" %}
 <script src='{{ phaser_src }}'></script>
+{% endif %}
 {% include 'main_script.html' %}
 <script>
+{% if embed != "goals" and embed != "explain" %}
 {% for p in persona_names %}
     {% set safe_p = p|replace(' ', '_') %}
     $('#on_screen_det_trigger-{{ safe_p }}').click(function() {
@@ -185,5 +188,6 @@ body { margin: 0; }
         document.getElementById("temp_focus").innerHTML = "{{ p }}";
     });
 {% endfor %}
+{% endif %}
 </script>
 {% endblock js_content %}

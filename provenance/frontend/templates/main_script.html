@@ -82,37 +82,39 @@
 	// Phaser configuration
 	// embed 模式(scene 嵌入 iframe):自适应容器尺寸;独立页面:固定 864x768
 	const embedMode = document.body.getAttribute("data-embed") || "";
-	const gameWidth = embedMode ? Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864) : 864;
-	const gameHeight = embedMode ? Math.max(240, window.innerHeight || 768) : 768;
-	const config = {
-		type: Phaser.AUTO,
-		backgroundColor: "#e8e8e8",
-        width: gameWidth,
-        height: gameHeight,
-		parent: "game-container",
-        mode: Phaser.Scale.NONE,
-		pixelArt: true,
-		physics: {
-			default: "arcade",
-			arcade: {
-				gravity: { y: 0 }
-			}
-		},
-		scene: {
-			preload: preload,
-			create: create,
-			update: update
-		},
-		scale: {
-			zoom: zoom
-		}
-	};
-
-	// Create Phaser game instance
 	// 仅独立页面与 scene 嵌入模式创建场景;goals/explain 是纯面板页,
-	// 不加载场景(避免 iframe 里多个 Phaser 实例互相干扰/初始化失败)
+	// 不加载场景(避免 iframe 里多个 Phaser 实例互相干扰/初始化失败,
+	// 也避免 Phaser 脚本加载失败时中断面板脚本)
 	const wantScene = !embedMode || embedMode === "scene";
-	const game = wantScene ? new Phaser.Game(config) : null;
+	let game = null;
+	if (wantScene) {
+		const gameWidth = Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864);
+		const gameHeight = Math.max(240, window.innerHeight || 768);
+		const config = {
+			type: Phaser.AUTO,
+			backgroundColor: "#e8e8e8",
+			width: gameWidth,
+			height: gameHeight,
+			parent: "game-container",
+			mode: Phaser.Scale.NONE,
+			pixelArt: true,
+			physics: {
+				default: "arcade",
+				arcade: {
+					gravity: { y: 0 }
+				}
+			},
+			scene: {
+				preload: preload,
+				create: create,
+				update: update
+			},
+			scale: {
+				zoom: zoom
+			}
+		};
+		game = new Phaser.Game(config);
+	}
 	let cursors;
 	let player;
 
