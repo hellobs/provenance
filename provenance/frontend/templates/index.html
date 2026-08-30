@@ -50,9 +50,8 @@ body { margin: 0; }
     </div>
     {% endif %}
 
-    <!-- Goal adjustment panel:嵌入模式(goals/explain)保留右侧悬浮;
-        独立页面移至底部角色栏下方(见下方布局) -->
-    {% if embed == "goals" or embed == "explain" %}
+    <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
+    {% if embed != "scene" %}
     <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
         display: flex; flex-direction: column; overflow: hidden; max-height: 45vh;">
@@ -143,21 +142,6 @@ body { margin: 0; }
             </div>
         </div>
     {% endfor %}
-
-    <!-- 治理约束面板(独立页面:置于角色栏与详情之下,替代右侧悬浮) -->
-    <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px; margin-top: 12px;
-        display: flex; flex-direction: column; overflow: hidden; max-height: 55vh;">
-        <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
-            border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
-            display:flex; justify-content:space-between; align-items:center;" id="goals-header">
-            <span>治理约束(实时调整)</span>
-            <span id="goals-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
-        </div>
-        <div id="goals-body" style="padding: 8px 12px; overflow-y: auto; flex: 1; line-height: 1.6;">
-            <div style="color:#999;">Loading goals...</div>
-        </div>
-    </div>
 </div>
 {% endif %}
 
