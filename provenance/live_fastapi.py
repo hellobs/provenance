@@ -29,6 +29,63 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 模块级日志:各处 except 容错统一走这里,不再静默吞错
 log = get_logger("provenance.live", level="info")
 
+# ---------------------------------------------------------------------------
+# checkpoint 倾向序列加载(带缓存)
+# ---------------------------------------------------------------------------
+# 缓存:checkpoint 目录 -> (mtime签名, {agent: [(dt, {goal:value}), ...]})
+# 目录 mtime 变化(新 checkpoint 落盘)才重扫——避免 explain/export 每次
+# 重复解析几百个 json 文件(几百文件时可达数百 ms)
+_series_cache = {}
+_series_cache_lock = threading.Lock()
+
+
+def _dir_mtime_sig(ckpt_dir: str) -> str:
+    """目录内 simulate-*.json 的数量 + 最新 mtime,作为缓存失效签名"""
+    import glob as _g
+    files = _g.glob(os.path.join(ckpt_dir, "simulate-*.json"))
+    if not files:
+        return ""
+    latest = max(os.path.getmtime(p) for p in files)
+    return "{}-{}".format(len(files), int(latest))
+
+
+def load_tendency_series(ckpt_dir: str, agent: str):
+    """读取某角色在 ckpt_dir 下的倾向序列(带缓存)。
+
+    返回 [(datetime, {goal: value}), ...] 按时间排序;
+    缓存键 = 目录 mtime 签名,新 checkpoint 落盘自动失效。
+    """
+    import datetime as _dt
+
+    sig = _dir_mtime_sig(ckpt_dir)
+    with _series_cache_lock:
+        cached = _series_cache.get(ckpt_dir)
+        if cached and cached[0] == sig:
+            return cached[1].get(agent, [])
+
+    import glob as _g
+
+    all_series = {}
+    files = sorted(_g.glob(os.path.join(ckpt_dir, "simulate-*.json")))
+    for p in files:
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                c = json.load(f)
+        except Exception:
+            continue
+        t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
+        try:
+            dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
+        except Exception:
+            continue
+        for aname, ag in (c.get("agents") or {}).items():
+            vt = (ag.get("status") or {}).get("value_tendency") or {}
+            if vt:
+                all_series.setdefault(aname, []).append((dt, vt))
+    with _series_cache_lock:
+        _series_cache[ckpt_dir] = (sig, all_series)
+    return all_series.get(agent, [])
+
 app = FastAPI(title="Provenance Live (FastAPI)")
 app.mount(
     "/static",
@@ -277,27 +334,10 @@ async def explain_agent(agent: str = ""):
         ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
     chain = []
     if ckpt_dir and os.path.isdir(ckpt_dir):
-        import glob as _glob
         import datetime as _dt
 
-        # 倾向序列
-        series = []
-        for p in sorted(_glob.glob(os.path.join(ckpt_dir, "simulate-*.json"))):
-            try:
-                c = json.load(open(p, encoding="utf-8"))
-            except Exception:
-                continue
-            t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
-            try:
-                dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
-            except Exception:
-                continue
-            ag = (c.get("agents") or {}).get(agent)
-            if not ag:
-                continue
-            v = (ag.get("status") or {}).get("value_tendency") or {}
-            if v:
-                series.append((dt, v))
+        # 倾向序列(带缓存)
+        series = load_tendency_series(ckpt_dir, agent)
         # 干预记录(该角色的、当前模拟的,按 sim_time 排序)
         iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
         my_ivs = []
@@ -474,29 +514,10 @@ async def export_chart(agent: str = ""):
     if not ckpt_dir or not os.path.isdir(ckpt_dir):
         return JSONResponse({"ok": False, "errors": ["模拟检查点目录不可用: {}".format(ckpt_dir)]})
 
-    # 读倾向序列
-    import glob
+    # 读倾向序列(带缓存:目录 mtime 变化才重扫,几百 checkpoint 时避免重复解析)
     import datetime as _dt
 
-    series = []  # [(datetime, {goal: value})]
-    files = sorted(glob.glob(os.path.join(ckpt_dir, "simulate-*.json")))
-    for p in files:
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                c = json.load(f)
-        except Exception:
-            continue
-        t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
-        try:
-            dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
-        except Exception:
-            continue
-        ag = (c.get("agents") or {}).get(agent)
-        if not ag:
-            continue
-        vt = (ag.get("status") or {}).get("value_tendency") or {}
-        if vt:
-            series.append((dt, vt))
+    series = load_tendency_series(ckpt_dir, agent)
     if not series:
         return JSONResponse({"ok": False, "errors": ["该角色暂无倾向数据"]})
 
