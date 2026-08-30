@@ -193,6 +193,159 @@ async def get_goals():
     })
 
 
+@app.get("/api/explain")
+async def explain_agent(agent: str = ""):
+    """倾向成因解释(可解释性面板):构成分解 + 窗口明细 + 干预因果链
+
+    回答"AI 的价值倾向为什么是现在这个值":
+    ① 构成分解:value_tendency = α×底色(initial_tendency) + (1-α)×窗口均值
+       (α 随累计体验衰减:体验少=人设主导,体验多=行为主导)
+    ② 窗口明细:最近 N 条体验,每条含 行动/对齐度/反馈(为什么这条体验
+       把倾向拉向某目标)
+    ③ 干预因果链:每次专家干预(约束跳变)→ 之后倾向的滞后收敛量化
+       (直接作为"AI 价值可被人为改变/内化滞后"的叙事证据)
+    """
+    global server
+    agent = agent.strip()
+    if not agent:
+        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
+
+    # ---- 运行中 agent 的内存状态(最准) ----
+    live_agent = None
+    if server is not None and getattr(server, "game", None) is not None:
+        live_agent = server.game.agents.get(agent)
+    if live_agent is None:
+        return JSONResponse({"ok": False, "errors": ["角色不在运行中的模拟里: {}".format(agent)]})
+
+    # ① 构成分解
+    vt = live_agent.get_tendency() or {}
+    base = getattr(live_agent, "initial_tendency", None) or {}
+    obs = int(getattr(live_agent, "_tendency_obs", 0) or 0)
+    alpha = max(0.1, 1.0 - obs / 8.0)
+    window = live_agent.status.get("tendency_window") or []
+    # 窗口均值(与 observe_consequence 相同的指数加权口径,仅用于展示)
+    win_mean = {}
+    if window:
+        n = len(window)
+        goals = set()
+        for w in window:
+            goals.update(w.get("feedback", w).keys())
+        for g in goals:
+            vals = [w.get("feedback", w).get(g, 0.0) for w in window]
+            weights = [0.5 ** (n - 1 - i) for i in range(n)]
+            wsum = sum(weights) or 1.0
+            win_mean[g] = sum(v * wt for v, wt in zip(vals, weights)) / wsum
+    decomposition = {}
+    for g in vt:
+        base_v = base.get(g, 0.0)
+        exp_v = win_mean.get(g, 0.0)
+        decomposition[g] = {
+            "tendency": round(vt[g], 4),
+            "alpha": round(alpha, 4),
+            "base_component": round(alpha * base_v, 4),
+            "experience_component": round((1 - alpha) * exp_v, 4),
+            "base_value": round(base_v, 4),
+            "window_mean": round(exp_v, 4),
+        }
+
+    # ② 窗口明细(最近 N 条体验,倒序=最新在前)
+    details = []
+    for w in reversed(window):
+        feedback = w.get("feedback", w) if isinstance(w, dict) else {}
+        details.append({
+            "action": str(w.get("action", ""))[:160] if isinstance(w, dict) else "",
+            "alignment": {k: round(v, 4) for k, v in (w.get("alignment", {}) or {}).items()} if isinstance(w, dict) else {},
+            "feedback": {k: round(v, 4) for k, v in feedback.items()},
+        })
+
+    # ③ 干预因果链:读 checkpoints 的倾向序列,量化每次干预后倾向迁移
+    ckpt_dir = ""
+    if compressor is not None:
+        ckpt_dir = getattr(compressor, "checkpoints_folder", "") or ""
+    if ckpt_dir and not os.path.isabs(ckpt_dir):
+        ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
+    chain = []
+    if ckpt_dir and os.path.isdir(ckpt_dir):
+        import glob as _glob
+        import datetime as _dt
+
+        # 倾向序列
+        series = []
+        for p in sorted(_glob.glob(os.path.join(ckpt_dir, "simulate-*.json"))):
+            try:
+                c = json.load(open(p, encoding="utf-8"))
+            except Exception:
+                continue
+            t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
+            try:
+                dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
+            except Exception:
+                continue
+            ag = (c.get("agents") or {}).get(agent)
+            if not ag:
+                continue
+            v = (ag.get("status") or {}).get("value_tendency") or {}
+            if v:
+                series.append((dt, v))
+        # 干预记录(该角色的,按 sim_time 排序)
+        iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+        my_ivs = []
+        if os.path.exists(iv_path):
+            try:
+                ivs = json.load(open(iv_path, encoding="utf-8"))
+                my_ivs = sorted(
+                    [x for x in ivs if x.get("agent") == agent],
+                    key=lambda x: str(x.get("sim_time", "")),
+                )
+            except Exception:
+                my_ivs = []
+        # 对每次干预:记录干预前最近倾向 + 干预后 2 小时倾向(量化内化滞后)
+        for iv in my_ivs:
+            try:
+                ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
+            except Exception:
+                continue
+            before = None
+            after = None
+            for dt, v in series:
+                if dt <= ivt:
+                    before = v
+                if after is None and dt > ivt and dt <= ivt + _dt.timedelta(hours=2):
+                    after = v
+                if dt > ivt + _dt.timedelta(hours=2):
+                    break
+            oldc = {k: round(vv, 4) for k, vv in (iv.get("old_constraints") or {}).items()}
+            newc = {k: round(vv, 4) for k, vv in (iv.get("new_constraints") or {}).items()}
+            # 倾向迁移量:干预后与干预前的差(取共现目标)
+            shift = {}
+            if before and after:
+                for g in after:
+                    if g in before:
+                        shift[g] = round(after[g] - before[g], 4)
+            chain.append({
+                "real_time": iv.get("time", ""),
+                "sim_time": iv.get("sim_time", ""),
+                "old_constraints": oldc,
+                "new_constraints": newc,
+                "tendency_before": {k: round(v, 4) for k, v in (before or {}).items()},
+                "tendency_after_2h": {k: round(v, 4) for k, v in (after or {}).items()},
+                "tendency_shift_2h": shift,
+            })
+
+    return JSONResponse({
+        "ok": True,
+        "agent": agent,
+        "value_tendency": {k: round(v, 4) for k, v in vt.items()},
+        "constraints": {k: round(v, 4) for k, v in (live_agent.get_constraints() or {}).items()},
+        "alpha": round(alpha, 4),
+        "experience_count": obs,
+        "window_size": len(window),
+        "decomposition": decomposition,
+        "window_details": details,
+        "intervention_chain": chain,
+    })
+
+
 @app.post("/api/goals")
 async def update_goals(request: Request):
     """更新某角色的治理约束(专家设定期望目标权重)
