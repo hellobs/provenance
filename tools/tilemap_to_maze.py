@@ -159,11 +159,12 @@ def build_maze(tilemap, gid_map, sector_layers, arena_layers, object_layers,
     arena_names = {int(k): v["name"] for k, v in gid_map.get("arena", {}).items()}
     object_names = {int(k): v["name"] for k, v in gid_map.get("object", {}).items()}
 
-    # 每格:最全地址 = world + sector + arena + object(缺则降级)
+    # 每格:最全地址 = sector + arena + object(缺则降级)
+    # 注意:address 不含 world 前缀——引擎 Tile 会自动 [world] + address
     tiles = []
     for y in range(h):
         for x in range(w):
-            addr = [world_name]
+            addr = []
             sector = sector_names.get(next((g for g in sector_gids if (x, y) in sector_gids[g]), 0))
             arena = arena_names.get(next((g for g in arena_gids if (x, y) in arena_gids[g]), 0))
             obj = object_names.get(next((g for g in object_gids if (x, y) in object_gids[g]), 0))
