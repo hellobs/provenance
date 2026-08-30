@@ -173,6 +173,13 @@ _tmp_test/
 # 新生成的模拟回放数据（内置的 example 已追踪，不受影响）
 results/compressed/
 
+# Tiled 编辑器工作文件(tilemap.json 是运行时文件,已入库;其余为编辑中间产物)
+provenance/frontend/static/assets/village/tilemap/*.tmx
+provenance/frontend/static/assets/village/tilemap/*.tsx
+provenance/frontend/static/assets/village/tilemap/*.bak
+provenance/frontend/static/assets/village/tilemap/_debug_err.txt
+provenance/frontend/static/assets/village/tilemap/finance_extras.jpg
+
 # 决策导出产物(由 checkpoints 生成,不入库)
 decisions_*.json
 
