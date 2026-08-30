@@ -1,10 +1,9 @@
 {
   "roles": {
     "AI Advisor": {
-      "Serve Users": 0.22139287747485611,
-      "Compliance Rigor": 0.18976532354987669,
-      "Risk Control": 0.49395913720032886,
-      "Data Rigor": 0.09488266177493834
+      "Compliance Rigor": 0.1806,
+      "Risk Control": 0.3355,
+      "Serve Users": 0.4839
     },
     "Wendy Lin": {
       "Risk Control": 0.35,
@@ -25,10 +24,10 @@
       "Risk Tolerance": 0.1
     },
     "Kevin Su": {
-      "Strategy Stability": 0.35,
-      "Alpha Generation": 0.3,
-      "Data Integrity": 0.2,
-      "Risk Control": 0.15
+      "Alpha Generation": 0.0958,
+      "Data Integrity": 0.2583,
+      "Risk Control": 0.1938,
+      "Strategy Stability": 0.4521
     },
     "Michael Chen": {
       "Research Rigor": 0.35,

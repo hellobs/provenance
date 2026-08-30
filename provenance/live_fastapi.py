@@ -495,6 +495,8 @@ def run_simulation(name, sim_config, start_step, step, stride):
             sim_config["agent_base"]["associate"] = assoc
 
         # 业务配置:relationships 注入 Agent,story 注入 Simulator
+        # 全球时区场景:所有角色(含 user)全天在线不睡觉
+        sim_config.setdefault("agent_base", {})["no_sleep"] = True
         relationships, story = [], []
         scenario_dir = os.path.join(BASE_DIR, "scenarios/investment")
         rel_path = os.path.join(scenario_dir, "relationships.json")
