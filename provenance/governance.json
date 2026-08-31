@@ -1,39 +1,39 @@
 {
   "roles": {
     "AI Advisor": {
-      "Compliance Rigor": 0.0971571056220395,
-      "Risk Control": 0.6425199519056188,
-      "Serve Users": 0.2603229424723417
+      "Compliance Rigor": 0.16056423124356564,
+      "Risk Control": 0.40921964750083406,
+      "Serve Users": 0.4302161212556003
     },
     "Wendy Lin": {
-      "Risk Control": 0.35,
-      "Compliance Rigor": 0.3,
-      "Client Protection": 0.2,
-      "Business Advancement": 0.15
+      "Risk Control": 0.267502949051144,
+      "Compliance Rigor": 0.4649941018977119,
+      "Client Protection": 0.15285882802922518,
+      "Business Advancement": 0.11464412102191887
     },
     "Daniel Shen": {
-      "Steady Returns": 0.35,
-      "Client Satisfaction": 0.25,
-      "Risk Control": 0.25,
-      "Professional Integrity": 0.15
+      "Steady Returns": 0.2161294306533284,
+      "Client Satisfaction": 0.5368655057428677,
+      "Risk Control": 0.15437816475237742,
+      "Professional Integrity": 0.09262689885142646
     },
     "Mr. Zhou": {
-      "Maximize Returns": 0.4,
-      "Speculative Freedom": 0.3,
-      "Trust in Advisors": 0.2,
-      "Risk Tolerance": 0.1
+      "Maximize Returns": 0.2758620689655173,
+      "Speculative Freedom": 0.20689655172413796,
+      "Trust in Advisors": 0.4482758620689656,
+      "Risk Tolerance": 0.06896551724137932
     },
     "Kevin Su": {
-      "Alpha Generation": 0.0958,
-      "Data Integrity": 0.2583,
-      "Risk Control": 0.1938,
-      "Strategy Stability": 0.4521
+      "Alpha Generation": 0.2769396362147526,
+      "Data Integrity": 0.20655440385504245,
+      "Risk Control": 0.15497577803758122,
+      "Strategy Stability": 0.3615301818926237
     },
     "Michael Chen": {
-      "Research Rigor": 0.35,
-      "Objectivity": 0.25,
-      "Timeliness": 0.25,
-      "Data Integrity": 0.15
+      "Research Rigor": 0.23611350539976753,
+      "Objectivity": 0.16865250385697678,
+      "Timeliness": 0.4940424884290696,
+      "Data Integrity": 0.10119150231418607
     }
   }
 }

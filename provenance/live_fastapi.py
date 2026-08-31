@@ -71,12 +71,14 @@ def load_tendency_series(ckpt_dir: str, agent: str):
         try:
             with open(p, "r", encoding="utf-8") as f:
                 c = json.load(f)
-        except Exception:
+        except Exception as e:
+            log.warning("load_tendency_series 解析存档失败,跳过(p={}): {}".format(p, e))
             continue
         t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
         try:
             dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
-        except Exception:
+        except ValueError as e:
+            log.warning("load_tendency_series 时间格式非法,跳过(p={}, time={}): {}".format(p, t, e))
             continue
         for aname, ag in (c.get("agents") or {}).items():
             vt = (ag.get("status") or {}).get("value_tendency") or {}
@@ -356,7 +358,8 @@ async def explain_agent(agent: str = ""):
         for iv in my_ivs:
             try:
                 ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
-            except Exception:
+            except (ValueError, TypeError) as e:
+                log.warning("explain 干预时间非法,跳过干预(agent={}, sim_time={}): {}".format(agent, iv.get("sim_time"), e))
                 continue
             before = None
             after = None
@@ -584,7 +587,8 @@ async def export_chart(agent: str = ""):
     for iv in my_ivs:
         try:
             ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
-        except Exception:
+        except (ValueError, TypeError) as e:
+            log.warning("export-chart 干预时间非法,跳过(agent={}, sim_time={}): {}".format(agent, iv.get("sim_time"), e))
             continue
         steps.append((ivt, dict(iv.get("new_constraints") or cur)))
         if t0 <= ivt <= t1:
@@ -622,7 +626,8 @@ async def export_chart(agent: str = ""):
     for iv in my_ivs:
         try:
             ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
-        except Exception:
+        except (ValueError, TypeError) as e:
+            log.warning("export-chart 干预时间非法,跳过干预竖线(agent={}, sim_time={}): {}".format(agent, iv.get("sim_time"), e))
             continue
         if t0 <= ivt <= t1:
             ax.axvline(ivt, color="#e07b39", linewidth=1.6, linestyle=":", alpha=0.8)

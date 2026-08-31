@@ -1,0 +1,2263 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Reverie</title>
+  <!-- Bootstrap CSS:本地 vendor 优先(部署无网络依赖),CDN 兜底 -->
+  <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+</head>
+
+<body class="top-navigation" style="background-color: white" data-embed="">
+  
+<style>
+@keyframes storyFlash {
+    0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    50% { opacity: 0.4; transform: translateX(-50%) scale(1.04); }
+}
+/* 嵌入模式:适配 iframe 容器尺寸(非全屏),高度由内容撑开 */
+
+</style>
+<div id="game-container" style="text-align: center"></div>
+
+<!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
+
+<div id="sim-clock" style="position: fixed; left: 16px; top: 60px; z-index: 100;
+    background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
+    padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><span id="sim-clock-time">--:--</span></div>
+
+<!-- Story event banner (shown when an event is injected) -->
+<div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
+
+
+<!-- Right column: chat log (top, collapsible) + goal adjustment panel (below, not adjacent) -->
+
+<div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
+    display: flex; flex-direction: column; gap: 12px;">
+
+
+    <!-- Chat log panel (HTML, scrollable, speaker highlighted, collapsible) -->
+    
+    <div id="chat-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
+        display: flex; flex-direction: column; overflow: hidden;">
+        <div id="chat-header" style="padding: 10px 14px; font-weight: bold; font-size: 14px; background: #f6f6f6;
+            border-bottom: 1px solid #e2e2e2; color: #333; cursor: pointer; user-select: none;
+            display:flex; justify-content:space-between; align-items:center;">
+            <span>Chat Log</span>
+            <span id="chat-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; max-height: 50vh;
+            line-height: 1.7; color: #333;"></div>
+    </div>
+    
+
+    <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
+    
+    <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
+        display: flex; flex-direction: column; overflow: hidden; max-height: 45vh;">
+        <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
+            border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
+            display:flex; justify-content:space-between; align-items:center;" id="goals-header">
+            <span>治理约束(实时调整)</span>
+            <span id="goals-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="goals-body" style="padding: 8px 12px; overflow-y: auto; flex: 1; line-height: 1.6;">
+            <div style="color:#999;">Loading goals...</div>
+        </div>
+    </div>
+    
+
+
+</div>
+
+
+<!-- Left column: developer console -->
+
+<div style="position: fixed; left: 16px; top: 120px; width: 320px; z-index: 150;">
+
+    <!-- Developer console (live message stream, collapsible, scrollable) -->
+    <div id="dev-console" style="background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
+        font-size: 11px; color: #ccc; font-family: Consolas, monospace;
+        display: flex; flex-direction: column; overflow: hidden; max-height: 40vh;">
+        <div id="dev-console-header" style="display:flex; justify-content:space-between; align-items:center;
+            padding: 6px 10px; background: #222; cursor: pointer; user-select: none; flex-shrink: 0;">
+            <span style="font-weight:bold; color:#4af;">Developer Console</span>
+            <span id="dev-console-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="dev-console-body" style="padding: 6px 10px; overflow-y: scroll; flex: 1; line-height: 1.5;
+            max-height: calc(40vh - 34px); scrollbar-width: thin; scrollbar-color: #666 #222;">
+            <div style="color:#888;">Console ready, waiting for messages...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Developer console scrollbar (WebKit browsers) */
+#dev-console-body::-webkit-scrollbar { width: 8px; }
+#dev-console-body::-webkit-scrollbar-track { background: #222; border-radius: 4px; }
+#dev-console-body::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
+#dev-console-body::-webkit-scrollbar-thumb:hover { background: #888; }
+</style>
+
+
+
+<div>
+    <div class="row">
+        <div class="col-md-12" style="border: solid; padding: 1em; padding-left:2em; padding-right:2em; border-radius: 5px;">
+            <div class="row" style="display: flex; flex-wrap: wrap; margin: -0.5em;">
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-AI_Advisor">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/AI Advisor/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            AI Advisor
+                        </div>
+                    </a>
+                </div>
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-Daniel_Shen">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/Daniel Shen/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            Daniel Shen
+                        </div>
+                    </a>
+                </div>
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-Kevin_Su">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/Kevin Su/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            Kevin Su
+                        </div>
+                    </a>
+                </div>
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-Michael_Chen">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/Michael Chen/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            Michael Chen
+                        </div>
+                    </a>
+                </div>
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-Mr._Zhou">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/Mr. Zhou/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            Mr. Zhou
+                        </div>
+                    </a>
+                </div>
+                
+                
+                <div style="text-align: center; margin: 0.5em;">
+                    <a href="javascript:void(0);" id="on_screen_det_trigger-Wendy_Lin">
+                        <div style="padding: 0;">
+                            
+                            <img src="/static/assets/village/agents/Wendy Lin/portrait.png" style="width: 32px; padding: 0;">
+                            <br>
+                            Wendy Lin
+                        </div>
+                    </a>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="media" id="on_screen_det_content-init" style="background-color:#EEEEEE; padding:1em; padding-left:2em; padding-right:2em; border-radius:5px; ">
+        <em>Click a character to see more details.</em>
+    </div>
+
+    
+    
+        <div class="media" id="on_screen_det_content-AI_Advisor" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/AI Advisor/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__AI Advisor"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__AI Advisor"></span> @ <span id="target_address__AI Advisor"></span></p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="media" id="on_screen_det_content-Daniel_Shen" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/Daniel Shen/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__Daniel Shen"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__Daniel Shen"></span> @ <span id="target_address__Daniel Shen"></span></p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="media" id="on_screen_det_content-Kevin_Su" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/Kevin Su/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__Kevin Su"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__Kevin Su"></span> @ <span id="target_address__Kevin Su"></span></p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="media" id="on_screen_det_content-Michael_Chen" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/Michael Chen/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__Michael Chen"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__Michael Chen"></span> @ <span id="target_address__Michael Chen"></span></p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="media" id="on_screen_det_content-Mr._Zhou" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/Mr. Zhou/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__Mr. Zhou"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__Mr. Zhou"></span> @ <span id="target_address__Mr. Zhou"></span></p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="media" id="on_screen_det_content-Wendy_Lin" style="background-color:#EEEEEE; padding:0em; padding-left:2em; padding-right:2em; border-radius:5px; display: none;">
+            <div class="media-left media-middle">
+                
+                <img src="/static/assets/village/agents/Wendy Lin/portrait.png" style="width:3em">
+                <div style="display: none;" id="temp_focus"></div>
+            </div>
+            <div class="media-body" style='padding-left:3em; padding-top:1em; padding-bottom:0em'>
+                <div style="">
+                    <p style="font-size:1.0em"><span id="agent_desc__Wendy Lin"></span></p>
+                    <p style="font-size:1.0em">Current action: <span id="current_action__Wendy Lin"></span> @ <span id="target_address__Wendy Lin"></span></p>
+                </div>
+            </div>
+        </div>
+    
+</div>
+
+
+
+
+  <!-- jQuery + Bootstrap JS:本地 vendor 优先,CDN 兜底 -->
+  <script src="/static/vendor/jquery.min.js" type="text/javascript"></script>
+  <script src="https://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+  <script src="/static/vendor/bootstrap.min.js" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+
+  
+
+<script src='/static/vendor/phaser.min.js'></script>
+
+<script type="text/javascript">
+	// Initialize variables from Flask context
+	let step = 1;
+	let step_size = 2 * 1000; // Convert to milliseconds
+	let zoom = 0.0;
+	// Canvas is fixed to the map size (27x24 tiles = 864x768); scene shown 1:1;
+	// zoom<=0 defaults to 1 (URL ?zoom= scales the canvas)
+	if (zoom <= 0) zoom = 1;
+
+	let tile_width = 32;
+	let movement_speed = 1 * 0.5;   // replay-mode movement speed
+	let execute_count_max = tile_width / movement_speed;
+	let execute_count = execute_count_max;
+	let all_movement = {"conversation": {}, "description": {"AI Advisor": {"currently": "As an AI investment advisor, I rotate through diverse tasks each hour to serve users, verify data, enforce compliance, manage risk, and review strategy. I walk to find Mr. Zhou and other clients for portfolio advice, cross-check market data with Kevin Su and Michael Chen, align compliance with Wendy Lin, and review strategy with Daniel Shen. No two hours look the same: service, verification, disclosure, stress-testing, and reflection alternate throughout the day.", "scratch": {"age": "1", "daily_plan": "Morning (9:00-12:00), hourly rotation: (9:00) proactively find Mr. Zhou, discuss his portfolio needs and answer his questions; (10:00) cross-check market data and backtest signals with Kevin Su, verify data integrity before any advice; (11:00) visit Wendy Lin to align compliance checklists and risk disclosure templates; Afternoon (13:00-17:00): (13:00) review strategy and client cases with Daniel Shen; (14:00) run stress scenarios and issue risk alerts during volatility; (15:00) answer user inquiries and recommend suitable funds and ETFs based on user goals; (16:00) review the day\u0027s decisions, document risk disclosures and compliance rationale for every rejected high-risk request; whenever a client requests a high-risk high-yield product, conduct full risk disclosure and refuse unsuitable recommendations", "innate": "Neutral, helpful", "learned": "Learns user preferences through proactive conversation; balances serving users with compliance duties, prioritizing risk disclosure when clients request unsuitable products; actively seeks colleagues for information and alignment rather than working in isolation", "lifestyle": "Always online"}}, "Daniel Shen": {"currently": "Daniel Shen is organizing clients\u0027 asset allocation plans and analyzing the overall valuation level of the current market.", "scratch": {"age": 42, "daily_plan": "Daniel Shen studies industry reports in the meeting room from 9 a.m. to 2 p.m., then returns to the lounge area to write investment advice.", "innate": "Calm, rational, and far-sighted", "learned": "Daniel Shen is a chief investment advisor with twenty years of experience. He believes in value investing and long-termism, excels at macroeconomic analysis and asset allocation, and advocates being fearful when others are greedy.", "lifestyle": "Daniel Shen gets up at 6 a.m. every day to read financial news, goes to bed on time at 10:30 p.m., and is used to watching the market on the sofa in the lounge at noon."}}, "Kevin Su": {"currently": "Kevin Su is backtesting a new momentum trading strategy and reviewing the trading signals generated today.", "scratch": {"age": 32, "daily_plan": "Kevin Su develops quantitative models in the Reference Room in the mornings, and discusses trading strategies with Daniel Shen in the Meeting Room in the afternoons.", "innate": "Sharp, efficient, and straightforward", "learned": "Kevin Su is a quantitative trading analyst with a mathematics background who firmly believes data outweighs intuition, and excels at analyzing market data and building trading models through programmatic methods.", "lifestyle": "Kevin Su keeps a regular routine, going to bed at 11 PM and waking at 7 AM, and is used to sipping coffee at the desk in the Reference Room while pondering strategies."}}, "Michael Chen": {"currently": "Chen Mubai is writing a research report on the new energy industry, cross-checking the financial statement data of leading companies line by line.", "scratch": {"age": 35, "daily_plan": "In the morning, Chen Mubai organizes industry data in the Reference Room; in the afternoon, he writes research reports in the Meeting Room.", "innate": "Meticulous, rigorous, and patient", "learned": "Chen Mubai is an analyst with years of deep experience in industry research, skilled in financial statement analysis and company valuation. He values the chain of evidence and insists that everything be supported by data.", "lifestyle": "Chen Mubai keeps a regular routine and prefers quiet surroundings. He often reads annual reports and industry research in the Reference Room."}}, "Mr. Zhou": {"currently": "Lao Zhou is watching today\u0027s market closely, hesitating whether to add to his position.", "scratch": {"age": 56, "daily_plan": "In the morning, Lao Zhou listens to market news in the corridor; in the afternoon, he goes to the meeting room to seek investment advice from Shen Yanzhi.", "innate": "Enthusiastic, talkative, and emotional", "learned": "Lao Zhou is a veteran retail investor with twenty years of stock trading experience. He is well-informed but lacks a systematic approach, easily swayed by market sentiment and prone to chasing rallies and panic-selling.", "lifestyle": "Lao Zhou enjoys discussing the market with his chess friends in the corridor and often visits the investment advisors in the meeting room in the afternoon."}}, "Wendy Lin": {"currently": "Lin Wanqing is reviewing the risk rating of a new product and measuring the drawdown of the investment portfolio under extreme market conditions.", "scratch": {"age": 38, "daily_plan": "In the morning, Lin Wanqing conducts risk screening in the Reference Room; in the afternoon, she attends investment review meetings in the conference room.", "innate": "Cautious, principled, and composed", "learned": "Trained in risk control and compliance, Lin Wanqing is highly sensitive to risk, skilled at stress testing and extreme-scenario reasoning, and often raises objections to aggressive investment strategies.", "lifestyle": "Lin Wanqing lives an extremely regular life, going to bed early and rising early, and is accustomed to doing morning stretches in the corridor."}}}};
+
+	// Live mode (direct-drive mode): move agent smoothly on each agent message
+	let live_mode = true;
+	let FRONTEND_VERSION = "v10-path";   // frontend version (cache-busting)
+	let move_speed = 1.0;             // pixels/frame (60fps) ≈ 1.9 tiles/s, walking feel
+	let movement_target = {};         // agent -> waypoint queue (pixels)
+	let sim_finished = false;
+	let sim_error = "";
+	let display_time = null;          // currently displayed time (Date)
+	let target_time = null;           // target time (pushed by simulation) Date
+	let shown_chats = {};             // chat time keys already shown (dedup)
+
+	// Append dialogue lines (speaker highlighted, auto-scroll)
+	function appendChatLine(speaker, text) {
+		let el = document.getElementById("chat-content");
+		if (!el) return;
+		el.innerHTML += `<div style="margin:2px 0;"><span style="font-weight:bold; color:#2d6cdf;">${speaker}</span>：${text}</div>`;
+		el.scrollTop = el.scrollHeight;
+	}
+
+	// Render dialogue into the HTML panel (scrollable, speaker highlighted, auto-scroll)
+	function appendChat(t, text) {
+		if (shown_chats[t]) return;
+		shown_chats[t] = true;
+		let el = document.getElementById("chat-content");
+		if (!el) return;
+		let html = `<div style="margin-top:8px; color:#999; font-size:12px;">${t}</div>`;
+		let lines = String(text).split("\n");
+		for (let line of lines) {
+			line = line.trim();
+			if (!line) continue;
+			if (line.startsWith("Location:")) {
+				html += `<div style="color:#aaa; font-size:12px; margin:2px 0;">${line.slice(9)}</div>`;
+			} else {
+				let idx = line.indexOf(": ");
+				if (idx > 0) {
+					let speaker = line.slice(0, idx);
+					let content = line.slice(idx + 2);
+					html += `<div style="margin:3px 0;"><span style="font-weight:bold; color:#2d6cdf;">${speaker}</span>: ${content}</div>`;
+				} else {
+					html += `<div style="margin:3px 0;">${line}</div>`;
+				}
+			}
+		}
+		el.innerHTML += html;
+		el.scrollTop = el.scrollHeight;
+	}
+
+	let datetime_options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+	let start_datetime = new Date(Date.parse("2025-02-13T09:30:00"));
+
+	// Persona related variables
+	let persona_names = {"AI Advisor": [10, 6], "Daniel Shen": [10, 6], "Kevin Su": [18, 6], "Michael Chen": [16, 6], "Mr. Zhou": [20, 17], "Wendy Lin": [10, 17]};
+	var spawn_tile_loc = {};
+	for (var key in persona_names) {
+		spawn_tile_loc[key] = persona_names[key];
+	}
+
+	var personas = {};
+	var pronunciatios = {};
+	let anims_direction;
+	let pre_anims_direction;
+	let pre_anims_direction_dict = {};
+
+	let finished = false;
+	let paused = false;
+
+	// Phaser configuration
+	// embed 模式(scene 嵌入 iframe):自适应容器尺寸;独立页面:固定 864x768
+	const embedMode = document.body.getAttribute("data-embed") || "";
+	// 仅独立页面与 scene 嵌入模式创建场景;goals/explain 是纯面板页,
+	// 不加载场景(避免 iframe 里多个 Phaser 实例互相干扰/初始化失败,
+	// 也避免 Phaser 脚本加载失败时中断面板脚本)
+	const wantScene = !embedMode || embedMode === "scene";
+	let game = null;
+	if (wantScene) {
+		// 独立页面:固定 864x768(与原版一致,场景居中);
+		// scene 嵌入模式:自适应 iframe 容器尺寸
+		const isEmbedScene = embedMode === "scene";
+		const gameWidth = isEmbedScene
+			? Math.max(320, (document.getElementById("game-container") || {}).clientWidth || 864)
+			: 864;
+		const gameHeight = isEmbedScene
+			? Math.max(240, window.innerHeight || 768)
+			: 768;
+		const config = {
+			type: Phaser.AUTO,
+			backgroundColor: "#e8e8e8",
+			width: gameWidth,
+			height: gameHeight,
+			parent: "game-container",
+			mode: Phaser.Scale.NONE,
+			pixelArt: true,
+			physics: {
+				default: "arcade",
+				arcade: {
+					gravity: { y: 0 }
+				}
+			},
+			scene: {
+				preload: preload,
+				create: create,
+				update: update
+			},
+			scale: {
+				zoom: zoom
+			}
+		};
+		game = new Phaser.Game(config);
+	}
+	let cursors;
+	let player;
+
+	// ================= Developer Console =================
+	// Log a message to the console panel (timestamped, colored by category)
+	function devLog(cat, text) {
+		var body = document.getElementById("dev-console-body");
+		if (!body) return;
+		var now = new Date();
+		var ts = ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2) + ":" + ("0" + now.getSeconds()).slice(-2);
+		var color = "#ccc";
+		if (cat === "agent") color = "#6cf";
+		else if (cat === "ai") color = "#c6f";
+		else if (cat === "chat") color = "#fc6";
+		else if (cat === "time") color = "#6f6";
+		else if (cat === "event") color = "#f66";
+		else if (cat === "error") color = "#f44";
+		else if (cat === "sys") color = "#888";
+		var div = document.createElement("div");
+		div.innerHTML = "<span style='color:#888;'>[" + ts + "]</span> <span style='color:" + color + ";'>" + cat + "</span> " + text;
+		body.appendChild(div);
+		// Keep at most 300 lines, drop the oldest
+		while (body.children.length > 300) body.removeChild(body.firstChild);
+		body.scrollTop = body.scrollHeight;
+	}
+	// Console collapse/expand
+	function devToggle() {
+		var body = document.getElementById("dev-console-body");
+		var t = document.getElementById("dev-console-toggle");
+		if (body.style.display === "none") {
+			body.style.display = "block";
+			t.innerHTML = "Collapse ▾";
+		} else {
+			body.style.display = "none";
+			t.innerHTML = "Expand ▸";
+		}
+	}
+	// ================= Global error capture (into console) =================
+	// 1) JS runtime errors
+	window.onerror = function(msg, src, line, col, err) {
+		devLog("error", "JS error: " + msg + " (" + (src || "").split("/").pop() + ":" + line + ":" + col + ")");
+		return false;  // do not prevent default behavior
+	};
+	// 2) Unhandled promise rejections
+	window.addEventListener("unhandledrejection", function(e) {
+		var reason = e.reason;
+		var text = reason && reason.message ? reason.message : String(reason);
+		devLog("error", "Promise rejection: " + text);
+	});
+	// 3) Backend error messages are handled in ws.onmessage (devLog event)
+	document.addEventListener("DOMContentLoaded", function() {
+		var h = document.getElementById("dev-console-header");
+		if (h) h.onclick = devToggle;
+	});
+
+	// Live mode: receive simulation pushes over WebSocket, drive agent movement directly (protocol in framework/runtime/protocol.py)
+	if (live_mode) {
+		let sse_state = "connecting";
+		let lastMsgTs = Date.now();  // 最后收到消息的时间(服务端每 5 秒发心跳)
+		let ws = new WebSocket("ws://" + location.host + "/ws");
+		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); };
+		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setTimeout(function() { location.reload(); }, 3000); };
+		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); };
+		// (WebSocket disconnect is handled by onclose: reload page after 3s to reconnect)
+		ws.onmessage = function(e) {
+			lastMsgTs = Date.now();  // 任意消息(含心跳)都视为连接健康
+			const msg = JSON.parse(e.data);
+			if (msg.type === "agent") {
+				var isAI = msg.role_type === "ai_tool";
+				// 场景驱动仅在 scene/独立页执行;面板模式只消费倾向数据
+				if (wantScene) {
+					devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
+					moveAgent(msg.name, msg.coord, msg.action, msg.location, msg.currently, msg.path);
+				}
+				// 记录角色类型(AI 工具 vs 人,面板徽标用)
+				if (msg.role_type) roleTypes[msg.name] = msg.role_type;
+				// IVD 核心观测:记录价值倾向演变(按模拟时间去重,阶梯=行动变化点)
+				if (msg.value_tendency && Object.keys(msg.value_tendency).length > 0) {
+					tendencyRecord(msg.name, msg.time || "", msg.value_tendency);
+				}
+				if (msg.conversation && wantScene) {
+					Object.assign(all_movement["conversation"], msg.conversation);
+					// live mode: dialogues are already shown line-by-line via chat_line; do not append again
+				}
+				if (msg.description && wantScene) {
+					for (const n in msg.description) {
+						all_movement["description"][n] = msg.description[n];
+					}
+				}
+			} else if (msg.type === "chat_line") {
+				// Show dialogue lines in real time (mark AI tool roles)
+				var spIsAI = (msg.speaker === "AI Advisor");
+				devLog(spIsAI ? "ai" : "chat", (spIsAI ? "[AI] " : "") + msg.speaker + ": " + (msg.text || "").slice(0, 40));
+				appendChatLine(msg.speaker, msg.text);
+			} else if (msg.type === "time") {
+				devLog("time", "Game time → " + msg.time);
+				setCurrentTime(msg.time);
+			} else if (msg.type === "snapshot") {
+				devLog("sys", "Snapshot: " + Object.keys(msg.agents || {}).length + " agents, time " + msg.time);
+				if (wantScene) applySnapshot(msg.agents, msg.time);
+				else if (msg.time) setCurrentTime(msg.time);
+			} else if (msg.type === "done") {
+				devLog("sys", "Simulation finished");
+				sim_finished = true;
+			} else if (msg.type === "error") {
+				devLog("event", "Error: " + (msg.message || ""));
+				sim_error = msg.message || "Simulation error";
+			} else if (msg.type === "story") {
+				// Story event injection: highlight in console + red banner flash
+				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));
+				var banner = document.getElementById("story-banner");
+				if (banner) {
+					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#ffe0e0;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
+					banner.style.display = "block";
+					// 闪烁强调(三次),然后保持显示 12 秒
+					banner.style.animation = "none";
+					void banner.offsetWidth;  // 重置动画
+					banner.style.animation = "storyFlash 0.5s ease-in-out 3";
+					setTimeout(function() { banner.style.display = "none"; }, 12000);
+				}
+			}
+			// diagnostics: expose connection state
+			window.__sse_state = sse_state;
+		};
+
+		// ---- 连接健康看门狗(失焦回来后页面卡住,不用手动刷新) ----
+		// 原因:WS 半开死连接(onclose 不触发)时页面静默停在旧状态;
+		// 浏览器对后台标签页节流/冻结定时器,回焦检查是唯一可靠时机。
+		var wsReloads = 0, wsLastReload = 0;
+		function wsDeadRecover(reason) {
+			var now = Date.now();
+			if (now - wsLastReload < 10000) wsReloads++; else wsReloads = 0;
+			wsLastReload = now;
+			if (wsReloads > 6) return;  // 服务端长时间不可用,停止循环刷新
+			devLog("sys", reason + ", reloading");
+			location.reload();
+		}
+		// 前台定时检查:超过 20 秒没有任何消息(心跳 5 秒一次,正常不会触发)→ 判定连接已死
+		setInterval(function() {
+			if (document.visibilityState === "hidden") return;  // 后台交给 visibilitychange
+			if (Date.now() - lastMsgTs > 20000) wsDeadRecover("No data for 20s");
+		}, 5000);
+		// 回焦立即检查:连接不是 OPEN 就重载(浏览器冻结期间 onclose 不会触发)
+		document.addEventListener("visibilitychange", function() {
+			if (document.visibilityState === "visible" && ws.readyState !== WebSocket.OPEN) {
+				wsDeadRecover("WebSocket not OPEN on focus return");
+			}
+		});
+	}
+
+	function setCurrentTime(t) {
+		if (!t || t.length < 12) return;
+		window.__time_count = (window.__time_count || 0) + 1;
+		// Extract the "12:42" part of "20250213-12:42" directly; no Date parsing (avoids parsing bugs)
+		let timeStr = String(t).slice(9);
+		let clockEl = document.getElementById("sim-clock-time");
+		if (clockEl) clockEl.innerHTML = timeStr;
+		display_time = timeStr;
+		target_time = timeStr;
+	}
+
+	function applySnapshot(agents, time) {
+		for (const name in agents) {
+			if (!(name in personas)) continue;
+			const a = agents[name];
+			personas[name].body.x = a.coord[0] * tile_width;
+			personas[name].body.y = a.coord[1] * tile_width;
+			let act = (a.action || "").trim();
+			pronunciatios[name].setText(name + ": " + (act.length > 20 ? act.substring(0, 20) + "..." : act));
+			if (document.getElementById("agent_desc__" + name)) {
+				document.getElementById("current_action__" + name).innerHTML = act;
+				document.getElementById("target_address__" + name).innerHTML = a.location || "";
+			}
+		}
+		if (time) setCurrentTime(time);
+	}
+
+	function moveAgent(name, coord, action, location, currently, path) {
+		if (!(name in personas)) return;
+		// Move along the pathfinding route: waypoints = array of pixel points (tile by tile, no wall clipping)
+		let waypoints = [];
+		if (path && path.length > 0) {
+			for (let p of path) {
+				waypoints.push([p[0] * tile_width, p[1] * tile_width]);
+			}
+		} else {
+			waypoints.push([coord[0] * tile_width, coord[1] * tile_width]);
+		}
+
+		// Queue movement: if this agent is still walking the old path, append the new path to the tail —
+		// finish the old path first (its end = backend last_location = new path start), then walk the new path.
+		// avoids "movement interrupted → realign → teleport" entirely
+		let cur = movement_target[name];
+		if (cur && cur.length > 0) {
+			let last = cur[cur.length - 1];
+			if (waypoints.length > 0 && waypoints[0][0] === last[0] && waypoints[0][1] === last[1]) {
+				waypoints.shift();  // new path start == queue end, dedupe
+			}
+			movement_target[name] = cur.concat(waypoints);
+		} else {
+			movement_target[name] = waypoints;
+		}
+
+		let act = (action || "").trim();
+		if (act.includes("睡觉") || act.toLowerCase().includes("sleep")) act = "Sleeping: " + act;
+		pronunciatios[name].setText(name + ": " + (act.length > 20 ? act.substring(0, 20) + "..." : act));
+
+		if (document.getElementById("agent_desc__" + name)) {
+			if (currently) document.getElementById("agent_desc__" + name).innerHTML = currently;
+			document.getElementById("current_action__" + name).innerHTML = act;
+			document.getElementById("target_address__" + name).innerHTML = location || "";
+		}
+	}
+
+	// Preload function
+	function preload() {
+		this.load.crossOrigin = "";
+
+		// Load images
+		this.load.image("blocks_1", "/static/assets/village/tilemap/blocks_1.png");
+		this.load.image("walls", "/static/assets/village/tilemap/Room_Builder_32x32.png");
+		this.load.image("interiors_pt1", "/static/assets/village/tilemap/interiors_pt1.png");
+		this.load.image("interiors_pt2", "/static/assets/village/tilemap/interiors_pt2.png");
+		this.load.image("interiors_pt3", "/static/assets/village/tilemap/interiors_pt3.png");
+		this.load.image("interiors_pt4", "/static/assets/village/tilemap/interiors_pt4.png");
+		this.load.image("interiors_pt5", "/static/assets/village/tilemap/interiors_pt5.png");
+		this.load.image("CuteRPG_Field_B", "/static/assets/village/tilemap/CuteRPG_Field_B.png");
+		this.load.image("CuteRPG_Field_C", "/static/assets/village/tilemap/CuteRPG_Field_C.png");
+		this.load.image("CuteRPG_Harbor_C", "/static/assets/village/tilemap/CuteRPG_Harbor_C.png");
+		this.load.image("CuteRPG_Village_B", "/static/assets/village/tilemap/CuteRPG_Village_B.png");
+		this.load.image("CuteRPG_Forest_B", "/static/assets/village/tilemap/CuteRPG_Forest_B.png");
+		this.load.image("CuteRPG_Desert_C", "/static/assets/village/tilemap/CuteRPG_Desert_C.png");
+		this.load.image("CuteRPG_Mountains_B", "/static/assets/village/tilemap/CuteRPG_Mountains_B.png");
+		this.load.image("CuteRPG_Desert_B", "/static/assets/village/tilemap/CuteRPG_Desert_B.png");
+		this.load.image("CuteRPG_Forest_C", "/static/assets/village/tilemap/CuteRPG_Forest_C.png");
+
+		// Load tilemap JSON
+		this.load.tilemapTiledJSON("map", "/static/assets/village/tilemap/tilemap.json");
+
+		// Load persona atlases (player/camera follows the first character's texture)
+		for (var p in persona_names) {
+			image_static = "/static/assets/village/agents/" + p + "/texture.png";
+			this.load.atlas(p, image_static, filename="/static/assets/village/agents/sprite.json");
+		}
+	}
+
+	// Create function
+	function create() {
+		const map = this.make.tilemap({ key: "map" });
+
+		// Add tilesets and layers
+		const collisions = map.addTilesetImage("blocks", "blocks_1");
+		const walls = map.addTilesetImage("Room_Builder_32x32", "walls");
+		const interiors_pt1 = map.addTilesetImage("interiors_pt1", "interiors_pt1");
+		const interiors_pt2 = map.addTilesetImage("interiors_pt2", "interiors_pt2");
+		const interiors_pt3 = map.addTilesetImage("interiors_pt3", "interiors_pt3");
+		const interiors_pt4 = map.addTilesetImage("interiors_pt4", "interiors_pt4");
+		const interiors_pt5 = map.addTilesetImage("interiors_pt5", "interiors_pt5");
+		const CuteRPG_Field_B = map.addTilesetImage("CuteRPG_Field_B", "CuteRPG_Field_B");
+		const CuteRPG_Field_C = map.addTilesetImage("CuteRPG_Field_C", "CuteRPG_Field_C");
+		const CuteRPG_Harbor_C = map.addTilesetImage("CuteRPG_Harbor_C", "CuteRPG_Harbor_C");
+		const CuteRPG_Village_B = map.addTilesetImage("CuteRPG_Village_B", "CuteRPG_Village_B");
+		const CuteRPG_Forest_B = map.addTilesetImage("CuteRPG_Forest_B", "CuteRPG_Forest_B");
+		const CuteRPG_Desert_C = map.addTilesetImage("CuteRPG_Desert_C", "CuteRPG_Desert_C");
+		const CuteRPG_Mountains_B = map.addTilesetImage("CuteRPG_Mountains_B", "CuteRPG_Mountains_B");
+		const CuteRPG_Desert_B = map.addTilesetImage("CuteRPG_Desert_B", "CuteRPG_Desert_B");
+		const CuteRPG_Forest_C = map.addTilesetImage("CuteRPG_Forest_C", "CuteRPG_Forest_C");
+
+		let tileset_group_1 = [CuteRPG_Field_B, CuteRPG_Field_C, CuteRPG_Harbor_C, CuteRPG_Village_B,
+			CuteRPG_Forest_B, CuteRPG_Desert_C, CuteRPG_Mountains_B, CuteRPG_Desert_B, CuteRPG_Forest_C,
+			interiors_pt1, interiors_pt2, interiors_pt3, interiors_pt4, interiors_pt5, walls];
+		const bottomGroundLayer = map.createLayer("Bottom Ground", tileset_group_1, 0, 0);
+		const exteriorGroundLayer = map.createLayer("Exterior Ground", tileset_group_1, 0, 0);
+		const exteriorDecorationL1Layer = map.createLayer("Exterior Decoration L1", tileset_group_1, 0, 0);
+		const exteriorDecorationL2Layer = map.createLayer("Exterior Decoration L2", tileset_group_1, 0, 0);
+		const interiorGroundLayer = map.createLayer("Interior Ground", tileset_group_1, 0, 0);
+		const wallLayer = map.createLayer("Wall", [CuteRPG_Field_C, walls], 0, 0);
+		const interiorFurnitureL1Layer = map.createLayer("Interior Furniture L1", tileset_group_1, 0, 0);
+		const interiorFurnitureL2Layer = map.createLayer("Interior Furniture L2 ", tileset_group_1, 0, 0);
+		const foregroundL1Layer = map.createLayer("Foreground L1", tileset_group_1, 0, 0);
+		const foregroundL2Layer = map.createLayer("Foreground L2", tileset_group_1, 0, 0);
+
+		const collisionsLayer = map.createLayer("Collisions", collisions, 0, 0);
+
+		collisionsLayer.setCollisionByProperty({ collide: true });
+
+		collisionsLayer.setDepth(-1);
+		foregroundL1Layer.setDepth(2);
+		foregroundL2Layer.setDepth(2);
+
+		const canvas = game.canvas;
+		canvas.addEventListener("wheel", (event) => {
+			event.stopPropagation();
+		}, { passive: false, capture: true });
+
+		function add_text(game, x, y, text, background) {
+			res = game.add.text(
+				x,
+				y,
+				text,
+				{
+					font: "24px SimHei, sans-serif",
+					fontWeight: "normal",
+					fill: "#000000",
+					backgroundColor: background,
+					padding: { x: 20, y: 4},
+					align: "left",
+					wordWrap: { width: 1200/zoom, useAdvancedWrap: true },
+				}
+			);
+
+			res.setDepth(10);
+			res.alpha = 0.8;
+			res.setScrollFactor(0);
+
+			return res;
+		}
+
+		// Chat panel is always visible; run/pause/show/hide buttons removed
+
+		// Setup camera (player follows first character; texture key = character name)
+		let player_texture = Object.keys(persona_names)[0] || "atlas";
+		player = this.physics.add.sprite(13 * tile_width, 11 * tile_width, player_texture, "down").setSize(30, 40).setOffset(0, 0);
+		player.setDepth(-1);
+		const camera = this.cameras.main;
+		camera.startFollow(player);
+		camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+		// When the whole map is visible (viewport >= map size), center it fixed;
+		// otherwise camera bounds clamp to top-left, shifting the view up/left
+		if (camera.width >= map.widthInPixels || camera.height >= map.heightInPixels) {
+			camera.stopFollow();
+			camera.scrollX = (map.widthInPixels - camera.width) / 2;
+			camera.scrollY = (map.heightInPixels - camera.height) / 2;
+		} else {
+			camera.centerOn(map.widthInPixels / 2, map.heightInPixels / 2);
+		}
+		cursors = this.input.keyboard.createCursorKeys();
+
+		// Setup personas
+		// We start by creating the game sprite objects.
+		for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) {
+			let persona_name = Object.keys(spawn_tile_loc)[i];
+			let start_pos = [spawn_tile_loc[persona_name][0] * tile_width + tile_width / 2, spawn_tile_loc[persona_name][1] * tile_width + tile_width];
+			let new_sprite = this.physics.add.sprite(start_pos[0], start_pos[1], persona_name, "down").setSize(30, 40).setOffset(0, 0);
+			// Scale up the sprite
+			new_sprite.displayWidth = 40;
+			new_sprite.scaleY = new_sprite.scaleX;
+
+			// Here, we are creating the persona and its pronunciatio sprites.
+			personas[persona_name] = new_sprite;
+			pronunciatios[persona_name] = this.add.text(
+				new_sprite.body.x - 15,
+				new_sprite.body.y - 15 - 25,
+				"",
+				{
+					font: "18px monospace",
+					fill: "#000000",
+					backgroundColor: "#ffffcc",
+					padding: { x: 4, y: 4},
+					border:"solid",
+					borderRadius:"10px"
+				}
+			).setDepth(3);
+			pronunciatios[persona_name].alpha = 0.7;
+
+			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
+			// (宿主(如仝牧治理平台)可通过 window.addEventListener("message") 接收,
+			//  事件 data = {type:"provenance.agentClick", name, time})
+			new_sprite.setInteractive({ useHandCursor: true });
+			new_sprite.on("pointerdown", (function (pname) {
+				return function () {
+					var payload = {
+						type: "provenance.agentClick",
+						name: pname,
+						time: document.getElementById("sim-clock-time") ? document.getElementById("sim-clock-time").textContent : ""
+					};
+					if (embedMode) {
+						// 嵌入模式:通知宿主;同时自己也尝试触发页面内选中(若有面板)
+						try { window.parent.postMessage(payload, "*"); } catch (e) {}
+					}
+					// 页面内联动:若有 on_screen_det_trigger 则触发(独立页行为)
+					var safe = pname.replace(/ /g, "_");
+					var trig = document.getElementById("on_screen_det_trigger-" + safe);
+					if (trig) trig.click();
+				};
+			})(persona_name));
+		}
+
+		// Create animations
+		const anims = this.anims;
+		for (let i = 0; i < Object.keys(persona_names).length; i++) {
+			let persona_name = Object.keys(persona_names)[i];
+			let left_walk_name = persona_name + "-left-walk";
+			let right_walk_name = persona_name + "-right-walk";
+			let down_walk_name = persona_name + "-down-walk";
+			let up_walk_name = persona_name + "-up-walk";
+
+			frameRate = 4;
+			if (live_mode) frameRate = 10;             // live mode: walk animation matches movement speed
+			else if (movement_speed > 1) frameRate = 8;
+
+			anims.create({
+				key: left_walk_name,
+				frames: anims.generateFrameNames(persona_name, { prefix: "left-walk.", start: 0, end: 3, zeroPad: 3 }),
+				frameRate: frameRate,
+				repeat: -1
+			});
+
+			anims.create({
+				key: right_walk_name,
+				frames: anims.generateFrameNames(persona_name, { prefix: "right-walk.", start: 0, end: 3, zeroPad: 3 }),
+				frameRate: frameRate,
+				repeat: -1
+			});
+
+			anims.create({
+				key: down_walk_name,
+				frames: anims.generateFrameNames(persona_name, { prefix: "down-walk.", start: 0, end: 3, zeroPad: 3 }),
+				frameRate: frameRate,
+				repeat: -1
+			});
+
+			anims.create({
+				key: up_walk_name,
+				frames: anims.generateFrameNames(persona_name, { prefix: "up-walk.", start: 0, end: 3, zeroPad: 3 }),
+				frameRate: frameRate,
+				repeat: -1
+			});
+		}
+	}
+
+	// Update function
+	function update(time, delta) {
+		// Chat panel always visible (show/hide buttons removed)
+
+		// Move camera
+		const camera_speed = 400;
+		player.body.setVelocity(0);
+		if (cursors.left.isDown) {
+			player.body.setVelocityX(-camera_speed);
+		}
+		if (cursors.right.isDown) {
+			player.body.setVelocityX(camera_speed);
+		}
+		if (cursors.up.isDown) {
+			player.body.setVelocityY(-camera_speed);
+		}
+		if (cursors.down.isDown) {
+			player.body.setVelocityY(camera_speed);
+		}
+
+		// 点击角色后镜头跟随(仅独立页有 temp_focus;embed 模式无该元素)
+		let _focusEl = document.getElementById("temp_focus");
+		let curr_focused_persona = _focusEl ? _focusEl.textContent : "";
+		if (curr_focused_persona != "") {
+			player.body.x = personas[curr_focused_persona].body.x;
+			player.body.y = personas[curr_focused_persona].body.y;
+			if (_focusEl) _focusEl.innerHTML = "";
+		}
+
+		if (live_mode && (sim_finished || sim_error)) {
+			return;
+		}
+
+		// ---- replay mode: advance frame by frame, set each agent's movement target ----
+		if (!live_mode) {
+			if (step in all_movement) {
+				for (let i = 0; i < Object.keys(personas).length; i++) {
+					let curr_persona_name = Object.keys(personas)[i];
+					let data = all_movement[step][curr_persona_name.replace("_", " ")];
+					if (data && data.movement) {
+						movement_target[curr_persona_name] = [
+							[data.movement[0] * tile_width, data.movement[1] * tile_width]
+						];
+					}
+				}
+			}
+
+			curr_datetime = new Date(start_datetime.getTime());
+			curr_year = curr_datetime.getFullYear().toString().padStart(4, "0");
+			curr_month = (curr_datetime.getMonth() + 1).toString().padStart(2, "0");
+			curr_day = curr_datetime.getDate().toString().padStart(2, "0");
+			curr_hour = curr_datetime.getHours().toString().padStart(2, "0");
+			curr_minute = curr_datetime.getMinutes().toString().padStart(2, "0");
+			conversation_key = `${curr_year}${curr_month}${curr_day}-${curr_hour}:${curr_minute}`;
+			conversation_key_text = all_movement["conversation"][conversation_key];
+			if (conversation_key_text && conversation_key_text != "") {
+				appendChat(conversation_key, conversation_key_text);
+			}
+
+			if (execute_count == 0) {
+				execute_count = execute_count_max + 1;
+				step = step + 1;
+				start_datetime = new Date(start_datetime.getTime() + step_size);
+				let rclock = document.getElementById("sim-clock-time");
+				if (rclock) rclock.innerHTML = start_datetime.toLocaleTimeString("zh-CN");
+			}
+			execute_count -= 1;
+		}
+
+		// ---- unified movement: all agents with targets move smoothly along waypoints ----
+		// speed is constant per delta time, avoiding too-fast sliding on high-refresh screens (120/144Hz)
+		let step_px = 0.8 * (delta || 16.67) / 16.67;   // constant ~48px/s ≈ 1.5 tiles/s
+		for (let i = 0; i < Object.keys(personas).length; i++) {
+			let curr_persona_name = Object.keys(personas)[i];
+			let curr_persona = personas[curr_persona_name];
+			let curr_pronunciatio = pronunciatios[curr_persona_name];
+			let waypoints = movement_target[curr_persona_name];
+			if (!waypoints || waypoints.length === 0) continue;
+
+			let target = waypoints[0];
+			let dx = target[0] - curr_persona.body.x;
+			let dy = target[1] - curr_persona.body.y;
+			let dist = Math.sqrt(dx * dx + dy * dy);
+
+			// safety: when current position deviates too far from path start (lost messages/reconnect),
+			// align to path start first, then walk point by point; never let the agent fly straight through walls
+			if (dist > tile_width * 3) {
+				curr_persona.body.x = target[0];
+				curr_persona.body.y = target[1];
+				curr_pronunciatio.x = target[0] - 15;
+				curr_pronunciatio.y = target[1] - 15 - 25;
+				continue;
+			}
+
+			if (dist <= step_px) {
+				// arrived at current waypoint: snap to it, take the next
+				curr_persona.body.x = target[0];
+				curr_persona.body.y = target[1];
+				waypoints.shift();
+				if (waypoints.length === 0) {
+					delete movement_target[curr_persona_name];
+					// path finished: stop walking animation
+					let d = pre_anims_direction_dict[curr_persona_name];
+					if (d == "l") curr_persona.setTexture(curr_persona_name, "left");
+					else if (d == "r") curr_persona.setTexture(curr_persona_name, "right");
+					else if (d == "u") curr_persona.setTexture(curr_persona_name, "up");
+					else if (d == "d") curr_persona.setTexture(curr_persona_name, "down");
+					curr_persona.anims.stop();
+				}
+			} else {
+				// move smoothly toward the current waypoint
+				let vx = dx / dist * step_px;
+				let vy = dy / dist * step_px;
+				curr_persona.body.x += vx;
+				curr_persona.body.y += vy;
+
+				// walking animation (by movement direction)
+				let dir = Math.abs(dx) > Math.abs(dy) ? (vx > 0 ? "r" : "l") : (vy > 0 ? "d" : "u");
+				pre_anims_direction_dict[curr_persona_name] = dir;
+				// animation key uses full words (down/up/left/right), consistent with the create phase
+				let dir_word = dir == "d" ? "down" : dir == "u" ? "up" : dir == "l" ? "left" : "right";
+				curr_persona.anims.play(curr_persona_name + "-" + dir_word + "-walk", true);
+			}
+		}
+
+		// ---- text bubbles: reset to each agent's head (baseline) every frame, then detect overlaps ----
+		for (let i = 0; i < Object.keys(personas).length; i++) {
+			let name = Object.keys(personas)[i];
+			pronunciatios[name].x = personas[name].body.x - 15;
+			pronunciatios[name].y = personas[name].body.y - 15 - 25;
+		}
+
+		// ---- text bubble overlap: adjacent agents' bubbles offset vertically to avoid occlusion ----
+		// detect on the per-frame baseline; offset only when overlapping; bubbles return when agents separate
+		let bubbles = [];
+		for (let i = 0; i < Object.keys(personas).length; i++) {
+			let name = Object.keys(personas)[i];
+			let b = pronunciatios[name];
+			if (!b.text) continue;
+			bubbles.push({ name: name, x: b.x, y: b.y, w: b.width, h: b.height });
+		}
+		bubbles.sort((a, b) => a.y - b.y || a.x - b.x);
+		for (let i = 1; i < bubbles.length; i++) {
+			let prev = bubbles[i - 1];
+			let cur = bubbles[i];
+			if (cur.x < prev.x + prev.w && prev.x < cur.x + cur.w &&
+				cur.y < prev.y + prev.h && prev.y < cur.y + cur.h) {
+				pronunciatios[cur.name].y = prev.y + prev.h + 2;
+				cur.y = pronunciatios[cur.name].y;
+				cur.h = pronunciatios[cur.name].height;
+			}
+		}
+	}
+
+	// ================= Goals live adjustment =================
+	// Load governance constraints (editable) + value tendency (read-only) from /api/goals
+	var goalsData = {};    // agent -> {goalName: weight}  治理约束(可调)
+	var tendencyData = {}; // agent -> {goalName: weight}  价值倾向(只读,内化结果)
+	var interventionsData = []; // 专家干预审计(曲线竖线标记)
+	var roleTypes = {};    // agent -> "ai_tool" / "user"
+	var selectedAgent = "";      // 当前详情视图选中的角色
+	var goalsTimer = null;
+
+	function goalsEscape(s) {
+		return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+	}
+
+	// 角色选择栏 + 选中角色详情(大曲线 + 约束vs倾向信息)
+	function goalsRender() {
+		var body = document.getElementById("goals-body");
+		if (!body) return;
+		var agents = Object.keys(goalsData).sort();
+		if (agents.length === 0) {
+			body.innerHTML = '<div style="color:#999;">未配置角色。</div>';
+			return;
+		}
+		if (!selectedAgent || goalsData[selectedAgent] === undefined) selectedAgent = agents[0];
+		var html = "";
+		// 角色选择栏
+		html += '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">';
+		for (var i = 0; i < agents.length; i++) {
+			var sel = agents[i] === selectedAgent;
+			html += '<button data-agent-tab="' + goalsEscape(agents[i]) + '" style="padding:2px 8px; font-size:11px; border-radius:10px; border:1px solid ' + (sel ? "#2d6cdf" : "#ddd") + '; background:' + (sel ? "#2d6cdf" : "#fff") + '; color:' + (sel ? "#fff" : "#555") + '; cursor:pointer;">' + goalsEscape(agents[i]) + '</button>';
+		}
+		html += '</div>';
+		// 选中角色详情
+		var a = selectedAgent;
+		var goals = goalsData[a] || {};
+		var tend = tendencyData[a] || {};
+		var names = Object.keys(goals);
+		html += '<div style="margin-bottom:8px; border:1px solid #e0e0e0; border-radius:6px; padding:6px 8px;">';
+		// 角色类型徽标:AI 工具(制度内建)→ 起点=约束;人(体验形成)→ 起点=均匀
+		var isAITool = roleTypes[a] === "ai_tool";
+		html += '<div style="display:flex; align-items:center; gap:6px;">';
+		html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
+		html += '<span style="font-size:9px; padding:0 6px; border-radius:8px; ' + (isAITool ? 'background:#e8f0fe; color:#2d6cdf;' : 'background:#f0f0f0; color:#666;') + ';">' + (isAITool ? "AI 工具·制度内建" : "人·体验形成") + '</span>';
+		html += '</div>';
+		// 核心观测:价值倾向(内化)演变曲线(大图,支持横向滚动)
+		// canvas 固定高度,宽度按数据点数动态撑开,外层容器横向滚动
+		html += '<div style="margin:4px 0; overflow-x:auto; border:1px solid #e8e8e8; border-radius:4px; background:#fcfcfc;"><canvas data-tend-chart-for="' + goalsEscape(a) + '" width="356" height="150" style="height:150px; display:block;"></canvas></div>';
+		// 曲线图例
+		html += '<div style="font-size:10px; color:#666; margin:0 0 4px; line-height:1.5;" data-tend-legend-for="' + goalsEscape(a) + '"></div>';
+		// 导出按钮 + 解释面板按钮
+		html += '<div style="text-align:right; margin:0 0 4px;"><button data-export-chart-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #ccc; border-radius:4px; background:#fafafa; color:#555; cursor:pointer;">导出图片</button> <button data-explain-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #2d6cdf; border-radius:4px; background:#eef3ff; color:#2d6cdf; cursor:pointer;">解释倾向成因</button></div>';
+		// 倾向成因解释面板(可解释性:构成分解 + 窗口明细 + 干预因果链)
+		html += '<div data-explain-panel-for="' + goalsEscape(a) + '" style="display:none; margin:4px 0; border:1px solid #dbe4f5; border-radius:6px; background:#f7f9ff; padding:6px 8px; font-size:10px;"></div>';
+		// 信息区:约束(制度期望) vs 倾向(内化现状) 对照
+		html += '<div style="font-size:10px; margin:4px 0; border-top:1px dashed #e0e0e0; padding-top:4px;">';
+		html += '<div style="color:#888; margin-bottom:2px;">约束(期望) vs 倾向(内化)对照:</div>';
+		for (var ci = 0; ci < names.length; ci++) {
+			var g = names[ci];
+			var w = goals[g] || 0;
+			var tv = tend[g] !== undefined ? tend[g] : null;
+			var color = TEND_COLORS[ci % TEND_COLORS.length];
+			var wbar = Math.round(w * 100);
+			var tvbar = tv !== null ? Math.round(tv * 100) : 0;
+			var delta = tv !== null ? (tv - w) : 0;
+			html += '<div style="display:flex; align-items:center; gap:6px; margin:2px 0;">';
+			html += '<span style="flex:0 0 130px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555;" title="' + goalsEscape(g) + '"><span style="color:' + color + ';">■</span> ' + goalsEscape(g) + '</span>';
+			// 约束条(灰) + 倾向条(彩色) 并排
+			html += '<div style="flex:1; display:flex; flex-direction:column; gap:1px;">';
+			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:#999; font-size:9px;">约束</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div style="width:' + wbar + '%; height:7px; background:#bbb; border-radius:3px;"></div></div><span style="flex:0 0 30px; text-align:right; color:#777; font-size:9px;">' + wbar + '%</span></div>';
+			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:' + color + '; font-size:9px;">倾向</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div data-tend-fill-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="width:' + tvbar + '%; height:7px; background:' + color + '; border-radius:3px;"></div></div><span data-tend-pct-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 30px; text-align:right; font-size:9px; color:#333;">' + (tv !== null ? tvbar + '%' : '--') + '</span></div>';
+			html += '</div>';
+			// Δ 变化量
+			if (tv !== null) {
+				var dTxt = (delta >= 0 ? "+" : "") + (Math.round(delta * 1000) / 10) + "pp";
+				html += '<span data-tend-delta-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 46px; text-align:right; font-size:9px; color:' + (Math.abs(delta) < 0.01 ? "#999" : (delta > 0 ? "#e07b39" : "#2f9e44")) + ';">Δ ' + dTxt + '</span>';
+			} else {
+				html += '<span data-tend-delta-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 46px; text-align:right; font-size:9px; color:#aaa;">Δ --</span>';
+			}
+			html += '</div>';
+		}
+		html += '</div>';
+		// 约束滑条(可调)
+		for (var j = 0; j < names.length; j++) {
+			var g2 = names[j];
+			var w2 = Math.round((goals[g2] || 0) * 100);
+			html += '<div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:3px 0;">';
+			html += '<span style="flex:1 1 100px; min-width:60px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g2) + '">' + goalsEscape(g2) + '</span>';
+			html += '<input type="range" min="0" max="100" value="' + w2 + '" style="width:64px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g2) + '">';
+			html += '<span style="width:30px; text-align:right; color:#333; flex:0 0 auto;" data-weight-for="' + goalsEscape(g2) + '">' + w2 + '%</span>';
+			html += '<button class="del-btn" style="margin-left:auto; padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g2) + '" data-del-agent="' + goalsEscape(a) + '">移除</button>';
+			html += '</div>';
+		}
+		html += '<div style="margin-top:4px; display:flex; gap:4px;">';
+		html += '<input type="text" placeholder="添加目标" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
+		html += '<button class="del-btn" style="background:#2d6cdf; padding:2px 8px; font-size:10px;" data-add-goal="' + goalsEscape(a) + '">+</button>';
+		html += '</div>';
+		html += '<div style="font-size:10px; color:#888;">合计: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
+		html += '</div>';
+		body.innerHTML = html;
+		goalsUpdateSums();
+		drawTendencyChart(a);
+		updateTendencyLegend(a);
+		// 嵌入模式:explain → 自动展开当前角色解释面板;goals → 收起其他列
+		var embedMode = document.body.getAttribute("data-embed") || "";
+		if (embedMode === "explain") {
+			var eb = body.querySelector('[data-explain-for="' + goalsEscape(a) + '"]');
+			if (eb) eb.click();
+		}
+	}
+
+	function goalsUpdateSums() {
+		var agents = Object.keys(goalsData);
+		for (var i = 0; i < agents.length; i++) {
+			var a = agents[i];
+			var sum = 0;
+			var goals = goalsData[a] || {};
+			for (var g in goals) sum += goals[g];
+			var el = document.querySelector('[data-sum-for="' + a + '"]');
+			if (el) {
+				el.textContent = (Math.round(sum * 100) / 100).toFixed(2);
+				el.style.color = Math.abs(sum - 1) < 0.001 ? "#070" : "#a00";
+			}
+		}
+	}
+
+	function goalsNormalize(agentName) {
+		// Re-normalize weights to sum to 1 (keep relative proportions)
+		var goals = goalsData[agentName] || {};
+		var total = 0;
+		for (var g in goals) total += goals[g];
+		if (total <= 0) return;
+		for (var g in goals) goals[g] = goals[g] / total;
+		goalsData[agentName] = goals;
+	}
+
+	function goalsPush(agentName) {
+		var goals = {};
+		var src = goalsData[agentName] || {};
+		// 过滤 0 权重项:添加目标后未拖动前权重为 0,不提交(避免垃圾干预)
+		for (var g in src) {
+			if (src[g] > 0) goals[g] = src[g];
+		}
+		if (Object.keys(goals).length === 0) return;
+		// 提交前归一化(删除目标后剩余总和≠1,后端会拒绝;必须归一化到1)
+		var gsum = 0;
+		for (var gg in goals) gsum += goals[gg];
+		if (gsum > 0) {
+			for (var gg2 in goals) goals[gg2] = goals[gg2] / gsum;
+		}
+		goalsNormalize(agentName);
+		goalsRender();
+		// debounce 400ms
+		if (goalsTimer) clearTimeout(goalsTimer);
+		goalsTimer = setTimeout(function() {
+			fetch("/api/goals", {
+				method: "POST",
+				headers: {"Content-Type": "application/json"},
+				body: JSON.stringify({name: agentName, goals: goals})
+			}).then(function(r) { return r.json(); }).then(function(out) {
+				if (!out.ok) console.warn("goals update failed:", out.errors);
+			}).catch(function(e) { console.warn("goals update error:", e); });
+		}, 400);
+	}
+
+	// ================= 价值倾向演变曲线(核心观测对象) =================
+	// tendencyHistory[agent] = [{t: "20250213-09:30", v: {goal: weight}}]
+	var tendencyHistory = {};
+	var TEND_COLORS = ["#2d6cdf", "#e07b39", "#2f9e44", "#c92a2a", "#9c36b5", "#0b7285"];
+
+	// 按模拟时间去重记录倾向;同时间更新、新时间追加(阶梯=行动变化点)
+	function tendencyRecord(agentName, timeStr, tendency) {
+		if (!agentName || !tendency) return;
+		var hist = tendencyHistory[agentName] || (tendencyHistory[agentName] = []);
+		var last = hist.length > 0 ? hist[hist.length - 1] : null;
+		if (last && last.t === timeStr) {
+			last.v = tendency;  // 同一时间刷新(去重)
+		} else {
+			hist.push({ t: timeStr || "", v: tendency });
+			if (hist.length > 200) hist.shift();
+		}
+		// 同步当前倾向快照(文本/对照条数据源),局部刷新,不整页重绘(避免打断滑条)
+		tendencyData[agentName] = tendency;
+		drawTendencyChart(agentName);
+		updateTendencyLegend(agentName);
+		updateTendencyBars(agentName);
+	}
+
+	// 局部更新"约束 vs 倾向"对照条的倾向值 + Δ(仅当前详情角色可见时)
+	function updateTendencyBars(agentName) {
+		if (selectedAgent !== agentName) return;
+		var tend = tendencyData[agentName] || {};
+		var goals = goalsData[agentName] || {};
+		for (var g in goals) {
+			var tv = tend[g];
+			if (tv === undefined) continue;
+			var key = goalsEscape(agentName) + "_" + goalsEscape(g);
+			var fill = document.querySelector('[data-tend-fill-for="' + key + '"]');
+			var pct = document.querySelector('[data-tend-pct-for="' + key + '"]');
+			var dlt = document.querySelector('[data-tend-delta-for="' + key + '"]');
+			var tvbar = Math.round(tv * 100);
+			if (fill) fill.style.width = tvbar + "%";
+			if (pct) pct.textContent = tvbar + "%";
+			if (dlt) {
+				var w = goals[g] || 0;
+				var delta = tv - w;
+				var dTxt = (delta >= 0 ? "+" : "") + (Math.round(delta * 1000) / 10) + "pp";
+				dlt.textContent = "Δ " + dTxt;
+				dlt.style.color = Math.abs(delta) < 0.01 ? "#999" : (delta > 0 ? "#e07b39" : "#2f9e44");
+			}
+		}
+	}
+
+	function tendencyGoalColors(agentName) {
+		// 该角色约束内目标的固定配色(与图例一致)
+		var goals = goalsData[agentName] || {};
+		var names = Object.keys(goals).sort();
+		var map = {};
+		for (var i = 0; i < names.length; i++) map[names[i]] = TEND_COLORS[i % TEND_COLORS.length];
+		return map;
+	}
+
+	function drawTendencyChart(agentName, cvOverride, opts) {
+		opts = opts || {};
+		var scale = opts.scale || 1;
+		var cv = cvOverride || document.querySelector('[data-tend-chart-for="' + agentName + '"]');
+		if (!cv) return;
+		var hist = tendencyHistory[agentName] || [];
+		var PX = 10;  // 每个数据点最小像素宽(横向滚动由此撑开)
+		var minW = 356;
+		var cw = Math.max(minW, Math.max(1, hist.length) * PX);
+		// 实时视图:按点数动态设宽(容器横向滚动);导出视图:宽度已在调用处按 scale 设好
+		if (!opts.export && cv.width !== cw) cv.width = cw;
+		var w = cv.width / scale;
+		var h = cv.height / scale;
+		var ctx = cv.getContext("2d");
+		// 背景:实时用透明(容器底色),导出用纯白
+		if (opts.export) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+		else { ctx.clearRect(0, 0, w, h); }
+		if (hist.length === 0) {
+			ctx.fillStyle = "#888"; ctx.font = "12px sans-serif";
+			ctx.fillText("等待倾向数据...", 8, 18);
+			return;
+		}
+		// 绘图区:导出模式顶部留标题,底部留图例
+		// 导出模式布局:标题(22)/时间(40)/绘图区(56~h-76)/时间刻度(h-62)/图例(最多3行,向上生长)
+		var top = opts.export ? 56 : 26;
+		var bottom = opts.export ? 76 : 22;
+		var plotH = h - top - bottom;
+		var yOf = function(v) { return top + (1 - v) * plotH; };
+		var n = hist.length;
+		var xOf = function(i) { return 30 + (n === 1 ? 0 : i / (n - 1)) * (w - 60); };
+		var colors = tendencyGoalColors(agentName);
+		var names = Object.keys(colors);
+		var goals = goalsData[agentName] || {};
+		// 网格:0 / 0.25 / 0.5 / 0.75 / 1(略深,清晰)
+		ctx.strokeStyle = "#dcdcdc"; ctx.lineWidth = 1;
+		for (var gy = 0; gy <= 4; gy++) {
+			var y = yOf(gy / 4);
+			ctx.beginPath(); ctx.moveTo(30, y); ctx.lineTo(w - 30, y); ctx.stroke();
+		}
+		// Y 轴线
+		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.moveTo(30, top); ctx.lineTo(30, h - bottom); ctx.stroke();
+		ctx.fillStyle = "#555"; ctx.font = "bold 11px sans-serif";
+		ctx.textAlign = "right";
+		ctx.fillText("1.0", 27, top + 4);          // 刻度放绘图区内侧,避开标题/时间行
+		ctx.fillText("0.5", 27, yOf(0.5) + 4);
+		ctx.fillText("0", 27, h - bottom - 2);
+		ctx.textAlign = "left";
+		// 导出模式:标题行(角色名 + 时间范围)
+		if (opts.export) {
+			ctx.fillStyle = "#333"; ctx.font = "bold 15px sans-serif";
+			ctx.fillText(agentName + " — 价值倾向演变(内化)", 4, 22);
+			ctx.font = "11px sans-serif"; ctx.fillStyle = "#777";
+			var t0 = String(hist[0].t || "").slice(9);
+			var t1 = String(hist[n - 1].t || "").slice(9);
+			ctx.fillText("时间: " + t0 + " ~ " + t1, 4, 40);
+		}
+		// 约束期望虚线:每个目标一条(同色虚线,表示制度期望基准)
+		for (var cg = 0; cg < names.length; cg++) {
+			var cgoal = names[cg];
+			var cw = goals[cgoal] || 0;
+			if (cw <= 0) continue;
+			ctx.strokeStyle = colors[cgoal];
+			ctx.globalAlpha = 0.55;
+			ctx.lineWidth = 1.6;
+			ctx.setLineDash([6, 4]);
+			var cy = yOf(cw);
+			ctx.beginPath(); ctx.moveTo(30, cy); ctx.lineTo(w - 30, cy); ctx.stroke();
+			ctx.setLineDash([]);
+			ctx.globalAlpha = 1;
+		}
+		// 干预竖线:该角色的 interventions(按 sim_time 匹配 x 轴)
+		var ivs = (interventionsData || []).filter(function(iv) {
+			return iv.agent === agentName && iv.sim_time;
+		});
+		for (var iv = 0; iv < ivs.length; iv++) {
+			var ivTime = String(ivs[iv].sim_time);
+			for (var ii = 0; ii < n; ii++) {
+				if (String(hist[ii].t) === ivTime) {
+					var ivx = xOf(ii);
+					ctx.strokeStyle = "rgba(224,123,57,0.75)"; ctx.lineWidth = 1.8;
+					ctx.setLineDash([4, 3]);
+					ctx.beginPath(); ctx.moveTo(ivx, top - 4); ctx.lineTo(ivx, h - bottom); ctx.stroke();
+					ctx.setLineDash([]);
+					ctx.fillStyle = "#e07b39"; ctx.font = "bold 9px sans-serif";
+					ctx.fillText("干预", ivx + 3, top - 6);
+					break;
+				}
+			}
+		}
+		// 各目标曲线
+		for (var g = 0; g < names.length; g++) {
+			var goal = names[g];
+			ctx.strokeStyle = colors[goal];
+			ctx.lineWidth = 2.6;
+			ctx.beginPath();
+			var started = false;
+			for (var i = 0; i < n; i++) {
+				var v = hist[i].v[goal];
+				if (v === undefined) continue;
+				var x = xOf(i), y = yOf(v);
+				if (!started) { ctx.moveTo(x, y); started = true; }
+				else ctx.lineTo(x, y);
+			}
+			if (started) ctx.stroke();
+			// 最新值圆点 + 末值标注(白底,清晰可读)
+			var lastV = hist[n - 1].v[goal];
+			if (lastV !== undefined) {
+				var lx = xOf(n - 1), ly = yOf(lastV);
+				ctx.fillStyle = colors[goal];
+				ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+				ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+				ctx.stroke();
+				var label = Math.round(lastV * 100) + "%";
+				ctx.font = "bold 11px sans-serif";
+				var tw = ctx.measureText(label).width;
+				var bx = Math.max(2, Math.min(lx - tw - 8, w - tw - 4));
+				var by = ly - 18;
+				if (by < 8) by = ly + 12;
+				ctx.fillStyle = "rgba(255,255,255,0.92)";
+				ctx.fillRect(bx - 3, by - 10, tw + 6, 14);
+				ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 1;
+				ctx.strokeRect(bx - 3, by - 10, tw + 6, 14);
+				ctx.fillStyle = colors[goal];
+				ctx.fillText(label, bx, by);
+			}
+		}
+		// X 轴:底部时间刻度(最多 6 个,均匀分布;只显示 HH:MM)
+		ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.moveTo(30, h - bottom); ctx.lineTo(w - 30, h - bottom); ctx.stroke();
+		ctx.fillStyle = "#555"; ctx.font = "bold 10px sans-serif";
+		// 时间刻度基线:导出模式在轴线下 14px(给图例让出更底部一行),实时模式贴底
+		var tickY = opts.export ? h - bottom + 14 : h - 7;
+		var tickN = Math.min(6, n);
+		var drawn = {};
+		for (var tk = 0; tk < tickN; tk++) {
+			var idx = Math.round(tk * (n - 1) / Math.max(1, tickN - 1));
+			var tRaw = String(hist[idx].t || "");
+			var tShort = tRaw.length > 9 ? tRaw.slice(9) : tRaw;  // 只显示 "HH:MM"
+			if (drawn[tShort]) continue;
+			drawn[tShort] = true;
+			// 首尾刻度左/右对齐防裁剪,中间居中
+			if (tk === 0) ctx.textAlign = "left";
+			else if (tk === tickN - 1) ctx.textAlign = "right";
+			else ctx.textAlign = "center";
+			ctx.fillText(tShort, xOf(idx), tickY);
+		}
+		ctx.textAlign = "left";
+		// 导出模式:底部图例行(独立一行,不与时间刻度重叠;超宽自动换行)
+		if (opts.export) {
+			ctx.font = "11px sans-serif";
+			var lx = 4, ly = h - 24;
+			var legendItems = [];
+			for (var lg = 0; lg < names.length; lg++) {
+				var lgoal = names[lg];
+				legendItems.push({ color: colors[lgoal], text: " " + lgoal, dashed: false });
+			}
+			legendItems.push({ color: "#888", text: " 约束期望", dashed: true });
+			for (var li = 0; li < legendItems.length; li++) {
+				var item = legendItems[li];
+				var iw = 13 + ctx.measureText(item.text).width + 16;
+				if (lx + iw > w - 4 && lx > 4) {  // 超宽换行
+					lx = 4;
+					ly -= 14;
+				}
+				if (item.dashed) {
+					ctx.strokeStyle = item.color;
+					ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4;
+					ctx.beginPath(); ctx.moveTo(lx, ly + 5); ctx.lineTo(lx + 20, ly + 5); ctx.stroke();
+					ctx.setLineDash([]);
+					ctx.fillStyle = "#333";
+					ctx.fillText(item.text, lx + 24, ly + 10);
+				} else {
+					ctx.fillStyle = item.color;
+					ctx.fillRect(lx, ly, 10, 10);
+					ctx.fillStyle = "#333";
+					ctx.fillText(item.text, lx + 13, ly + 10);
+				}
+				lx += iw;
+			}
+		}
+		// 悬停 tooltip:鼠标移到曲线区域,显示最近数据点的各目标值 + 干预信息
+		// (仅实时视图启用;导出视图是静态 PNG 无交互)
+		if (!opts.export && cv && typeof cv._tendHoverInit === "undefined") {
+			cv._tendHoverInit = true;
+			var _hist = hist;
+			var _colors = colors;   // 捕获当前目标配色
+			var _ivs = ivs;         // 捕获当前角色的干预列表
+			var _agent = agentName;
+			var _cv = cv;
+			var _scale = scale;
+			cv.addEventListener("mousemove", function (e) {
+				var rect = _cv.getBoundingClientRect();
+				var mx = (e.clientX - rect.left) * (_cv.width / rect.width);
+				var my = (e.clientY - rect.top) * (_cv.height / rect.height);
+				// 找到最近的点(按 x 距离)
+				var nn = _hist.length;
+				if (nn === 0) return;
+				var best = -1, bd = 1e9;
+				var plotW = (_cv.width / _scale) - 60;
+				for (var pi = 0; pi < nn; pi++) {
+					var px = 30 + (nn === 1 ? 0 : pi / (nn - 1)) * plotW;
+					var d = Math.abs(px - mx);
+					if (d < bd) { bd = d; best = pi; }
+				}
+				if (best < 0) return;
+				// 判断是否在绘图区(避免贴边也触发)
+				var topR = 26, bottomR = 22;
+				var hR = (_cv.height / _scale) - topR - bottomR;
+				if (mx < 30 || mx > 30 + plotW || my < topR || my > topR + hR) return;
+				// 重绘 + 画 tooltip
+				drawTendencyChart(_agent, _cv, opts);
+				var px = 30 + (nn === 1 ? 0 : best / (nn - 1)) * plotW;
+				var toolLines = [];
+				var pt = String(_hist[best].t || "");
+				toolLines.push(pt.slice(9) || pt);
+				var goalArr = Object.keys(_colors);
+				for (var tg = 0; tg < goalArr.length; tg++) {
+					var tgGoal = goalArr[tg];
+					var tv = _hist[best].v[tgGoal];
+					if (tv !== undefined) toolLines.push(tgGoal + ": " + Math.round(tv * 1000) / 10 + "%");
+				}
+				// 该时刻是否有干预
+				for (var ivj = 0; ivj < _ivs.length; ivj++) {
+					if (String(_ivs[ivj].sim_time) === pt) { toolLines.push("▲ 干预时刻"); break; }
+				}
+				// 绘制 tooltip 白底框
+				var tctx = _cv.getContext("2d");
+				tctx.font = "10px sans-serif";
+				var boxW = 0;
+				for (var tl = 0; tl < toolLines.length; tl++) {
+					var tw2 = tctx.measureText(toolLines[tl]).width;
+					if (tw2 > boxW) boxW = tw2;
+				}
+				boxW += 12;
+				var boxH = toolLines.length * 13 + 8;
+				var bx2 = Math.min(px + 12, 30 + plotW - boxW - 2);
+				if (bx2 < 4) bx2 = 4;
+				var by2 = Math.max(4, my - boxH - 6);
+				tctx.fillStyle = "rgba(255,255,255,0.95)";
+				tctx.strokeStyle = "rgba(0,0,0,0.25)";
+				tctx.lineWidth = 1;
+				tctx.fillRect(bx2, by2, boxW, boxH);
+				tctx.strokeRect(bx2, by2, boxW, boxH);
+				tctx.fillStyle = "#333";
+				for (var tl2 = 0; tl2 < toolLines.length; tl2++) {
+					tctx.fillText(toolLines[tl2], bx2 + 6, by2 + 12 + tl2 * 13);
+				}
+				// 时间轴上的定位圆点
+				tctx.fillStyle = "#e07b39";
+				tctx.beginPath(); tctx.arc(px, my, 3.5, 0, Math.PI * 2); tctx.fill();
+			});
+			cv.addEventListener("mouseleave", function () {
+				drawTendencyChart(_agent, _cv, opts);
+			});
+		}
+	}
+
+	function updateTendencyLegend(agentName) {
+		var leg = document.querySelector('[data-tend-legend-for="' + agentName + '"]');
+		if (!leg) return;
+		var colors = tendencyGoalColors(agentName);
+		var names = Object.keys(colors);
+		if (names.length === 0) { leg.innerHTML = ""; return; }
+		var parts = [];
+		for (var i = 0; i < names.length; i++) {
+			parts.push('<span style="color:' + colors[names[i]] + ';">■</span> ' + goalsEscape(names[i]));
+		}
+		parts.push('<span style="color:#999;">┅</span> 约束期望');
+		leg.innerHTML = parts.join("　");
+	}
+
+	// 导出倾向曲线 PNG:后端 matplotlib 渲染(含完整历史 + 分段约束阶梯 + 干预竖线)
+	// 数据源=checkpoints(刷新不丢历史),替代前端 canvas 导出(布局/裁剪问题)
+	function exportTendencyChart(agentName) {
+		var a = document.createElement("a");
+		a.href = "/api/export-chart?agent=" + encodeURIComponent(agentName);
+		a.download = "倾向演变_" + agentName + ".png";
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	}
+
+	// 倾向成因解释面板:构成分解 + 窗口明细 + 干预因果链(可解释性)
+	function renderExplainPanel(agentName, panelEl) {
+		panelEl.innerHTML = '<div style="color:#888;">加载解释数据…</div>';
+		fetch("/api/explain?agent=" + encodeURIComponent(agentName)).then(function(r) { return r.json(); }).then(function(d) {
+			if (!d.ok) { panelEl.innerHTML = '<div style="color:#a00;">' + goalsEscape((d.errors || []).join("; ")) + '</div>'; return; }
+			var h = "";
+			// ① 构成分解:倾向 = α×底色 + (1-α)×体验
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin-bottom:2px;">① 倾向构成分解(为什么是这个值)</div>';
+			h += '<div style="color:#666; margin-bottom:3px;">倾向 = α×人物底色 + (1-α)×体验窗口均值 · α=' + d.alpha + '(累计体验 ' + d.experience_count + ' 次,窗口 ' + d.window_size + ' 条)</div>';
+			var goals = d.constraints || {};
+			var gnames = Object.keys(goals);
+			for (var i = 0; i < gnames.length; i++) {
+				var g = gnames[i];
+				var dec = d.decomposition[g];
+				if (!dec) continue;
+				var color = TEND_COLORS[i % TEND_COLORS.length];
+				h += '<div style="display:flex; align-items:center; gap:5px; margin:2px 0; flex-wrap:wrap;">';
+				h += '<span style="flex:0 0 110px; color:#555;" title="' + goalsEscape(g) + '"><span style="color:' + color + ';">■</span> ' + goalsEscape(g) + '</span>';
+				h += '<span style="color:#333; font-weight:bold;">' + Math.round(dec.tendency * 1000) / 10 + '%</span>';
+				h += '<span style="color:#999;">= 底色 ' + Math.round(dec.base_component * 1000) / 10 + '% (α×' + Math.round(dec.base_value * 1000) / 10 + '%) + 体验 ' + Math.round(dec.experience_component * 1000) / 10 + '% ((1-α)×窗口均值 ' + Math.round(dec.window_mean * 1000) / 10 + '%)</span>';
+				h += '</div>';
+			}
+			// ② 窗口明细:最近体验(行动 → 对齐度 → 反馈)
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">② 体验窗口明细(最近 ' + d.window_details.length + ' 条,最新在前)</div>';
+			if (d.window_details.length === 0) {
+				h += '<div style="color:#999;">暂无体验记录(模拟刚开始或该角色无行动)。</div>';
+			} else {
+				h += '<div style="overflow-x:auto;"><table style="border-collapse:collapse; width:100%; font-size:9px;">';
+				h += '<tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">行动</th>';
+				var gnames2 = Object.keys(goals);
+				for (var j = 0; j < gnames2.length; j++) {
+					h += '<th style="padding:2px 4px; border-bottom:1px solid #ddd;">' + goalsEscape(gnames2[j]) + ' 反馈</th>';
+				}
+				h += '</tr>';
+				for (var k = 0; k < d.window_details.length; k++) {
+					var w = d.window_details[k];
+					h += '<tr><td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + goalsEscape(w.action) + '">' + goalsEscape(w.action || "(无行动描述)") + '</td>';
+					for (var jj = 0; jj < gnames2.length; jj++) {
+						var fb = w.feedback[gnames2[jj]];
+						h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; text-align:center; color:' + (fb !== undefined && fb > 0.1 ? "#2f9e44" : "#999") + ';">' + (fb !== undefined ? Math.round(fb * 1000) / 10 + '%' : "–") + '</td>';
+					}
+					h += '</tr>';
+				}
+				h += '</table></div>';
+				h += '<div style="color:#999; margin-top:2px;">反馈 = 行动与目标语义对齐度(相对占比)× 约束权重;绿色为强反馈。</div>';
+			}
+			// ③ 干预因果链:干预 → 约束跳变 → 倾向滞后收敛
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">③ 干预因果链(价值可被人为改变的证据)</div>';
+			if (!d.intervention_chain || d.intervention_chain.length === 0) {
+				h += '<div style="color:#999;">该角色暂无干预记录。</div>';
+			} else {
+				h += '<table style="border-collapse:collapse; width:100%; font-size:9px;"><tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">模拟时间</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预前倾向</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预后 2h 倾向</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">迁移量</th></tr>';
+				for (var m = 0; m < d.intervention_chain.length; m++) {
+					var iv = d.intervention_chain[m];
+					var ivt = iv.sim_time || "";
+					var ivNew = [];
+					for (var n in iv.new_constraints) ivNew.push(n + " " + Math.round(iv.new_constraints[n] * 100) + "%");
+					var ivBefore = [], ivAfter = [], ivShift = [];
+					for (var nn in iv.tendency_before) ivBefore.push(nn + " " + Math.round(iv.tendency_before[nn] * 1000) / 10 + "%");
+					for (var nn2 in iv.tendency_after_2h) ivAfter.push(nn2 + " " + Math.round(iv.tendency_after_2h[nn2] * 1000) / 10 + "%");
+					for (var nn3 in iv.tendency_shift_2h) {
+						var sv = iv.tendency_shift_2h[nn3];
+						ivShift.push(nn3 + " " + (sv >= 0 ? "+" : "") + Math.round(sv * 1000) / 10 + "pp");
+					}
+					h += '<tr><td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#555;">' + goalsEscape(ivt) + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#2d6cdf;">' + goalsEscape(ivNew.join(", ")) + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#888;">' + goalsEscape(ivBefore.join(", ")) + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#333;">' + goalsEscape(ivAfter.join(", ")) + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#e07b39;">' + goalsEscape(ivShift.join(", ")) + '</td></tr>';
+				}
+				h += '</table>';
+				h += '<div style="color:#999; margin-top:2px;">迁移量 = 干预后 2 小时倾向 − 干预前倾向(内化滞后收敛的量化证据)。</div>';
+			}
+			panelEl.innerHTML = h;
+		}).catch(function() { panelEl.innerHTML = '<div style="color:#a00;">解释数据加载失败。</div>'; });
+	}
+
+	document.addEventListener("DOMContentLoaded", function() {
+		// chat log collapse toggle
+		var ch = document.getElementById("chat-header");
+		var ct = document.getElementById("chat-toggle");
+		if (ch && ct) ch.onclick = function() {
+			var body = document.getElementById("chat-content");
+			if (body.style.display === "none") { body.style.display = "block"; ct.textContent = "Collapse ▾"; }
+			else { body.style.display = "none"; ct.textContent = "Expand ▸"; }
+		};
+		// collapse toggle
+		var gh = document.getElementById("goals-header");
+		var gt = document.getElementById("goals-toggle");
+		if (gh && gt) gh.onclick = function() {
+			var body = document.getElementById("goals-body");
+			if (body.style.display === "none") { body.style.display = "block"; gt.textContent = "Collapse ▾"; }
+			else { body.style.display = "none"; gt.textContent = "Expand ▸"; }
+		};
+		// load governance constraints + value tendency + interventions
+		fetch("/api/goals").then(function(r) { return r.json(); }).then(function(out) {
+			if (out.ok && out.goals) {
+				goalsData = out.goals;
+				tendencyData = out.tendency || {};
+				interventionsData = out.interventions || [];
+				roleTypes = out.role_types || {};
+				goalsRender();
+			}
+		}).catch(function() {});
+		// event delegation on goals-body
+		var body = document.getElementById("goals-body");
+		if (!body) return;
+		// 拖动过程只更新本地显示(不提交);松开(change)才提交——避免拖动过程产生大量干预记录
+		// 注意:input 时不能 goalsRender()——重建面板会销毁滑条元素,导致 change 事件永不触发
+		body.addEventListener("input", function(e) {
+			if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
+				var a = e.target.getAttribute("data-agent");
+				var g = e.target.getAttribute("data-goal");
+				if (a && g && goalsData[a]) {
+					goalsData[a][g] = parseInt(e.target.value, 10) / 100;
+					goalsNormalize(a);
+					// 只更新权重数字与条宽,不重建面板(保住滑条元素让 change 能触发)
+					var wEl = body.querySelector('[data-weight-for="' + g + '"]');
+					if (wEl) wEl.textContent = Math.round(goalsData[a][g] * 100) + '%';
+					updateTendencyBars(a);
+				}
+			}
+		});
+		body.addEventListener("change", function(e) {
+			if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
+				var a = e.target.getAttribute("data-agent");
+				var g = e.target.getAttribute("data-goal");
+				if (a && g && goalsData[a]) {
+					goalsData[a][g] = parseInt(e.target.value, 10) / 100;
+					goalsNormalize(a);
+					goalsPush(a);
+				}
+			}
+		});
+		body.addEventListener("click", function(e) {
+			var t = e.target;
+			// 导出曲线图片
+			if (t && t.getAttribute && t.getAttribute("data-export-chart-for") !== null) {
+				exportTendencyChart(t.getAttribute("data-export-chart-for"));
+				return;
+			}
+			// 解释倾向成因(可解释性面板)
+			if (t && t.getAttribute && t.getAttribute("data-explain-for") !== null) {
+				var ea = t.getAttribute("data-explain-for");
+				var panel = body.querySelector('[data-explain-panel-for="' + ea + '"]');
+				if (panel) {
+					var vis = panel.style.display !== "none";
+					panel.style.display = vis ? "none" : "block";
+					if (!vis) renderExplainPanel(ea, panel);
+				}
+				return;
+			}
+			// 角色切换
+			if (t && t.getAttribute && t.getAttribute("data-agent-tab") !== null) {
+				selectedAgent = t.getAttribute("data-agent-tab");
+				goalsRender();
+				return;
+			}
+			// add goal
+			if (t && t.getAttribute && t.getAttribute("data-add-goal") !== null) {
+				var a = t.getAttribute("data-add-goal");
+				var input = body.querySelector('[data-new-goal="' + a + '"]');
+				var name = input ? input.value.trim() : "";
+				if (!name || /^\d/.test(name)) return;  // 空名/数字开头 = 误输入,丢弃
+				if (!goalsData[a]) goalsData[a] = {};
+				// 新目标给极小非零权重:goalsPush 会过滤 0 权重项(防拖动垃圾),
+				// 但添加是明确操作必须提交,0 会被后端清洗丢弃 → 前后端不一致
+				goalsData[a][name] = 0.001;
+				goalsPush(a);
+			}
+			// delete goal
+			if (t && t.getAttribute && t.getAttribute("data-del-goal") !== null) {
+				var a2 = t.getAttribute("data-del-agent");
+				var g2 = t.getAttribute("data-del-goal");
+				if (a2 && g2 && goalsData[a2]) {
+					delete goalsData[a2][g2];
+					goalsPush(a2);
+				}
+			}
+		});
+	});
+</script>
+
+<script>
+
+
+    
+    $('#on_screen_det_trigger-AI_Advisor').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-AI_Advisor').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-AI_Advisor').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-AI_Advisor').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "AI Advisor";
+    });
+
+    
+    $('#on_screen_det_trigger-Daniel_Shen').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-Daniel_Shen').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-Daniel_Shen').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-Daniel_Shen').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "Daniel Shen";
+    });
+
+    
+    $('#on_screen_det_trigger-Kevin_Su').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-Kevin_Su').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-Kevin_Su').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-Kevin_Su').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "Kevin Su";
+    });
+
+    
+    $('#on_screen_det_trigger-Michael_Chen').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-Michael_Chen').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-Michael_Chen').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-Michael_Chen').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "Michael Chen";
+    });
+
+    
+    $('#on_screen_det_trigger-Mr._Zhou').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-Mr._Zhou').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-Mr._Zhou').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-Mr._Zhou').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "Mr. Zhou";
+    });
+
+    
+    $('#on_screen_det_trigger-Wendy_Lin').click(function() {
+        $('#on_screen_det_content-init').css({
+          'display': 'none',
+        });
+        
+            
+            $('#on_screen_det_content-AI_Advisor').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-AI_Advisor').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-AI_Advisor').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Daniel_Shen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Daniel_Shen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Daniel_Shen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Kevin_Su').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Kevin_Su').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Kevin_Su').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Michael_Chen').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Michael_Chen').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Michael_Chen').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Mr._Zhou').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Mr._Zhou').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Mr._Zhou').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+            
+            $('#on_screen_det_content-Wendy_Lin').css({
+                'display': 'none',
+            });
+            $('#on_screen_det_trigger-Wendy_Lin').css({
+                'font-weight': '500',
+            });
+            $('#on_screen_det_trigger_container-Wendy_Lin').css({
+                'background-color': 'white',
+                'border-radius': '10px'
+            });
+        
+
+        $('#on_screen_det_trigger-Wendy_Lin').css({
+            'font-weight': '900',
+        });
+        $('#on_screen_det_trigger_container-Wendy_Lin').css({
+            'background-color': '#ABFF84',
+            'border-radius': '10px'
+        });
+        $('#on_screen_det_content-Wendy_Lin').css({
+            'display': 'block',
+        });
+
+        document.getElementById("temp_focus").innerHTML = "Wendy Lin";
+    });
+
+
+</script>
+
+
+</body>
+</html>
