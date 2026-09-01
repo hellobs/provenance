@@ -88,6 +88,89 @@ def load_tendency_series(ckpt_dir: str, agent: str):
         _series_cache[ckpt_dir] = (sig, all_series)
     return all_series.get(agent, [])
 
+
+# 窗口条目时间反查缓存:ckpt_dir -> (签名, {agent: {条目签名: [时间...]}})
+_window_time_cache = {}
+_window_time_cache_lock = threading.Lock()
+
+
+def _window_entry_sig(entry: dict) -> str:
+    """窗口条目签名:action + feedback(旧存档无 time 时用于跨 checkpoint 匹配)"""
+    try:
+        fb = json.dumps(entry.get("feedback") or {}, sort_keys=True, default=str)
+    except Exception:
+        fb = ""
+    return "{}||{}".format(str(entry.get("action", "")), fb)
+
+
+def _backfill_window_times(ckpt_dir: str, agent: str, window: list) -> None:
+    """为旧存档窗口条目(无 time 字段)反查模拟时间。
+
+    新代码 observe_consequence 会写入 time;旧存档缺该字段。
+    反查策略:扫描各 checkpoint 快照里该 agent 的 tendency_window,
+    按 (action, feedback) 签名 + 出现次序,映射到最早出现的 checkpoint 时间。
+    同签名多条:第 k 条取第 k 次出现的 checkpoint 时间(不全都标同一时刻)。
+    找不到的条目保持空串(前端显示 "–")。
+    """
+    if not ckpt_dir or not os.path.isdir(ckpt_dir):
+        return
+    import glob as _g
+    import datetime as _dt
+
+    need = [w for w in window if isinstance(w, dict) and not w.get("time")]
+    if not need:
+        return
+    sig = _dir_mtime_sig(ckpt_dir)
+    with _window_time_cache_lock:
+        cached = _window_time_cache.get(ckpt_dir)
+        if cached and cached[0] == sig:
+            times_map = cached[1].get(agent, {})
+        else:
+            times_map = None
+    if times_map is None:
+        # 扫描所有 checkpoint:记录每个签名的出现时间序列
+        files = sorted(_g.glob(os.path.join(ckpt_dir, "simulate-*.json")))
+        seen: Dict[str, list] = {}
+        for p in files:
+            t = os.path.basename(p).replace("simulate-", "").replace(".json", "")
+            try:
+                dt = _dt.datetime.strptime(t, "%Y%m%d-%H%M")
+            except ValueError:
+                continue
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    c = json.load(f)
+            except Exception:
+                continue
+            ag = (c.get("agents") or {}).get(agent)
+            if not ag:
+                continue
+            win = (ag.get("status") or {}).get("tendency_window") or []
+            for w in win:
+                if not isinstance(w, dict):
+                    continue
+                s = _window_entry_sig(w)
+                seen.setdefault(s, []).append(dt)
+        times_map = {s: [x.strftime("%Y%m%d-%H:%M") for x in v] for s, v in seen.items()}
+        with _window_time_cache_lock:
+            _window_time_cache[ckpt_dir] = (sig, {agent: times_map} if times_map else {})
+    if not times_map:
+        return
+    # 按出现次序填时间:同签名第 k 条取第 k 次出现
+    occ: Dict[str, int] = {}
+    for w in window:
+        if not isinstance(w, dict) or w.get("time"):
+            continue
+        s = _window_entry_sig(w)
+        times = times_map.get(s)
+        if not times:
+            continue
+        k = occ.get(s, 0)
+        occ[s] = k + 1
+        if k < len(times):
+            w["time"] = times[k]
+
+
 app = FastAPI(title="Provenance Live (FastAPI)")
 app.mount(
     "/static",
@@ -318,22 +401,25 @@ async def explain_agent(agent: str = ""):
             "window_mean": round(exp_v, 4),
         }
 
-    # ② 窗口明细(最近 N 条体验,倒序=最新在前)
+    # ② 窗口明细(最近 N 条体验,正序=从早到晚;每条含 模拟时间/行动/对齐度/反馈)
+    ckpt_dir = ""
+    if compressor is not None:
+        ckpt_dir = getattr(compressor, "checkpoints_folder", "") or ""
+    if ckpt_dir and not os.path.isabs(ckpt_dir):
+        ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
     details = []
-    for w in reversed(window):
+    # 旧存档窗口条目无 time:从 checkpoint 快照反查近似模拟时间
+    _backfill_window_times(ckpt_dir, agent, window)
+    for w in window:
         feedback = w.get("feedback", w) if isinstance(w, dict) else {}
         details.append({
+            "time": str(w.get("time", "")) if isinstance(w, dict) else "",
             "action": str(w.get("action", ""))[:160] if isinstance(w, dict) else "",
             "alignment": {k: round(v, 4) for k, v in (w.get("alignment", {}) or {}).items()} if isinstance(w, dict) else {},
             "feedback": {k: round(v, 4) for k, v in feedback.items()},
         })
 
     # ③ 干预因果链:读 checkpoints 的倾向序列,量化每次干预后倾向迁移
-    ckpt_dir = ""
-    if compressor is not None:
-        ckpt_dir = getattr(compressor, "checkpoints_folder", "") or ""
-    if ckpt_dir and not os.path.isabs(ckpt_dir):
-        ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
     chain = []
     if ckpt_dir and os.path.isdir(ckpt_dir):
         import datetime as _dt

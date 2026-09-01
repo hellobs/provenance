@@ -1233,12 +1233,12 @@
 				h += '</div>';
 			}
 			// ② 窗口明细:最近体验(行动 → 对齐度 → 反馈)
-			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">② 体验窗口明细(最近 ' + d.window_details.length + ' 条,最新在前)</div>';
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">② 体验窗口明细(最近 ' + d.window_details.length + ' 条,从早到晚)</div>';
 			if (d.window_details.length === 0) {
 				h += '<div style="color:#999;">暂无体验记录(模拟刚开始或该角色无行动)。</div>';
 			} else {
 				h += '<div style="overflow-x:auto;"><table style="border-collapse:collapse; width:100%; font-size:9px;">';
-				h += '<tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">行动</th>';
+				h += '<tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">模拟时间</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">行动</th>';
 				var gnames2 = Object.keys(goals);
 				for (var j = 0; j < gnames2.length; j++) {
 					h += '<th style="padding:2px 4px; border-bottom:1px solid #ddd;">' + goalsEscape(gnames2[j]) + ' 反馈</th>';
@@ -1246,7 +1246,9 @@
 				h += '</tr>';
 				for (var k = 0; k < d.window_details.length; k++) {
 					var w = d.window_details[k];
-					h += '<tr><td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + goalsEscape(w.action) + '">' + goalsEscape(w.action || "(无行动描述)") + '</td>';
+					var wtime = w.time ? w.time.replace(/^(\d{4})(\d{2})(\d{2})-/, "$1-$2-$3 ") : "–";
+					h += '<tr><td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#888; white-space:nowrap;">' + goalsEscape(wtime) + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + goalsEscape(w.action) + '">' + goalsEscape(w.action || "(无行动描述)") + '</td>';
 					for (var jj = 0; jj < gnames2.length; jj++) {
 						var fb = w.feedback[gnames2[jj]];
 						h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; text-align:center; color:' + (fb !== undefined && fb > 0.1 ? "#2f9e44" : "#999") + ';">' + (fb !== undefined ? Math.round(fb * 1000) / 10 + '%' : "–") + '</td>';

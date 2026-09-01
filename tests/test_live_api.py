@@ -196,6 +196,18 @@ class TestExplain:
         assert r.status_code == 200
         assert r.json()["ok"] is False
 
+    def test_window_details_ascending_with_time(self, client):
+        # 窗口明细:从早到晚(正序)+ 每条含模拟时间(治理约束面板表格展示)
+        r = client.get("/api/explain", params={"agent": "AI Advisor"})
+        assert r.status_code == 200
+        details = r.json()["window_details"]
+        times = [d.get("time", "") for d in details]
+        assert times == sorted(times), "窗口明细应按时序从早到晚排列"
+        for d in details:
+            assert "time" in d
+            assert "action" in d
+            assert "feedback" in d
+
 
 # ---------------------------------------------------------------------------
 # 页面渲染冒烟(HTML + JS 语法)
