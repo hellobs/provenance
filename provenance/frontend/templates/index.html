@@ -79,7 +79,7 @@ body { margin: 0; }
     display: flex; flex-direction: column; overflow: hidden;">
 {% elif embed == "timeline" %}
 <div id="timeline-panel" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
-    font-size: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 320px;">
+    font-size: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 340px;">
 {% endif %}
 {% if not embed or embed == "timeline" %}
     <div style="padding: 7px 12px; font-weight: bold; font-size: 12px; background: #f6f6f6;
@@ -88,7 +88,7 @@ body { margin: 0; }
         <span>干预时间轴(专家参与记录)</span>
         <span id="timeline-toggle" style="color:#888; font-size:12px;"></span>
     </div>
-    <div id="timeline-body" style="padding: 6px 10px; overflow: hidden; flex: 1; min-height: 0;">
+    <div id="timeline-body" style="padding: 6px 10px 10px 10px; overflow: hidden; flex: 1; min-height: 0;">
         <div style="color:#999;">Loading timeline...</div>
     </div>
     <!-- 干预详情浮层(点击时间轴圆点弹出) -->

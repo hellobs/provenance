@@ -809,6 +809,7 @@ async def timeline_data():
     return JSONResponse({
         "ok": True,
         "simulation": cur_sim,
+        "start_time": str(sim_state.get("start_time", "") or ""),
         "cur_sim_time": cur_sim_time,
         "events": events,
     })
@@ -1303,6 +1304,21 @@ if __name__ == "__main__":
 
     sim_state["start_time"] = sim_config["time"]["start"]
     sim_state["stride"] = args.stride
+
+    # 时间轴横轴起点:resume 时 config 的 start 是"恢复时刻",并非模拟真实起点。
+    # 从 checkpoint 目录最早 simulate-*.json 的文件名反推真实起点(如 09:30),
+    # 供干预时间轴展示完整"从模拟开始到当前"的进程。
+    if args.resume and os.path.isdir(checkpoints_folder):
+        import glob as _g
+        import datetime as _dt
+        _ck_files = sorted(_g.glob(os.path.join(checkpoints_folder, "simulate-*.json")))
+        if _ck_files:
+            _first = os.path.basename(_ck_files[0]).replace("simulate-", "").replace(".json", "")
+            try:
+                _dt0 = _dt.datetime.strptime(_first, "%Y%m%d-%H%M")
+                sim_state["start_time"] = _dt0.strftime("%Y%m%d-%H:%M")
+            except (ValueError, TypeError):
+                pass  # 文件名异常时保留 config 的 start
 
     sim_thread = threading.Thread(
         target=run_simulation,
