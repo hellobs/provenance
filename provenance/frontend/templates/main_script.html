@@ -1335,6 +1335,11 @@
 		}).catch(function() { body.innerHTML = '<div style="color:#a00;">时间轴加载失败。</div>'; });
 	}
 
+	function tlFmtMD(t) { // Date → "02/13"
+		var p = function(n) { return (n < 10 ? "0" : "") + n; };
+		return p(t.getMonth() + 1) + "/" + p(t.getDate());
+	}
+
 	function timelineRender(body, curSimTime) {
 		var evs = timelineEvents.filter(function(e) { return e.sim_time; });
 		// 时间范围:最早事件 ~ 当前模拟时间(无事件则只显示空态)
@@ -1348,61 +1353,109 @@
 		var tMax = now && now.getTime() > tMin.getTime() ? now : new Date(Math.max.apply(null, times.map(function(d) { return d.getTime(); })));
 		if (tMax.getTime() === tMin.getTime()) tMax = new Date(tMin.getTime() + 60 * 60000);
 		var spanMs = tMax.getTime() - tMin.getTime();
-		var W = 900; // 时间轴内容逻辑宽度(px);body 横向滚动
-		var padL = 8, padR = 8;
+		var W = 960; // 时间轴内容逻辑宽度(px);body 横向滚动
+		var padL = 10, padR = 56; // 右端给"现在"标记留位
 		var innerW = W - padL - padR;
 		var xOf = function(d) { return padL + (d.getTime() - tMin.getTime()) / spanMs * innerW; };
 
-		// 图例 + 事件数
+		// 时间槽位:按 sim_time 分组;贪心摊开保证视觉最小间距
+		// (时间极近的槽位如 12:02/12:04 在长跨度下 x 差可 < 3px,须摊开防重叠)
+		var groups = {};
+		var order = [];
+		for (var gi = 0; gi < evs.length; gi++) {
+			var st = evs[gi].sim_time;
+			if (!groups[st]) { groups[st] = []; order.push(st); }
+			groups[st].push(gi);
+		}
+		var MIN_SLOT = 16; // 相邻槽位最小像素间距
+		var slotX = {};    // sim_time -> 摊开后的 x
+		var prevX = -999;
+		for (var oi = 0; oi < order.length; oi++) {
+			var st0 = order[oi];
+			var d0 = tlParse(st0);
+			var rawX = d0 ? xOf(d0) : 0;
+			var x = Math.max(rawX, prevX + MIN_SLOT);
+			slotX[st0] = x;
+			prevX = x;
+		}
+
+		// 顶部行:范围 + 图例(角色色点)
 		var agents = [];
 		evs.forEach(function(e) { if (agents.indexOf(e.agent) < 0) agents.push(e.agent); });
 		var legend = '';
 		for (var ai = 0; ai < agents.length; ai++) {
-			legend += '<span style="margin-right:8px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:3px;"></span>' + goalsEscape(agents[ai]) + '</span>';
+			legend += '<span style="margin-right:7px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:2px;"></span>' + goalsEscape(agents[ai]) + '</span>';
 		}
-		var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
-		h += '<div style="color:#888;">共 ' + evs.length + ' 次干预/撤销 · 拖动滑条提交即记录</div>';
+		var rangeTxt = tlFmtMD(tMin) + ' ' + tlFmtHM(tMin) + ' ~ ' + tlFmtMD(tMax) + ' ' + tlFmtHM(tMax);
+		var h = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap;">';
+		h += '<div style="color:#888;font-size:10px;">共 ' + evs.length + ' 次干预 · ' + goalsEscape(rangeTxt) + '</div>';
 		h += '<div>' + legend + '</div></div>';
 
-		// 轨道(圆点 + 连接线)
-		h += '<div style="overflow-x:auto;"><div style="position:relative;width:' + W + 'px;height:44px;">';
+		// 轨道:同一时刻多条事件垂直错开堆叠(避免圆点重合);时间标签移出事件行
+		h += '<div style="overflow-x:auto;"><div style="position:relative;width:' + W + 'px;height:52px;">';
 		// 中线
-		h += '<div style="position:absolute;left:' + padL + 'px;right:' + padR + 'px;top:24px;height:2px;background:#e0e0e0;"></div>';
-		// 当前时间标记(右端三角)
-		h += '<div style="position:absolute;left:' + (padL + innerW) + 'px;top:18px;transform:translateX(-50%);text-align:center;">';
-		h += '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:7px solid #c2255c;margin:0 auto;"></div>';
-		h += '<div style="font-size:9px;color:#c2255c;font-weight:bold;">现在<br>' + goalsEscape(tlFmtHM(tMax)) + '</div></div>';
-		// 事件圆点
-		for (var i = 0; i < evs.length; i++) {
-			var ev = evs[i];
-			var d = tlParse(ev.sim_time);
-			if (!d) continue;
-			var x = xOf(d);
-			var isUndo = ev.operator === "undo";
-			var isRevoked = !!ev.revoked;
-			var col = timelineAgentColor(ev.agent);
-			if (isUndo) {
-				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 6) + 'px;top:18px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件"></div>';
-			} else if (isRevoked) {
-				// 已撤销的干预:灰点 + 横线(表示已回滚,不删除记录)
-				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 6) + 'px;top:18px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:9px;color:#fff;font-size:10px;" title="已撤销: ' + goalsEscape(ev.agent + " " + ev.sim_time) + '">✕</div>';
-			} else {
-				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 5) + 'px;top:19px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + goalsEscape(ev.agent + " " + ev.sim_time) + '"></div>';
+		h += '<div style="position:absolute;left:' + padL + 'px;right:' + padR + 'px;top:38px;height:2px;background:#e6e6e6;"></div>';
+		// 时间标签防重叠:记录上一标签 x,间距不足 50px 时跳过(信息在浮层/提示里)
+		var lastLabelX = -999;
+		for (var oi = 0; oi < order.length; oi++) {
+			var g = groups[order[oi]];
+			var d0 = tlParse(order[oi]);
+			if (!d0) continue;
+			var gx = slotX[order[oi]];
+			var N = g.length;
+			var shown = Math.min(N, 4); // 一列最多 4 个圆点,超出折叠为计数点
+			var topBase = 6;            // 顶层 y(圆点中心)
+			var stepY = 11;             // 层间距
+			for (var k = 0; k < shown; k++) {
+				var idx = g[k];
+				var ev = evs[idx];
+				var cy = topBase + k * stepY;
+				var isUndo = ev.operator === "undo";
+				var isRevoked = !!ev.revoked;
+				var col = timelineAgentColor(ev.agent);
+				if (isUndo) {
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件 ' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '"></div>';
+				} else if (isRevoked) {
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:10px;color:#fff;font-size:9px;" title="已撤销: ' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '">✕</div>';
+				} else {
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 5) + 'px;top:' + (cy - 5) + 'px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '"></div>';
+				}
 			}
-			// 时间标签(稀疏:同刻多条时只标第一条附近,避免重叠——全部标,滚动下可读)
-			h += '<div style="position:absolute;left:' + (x - 26) + 'px;top:0;width:52px;text-align:center;font-size:9px;color:#555;">' + goalsEscape(tlFmtHM(d)) + '</div>';
+			// 超出 4 条的折叠计数点(点击展开?此处仅提示数量)
+			if (N > shown) {
+				h += '<div data-tl-idx="' + g[shown] + '" style="position:absolute;left:' + (gx - 7) + 'px;top:' + (topBase + shown * stepY - 6) + 'px;min-width:14px;height:12px;border-radius:7px;background:#555;color:#fff;font-size:8px;line-height:12px;text-align:center;padding:0 2px;cursor:pointer;" title="该时刻共 ' + N + ' 条干预,展示前 ' + shown + ' 条">+' + (N - shown) + '</div>';
+			}
+			// 时刻标签:与上一标签间距不足 50px 则跳过(避免重叠)
+			if (gx - lastLabelX >= 50) {
+				h += '<div style="position:absolute;left:' + (gx - 26) + 'px;top:0;width:52px;text-align:center;font-size:8px;color:#666;pointer-events:none;">' + goalsEscape(tlFmtHM(d0)) + '</div>';
+				lastLabelX = gx;
+			}
 		}
+		// 当前时间标记(右端)
+		var nx = padL + innerW;
+		h += '<div style="position:absolute;left:' + nx + 'px;top:24px;text-align:left;">';
+		h += '<div style="width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:8px solid #c2255c;margin:2px 0 2px 2px;"></div>';
+		h += '<div style="font-size:8px;color:#c2255c;font-weight:bold;white-space:nowrap;">现在 ' + goalsEscape(tlFmtMD(tMax) + ' ' + tlFmtHM(tMax)) + '</div></div>';
 		h += '</div></div>';
-		// 时间刻度(整点/半点)
-		h += '<div style="position:relative;height:14px;margin-top:2px;"><div style="position:relative;width:' + W + 'px;overflow:hidden;">';
-		var cur = new Date(tMin.getTime());
-		cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
-		while (cur.getTime() <= tMax.getTime() + 1800000) {
-			if (cur.getTime() >= tMin.getTime()) {
+		// 底部刻度:按跨度自适应步长;跨天处(00:00)标日期分隔
+		var stepMin = spanMs <= 9 * 3600000 ? 60 : (spanMs <= 18 * 3600000 ? 120 : 240);
+		h += '<div style="position:relative;height:16px;margin-top:2px;overflow:hidden;"><div style="position:relative;width:' + W + 'px;">';
+		var cur = new Date(Math.floor(tMin.getTime() / (stepMin * 60000)) * stepMin * 60000);
+		var lastMD = "";
+		while (cur.getTime() <= tMax.getTime()) {
+			if (cur.getTime() >= tMin.getTime() - 60000) {
 				var tx = xOf(cur);
-				h += '<div style="position:absolute;left:' + tx + 'px;top:0;transform:translateX(-50%);font-size:8px;color:#999;">' + goalsEscape(tlFmtHM(cur)) + '</div>';
+				var md = tlFmtMD(cur);
+				var label = tlFmtHM(cur);
+				var isDayStart = cur.getHours() === 0 && cur.getMinutes() === 0;
+				if (isDayStart || md !== lastMD || tx - xOf(tMin) > 40) {
+					h += '<div style="position:absolute;left:' + tx + 'px;top:0;transform:translateX(-50%);font-size:8px;color:#999;white-space:nowrap;">'
+						+ (isDayStart ? '<span style="color:#c2255c;font-weight:bold;">' + goalsEscape(md) + '</span> ' : (md !== lastMD ? goalsEscape(md) + ' ' : ''))
+						+ goalsEscape(label) + '</div>';
+				}
+				if (md !== lastMD) lastMD = md;
 			}
-			cur = new Date(cur.getTime() + 30 * 60000);
+			cur = new Date(cur.getTime() + stepMin * 60000);
 		}
 		h += '</div></div>';
 		body.innerHTML = h;
