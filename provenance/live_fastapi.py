@@ -374,7 +374,15 @@ async def explain_agent(agent: str = ""):
     vt = live_agent.get_tendency() or {}
     base = getattr(live_agent, "initial_tendency", None) or {}
     obs = int(getattr(live_agent, "_tendency_obs", 0) or 0)
-    alpha = max(0.1, 1.0 - obs / 8.0)
+    # α 优先取引擎审计元信息(自适应过渡期唯一真相源),避免这里二次推导公式漂移
+    meta = (live_agent.status or {}).get("tendency_meta") or {}
+    if meta.get("alpha") is not None:
+        alpha = float(meta["alpha"])
+        decay_total = int(meta.get("decay_total") or 0)
+    else:
+        # 回退:与 observe_consequence 相同的自适应公式
+        decay_total = max(1, int(getattr(live_agent, "_window_size", 15) or 15))
+        alpha = round(max(0.1, 1.0 - obs / decay_total), 4)
     window = live_agent.status.get("tendency_window") or []
     # 窗口均值(与 observe_consequence 相同的指数加权口径,仅用于展示)
     win_mean = {}
@@ -432,9 +440,11 @@ async def explain_agent(agent: str = ""):
         if os.path.exists(iv_path):
             try:
                 ivs = json.load(open(iv_path, encoding="utf-8"))
+                cur_sim = sim_state.get("name", "") or ""
                 my_ivs = sorted(
                     [x for x in ivs if x.get("agent") == agent
-                     and x.get("simulation") == sim_state.get("name", "")],
+                     # 历史干预(未写 simulation 字段)视为与当前会话兼容,不丢弃
+                     and (not x.get("simulation") or x.get("simulation") == cur_sim)],
                     key=lambda x: str(x.get("sim_time", "")),
                 )
             except Exception as e:
@@ -449,13 +459,32 @@ async def explain_agent(agent: str = ""):
                 continue
             before = None
             after = None
+            # before = 干预时刻及之前最近一个倾向快照
+            # after = (ivt, ivt+2h] 内最后一个快照;若窗口内无点,则取 ivt 后
+            # 第一个可用快照(迁移量不因无点而静默为 +0),并保证与 before 不同
+            after_in_window = None
             for dt, v in series:
                 if dt <= ivt:
                     before = v
-                if after is None and dt > ivt and dt <= ivt + _dt.timedelta(hours=2):
-                    after = v
-                if dt > ivt + _dt.timedelta(hours=2):
+                elif dt <= ivt + _dt.timedelta(hours=2):
+                    after_in_window = v  # 持续取,保留窗口内最后一个
+                else:
                     break
+            if after_in_window is not None:
+                after = after_in_window
+            else:
+                # 2h 内无点:后退到 ivt 后第一个点(可能 >2h)
+                for dt2, v2 in series:
+                    if dt2 > ivt:
+                        after = v2
+                        break
+            # before/after 落到同一快照(干预恰在落盘点瞬时):向 after 方向
+            # 推进到下一个不同快照,避免迁移量退化为 0
+            if before is not None and after is not None and before == after:
+                for _d2, _v2 in series:
+                    if _d2 > ivt and _v2 != after:
+                        after = _v2
+                        break
             oldc = {k: round(vv, 4) for k, vv in (iv.get("old_constraints") or {}).items()}
             newc = {k: round(vv, 4) for k, vv in (iv.get("new_constraints") or {}).items()}
             # 倾向迁移量:干预后与干预前的差(取共现目标)

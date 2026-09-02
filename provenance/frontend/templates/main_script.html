@@ -1007,11 +1007,11 @@
 			for (var ii = 0; ii < n; ii++) {
 				if (String(hist[ii].t) === ivTime) {
 					var ivx = xOf(ii);
-					ctx.strokeStyle = "rgba(224,123,57,0.75)"; ctx.lineWidth = 1.8;
-					ctx.setLineDash([4, 3]);
-					ctx.beginPath(); ctx.moveTo(ivx, top - 4); ctx.lineTo(ivx, h - bottom); ctx.stroke();
-					ctx.setLineDash([]);
-					ctx.fillStyle = "#e07b39"; ctx.font = "bold 9px sans-serif";
+					ctx.strokeStyle = "rgba(130,130,130,0.75)"; ctx.lineWidth = 1.8;
+						ctx.setLineDash([4, 3]);
+						ctx.beginPath(); ctx.moveTo(ivx, top - 4); ctx.lineTo(ivx, h - bottom); ctx.stroke();
+						ctx.setLineDash([]);
+						ctx.fillStyle = "#8a8a8a"; ctx.font = "bold 9px sans-serif";
 					ctx.fillText("干预", ivx + 3, top - 6);
 					break;
 				}
