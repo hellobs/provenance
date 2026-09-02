@@ -60,7 +60,7 @@ def marked_node_ids() -> set:
 
 
 def new_mark(agent: str, simulation: str, sim_time: str, node_id: str,
-             thought: str, verdict: str, correction: str) -> dict:
+             thought: str, verdict: str, correction: str, context: dict) -> dict:
     return {
         "agent": agent,
         "simulation": simulation,
@@ -69,6 +69,45 @@ def new_mark(agent: str, simulation: str, sim_time: str, node_id: str,
         "thought": thought,
         "verdict": verdict,          # correct / incorrect / partial
         "correction": correction,    # 专家纠正文本(incorrect/partial 时非空)
+        "context": context,          # 行为上下文(action/tendency/alignment/location/role)
         "marked_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "operator": "expert",
     }
+
+
+def build_lora_sample(mark: dict) -> dict:
+    """从标记记录生成 LoRA 训练样本(SFT 格式 + DPO 偏好对)。
+
+    - SFT: instruction/input → output(correct=强化原反思, incorrect/partial=纠正文本)
+    - DPO: chosen=修正后反思, rejected=原反思(incorrect/partial 时有意义)
+    """
+    agent = mark.get("agent", "")
+    role = (mark.get("context") or {}).get("role", "")
+    action = (mark.get("context") or {}).get("action", "")
+    thought = mark.get("thought", "")
+    correction = mark.get("correction", "")
+    verdict = mark.get("verdict", "")
+    tendency = (mark.get("context") or {}).get("value_tendency") or {}
+    tend_str = ", ".join(f"{k}={v}" for k, v in tendency.items()) if tendency else "无"
+
+    instruction = (
+        f"你是{agent}" + (f"({role})" if role else "") + "。"
+        "以下是你基于近期行为产生的反思,专家已判定该反思的价值对齐情况。"
+        "请根据判定结果输出修正后的反思(如果判定为正确,请重申该反思的核心判断)。"
+    )
+    inp = f"近期行动: {action} | 价值倾向: {tend_str} | 你的反思: {thought}"
+    output = correction if correction else thought
+
+    sample = {
+        "instruction": instruction,
+        "input": inp,
+        "output": output,
+    }
+    dpo = None
+    if verdict in ("incorrect", "partial") and correction:
+        dpo = {
+            "prompt": instruction + " | " + inp,
+            "chosen": correction,
+            "rejected": thought,
+        }
+    return {"sample": sample, "dpo": dpo}
