@@ -1634,6 +1634,7 @@
 				body2.style.display = "block";
 			}
 			header.onclick = function() {
+				tlHideDetail(); // 点头部收/展时先关掉残留的详情浮层(它可能盖住面板)
 				var isCollapsed = body2.style.display === "none";
 				body2.style.display = isCollapsed ? "block" : "none";
 				if (toggle) toggle.textContent = isCollapsed ? "收起 ▾" : "展开 ▸";
