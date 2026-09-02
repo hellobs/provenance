@@ -597,6 +597,7 @@ async def update_goals(request: Request):
             "old_constraints": old,
             "new_constraints": goals,
             "operator": "expert",
+            "note": str(body.get("note", "") or "").strip(),  # 专家干预理由(可审计/时间轴展示)
         })
         os.makedirs(os.path.dirname(audit_path), exist_ok=True)
         with open(audit_path, "w", encoding="utf-8") as f:
@@ -606,6 +607,211 @@ async def update_goals(request: Request):
         log.error("写入干预审计失败(agent={}): {}".format(name, e), exc_info=True)
 
     return JSONResponse({"ok": True, "name": name, "constraints": goals})
+
+
+@app.post("/api/undo-intervention")
+async def undo_intervention(request: Request):
+    """撤销一次专家干预:把该角色约束回滚到该次干预的 old_constraints。
+
+    IVD 语义:利益相关者可"修正自己之前的调整"——回滚同样走制度层
+    (governance.json)+ 追加 operator=undo 审计记录(撤销本身可审计,
+    不抹除历史:interventions.json 保留原记录,另记一条撤销)。
+    匹配键:agent + sim_time + 记录写入真实时间(time),避免跨模拟/同名混淆。
+    """
+    global server
+    body = await request.json()
+    agent = str(body.get("agent", "")).strip()
+    sim_time = str(body.get("sim_time", "")).strip()
+    rec_time = str(body.get("time", "")).strip()  # 真实写入时间(秒级,区分同刻干预)
+    if not agent or not sim_time or not rec_time:
+        return JSONResponse({"ok": False, "errors": ["缺少 agent/sim_time/time"]})
+
+    audit_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+    if not os.path.exists(audit_path):
+        return JSONResponse({"ok": False, "errors": ["interventions.json 不存在"]})
+    try:
+        audit = json.load(open(audit_path, encoding="utf-8"))
+    except Exception as e:
+        log.error("撤销读取 interventions.json 失败: {}".format(e), exc_info=True)
+        return JSONResponse({"ok": False, "errors": ["读取干预记录失败: {}".format(e)]})
+
+    # 定位目标记录:agent+sim_time+time 三键匹配(同角色同模拟时刻的多次干预靠 time 区分)
+    cur_sim = sim_state.get("name", "") or ""
+    target_idx = None
+    for i, iv in enumerate(audit):
+        if (str(iv.get("agent", "")) == agent
+                and str(iv.get("sim_time", "")) == sim_time
+                and str(iv.get("time", "")) == rec_time
+                and (not iv.get("simulation") or iv.get("simulation") == cur_sim)):
+            target_idx = i
+            break
+    if target_idx is None:
+        return JSONResponse({"ok": False, "errors": ["未找到匹配的干预记录(agent={} sim={} time={})".format(agent, sim_time, rec_time)]})
+    target = audit[target_idx]
+    # 已被撤销的记录不再重复撤销(原记录打 revoked 标记,undo 记录不参与匹配)
+    if target.get("operator") == "undo" or target.get("revoked"):
+        return JSONResponse({"ok": False, "errors": ["该干预已被撤销,不能重复撤销"]})
+
+    old_constraints = dict(target.get("old_constraints") or {})
+    if not old_constraints:
+        return JSONResponse({"ok": False, "errors": ["该记录无 old_constraints,无法回滚"]})
+    # 回滚目标必须仍存在于当前约束集;若当前治理已不包含这些目标(已被后续干预
+    # 删除),回滚会导致维度错乱——此时拒绝并提示(保守策略,不做隐式合并)
+    from mavisframework.runtime.governance import Governance
+
+    gov_path = os.path.join(BASE_DIR, "governance.json")
+    gov = Governance()
+    if os.path.exists(gov_path):
+        gov.load(gov_path)
+    current = gov.get_constraints(agent)
+    if not current:
+        return JSONResponse({"ok": False, "errors": ["该角色当前无治理约束,无法回滚"]})
+    # 回滚 = 整约束替换为该次干预前状态(与干预时 set_constraints 对称)
+    rollback_goals = dict(old_constraints)
+    # 归一化(old_constraints 理论 sum=1,防御旧数据)
+    total = sum(float(v) for v in rollback_goals.values()) or 1.0
+    rollback_goals = {g: float(v) / total for g, v in rollback_goals.items()}
+    gov.set_constraints(agent, rollback_goals)
+
+    # 同步运行中治理实例(否则后果反馈仍按旧约束,倾向不响应回滚)
+    if server is not None and getattr(server, "game", None) is not None:
+        live_gov = getattr(server.game, "governance", None)
+        if live_gov is not None:
+            live_gov.data.setdefault("roles", {})[agent] = dict(rollback_goals)
+
+    # 追加撤销审计(不删原记录——撤销本身入链,历史完整;原记录打 revoked 标记防重复撤销)
+    try:
+        import datetime as _dt2
+        audit[target_idx]["revoked"] = True
+        audit.append({
+            "time": _dt2.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "sim_time": sim_time,
+            "simulation": cur_sim,
+            "agent": agent,
+            "old_constraints": current,          # 撤销前的当前约束
+            "new_constraints": rollback_goals,   # 回滚到的状态
+            "operator": "undo",
+            "note": "撤销干预(回滚到 {} 干预前状态)".format(rec_time),
+            "undo_of": {"time": target.get("time", ""), "sim_time": sim_time},
+        })
+        with open(audit_path, "w", encoding="utf-8") as f:
+            json.dump(audit, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log.error("撤销审计写入失败(agent={}): {}".format(agent, e), exc_info=True)
+        return JSONResponse({"ok": False, "errors": ["回滚成功但审计写入失败: {}".format(e)]})
+
+    return JSONResponse({"ok": True, "agent": agent, "constraints": rollback_goals,
+                         "rollback_to": old_constraints})
+
+
+@app.get("/api/timeline")
+async def timeline_data():
+    """干预时间轴数据(全部角色混排,按 sim_time 排序)。
+
+    供底部时间轴横条 / /embed/timeline 使用:
+    - events: 每次干预(角色/时间/old→new 权重/备注/operator)
+    - 每个事件附 tendency_before/after(干预前最近快照 + 干预后 2h 内最后快照,
+      与 explain 干预链同口径;数据源 = checkpoints 倾向序列,目录 mtime 缓存)
+    - undo 记录也列出(operator=undo,便于时间轴上展示"撤销"事件本身)
+    返回按 sim_time 升序;sim_time 字符串格式统一 %Y%m%d-%H:%M。
+    """
+    global server
+    cur_sim = sim_state.get("name", "") or ""
+    # 当前模拟时间(用于横轴范围上限与实时定位)
+    cur_sim_time = ""
+    if server is not None and getattr(server, "game", None) is not None:
+        try:
+            cur_sim_time = server.game._timer.get_date("%Y%m%d-%H:%M")
+        except Exception:
+            cur_sim_time = ""
+    # checkpoint 目录(倾向序列来源)
+    ckpt_dir = ""
+    if compressor is not None:
+        ckpt_dir = getattr(compressor, "checkpoints_folder", "") or ""
+    if ckpt_dir and not os.path.isabs(ckpt_dir):
+        ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
+    # 读干预记录(所有角色;当前模拟的优先,历史无 simulation 字段的兼容展示)
+    iv_path = os.path.join(BASE_DIR, "results/checkpoints", "interventions.json")
+    ivs = []
+    if os.path.exists(iv_path):
+        try:
+            all_ivs = json.load(open(iv_path, encoding="utf-8"))
+            ivs = sorted(
+                [x for x in all_ivs if x.get("agent")
+                 and (not x.get("simulation") or x.get("simulation") == cur_sim)],
+                key=lambda x: str(x.get("sim_time", "")),
+            )
+        except Exception as e:
+            log.warning("timeline 读取 interventions.json 失败: {}".format(e))
+            ivs = []
+    # 每角色倾向序列(一次加载,事件按 agent 取)
+    series_by_agent = {}
+    if ckpt_dir and os.path.isdir(ckpt_dir):
+        agents = sorted(set(str(x.get("agent", "")) for x in ivs))
+        for ag in agents:
+            series_by_agent[ag] = load_tendency_series(ckpt_dir, ag)
+    # 组装事件
+    import datetime as _dt
+
+    events = []
+    for iv in ivs:
+        agent = str(iv.get("agent", ""))
+        sim_t = str(iv.get("sim_time", ""))
+        oldc = {k: round(float(v), 4) for k, v in (iv.get("old_constraints") or {}).items()}
+        newc = {k: round(float(v), 4) for k, v in (iv.get("new_constraints") or {}).items()}
+        # 迁移量(与 explain 同口径):干预前最近 + 干预后 2h 内最后
+        before = None
+        after = None
+        try:
+            ivt = _dt.datetime.strptime(sim_t, "%Y%m%d-%H:%M")
+        except (ValueError, TypeError):
+            ivt = None
+        if ivt is not None:
+            series = series_by_agent.get(agent, [])
+            after_in_win = None
+            for dt, v in series:
+                if dt <= ivt:
+                    before = v
+                elif dt <= ivt + _dt.timedelta(hours=2):
+                    after_in_win = v
+                else:
+                    break
+            after = after_in_win
+            if after is None and series:
+                # 2h 内无点:取干预后第一个快照(不为空则不静默为 0)
+                for dt2, v2 in series:
+                    if dt2 > ivt:
+                        after = v2
+                        break
+            if before is not None and after is not None and before == after:
+                for _d3, _v3 in series:
+                    if _v3 != after:
+                        after = _v3
+                        break
+        shift = {}
+        if before and after:
+            for g in after:
+                if g in before:
+                    shift[g] = round(after[g] - before[g], 4)
+        events.append({
+            "agent": agent,
+            "sim_time": sim_t,
+            "real_time": str(iv.get("time", "")),
+            "operator": str(iv.get("operator", "expert")),
+            "revoked": bool(iv.get("revoked")),
+            "note": str(iv.get("note", "") or ""),
+            "old_constraints": oldc,
+            "new_constraints": newc,
+            "tendency_before": {k: round(v, 4) for k, v in (before or {}).items()},
+            "tendency_after": {k: round(v, 4) for k, v in (after or {}).items()},
+            "tendency_shift": shift,
+        })
+    return JSONResponse({
+        "ok": True,
+        "simulation": cur_sim,
+        "cur_sim_time": cur_sim_time,
+        "events": events,
+    })
 
 
 @app.get("/api/export-chart")
@@ -962,11 +1168,13 @@ async def index(request: Request):
 @app.get("/embed/scene", response_class=HTMLResponse)
 @app.get("/embed/goals", response_class=HTMLResponse)
 @app.get("/embed/explain", response_class=HTMLResponse)
+@app.get("/embed/timeline", response_class=HTMLResponse)
 async def embed_index(request: Request):
     """嵌入模式(供外部治理平台 iframe 引用):
-    - /embed/scene   : 仅 Phaser 场景(无浮动面板,嵌入 canvas 位)
-    - /embed/goals   : 仅治理约束面板(约束滑条+倾向曲线+解释)
-    - /embed/explain : 倾向成因解释面板(构成分解+窗口明细+干预因果链)
+    - /embed/scene    : 仅 Phaser 场景(无浮动面板,嵌入 canvas 位)
+    - /embed/goals    : 仅治理约束面板(约束滑条+倾向曲线+解释)
+    - /embed/explain  : 倾向成因解释面板(构成分解+窗口明细+干预因果链)
+    - /embed/timeline : 干预时间轴面板(全部角色干预事件 + 撤销 + 详情)
     共享同一 WebSocket/数据源;通过 URL 参数控制 index.html 面板显隐。
     """
     path = request.url.path.rstrip("/")
@@ -975,6 +1183,8 @@ async def embed_index(request: Request):
         mode = "goals"
     elif path.endswith("explain"):
         mode = "explain"
+    elif path.endswith("timeline"):
+        mode = "timeline"
     return await _render_index(request, embed=mode)
 
 

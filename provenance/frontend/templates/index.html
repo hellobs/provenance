@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 <style>
@@ -15,7 +15,7 @@ body { margin: 0; }
 <div id="game-container" style="text-align: center"></div>
 
 <!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
-{% if embed != "goals" and embed != "explain" %}
+{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
 <div id="sim-clock" style="position: fixed; left: 16px; top: 60px; z-index: 100;
     background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
     padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
@@ -28,33 +28,33 @@ body { margin: 0; }
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
 {% endif %}
 
-<!-- Right column: chat log (top, collapsible) + goal adjustment panel (below, not adjacent) -->
-{% if embed != "scene" %}
+<!-- Right column: chat log (top) + goal adjustment panel (below) -->
+{% if embed != "scene" and embed != "timeline" %}
 <div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
-    display: flex; flex-direction: column; gap: 12px;">
+    display: flex; flex-direction: column; gap: 12px;
+    {% if embed %}bottom: 16px;{% else %}bottom: 210px;{% endif %}">
 {% endif %}
 
     <!-- Chat log panel (HTML, scrollable, speaker highlighted, collapsible) -->
-    {% if embed != "scene" and embed != "goals" and embed != "explain" %}
+    {% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
     <div id="chat-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
-        display: flex; flex-direction: column; overflow: hidden;">
+        display: flex; flex-direction: column; overflow: hidden; flex: 0 0 auto; max-height: 45%;">
         <div id="chat-header" style="padding: 10px 14px; font-weight: bold; font-size: 14px; background: #f6f6f6;
             border-bottom: 1px solid #e2e2e2; color: #333; cursor: pointer; user-select: none;
             display:flex; justify-content:space-between; align-items:center;">
             <span>Chat Log</span>
             <span id="chat-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
         </div>
-        <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; max-height: 50vh;
-            line-height: 1.7; color: #333;"></div>
+        <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; flex: 1; line-height: 1.7; color: #333;"></div>
     </div>
     {% endif %}
 
     <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
-    {% if embed != "scene" %}
+    {% if embed != "scene" and embed != "timeline" %}
     <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
-        display: flex; flex-direction: column; overflow: hidden; max-height: 45vh;">
+        display: flex; flex-direction: column; overflow: hidden; flex: 1 1 auto; min-height: 0;">
         <div style="padding: 8px 12px; font-weight: bold; font-size: 13px; background: #f6f6f6;
             border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
             display:flex; justify-content:space-between; align-items:center;" id="goals-header">
@@ -67,12 +67,38 @@ body { margin: 0; }
     </div>
     {% endif %}
 
-{% if embed != "scene" %}
+{% if embed != "scene" and embed != "timeline" %}
 </div>
 {% endif %}
 
+<!-- Bottom timeline bar (intervention history across all agents; full page overlay or standalone /embed/timeline) -->
+{% if not embed %}
+<div id="timeline-panel" style="position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 140;
+    background: rgba(255,255,255,0.97); border: 1px solid #d8d8d8; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18); font-size: 12px;
+    display: flex; flex-direction: column; overflow: hidden;">
+{% elif embed == "timeline" %}
+<div id="timeline-panel" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
+    font-size: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 320px;">
+{% endif %}
+{% if not embed or embed == "timeline" %}
+    <div style="padding: 7px 12px; font-weight: bold; font-size: 12px; background: #f6f6f6;
+        border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
+        display:flex; justify-content:space-between; align-items:center;" id="timeline-header">
+        <span>干预时间轴(专家参与记录)</span>
+        <span id="timeline-toggle" style="color:#888; font-size:12px;"></span>
+    </div>
+    <div id="timeline-body" style="padding: 6px 10px; overflow: hidden; flex: 1; min-height: 0;">
+        <div style="color:#999;">Loading timeline...</div>
+    </div>
+    <!-- 干预详情浮层(点击时间轴圆点弹出) -->
+    <div id="timeline-detail" style="display:none; position: fixed; z-index: 200;
+        background:#fff; border:1px solid #ccc; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.25);
+        padding:10px 12px; font-size:11px; max-width:420px; max-height:60vh; overflow-y:auto;"></div>
+{% endif %}
+
 <!-- Left column: developer console -->
-{% if embed != "scene" and embed != "goals" and embed != "explain" %}
+{% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
 <div style="position: fixed; left: 16px; top: 120px; width: 320px; z-index: 150;">
 
     <!-- Developer console (live message stream, collapsible, scrollable) -->
@@ -100,7 +126,7 @@ body { margin: 0; }
 </style>
 {% endif %}
 
-{% if embed != "scene" and embed != "goals" and embed != "explain" %}
+{% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
 <div>
     <div class="row">
         <div class="col-md-12" style="border: solid; padding: 1em; padding-left:2em; padding-right:2em; border-radius: 5px;">
@@ -148,12 +174,12 @@ body { margin: 0; }
 {% endblock content %}
 
 {% block js_content %}
-{% if embed != "goals" and embed != "explain" %}
+{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
 <script src='{{ phaser_src }}'></script>
 {% endif %}
 {% include 'main_script.html' %}
 <script>
-{% if embed != "goals" and embed != "explain" %}
+{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
 {% for p in persona_names %}
     {% set safe_p = p|replace(' ', '_') %}
     $('#on_screen_det_trigger-{{ safe_p }}').click(function() {

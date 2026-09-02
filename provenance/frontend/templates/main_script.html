@@ -715,6 +715,9 @@
 	var roleTypes = {};    // agent -> "ai_tool" / "user"
 	var selectedAgent = "";      // 当前详情视图选中的角色
 	var goalsTimer = null;
+	var timelineTimer = null;    // 时间轴轮询定时器
+	var timelineEvents = [];     // 时间轴事件缓存(干预 + 撤销)
+	var tlColors = {};           // agent -> 颜色(时间轴圆点)
 
 	function goalsEscape(s) {
 		return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -857,15 +860,24 @@
 		}
 		goalsNormalize(agentName);
 		goalsRender();
-		// debounce 400ms
+		// debounce 400ms(拖动结束才提交,避免拖动过程产生大量干预记录)
 		if (goalsTimer) clearTimeout(goalsTimer);
 		goalsTimer = setTimeout(function() {
+			// 干预备注:提交前弹窗让专家填写理由(可留空),记录进 interventions.json
+			// 支撑"记录参与过程/为何调整"叙事;测试/嵌入页可用 ?no-note=1 跳过
+			var note = "";
+			try {
+				var noNote = new URLSearchParams(location.search).get("no-note") === "1";
+				if (!noNote) note = window.prompt("干预理由(可选,将记录到干预审计与时间轴):\n例:监管新规,上调风控权重", "") || "";
+			} catch (err) { note = ""; }
 			fetch("/api/goals", {
 				method: "POST",
 				headers: {"Content-Type": "application/json"},
-				body: JSON.stringify({name: agentName, goals: goals})
+				body: JSON.stringify({name: agentName, goals: goals, note: note})
 			}).then(function(r) { return r.json(); }).then(function(out) {
 				if (!out.ok) console.warn("goals update failed:", out.errors);
+				// 干预成功:刷新时间轴(新事件出现);goals-body 存在才需要(时间轴轮询也会刷)
+				if (document.getElementById("timeline-body")) timelineRefresh();
 			}).catch(function(e) { console.warn("goals update error:", e); });
 		}, 400);
 	}
@@ -1288,6 +1300,281 @@
 			panelEl.innerHTML = h;
 		}).catch(function() { panelEl.innerHTML = '<div style="color:#a00;">解释数据加载失败。</div>'; });
 	}
+
+	// =============== 干预时间轴(底部横条 / /embed/timeline) ===============
+	var TIMELINE_COLORS = ["#2d6cdf", "#e07b39", "#2f9e44", "#e8590c", "#7048e8", "#0c8599", "#c2255c"];
+	var TIMELINE_AGENT_COLOR = {};
+
+	function timelineAgentColor(agent) {
+		if (!TIMELINE_AGENT_COLOR[agent]) {
+			var keys = Object.keys(TIMELINE_AGENT_COLOR);
+			TIMELINE_AGENT_COLOR[agent] = TIMELINE_COLORS[keys.length % TIMELINE_COLORS.length];
+		}
+		return TIMELINE_AGENT_COLOR[agent];
+	}
+
+	function tlParse(t) {
+		// "20250213-09:30" → Date(本地时间,仅用于排序/刻度)
+		var m = /^(\d{4})(\d{2})(\d{2})-(\d{2}):(\d{2})$/.exec(String(t || ""));
+		if (!m) return null;
+		return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+	}
+
+	function tlFmtHM(t) { // Date → "09:30"
+		var p = function(n) { return (n < 10 ? "0" : "") + n; };
+		return p(t.getHours()) + ":" + p(t.getMinutes());
+	}
+
+	function tlLoadTimeline() {
+		var body = document.getElementById("timeline-body");
+		if (!body) return;
+		fetch("/api/timeline").then(function(r) { return r.json(); }).then(function(d) {
+			if (!d.ok) { body.innerHTML = '<div style="color:#a00;">' + goalsEscape((d.errors || []).join("; ")) + '</div>'; return; }
+			timelineEvents = d.events || [];
+			timelineRender(body, d.cur_sim_time || "");
+		}).catch(function() { body.innerHTML = '<div style="color:#a00;">时间轴加载失败。</div>'; });
+	}
+
+	function timelineRender(body, curSimTime) {
+		var evs = timelineEvents.filter(function(e) { return e.sim_time; });
+		// 时间范围:最早事件 ~ 当前模拟时间(无事件则只显示空态)
+		var times = evs.map(function(e) { return tlParse(e.sim_time); }).filter(Boolean);
+		var now = tlParse(curSimTime);
+		if (times.length === 0) {
+			body.innerHTML = '<div style="color:#999;">暂无干预记录——专家调整右侧治理约束后,干预将出现在时间轴上。</div>';
+			return;
+		}
+		var tMin = new Date(Math.min.apply(null, times.map(function(d) { return d.getTime(); })));
+		var tMax = now && now.getTime() > tMin.getTime() ? now : new Date(Math.max.apply(null, times.map(function(d) { return d.getTime(); })));
+		if (tMax.getTime() === tMin.getTime()) tMax = new Date(tMin.getTime() + 60 * 60000);
+		var spanMs = tMax.getTime() - tMin.getTime();
+		var W = 900; // 时间轴内容逻辑宽度(px);body 横向滚动
+		var padL = 8, padR = 8;
+		var innerW = W - padL - padR;
+		var xOf = function(d) { return padL + (d.getTime() - tMin.getTime()) / spanMs * innerW; };
+
+		// 图例 + 事件数
+		var agents = [];
+		evs.forEach(function(e) { if (agents.indexOf(e.agent) < 0) agents.push(e.agent); });
+		var legend = '';
+		for (var ai = 0; ai < agents.length; ai++) {
+			legend += '<span style="margin-right:8px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:3px;"></span>' + goalsEscape(agents[ai]) + '</span>';
+		}
+		var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
+		h += '<div style="color:#888;">共 ' + evs.length + ' 次干预/撤销 · 拖动滑条提交即记录</div>';
+		h += '<div>' + legend + '</div></div>';
+
+		// 轨道(圆点 + 连接线)
+		h += '<div style="overflow-x:auto;"><div style="position:relative;width:' + W + 'px;height:44px;">';
+		// 中线
+		h += '<div style="position:absolute;left:' + padL + 'px;right:' + padR + 'px;top:24px;height:2px;background:#e0e0e0;"></div>';
+		// 当前时间标记(右端三角)
+		h += '<div style="position:absolute;left:' + (padL + innerW) + 'px;top:18px;transform:translateX(-50%);text-align:center;">';
+		h += '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:7px solid #c2255c;margin:0 auto;"></div>';
+		h += '<div style="font-size:9px;color:#c2255c;font-weight:bold;">现在<br>' + goalsEscape(tlFmtHM(tMax)) + '</div></div>';
+		// 事件圆点
+		for (var i = 0; i < evs.length; i++) {
+			var ev = evs[i];
+			var d = tlParse(ev.sim_time);
+			if (!d) continue;
+			var x = xOf(d);
+			var isUndo = ev.operator === "undo";
+			var isRevoked = !!ev.revoked;
+			var col = timelineAgentColor(ev.agent);
+			if (isUndo) {
+				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 6) + 'px;top:18px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件"></div>';
+			} else if (isRevoked) {
+				// 已撤销的干预:灰点 + 横线(表示已回滚,不删除记录)
+				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 6) + 'px;top:18px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:9px;color:#fff;font-size:10px;" title="已撤销: ' + goalsEscape(ev.agent + " " + ev.sim_time) + '">✕</div>';
+			} else {
+				h += '<div data-tl-idx="' + i + '" style="position:absolute;left:' + (x - 5) + 'px;top:19px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + goalsEscape(ev.agent + " " + ev.sim_time) + '"></div>';
+			}
+			// 时间标签(稀疏:同刻多条时只标第一条附近,避免重叠——全部标,滚动下可读)
+			h += '<div style="position:absolute;left:' + (x - 26) + 'px;top:0;width:52px;text-align:center;font-size:9px;color:#555;">' + goalsEscape(tlFmtHM(d)) + '</div>';
+		}
+		h += '</div></div>';
+		// 时间刻度(整点/半点)
+		h += '<div style="position:relative;height:14px;margin-top:2px;"><div style="position:relative;width:' + W + 'px;overflow:hidden;">';
+		var cur = new Date(tMin.getTime());
+		cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
+		while (cur.getTime() <= tMax.getTime() + 1800000) {
+			if (cur.getTime() >= tMin.getTime()) {
+				var tx = xOf(cur);
+				h += '<div style="position:absolute;left:' + tx + 'px;top:0;transform:translateX(-50%);font-size:8px;color:#999;">' + goalsEscape(tlFmtHM(cur)) + '</div>';
+			}
+			cur = new Date(cur.getTime() + 30 * 60000);
+		}
+		h += '</div></div>';
+		body.innerHTML = h;
+	}
+
+	// 圆点点击 → 详情浮层(事件委托在 timeline-body 上)
+	function timelineBind(body) {
+		if (body._tlBound) return;
+		body._tlBound = true;
+		body.addEventListener("click", function(e) {
+			var t = e.target;
+			var idxEl = t && t.closest ? t.closest("[data-tl-idx]") : null;
+			if (idxEl) {
+				var idx = parseInt(idxEl.getAttribute("data-tl-idx"), 10);
+				var ev = timelineEvents.filter(function(x) { return x.sim_time; })[idx];
+				if (ev) tlShowDetail(ev, e);
+				return;
+			}
+			// 撤销按钮(详情浮层内,事件冒泡到 body——改用 document 级关闭,这里处理按钮)
+			var ub = t && t.closest ? t.closest("[data-tl-undo]") : null;
+			if (ub) {
+				tlUndo(ub.getAttribute("data-tl-undo"), ub.getAttribute("data-tl-undo-time"));
+				return;
+			}
+			var cb = t && t.closest ? t.closest("[data-tl-close]") : null;
+			if (cb) tlHideDetail();
+		});
+	}
+
+	function tlHideDetail() {
+		var d = document.getElementById("timeline-detail");
+		if (d) d.style.display = "none";
+	}
+
+	function tlShowDetail(ev, evt) {
+		var d = document.getElementById("timeline-detail");
+		if (!d) return;
+		var rows = [];
+		var allGoals = {};
+		for (var g in ev.old_constraints) allGoals[g] = 1;
+		for (var g2 in ev.new_constraints) allGoals[g2] = 1;
+		for (var g3 in allGoals) {
+			var o = ev.old_constraints[g3];
+			var n = ev.new_constraints[g3];
+			var mark = "";
+			if (o !== undefined && n !== undefined) {
+				var diff = Math.round((n - o) * 1000) / 10;
+				if (Math.abs(diff) > 0.01) mark = '<span style="color:' + (diff > 0 ? "#2f9e44" : "#e8590c") + ';">(' + (diff > 0 ? "+" : "") + diff + 'pp)</span>';
+			}
+			rows.push('<tr><td style="padding:1px 6px 1px 0;color:#555;">' + goalsEscape(g3) + '</td>'
+				+ '<td style="padding:1px 6px;color:#888;text-align:right;">' + (o !== undefined ? Math.round(o * 1000) / 10 + "%" : "–") + '</td>'
+				+ '<td style="padding:1px 6px;color:#333;text-align:right;">' + (n !== undefined ? Math.round(n * 1000) / 10 + "%" : "–") + '</td>'
+				+ '<td style="padding:1px 6px;">' + mark + '</td></tr>');
+		}
+		var shiftRows = [];
+		for (var sg in ev.tendency_shift) {
+			var sv = ev.tendency_shift[sg];
+			shiftRows.push('<span style="margin-right:6px;">' + goalsEscape(sg) + ' ' + (sv >= 0 ? "+" : "") + Math.round(sv * 1000) / 10 + 'pp</span>');
+		}
+		var isUndo = ev.operator === "undo";
+		var isRevoked = !!ev.revoked;
+		var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+		h += '<div style="font-weight:bold;color:' + (isRevoked ? "#8a8a8a" : timelineAgentColor(ev.agent)) + ';">' + goalsEscape(ev.agent) + ' · ' + goalsEscape(ev.sim_time)
+			+ (isUndo ? ' · <span style="color:#8a8a8a;">撤销事件</span>'
+			  : isRevoked ? ' · <span style="color:#8a8a8a;">已撤销(回滚)</span>'
+			  : ' · <span style="color:#2d6cdf;">干预</span>') + '</div>';
+		h += '<button data-tl-close style="border:none;background:none;cursor:pointer;color:#999;font-size:13px;line-height:1;">✕</button></div>';
+		if (ev.note) h += '<div style="color:#555;margin-bottom:4px;background:#f4f6fa;padding:3px 6px;border-radius:4px;">备注:' + goalsEscape(ev.note) + '</div>';
+		if (ev.real_time) h += '<div style="color:#999;font-size:10px;margin-bottom:4px;">真实操作时间:' + goalsEscape(ev.real_time) + '</div>';
+		h += '<table style="border-collapse:collapse;font-size:10px;margin-bottom:4px;"><tr style="color:#888;"><th style="text-align:left;padding:1px 6px 1px 0;">目标</th><th style="text-align:right;padding:1px 6px;">干预前</th><th style="text-align:right;padding:1px 6px;">干预后</th><th></th></tr>' + rows.join("") + '</table>';
+		h += '<div style="color:#555;font-size:10px;margin-bottom:2px;">干预后 2h 倾向迁移:' + (shiftRows.length ? shiftRows.join("") : '<span style="color:#999;">暂无数据</span>') + '</div>';
+		if (!isUndo && !isRevoked && ev.real_time) {
+			h += '<div style="margin-top:6px;text-align:right;"><button data-tl-undo="' + goalsEscape(ev.agent) + '" data-tl-undo-time="' + goalsEscape(ev.real_time) + '" style="padding:3px 10px;font-size:10px;border:1px solid #e8590c;border-radius:4px;background:#fff7f4;color:#e8590c;cursor:pointer;">撤销此干预(回滚)</button></div>';
+		}
+		d.innerHTML = h;
+		d.style.display = "block";
+		// 定位:点击点附近(靠下显示),防溢出视口
+		var px = evt && evt.clientX ? evt.clientX : 200;
+		var py = evt && evt.clientY ? evt.clientY : 120;
+		var vw = window.innerWidth || 1200;
+		var left = Math.min(px, vw - 450);
+		d.style.left = Math.max(8, left) + "px";
+		d.style.top = Math.max(8, py - 90) + "px";
+	}
+
+	function tlUndo(agent, realTime) {
+		// 需要匹配:agent + sim_time + time。sim_time 从当前事件缓存按 real_time 找
+		var ev = null;
+		for (var i = 0; i < timelineEvents.length; i++) {
+			if (timelineEvents[i].agent === agent && timelineEvents[i].real_time === realTime
+				&& timelineEvents[i].operator !== "undo" && !timelineEvents[i].revoked) { ev = timelineEvents[i]; break; }
+		}
+		if (!ev) { alert("找不到对应干预记录"); return; }
+		if (!confirm("确定撤销 " + agent + " 于 " + ev.sim_time + " 的干预?约束将回滚到干预前状态,并记录一条撤销审计。")) return;
+		fetch("/api/undo-intervention", {
+			method: "POST",
+			headers: {"Content-Type": "application/json"},
+			body: JSON.stringify({agent: agent, sim_time: ev.sim_time, time: realTime})
+		}).then(function(r) { return r.json(); }).then(function(out) {
+			if (out.ok) {
+				tlHideDetail();
+				timelineRefresh();
+				// 治理面板约束已变:重新拉取(滑条/曲线/约束对照同步)
+				if (document.getElementById("goals-body")) {
+					fetch("/api/goals").then(function(r) { return r.json(); }).then(function(g) {
+						if (g.ok) { goalsData = g.goals; tendencyData = g.tendency || {}; roleTypes = g.role_types || {}; goalsRender(); }
+					}).catch(function() {});
+				}
+				devLog("ok", "已撤销干预:" + agent + " @" + ev.sim_time);
+			} else {
+				alert((out.errors || ["撤销失败"]).join("; "));
+			}
+		}).catch(function(e) { alert("撤销请求失败:" + e); });
+	}
+
+	function timelineRefresh() {
+		if (document.getElementById("timeline-body")) tlLoadTimeline();
+	}
+	// 时间轴轮询:5s 拉一次(干预少,轻量;新干预自动出现)
+	function timelinePollStart() {
+		if (timelineTimer) return;
+		timelineRefresh();
+		timelineTimer = setInterval(timelineRefresh, 5000);
+	}
+
+	// 时间轴显示模式:全页为 fixed 底部横条;timeline 嵌入为普通流式面板(无折叠头)
+	function timelineInit() {
+		var body = document.getElementById("timeline-body");
+		if (!body) return;
+		timelineBind(body);
+		// 详情浮层独立于 timeline-body,需 document 级委托(撤销/关闭按钮)
+		document.addEventListener("click", function(e) {
+			var t = e.target;
+			if (!t || !t.closest) return;
+			var ub = t.closest("[data-tl-undo]");
+			if (ub) {
+				e.stopPropagation();
+				tlUndo(ub.getAttribute("data-tl-undo"), ub.getAttribute("data-tl-undo-time"));
+				return;
+			}
+			var cb = t.closest("[data-tl-close]");
+			if (cb) { e.stopPropagation(); tlHideDetail(); return; }
+			// 点击浮层外部关闭
+			var det = document.getElementById("timeline-detail");
+			if (det && det.style.display !== "none" && !det.contains(t)) tlHideDetail();
+		});
+		var embedMode = document.body.getAttribute("data-embed") || "";
+		if (embedMode === "timeline") {
+			// 独立嵌入页:面板高度由内容撑开,横向滚动条由 timeline-body 内部处理
+			timelinePollStart();
+			return;
+		}
+		// 全页:底部横条可折叠(展开 ~170px / 收起 仅头部)
+		var header = document.getElementById("timeline-header");
+		var toggle = document.getElementById("timeline-toggle");
+		var panel = document.getElementById("timeline-panel");
+		if (header && panel) {
+			header.onclick = function() {
+				var collapsed = body.style.display === "none";
+				body.style.display = collapsed ? "block" : "none";
+				if (toggle) toggle.textContent = collapsed ? "收起 ▾" : "展开 ▸";
+				panel.style.maxHeight = collapsed ? "none" : "34px";
+				if (collapsed) timelinePollStart();
+			};
+			toggle.textContent = "收起 ▾";
+			// 默认展开(时间轴是核心观测,不折叠)
+			panel.style.maxHeight = "none";
+			body.style.display = "block";
+			timelinePollStart();
+		}
+	}
+	timelineInit();
 
 	document.addEventListener("DOMContentLoaded", function() {
 		// chat log collapse toggle

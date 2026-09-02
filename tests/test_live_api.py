@@ -210,6 +210,95 @@ class TestExplain:
 
 
 # ---------------------------------------------------------------------------
+# GET /api/timeline(干预时间轴)
+# ---------------------------------------------------------------------------
+class TestTimeline:
+    def test_returns_events_sorted_with_fields(self, client, tmp_path):
+        # 预置干预记录:两条同模拟(一条 expert 一条 undo),跨模拟的不返回
+        iv_path = tmp_path / "results" / "checkpoints" / "interventions.json"
+        iv_path.write_text(json.dumps([
+            {"time": "2026-08-30 10:00:00", "sim_time": "20250213-12:00",
+             "simulation": "test-sim", "agent": "AI Advisor", "operator": "expert",
+             "note": "监管新规", "old_constraints": {"Risk Control": 0.2},
+             "new_constraints": {"Risk Control": 0.5}},
+            {"time": "2026-08-30 10:05:00", "sim_time": "20250213-13:00",
+             "simulation": "test-sim", "agent": "Daniel Shen", "operator": "undo",
+             "note": "", "old_constraints": {}, "new_constraints": {}},
+            {"time": "2026-08-29 10:00:00", "sim_time": "20250213-11:00",
+             "simulation": "other-sim", "agent": "AI Advisor",
+             "old_constraints": {}, "new_constraints": {}},
+        ], ensure_ascii=False), encoding="utf-8")
+        r = client.get("/api/timeline")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["simulation"] == "test-sim"
+        # 跨模拟记录被过滤,事件按 sim_time 升序
+        assert [e["agent"] for e in body["events"]] == ["AI Advisor", "Daniel Shen"]
+        assert [e["sim_time"] for e in body["events"]] == ["20250213-12:00", "20250213-13:00"]
+        e0 = body["events"][0]
+        assert e0["note"] == "监管新规"
+        assert e0["old_constraints"]["Risk Control"] == 0.2
+        assert e0["operator"] == "expert"
+        assert "tendency_shift" in e0
+
+    def test_no_events_returns_ok_empty(self, client):
+        r = client.get("/api/timeline")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["events"] == []
+
+
+# ---------------------------------------------------------------------------
+# POST /api/undo-intervention(撤销干预)
+# ---------------------------------------------------------------------------
+class TestUndo:
+    def _seed_intervention(self, tmp_path):
+        iv_path = tmp_path / "results" / "checkpoints" / "interventions.json"
+        iv_path.write_text(json.dumps([{
+            "time": "2026-08-30 10:00:00", "sim_time": "20250213-12:00",
+            "simulation": "test-sim", "agent": "AI Advisor", "operator": "expert",
+            "old_constraints": {"Serve Users": 0.6, "Risk Control": 0.4},
+            "new_constraints": {"Serve Users": 0.5, "Risk Control": 0.3, "Compliance Rigor": 0.2},
+        }], ensure_ascii=False), encoding="utf-8")
+
+    def test_undo_rolls_back_and_appends_audit(self, client, tmp_path):
+        self._seed_intervention(tmp_path)
+        r = client.post("/api/undo-intervention", json={
+            "agent": "AI Advisor", "sim_time": "20250213-12:00", "time": "2026-08-30 10:00:00",
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["rollback_to"] == {"Serve Users": 0.6, "Risk Control": 0.4}
+        # governance.json 已回滚(整约束替换为干预前状态)
+        gov = json.loads((tmp_path / "governance.json").read_text(encoding="utf-8"))
+        assert gov["roles"]["AI Advisor"]["Risk Control"] == 0.4
+        # 审计:原记录保留 + 追加一条 operator=undo
+        ivs = json.loads((tmp_path / "results" / "checkpoints" / "interventions.json").read_text(encoding="utf-8"))
+        assert len(ivs) == 2
+        assert ivs[0]["operator"] == "expert"
+        assert ivs[1]["operator"] == "undo"
+        assert ivs[1]["new_constraints"]["Risk Control"] == 0.4
+
+    def test_undo_missing_record_returns_error(self, client, tmp_path):
+        self._seed_intervention(tmp_path)
+        r = client.post("/api/undo-intervention", json={
+            "agent": "AI Advisor", "sim_time": "20250213-09:00", "time": "2026-08-30 10:00:00",
+        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is False
+
+    def test_undo_twice_rejected(self, client, tmp_path):
+        self._seed_intervention(tmp_path)
+        payload = {"agent": "AI Advisor", "sim_time": "20250213-12:00", "time": "2026-08-30 10:00:00"}
+        assert client.post("/api/undo-intervention", json=payload).json()["ok"] is True
+        r2 = client.post("/api/undo-intervention", json=payload)
+        assert r2.json()["ok"] is False
+
+
+# ---------------------------------------------------------------------------
 # 页面渲染冒烟(HTML + JS 语法)
 # ---------------------------------------------------------------------------
 class TestPageRender:
@@ -218,7 +307,7 @@ class TestPageRender:
     用 TestClient 渲染(不启动真实服务),验证模板/Jinja/前端脚本可加载。
     """
 
-    @pytest.mark.parametrize("path", ["/", "/embed/scene", "/embed/goals", "/embed/explain"])
+    @pytest.mark.parametrize("path", ["/", "/embed/scene", "/embed/goals", "/embed/explain", "/embed/timeline"])
     def test_page_renders_ok(self, client, path):
         r = client.get(path)
         assert r.status_code == 200, "{} -> {}".format(path, r.status_code)
@@ -226,20 +315,20 @@ class TestPageRender:
         assert "<script" in r.text
 
     def test_pages_dumped_for_js_smoke(self, client):
-        """渲染首页 HTML 到 tests/_pages/(供 node tests/frontend_smoke.js 检查)
+        """渲染各模式 HTML 到 tests/_pages/(供 node tests/frontend_smoke.js 检查)
 
-        只渲染首页:embed 页面在 CI 无 Ollama 时渲染依赖较少(见
-        test_page_renders_ok 已对 4 页面断言 200);JS 语法由 node 检查首页。
+        embed 页面在 CI 无 Ollama 时渲染依赖较少;JS 语法由 node 检查。
         """
         import os
 
         out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_pages")
         os.makedirs(out_dir, exist_ok=True)
-        r = client.get("/")
-        assert r.status_code == 200
-        fn = os.path.join(out_dir, "index.html")
-        with open(fn, "w", encoding="utf-8") as f:
-            f.write(r.text)
+        for path, fn in [("/", "index.html"),
+                         ("/embed/timeline", "timeline.html")]:
+            r = client.get(path)
+            assert r.status_code == 200
+            with open(os.path.join(out_dir, fn), "w", encoding="utf-8") as f:
+                f.write(r.text)
 
     @pytest.mark.parametrize("path", ["/", "/embed/goals"])
     def test_page_js_syntax(self, client, path):

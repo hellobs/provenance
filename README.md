@@ -244,6 +244,7 @@ no CORS setup is required.
 | `/embed/scene` | Phaser canvas only (no floating panels) — for a "simulation" slot |
 | `/embed/goals` | Governance panel only (sliders + tendency curve + explain button) |
 | `/embed/explain` | Governance panel with the explanation panel auto-expanded |
+| `/embed/timeline` | Intervention timeline panel (all agents, full page) — for an "audit trail" slot |
 
 Example (React/Next.js):
 
@@ -269,8 +270,16 @@ live simulation.
   - `GET /api/goals` — constraints/tendency/interventions (scoped to the
     current simulation via `simulation` field)/role_types/embedding_health
   - `POST /api/goals` — expert constraint edit → writes governance.json +
-    interventions.json audit (with `simulation` tag); rejects numeric/zero
-    garbage goals; sum must equal 1
+    interventions.json audit (with `simulation` tag + optional `note` reason);
+    rejects numeric/zero garbage goals; sum must equal 1
+  - `POST /api/undo-intervention` — roll back a past intervention to its
+    `old_constraints` (matched by agent + sim_time + record time); appends an
+    `operator=undo` audit record and marks the original record `revoked` —
+    history is never deleted, only amended
+  - `GET /api/timeline` — intervention timeline across all agents (sorted by
+    sim_time): each event carries old→new constraints, note, operator, and
+    tendency shift (same windowing as `/api/explain`); revoked/undo events
+    flagged for the frontend
   - `GET /api/export-chart?agent=<name>` — matplotlib PNG of tendency curve
   - `GET /api/explain?agent=<name>` — explainability panel: tendency
     decomposition (α blend), experience window details (action/alignment/
