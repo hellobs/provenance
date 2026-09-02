@@ -1384,17 +1384,23 @@
 			prevX = x;
 		}
 
-		// 顶部行:范围 + 图例(角色色点)
+		// 顶部行:范围 + 角色图例 + 操作提示
 		var agents = [];
 		evs.forEach(function(e) { if (agents.indexOf(e.agent) < 0) agents.push(e.agent); });
 		var legend = '';
 		for (var ai = 0; ai < agents.length; ai++) {
-			legend += '<span style="margin-right:7px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:2px;"></span>' + goalsEscape(agents[ai]) + '</span>';
+			legend += '<span style="margin-right:7px;display:inline-flex;align-items:center;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:2px;"></span>' + goalsEscape(agents[ai]) + '</span>';
 		}
+		// 事件形态图例(独立于角色颜色)
+		legend += '<span style="margin-right:7px;display:inline-flex;align-items:center;margin-left:4px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#bbb;margin-right:2px;"></span>已撤销</span>';
+		legend += '<span style="display:inline-flex;align-items:center;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;margin-right:2px;"></span>撤销动作</span>';
 		var rangeTxt = tlFmtMD(tMin) + ' ' + tlFmtHM(tMin) + ' ~ ' + tlFmtMD(tMax) + ' ' + tlFmtHM(tMax);
-		var h = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap;">';
+		var h = '<style>#timeline-body [data-tl-idx]{transition:transform .12s ease;}#timeline-body [data-tl-idx]:hover{transform:scale(1.7);z-index:9;}</style>';
+		h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">';
 		h += '<div style="color:#888;font-size:10px;">共 ' + evs.length + ' 次干预 · ' + goalsEscape(rangeTxt) + '</div>';
 		h += '<div>' + legend + '</div></div>';
+		// 操作提示行:解释交互方式(颜色=角色,点击圆点看详情/撤销)
+		h += '<div style="font-size:10px;color:#2d6cdf;background:#eef3ff;border-radius:4px;padding:3px 8px;margin-bottom:4px;">点击彩色圆点 = 查看该次干预详情(权重变化/倾向迁移/备注),详情内可撤销回滚;圆点颜色 = 该角色(见右侧图例)。</div>';
 
 		// 轨道:事件列垂直错开堆叠;轨道更高,时间标签在上方引导线区
 		h += '<div style="overflow-x:auto;padding:2px 0 4px;"><div style="position:relative;width:' + W + 'px;height:64px;">';
@@ -1605,9 +1611,12 @@
 			}
 			var cb = t.closest("[data-tl-close]");
 			if (cb) { e.stopPropagation(); tlHideDetail(); return; }
-			// 点击浮层外部关闭
+			// 点击浮层外部关闭(排除时间轴面板内部:点圆点切换详情不应先关浮层)
 			var det = document.getElementById("timeline-detail");
-			if (det && det.style.display !== "none" && !det.contains(t)) tlHideDetail();
+			if (det && det.style.display !== "none" && !det.contains(t)) {
+				var inPanel = !!t.closest("#timeline-panel, [data-tl-idx]");
+				if (!inPanel) tlHideDetail();
+			}
 		});
 		var embedMode = document.body.getAttribute("data-embed") || "";
 		if (embedMode === "timeline") {
@@ -1645,13 +1654,21 @@
 			if (body.style.display === "none") { body.style.display = "block"; ct.textContent = "Collapse ▾"; }
 			else { body.style.display = "none"; ct.textContent = "Expand ▸"; }
 		};
-		// collapse toggle
+		// collapse toggle(治理约束面板)
 		var gh = document.getElementById("goals-header");
 		var gt = document.getElementById("goals-toggle");
+		var gPanel = document.getElementById("goals-panel");
 		if (gh && gt) gh.onclick = function() {
 			var body = document.getElementById("goals-body");
-			if (body.style.display === "none") { body.style.display = "block"; gt.textContent = "Collapse ▾"; }
-			else { body.style.display = "none"; gt.textContent = "Expand ▸"; }
+			if (body.style.display === "none") {
+				body.style.display = "block";
+				gt.textContent = "Collapse ▾";
+				if (gPanel) gPanel.style.flex = "1 1 auto"; // 展开:占满容器剩余
+			} else {
+				body.style.display = "none";
+				gt.textContent = "Expand ▸";
+				if (gPanel) gPanel.style.flex = "0 0 auto"; // 收起:面板收缩到仅头部
+			}
 		};
 		// load governance constraints + value tendency + interventions
 		fetch("/api/goals").then(function(r) { return r.json(); }).then(function(out) {
