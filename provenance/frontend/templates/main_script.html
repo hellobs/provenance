@@ -1432,12 +1432,15 @@
 				var isUndo = ev.operator === "undo";
 				var isRevoked = !!ev.revoked;
 				var col = timelineAgentColor(ev.agent);
+				// 同刻多条:序号标注(第 k+1/N 条),title 区分各条内容
+				var seqTxt = N > 1 ? ' · 第 ' + (k + 1) + '/' + N + ' 条' : '';
+				var ts = goalsEscape(ev.agent + ' ' + ev.sim_time + seqTxt);
 				if (isUndo) {
-					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件 ' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '"></div>';
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件 ' + ts + '"></div>';
 				} else if (isRevoked) {
-					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:10px;color:#fff;font-size:9px;" title="已撤销: ' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '">✕</div>';
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:10px;color:#fff;font-size:9px;" title="已撤销: ' + ts + '">✕</div>';
 				} else {
-					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 5) + 'px;top:' + (cy - 5) + 'px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + goalsEscape(ev.agent + ' ' + ev.sim_time) + '"></div>';
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 5) + 'px;top:' + (cy - 5) + 'px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + ts + '"></div>';
 				}
 			}
 			if (N > shown) {
@@ -1619,29 +1622,39 @@
 			}
 		});
 		var embedMode = document.body.getAttribute("data-embed") || "";
+		// 折叠(全页与 timeline 嵌入页统一):收起只留头部,展开恢复内容
+		var header = document.getElementById("timeline-header");
+		var toggle = document.getElementById("timeline-toggle");
+		var panel = document.getElementById("timeline-panel");
+		var body2 = document.getElementById("timeline-body");
+		if (header && panel) {
+			// 嵌入页面板有 min-height,折叠需同时清掉(否则 body 隐藏后仍占高)
+			if (embedMode === "timeline") {
+				panel.style.minHeight = "340px";
+				body2.style.display = "block";
+			}
+			header.onclick = function() {
+				var isCollapsed = body2.style.display === "none";
+				body2.style.display = isCollapsed ? "block" : "none";
+				if (toggle) toggle.textContent = isCollapsed ? "收起 ▾" : "展开 ▸";
+				if (embedMode === "timeline") {
+					panel.style.minHeight = isCollapsed ? "0px" : "340px";
+				} else {
+					panel.style.maxHeight = isCollapsed ? "none" : "40px";
+					// 右列底距联动:展开时给时间轴让位,收起后收回(否则留大空白)
+					var rc = document.getElementById("right-col");
+					if (rc) rc.style.bottom = isCollapsed ? "16px" : "210px";
+				}
+				if (isCollapsed) timelinePollStart();
+			};
+			toggle.textContent = "收起 ▾";
+		}
 		if (embedMode === "timeline") {
 			// 独立嵌入页:面板高度由内容撑开,横向滚动条由 timeline-body 内部处理
 			timelinePollStart();
 			return;
 		}
-		// 全页:底部横条可折叠(展开 ~170px / 收起 仅头部)
-		var header = document.getElementById("timeline-header");
-		var toggle = document.getElementById("timeline-toggle");
-		var panel = document.getElementById("timeline-panel");
-		if (header && panel) {
-			header.onclick = function() {
-				var collapsed = body.style.display === "none";
-				body.style.display = collapsed ? "block" : "none";
-				if (toggle) toggle.textContent = collapsed ? "收起 ▾" : "展开 ▸";
-				panel.style.maxHeight = collapsed ? "none" : "34px";
-				if (collapsed) timelinePollStart();
-			};
-			toggle.textContent = "收起 ▾";
-			// 默认展开(时间轴是核心观测,不折叠)
-			panel.style.maxHeight = "none";
-			body.style.display = "block";
-			timelinePollStart();
-		}
+		timelinePollStart();
 	}
 	timelineInit();
 

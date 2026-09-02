@@ -30,7 +30,7 @@ body { margin: 0; }
 
 <!-- Right column: chat log (top) + goal adjustment panel (below) -->
 {% if embed != "scene" and embed != "timeline" %}
-<div style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
+<div id="right-col" style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
     display: flex; flex-direction: column; gap: 12px;
     {% if embed %}bottom: 16px;{% else %}bottom: 210px;{% endif %}">
 {% endif %}
