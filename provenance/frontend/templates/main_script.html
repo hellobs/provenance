@@ -1452,10 +1452,11 @@
 		h += '<div style="position:absolute;left:' + nx + 'px;top:26px;text-align:left;">';
 		h += '<div style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #c2255c;margin:2px 0 2px 2px;"></div>';
 		h += '<div style="font-size:9px;color:#c2255c;font-weight:bold;white-space:nowrap;">现在<br>' + goalsEscape(tlFmtMD(tMax) + ' ' + tlFmtHM(tMax)) + '</div></div>';
-		h += '</div></div>';
+		h += '</div>'; // 关轨道容器(height:64)
 		// 底部刻度:按跨度自适应步长;跨天处(00:00)标日期分隔
+		// (置于 overflow-x:auto 滚动容器内,与轨道同步横向滚动对齐)
 		var stepMin = spanMs <= 9 * 3600000 ? 60 : (spanMs <= 18 * 3600000 ? 120 : 240);
-		h += '<div style="position:relative;height:16px;margin-top:2px;overflow:hidden;"><div style="position:relative;width:' + W + 'px;">';
+		h += '<div style="position:relative;height:16px;margin-top:2px;"><div style="position:relative;width:' + W + 'px;">';
 		var cur = new Date(Math.floor(tMin.getTime() / (stepMin * 60000)) * stepMin * 60000);
 		var lastMD = "";
 		while (cur.getTime() <= tMax.getTime()) {
@@ -1474,6 +1475,7 @@
 			cur = new Date(cur.getTime() + stepMin * 60000);
 		}
 		h += '</div></div>';
+		h += '</div>'; // 关 overflow-x:auto 滚动容器
 		body.innerHTML = h;
 	}
 
