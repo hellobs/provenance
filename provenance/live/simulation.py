@@ -106,7 +106,8 @@ def run_simulation(name, sim_config, start_step, step, stride):
             with open(conv_path, "r", encoding="utf-8") as f:
                 conversation = json.load(f)
 
-        compressor = LiveCompressor(checkpoints_folder, "frontend/static")
+        compressor = LiveCompressor(checkpoints_folder,
+                                     os.path.join(state.BASE_DIR, "frontend/static"))
         # 框架存储:默认用纯 stdlib 的 SimpleStore(零 llama_index 依赖,任何环境可跑)
         for agent_name, acfg in sim_config.get("agents", {}).items():
             base = sim_config.get("agent_base", {})
@@ -150,7 +151,8 @@ def run_simulation(name, sim_config, start_step, step, stride):
             governance.load(gov_path)
         consequence = ConsequenceEngine()
 
-        game = Game(name, "frontend/static", sim_config, conversation, timer=timer,
+        _static_root = os.path.join(state.BASE_DIR, "frontend/static")
+        game = Game(name, _static_root, sim_config, conversation, timer=timer,
                     governance=governance, consequence_fn=consequence.feedback)
         # 供 /api/goals 暴露 embedding 稳定性健康度(降级监控)
         game.consequence = consequence
