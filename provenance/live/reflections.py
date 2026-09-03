@@ -38,11 +38,21 @@ def append_mark(record: dict) -> None:
         json.dump(marks, f, ensure_ascii=False, indent=2)
 
 
+def jsonl_row(mark: dict) -> str:
+    """单条标记的导出行:原始记录 + 嵌套 lora 样本(SFT+DPO)。
+
+    保证磁盘文件与 /export.jsonl 接口返回内容一致(单一数据格式)。
+    """
+    row = dict(mark)
+    row["lora"] = build_lora_sample(mark)
+    return json.dumps(row, ensure_ascii=False)
+
+
 def rebuild_jsonl() -> str:
     """从 marks 重建 JSONL 导出文件,返回文件路径。
 
-    每行一个 LoRA 训练样本(人机协同闭环的 B 线数据格式):
-    {"agent", "simulation", "sim_time", "thought", "verdict", "correction", "marked_time"}
+    每行一个 LoRA 训练样本(人机协同闭环的 B 线数据格式),与接口保持一致:
+    {agent, simulation, sim_time, thought, verdict, correction, context, lora:{sample,dpo}, ...}
     """
     path = marks_path()
     marks = load_marks()
@@ -50,7 +60,7 @@ def rebuild_jsonl() -> str:
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         for m in marks:
-            f.write(json.dumps(m, ensure_ascii=False) + "\n")
+            f.write(jsonl_row(m) + "\n")
     return out
 
 

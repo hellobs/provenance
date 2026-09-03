@@ -761,6 +761,7 @@ async def mark_reflection(request: Request):
     if ckpt_dir and os.path.isdir(ckpt_dir):
         import glob as _g
         files = sorted(_g.glob(os.path.join(ckpt_dir, "simulate-*.json")))
+        dec_path = os.path.join(ckpt_dir, "decisions.json")
         if files:
             try:
                 snap = json.load(open(files[-1], encoding="utf-8"))
@@ -771,8 +772,7 @@ async def mark_reflection(request: Request):
                     context["goal_alignment"] = st.get("goal_alignment") or {}
             except Exception:
                 pass
-    dec_path = os.path.join(ckpt_dir, "decisions.json")
-    if os.path.exists(dec_path):
+    if ckpt_dir and os.path.exists(dec_path):
         try:
             dec = json.load(open(dec_path, encoding="utf-8"))
             evs = dec.get("events") or []
@@ -799,15 +799,10 @@ async def export_reflections_jsonl():
     """导出 LoRA 线训练数据(JSONL,每行一个标记样本)。"""
     from fastapi.responses import PlainTextResponse
     out = rebuild_jsonl()
-    from live.reflections import build_lora_sample
-    marks = load_marks()
-    lines = []
-    for m in marks:
-        line = dict(m)
-        line["lora"] = build_lora_sample(m)
-        lines.append(json.dumps(line, ensure_ascii=False))
+    with open(out, "r", encoding="utf-8") as f:
+        content = f.read()
     return PlainTextResponse(
-        "\n".join(lines),
+        content,
         media_type="application/x-ndjson",
         headers={"Content-Disposition": "attachment; filename=reflection_marks.jsonl"},
     )
