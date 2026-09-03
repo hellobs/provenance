@@ -42,6 +42,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
+        from matplotlib.ticker import FuncFormatter, FixedLocator
         from matplotlib.font_manager import FontProperties
     except Exception as e:
         log.warning("matplotlib 不可用: {}".format(e))
@@ -123,16 +124,39 @@ def render_tendency_png(ckpt_dir: str, agent: str,
     ax.set_title("{} — 价值倾向演变(实线=内化, 虚线=约束期望, 橙线=干预)".format(agent),
                  fontproperties=FONT, fontsize=13)
     ax.set_ylim(0, 1.0)
+    _time_abbr = lambda _x: _x.strftime("%m/%d %H:%M")
     ax.grid(True, alpha=0.3)
     if goal_names:
         import matplotlib.patches as mpatches
         handles = [mpatches.Patch(color=color_of[g], label=g) for g in goal_names]
         ax.legend(handles=handles, prop=FONT, fontsize=8, loc="lower center",
                   ncol=len(goal_names), frameon=True, bbox_to_anchor=(0.5, -0.32))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+    # X 轴时间刻度:按跨度选小时步长(约 6 个刻度),避免长跨度标签挤在一起;
+    # 格式定制——00:00(跨天处)标日期 MM/DD,其余标 HH:MM,贴合前端时间轴风格。
+    # 为保证跨天时确有 00:00 刻度(午夜即日期分隔),用 FixedLocator 在
+    # HourLocator 生成的整点刻度之上补插所有图内午夜,去重后固定刻度。
+    span_h = max((t1 - t0).total_seconds() / 3600.0, 0.1)
+    step = max(1, int(round(span_h / 6.0)))
+    _ticks = sorted(set(
+        list(mdates.HourLocator(interval=step).tick_values(t0, t1))
+        + list(mdates.HourLocator(byhour=0).tick_values(t0, t1))  # 图内每个 00:00
+    ))
+    ax.xaxis.set_major_locator(FixedLocator(_ticks))
+
+    def _time_fmt(n, pos=None):
+        d = mdates.num2date(n)
+        if d.hour == 0 and d.minute == 0:
+            # 跨天处:日期与时间上下两行堆叠,给出日期上下文又省横向宽度,避免和相邻刻度挤在一起
+            return "{}\n{}".format(d.strftime("%m/%d"), d.strftime("%H:%M"))
+        return d.strftime("%H:%M")
+
+    ax.xaxis.set_major_formatter(FuncFormatter(_time_fmt))
     fig.autofmt_xdate(rotation=0)
     fig.tight_layout()
+    # 标题携带日期区间,补足 X 轴只显时间时的日期上下文
+    ax.set_title("{} — 价值倾向演变(实线=内化, 虚线=约束期望, 橙线=干预)　{} ~ {}".format(
+        agent, _time_abbr(t0), _time_abbr(t1)),
+        fontproperties=FONT, fontsize=13)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150)
