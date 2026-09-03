@@ -27,6 +27,7 @@ for _p in (_PKG, _REPO):
         sys.path.insert(0, _p)
 
 import live_fastapi as lf
+from live import state
 
 
 # ---------------------------------------------------------------------------
@@ -93,11 +94,11 @@ def client(tmp_path, monkeypatch):
         }
     }, ensure_ascii=False), encoding="utf-8")
 
-    monkeypatch.setattr(lf, "BASE_DIR", str(tmp_path))
-    monkeypatch.setattr(lf, "server", SimpleNamespace(game=_fake_game()))
-    monkeypatch.setattr(lf, "sim_state", {"name": "test-sim", "status": "running",
+    monkeypatch.setattr(state, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(state, "server", SimpleNamespace(game=_fake_game()))
+    monkeypatch.setattr(state, "sim_state", {"name": "test-sim", "status": "running",
                                           "start_time": "20250213-09:30", "stride": 2})
-    monkeypatch.setattr(lf, "compressor", SimpleNamespace(
+    monkeypatch.setattr(state, "compressor", SimpleNamespace(
         checkpoints_folder=str(tmp_ckpt), started=False))
     return TestClient(lf.app)
 
