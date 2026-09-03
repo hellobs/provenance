@@ -21,6 +21,7 @@ from live.reflections import (
     rebuild_jsonl,
     marked_node_ids,
     append_mark,
+    build_lora_sample,
 )
 
 app = FastAPI(title="Provenance Live (FastAPI)")
@@ -754,9 +755,40 @@ async def mark_reflection(request: Request):
     if verdict in ("incorrect", "partial") and not correction:
         return JSONResponse({"ok": False, "errors": ["incorrect/partial 必须填写纠正文本"]})
 
+    # 行为上下文:decisions.json 中该角色最后一条决策(行动/对齐度/倾向/角色/地点)
+    context = {}
+    ckpt_dir = state.current_ckpt_dir()
+    if ckpt_dir and os.path.isdir(ckpt_dir):
+        import glob as _g
+        files = sorted(_g.glob(os.path.join(ckpt_dir, "simulate-*.json")))
+        if files:
+            try:
+                snap = json.load(open(files[-1], encoding="utf-8"))
+                ag = (snap.get("agents") or {}).get(agent)
+                if ag:
+                    st = ag.get("status") or {}
+                    context["value_tendency"] = st.get("value_tendency") or {}
+                    context["goal_alignment"] = st.get("goal_alignment") or {}
+            except Exception:
+                pass
+    dec_path = os.path.join(ckpt_dir, "decisions.json")
+    if os.path.exists(dec_path):
+        try:
+            dec = json.load(open(dec_path, encoding="utf-8"))
+            evs = dec.get("events") or []
+            for ev in reversed(evs):
+                if ev.get("agent") == agent:
+                    context["action"] = ev.get("action", "")
+                    context["role"] = ev.get("role", "")
+                    context["location"] = ev.get("location", "")
+                    context["goal_score"] = ev.get("goal_score")
+                    break
+        except Exception:
+            pass
+
     record = new_mark(agent=agent, simulation=state.current_sim_name(),
                       sim_time=sim_time, node_id=node_id, thought=text,
-                      verdict=verdict, correction=correction)
+                      verdict=verdict, correction=correction, context=context)
     append_mark(record)
     out = rebuild_jsonl()
     return JSONResponse({"ok": True, "mark": record, "export": out})
@@ -767,10 +799,15 @@ async def export_reflections_jsonl():
     """导出 LoRA 线训练数据(JSONL,每行一个标记样本)。"""
     from fastapi.responses import PlainTextResponse
     out = rebuild_jsonl()
-    with open(out, "r", encoding="utf-8") as f:
-        content = f.read()
+    from live.reflections import build_lora_sample
+    marks = load_marks()
+    lines = []
+    for m in marks:
+        line = dict(m)
+        line["lora"] = build_lora_sample(m)
+        lines.append(json.dumps(line, ensure_ascii=False))
     return PlainTextResponse(
-        content,
+        "\n".join(lines),
         media_type="application/x-ndjson",
         headers={"Content-Disposition": "attachment; filename=reflection_marks.jsonl"},
     )
