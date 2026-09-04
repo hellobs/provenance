@@ -422,18 +422,35 @@ async def explain_agent(agent: str = ""):
         decay_total = max(1, int(getattr(live_agent, "_window_size", 15) or 15))
         alpha = round(max(0.1, 1.0 - obs / decay_total), 4)
     window = live_agent.status.get("tendency_window") or []
-    # 窗口均值(与 observe_consequence 相同的指数加权口径,仅用于展示)
-    # 衰减系数从引擎取(think.tendency_decay,缺省 0.8)——口径漂移会误导解释面板
-    decay = float(getattr(live_agent, "_tendency_decay", 0.8) or 0.8)
+    # 窗口均值(与 observe_consequence 相同的口径,仅用于展示)
+    # 近因性按模拟时间衰减:权重 = decay_per_hour^age_hours,age=当前模拟时间−条目time
+    decay_ph = float(getattr(live_agent, "_tendency_decay_per_hour", 0.6) or 0.6)
+    _now = None
+    try:
+        _now = live_agent._timer.get_date()
+    except Exception:
+        _now = None
     win_mean = {}
     if window:
         n = len(window)
+        import datetime as _dt
+        ages = []
+        for i, w in enumerate(window):
+            t_str = str(w.get("time", "") or "")
+            if t_str and _now is not None:
+                try:
+                    t_entry = _dt.datetime.strptime(t_str, "%Y%m%d-%H:%M")
+                    ages.append(max(0.0, (_now - t_entry).total_seconds() / 3600.0))
+                    continue
+                except (ValueError, TypeError):
+                    pass
+            ages.append(float(n - i) * 0.25)
+        weights = [decay_ph ** a for a in ages]
         goals = set()
         for w in window:
             goals.update(w.get("feedback", w).keys())
         for g in goals:
             vals = [w.get("feedback", w).get(g, 0.0) for w in window]
-            weights = [decay ** (n - 1 - i) for i in range(n)]
             wsum = sum(weights) or 1.0
             win_mean[g] = sum(v * wt for v, wt in zip(vals, weights)) / wsum
     decomposition = {}
