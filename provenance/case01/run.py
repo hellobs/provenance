@@ -26,7 +26,38 @@ def main():
     ap.add_argument("--external-ethan", action="store_true",
                     help="Ethan/Router 用 OpenRouter 外部 API(需 key 配置);"
                          "缺省时与 Investment AI 同用本地 Ollama")
+    ap.add_argument("--reflect-only", action="store_true",
+                    help="只对已存在的 run 触发 Reflection+Router(不重跑对话)")
     args = ap.parse_args()
+
+    if args.reflect_only:
+        from case01.orchestrator import RUNS_ROOT
+        import json as _json
+        run_id = args.run_id
+        p = os.path.join(RUNS_ROOT(), run_id, "run.json")
+        if not os.path.exists(p):
+            print("run not found:", run_id)
+            sys.exit(1)
+        rec_data = _json.load(open(p, encoding="utf-8"))
+        from case01.agents.llm import OllamaClient, OpenRouterClient
+        from case01.reflection import run_reflection, run_router
+        local = OllamaClient()
+        router = OpenRouterClient() if args.external_ethan else local
+        print("=== Reflection ===")
+        ref = run_reflection(local, rec_data)
+        rec_data["reflection"] = {"material": ref["material"],
+                                  "text": ref["text"]}
+        print(ref["text"][:500])
+        print("\n=== Router ===")
+        rout = run_router(router, ref["text"])
+        rec_data["router"] = {"raw": rout["raw"], "issues": rout["issues"]}
+        print("issues:", len(rout["issues"]))
+        for i in rout["issues"]:
+            print(" -", i)
+        with open(p, "w", encoding="utf-8") as f:
+            _json.dump(rec_data, f, ensure_ascii=False, indent=2)
+        print("updated ->", p)
+        return
 
     ethan_llm = router_llm = None
     if args.external_ethan and not args.no_llm:

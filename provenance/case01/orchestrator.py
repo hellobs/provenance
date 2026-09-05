@@ -143,6 +143,11 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     world.advance_to(cfg.start_date)   # 释放 08-27 事件
     rec.data["start_date"] = cfg.start_date
     rec.data["end_date"] = FINAL_DATE
+    # 收集 T0 当天已释放事件(T0 咨询发生在这些事件背景下)
+    for e in world.released:
+        rec.data["events"].append({
+            "date": e.date, "kind": e.kind, "summary": e.summary,
+            "source": e.source, "price_usd": e.price_usd})
     log("[run {}] T0 @ {}".format(run_id, world.date))
 
     # ---- 2) T0 咨询 ----
@@ -272,6 +277,31 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     rec.data["final_feedback"] = {"date": world.date,
                                   "ethan": ethan_fb, "ai": ai_fb}
     rec.add_state(world.date, _state_snapshot(world))
+
+    # ---- 6.5) Reflection + Router(0904:Run 结束、最终反馈后后台触发) ----
+    if llm is not None:   # 需要本地模型(Reflection 与判断同源)
+        from .reflection import run_reflection, run_router
+        try:
+            log("=== Reflection(本地同源模型,后台) ===")
+            ref = run_reflection(llm, rec.data)
+            rec.data["reflection"] = {
+                "material": ref["material"], "text": ref["text"]}
+            log(ref["text"][:200] + "…" if len(ref["text"]) > 200 else ref["text"])
+            # Router(独立模型:router_llm,缺省回落到本地)
+            rllm = router_llm or llm
+            log("=== Router(问题拆分/分类/风险/路由) ===")
+            router_out = run_router(rllm, ref["text"])
+            rec.data["router"] = {
+                "raw": router_out["raw"],
+                "issues": router_out["issues"]}
+            log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
+            for _iss in router_out["issues"]:
+                log("  - [{}] {} | {} | {}".format(
+                    _iss.get("risk"), _iss.get("field"),
+                    _iss.get("summary", "")[:60], _iss.get("routing_reason", "")[:40]))
+        except Exception as _re:
+            log("[warn] Reflection/Router 失败: {}".format(_re))
+            rec.data["reflection"] = {"material": "", "text": "(失败)"}
 
     # ---- 7) 审计与落盘 ----
     rec.data["audit"] = world.audit()

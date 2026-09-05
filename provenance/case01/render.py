@@ -330,6 +330,92 @@ def _page_html(rec: dict) -> str:
              "后续里程碑,本页暂只记录 T0 咨询。</p>"
              .format(_html.escape(str(judge))))
 
+    # 五、市场时间线与结果(events + Ethan 状态随价格)
+    events = rec.get("events", [])
+    states = {s["date"]: s["state"] for s in rec.get("state_history", [])}
+    if events:
+        h.append("<div class='section-label'>五、市场时间线与结果</div>")
+        h.append("<p class='explain'>Branch {} 确定后,市场按预设时间线推进;"
+                 "中间节点只释放公开事件、不触发新咨询(0904 规则)。下表为每个日期"
+                 "的公开事件与 Ethan 当时的程序状态(持仓/现金)。</p>"
+                 .format(_html.escape(str(branch))))
+        # 按日期聚合
+        by_date = {}
+        for e in events:
+            by_date.setdefault(e.get("date", ""), []).append(e)
+        rows = []
+        all_dates = sorted(by_date.keys())
+        for d in all_dates:
+            st = states.get(d)
+            # Ethan 状态摘要
+            if st:
+                if st.get("exited"):
+                    st_txt = "已退出,现金 ≈ {:,} 元".format(int(st.get("cash_rmb", 0)))
+                elif st.get("hcm_shares"):
+                    pct = (st.get("exit_price_usd") or st.get("entry_price_usd") or 0)
+                    entry = st.get("entry_price_usd") or 1
+                    pnl = (pct - entry) / entry * 100 if entry else 0
+                    st_txt = "持有(成本 ${0}·现价 ${1}·{2:+.0f}%)·现金 {3:,}".format(
+                        entry, pct or "-", pnl, int(st.get("cash_rmb", 0)))
+                else:
+                    st_txt = "未持仓,现金 200,000 元"
+            else:
+                st_txt = "—"
+            ev_lines = "<br>".join(
+                "〔{}〕{}".format(_html.escape(str(e.get("kind", ""))),
+                                 _html.escape(str(e.get("summary", ""))))
+                for e in by_date[d])
+            rows.append("<tr><td style='white-space:nowrap'><b>{}</b></td>"
+                        "<td>{}</td><td style='color:#555'>{}</td></tr>".format(
+                            _html.escape(str(d)), ev_lines, st_txt))
+        h.append("<table><tr><th>日期</th><th>公开事件</th>"
+                 "<th>Ethan 状态</th></tr>{}</table>".format("".join(rows)))
+
+    # 六、最终反馈(09-15)
+    fb = rec.get("final_feedback")
+    if fb:
+        h.append("<div class='section-label'>六、最终反馈(2026-09-15)</div>")
+        h.append("<p class='explain'>Run 终点:Ethan 向 Investment AI 陈述实际"
+                 "行动、市场结果与个人后果(只陈述事实,不评价 AI 对错)。</p>")
+        if fb.get("ethan"):
+            h.append("<div class='utterance ethan'><div class='tag'>Ethan Lin"
+                     "<span class='who-note'>最终陈述</span></div>{}</div>"
+                     .format(_md(fb["ethan"])))
+        if fb.get("ai"):
+            h.append("<div class='utterance ai'><div class='tag'>Investment AI"
+                     "<span class='who-note'>回应</span></div>{}</div>"
+                     .format(_md(fb["ai"])))
+
+    # 七、内部反思(Reflection)
+    ref = rec.get("reflection")
+    if ref and ref.get("text"):
+        h.append("<div class='section-label'>七、Investment AI 内部反思(Reflection)</div>")
+        h.append("<p class='explain'>Run 结束后由程序后台触发,用与咨询判断相同的"
+                 "本地模型对本次经历做系统反思(8 个维度)。反思不发给 Ethan,"
+                 "作为独立结果与本次 Run 关联。</p>")
+        h.append("<div class='utterance ai'><div class='tag'>Reflection"
+                 "<span class='who-note'>内部生成</span></div>{}</div>"
+                 .format(_md(ref["text"])))
+
+    # 八、问题分流(Router)
+    router = rec.get("router")
+    if router and router.get("issues"):
+        h.append("<div class='section-label'>八、问题分流(Router)</div>")
+        h.append("<p class='explain'>独立 Router 模型读取反思,将其中已出现、"
+                 "需要专业审核的问题拆分并路由(专业类别/风险等级/路由理由)。"
+                 "Router 不替专家作最终判断,不发现反思未提到的新问题。</p>")
+        rows = "".join(
+            "<tr><td>{}</td><td>{}</td><td><span class='branch'>{}</span></td>"
+            "<td>{}</td><td>{}</td></tr>".format(
+                _html.escape(str(i.get("id", ""))),
+                _html.escape(str(i.get("field", ""))),
+                _html.escape(str(i.get("risk", ""))),
+                _html.escape(str(i.get("summary", ""))),
+                _html.escape(str(i.get("routing_reason", ""))))
+            for i in router["issues"])
+        h.append("<table><tr><th>#</th><th>专业领域</th><th>风险</th>"
+                 "<th>问题摘要</th><th>路由理由</th></tr>{}</table>".format(rows))
+
     # 页脚
     h.append("<div class='foot'>GTC Case 01 · 本地执行引擎(case01) · "
              "本页为过程记录只读视图,由 runs/ 自动渲染。"
