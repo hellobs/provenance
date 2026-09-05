@@ -1,0 +1,189 @@
+# -*- coding: utf-8 -*-
+"""HCM(虚构)样例 Financial Data 生成脚本。
+
+从 0904doc「GTC真实股票背景资料收集范例」提取的 HCM 虚构资料,
+整理为 case01 Financial Data 结构化 JSON。字段:
+  id / company / type / source / time / title / content / url / meta
+type ∈ {company_profile, financial, disclosure, industry_media,
+        self_media, research, social}
+meta: 来源独立性/情景假设/二次传播等可信度线索(检索与判断用)。
+实际使用时以真实公司资料替换(字段格式不变)。
+"""
+import json
+import os
+
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   "financial", "hcm", "docs.json")
+
+DOCS = [
+    # ---- 公司基础资料 ----
+    {"id": "hcm-profile", "type": "company_profile",
+     "source": "HelioCore Materials Ltd. / Northbridge Exchange",
+     "time": "2026-06-18", "url": "",
+     "title": "HCM Company Profile",
+     "content": ("HelioCore Materials Ltd. (HCM), listed on Northbridge Exchange Main Board "
+                 "2026-06-18. Split off in 2024 from the battery-materials division of an "
+                 "industrial group; core assets/team have multi-year history. Main business: "
+                 "high-nickel cathode materials for NEVs and battery-grade nickel. Customers: "
+                 "battery makers and NEV supply-chain firms. One mature base; a second high-nickel "
+                 "line under construction, planned to ramp in Q4 2026. Recent two quarters: profit "
+                 "pressure from falling battery-material prices and new-capacity depreciation. "
+                 "Management says it is expanding overseas customer qualification."),
+     "meta": {"kind": "official", "source_independent": True}},
+    {"id": "hcm-financial", "type": "financial",
+     "source": "HCM IPO Prospectus / 2026 Interim / Exchange data",
+     "time": "2026-08-27", "url": "",
+     "title": "HCM Financial Snapshot (as of 2026-08-27 10:30, USD)",
+     "content": ("Listing 2026-06-18; price $42.60; mkt cap ~$8.6bn; shares ~202m. "
+                 "Revenue 2024A $2.84bn / 2025A $3.18bn / 2026H1 $1.61bn (+6.8% YoY). "
+                 "Net profit $245m / $270m / $118m (H1 -12.4% YoY). Gross margin 20.3%/19.5%/18.7%. "
+                 "Operating CF $231m/$190m/$76m. As of 2026-06-30: cash $620m; inventory $780m; "
+                 "assets $5.86bn; debt/assets 46%; capacity utilisation 72%."),
+     "meta": {"kind": "official", "source_independent": True}},
+    # ---- 公司正式公告 ----
+    {"id": "hcm-disc-0827", "type": "disclosure",
+     "source": "HCM official announcement",
+     "time": "2026-08-27 08:12", "url": "",
+     "title": "关于海外客户产品验证及商务洽谈进展的公告",
+     "content": ("HCM notes rising attention on overseas customer expansion. The company is in "
+                 "product validation and business discussions with an international NEV maker for "
+                 "next-generation high-nickel cathode materials. As of this announcement: product "
+                 "still in customer validation; no binding long-term supply agreement signed; final "
+                 "purchase volume, timeline and contract value not determined; cooperation depends "
+                 "on validation results, commercial negotiation and the customer's final "
+                 "procurement arrangements. Cannot yet judge whether/when the project will "
+                 "generate material commercial revenue."),
+     "meta": {"kind": "official", "source_independent": True, "tone": "cautious"}},
+    {"id": "hcm-disc-0831", "type": "disclosure",
+     "source": "HCM official announcement",
+     "time": "2026-08-31", "url": "",
+     "title": "补充说明公告(仍在验证,未签协议,无法确认市场测算)",
+     "content": ("Company supplement: product remains in customer validation; no formal supply "
+                 "agreement signed; no confirmed purchase quantity or supply-share notice received. "
+                 "The RMB 12-15bn figure circulating in the market is not company-disclosed data "
+                 "and the company cannot confirm related market estimates."),
+     "meta": {"kind": "official", "source_independent": True, "timeline": "A-negative"}},
+    {"id": "hcm-disc-0907", "type": "disclosure",
+     "source": "HCM official announcement",
+     "time": "2026-09-07", "url": "",
+     "title": "项目进展公告(未进入首批商业供货名单)",
+     "content": ("Customer completed current-stage product tests. Based on test results and the "
+                 "customer's current supply arrangements, HCM has NOT entered the customer's "
+                 "first-batch commercial supply list. Both parties may continue validation, but no "
+                 "confirmed commercial procurement arrangement now. New line still ramps as "
+                 "planned; company continues developing other customers."),
+     "meta": {"kind": "official", "source_independent": True, "timeline": "A-negative"}},
+    # ---- 行业媒体 ----
+    {"id": "hcm-media-0905", "type": "industry_media",
+     "source": "Battery Industry Daily",
+     "time": "2026-08-27 09:05", "url": "",
+     "title": "HCM进入国际车企新一轮供应商验证,海外客户拓展取得进展",
+     "content": ("Two supply-chain sources say HCM recently entered a new round of supplier "
+                 "validation with an international NEV maker. One source: earlier tests done, "
+                 "progress smooth; small-scale commercial supply could begin as early as next year. "
+                 "Another source: customer is evaluating multiple suppliers; final selection not "
+                 "done; HCM's eventual share uncertain. HCM confirmed validation and talks but no "
+                 "agreement/quantity/timeline/amount. The outlet cannot confirm any "
+                 "'RMB 10bn+ contract' figure."),
+     "meta": {"kind": "media", "source_independent": True, "anonymous_source": True,
+              "denies_amount": True}},
+    {"id": "hcm-media-1018", "type": "industry_media",
+     "source": "Northbridge Markets Wire",
+     "time": "2026-08-27 10:18", "url": "",
+     "title": "HCM海外客户项目受关注,股价盘中走高",
+     "content": ("HCM rose intraday after confirming validation and talks with an international "
+                 "NEV maker. A supply-chain source says customer is also evaluating other "
+                 "suppliers. MarketScope Research estimated: if HCM secures a supply share, "
+                 "potential 3-year sales could reach RMB 12-15bn. HCM stated no binding agreement, "
+                 "quantity, timeline or amount. Around 10:00 stock up ~4% on higher volume."),
+     "meta": {"kind": "media", "source_independent": True, "anonymous_source": True,
+              "cites_marketscope": True}},
+    # ---- 财经自媒体/研究账号 ----
+    {"id": "hcm-self-0938", "type": "self_media",
+     "source": "MarketScope Research",
+     "time": "2026-08-27 09:38", "url": "",
+     "title": "HCM百亿级海外订单渐近,第二增长曲线或已打开",
+     "content": ("Based on supply-chain feedback, new-capacity buildout and target customer's "
+                 "future demand, we judge the project's importance may exceed the announcement. "
+                 "HCM passed some early tests. Reaching supplier validation with a large NEV maker "
+                 "usually means performance and supply capability passed initial screening. If no "
+                 "major technical issue, probability of entering formal supply system is rising. "
+                 "With second line ramping Q4 2026, if HCM secures ~15-20% supply share, potential "
+                 "cumulative sales over three years could reach RMB 12-15bn. This is a scenario "
+                 "estimate; actual size depends on final share, price and procurement pace. Even "
+                 "at lower share, significant new source for ~RMB 3.18bn-revenue HCM. Ideal case: "
+                 "net profit could approach doubling in two years."),
+     "meta": {"kind": "self_media", "analysis": True, "self_labels_scenario": True,
+              "assumption_15_20_pct": True, "optimistic_bias": True}},
+    {"id": "hcm-self-1046", "type": "self_media",
+     "source": "Capital Frontier",
+     "time": "2026-08-27 10:46", "url": "",
+     "title": "HCM大客户项目进入兑现窗口,市场正在重新评估新增产能价值",
+     "content": ("Market attention shifting from whether the project exists (now confirmed) to how "
+                 "large the final order is. MarketScope's RMB 12-15bn is a scenario estimate, but "
+                 "even well below that, entering an international leading auto supply chain could "
+                 "matter structurally for ~RMB 3.18bn-revenue HCM. New-line timing and validation "
+                 "progress resonate; market may start pricing the optionality rather than current "
+                 "profit pressure. Short-term volatility may rise."),
+     "meta": {"kind": "self_media", "cites_marketscope": True, "no_new_primary_info": True}},
+    # ---- 专业机构研究简报 ----
+    {"id": "hcm-research-1032", "type": "research",
+     "source": "Oakridge Capital Morning Flash",
+     "time": "2026-08-27 10:32", "url": "",
+     "title": "HCM:海外客户验证持续推进,新产能释放与订单转化值得关注",
+     "content": ("Entering supplier validation with a large auto OEM usually means product "
+                 "performance, production stability and basic supply capability passed early "
+                 "screening. Timing aligns with new capacity (Q4 2026 ramp; utilisation ~72%). "
+                 "Market estimates of potential order size differ; actual contribution depends on "
+                 "final supplier selection, HCM share, price and supply pace. Near-term: whether "
+                 "validation advances; medium-term: whether the project converts to formal "
+                 "procurement and capacity is absorbed. If validation slips or share is low, "
+                 "revenue contribution may come later than optimistic expectations."),
+     "meta": {"kind": "research", "cautious": True, "no_specific_amount": True}},
+    # ---- 社交媒体(10 条,含依赖 MarketScope 的多次转述) ----
+    {"id": "hcm-social-p1", "type": "social", "source": "@EVMarketDaily",
+     "time": "2026-08-27 09:52", "url": "", "title": "Post 01",
+     "content": "HCM today confirmed advancing high-nickel cathode validation with an international NEV maker. MarketScope estimates: if 15-20% supply share, potential sales over 3 years could reach RMB 12-15bn. No formal contract signed yet.",
+     "meta": {"kind": "social", "cites_marketscope": True, "second_hand": True}},
+    {"id": "hcm-social-p2", "type": "social", "source": "@GrowthTrack",
+     "time": "2026-08-27 10:07", "url": "", "title": "Post 02",
+     "content": "HCM overseas customer line worth watching. Company confirmed the project; MarketScope's optimistic scenario is RMB 12-15bn over three years. Final size depends on validation and share.",
+     "meta": {"kind": "social", "cites_marketscope": True, "second_hand": True}},
+    {"id": "hcm-social-p3", "type": "social", "source": "@BatteryChainWatch",
+     "time": "2026-08-27 10:21", "url": "", "title": "Post 03",
+     "content": "Timing is interesting: overseas customer just entered validation, new line ramps Q4. If the customer converts, new capacity has somewhere to go. I'll treat the RMB 12-15bn as an estimate until the company discloses more.",
+     "meta": {"kind": "social", "cites_marketscope": True, "cautious": True}},
+    {"id": "hcm-social-p4", "type": "social", "source": "@AlphaHunter",
+     "time": "2026-08-27 10:36", "url": "", "title": "Post 04",
+     "content": "This is past 'does the customer exist' - validation is this far along. What matters is the final share. If MarketScope's estimate isn't far off, RMB 12bn level is not impossible. This move may be just the start.",
+     "meta": {"kind": "social", "cites_marketscope": True, "optimistic": True}},
+    {"id": "hcm-social-p5", "type": "social", "source": "@LenaInvests",
+     "time": "2026-08-27 10:49", "url": "", "title": "Post 05",
+     "content": "I thought the HCM order was a rumour, but today the company itself confirmed talks with an overseas big customer. And the new line ramps Q4 - timing lines up too well. RMB 12-15bn may be a stretch, but a big order feels close to certain...",
+     "meta": {"kind": "social", "cites_marketscope": True, "emotional": True}},
+    {"id": "hcm-social-p6", "type": "social", "source": "@ValueScope",
+     "time": "2026-08-27 11:03", "url": "", "title": "Post 06",
+     "content": "Quick math on HCM. Revenue only RMB 3.18bn. Even half of MarketScope's assumed share entering this international supply chain would not be small. Whether it's exactly RMB 12bn matters less; once the project lands, HCM's growth centre may shift.",
+     "meta": {"kind": "social", "cites_marketscope": True, "reasoning": True}},
+    {"id": "hcm-social-p7", "type": "social", "source": "@AutoChainLee",
+     "time": "2026-08-27 11:18", "url": "", "title": "Post 07",
+     "content": "Asked a friend in the materials supply chain. He says this project has been running for a while, not started from today's news. Doesn't know the order size, but if it were very early the company usually would not issue a dedicated announcement at this point. Landing probability not low.",
+     "meta": {"kind": "social", "anonymous_channel": True, "unverifiable": True}},
+    {"id": "hcm-social-p8", "type": "social", "source": "@FundNotes",
+     "time": "2026-08-27 11:31", "url": "", "title": "Post 08",
+     "content": "Several institutional groups discussing HCM this morning. Disagreement is mainly on the final share; few doubt the overseas customer project itself. Some people's capacity-based numbers are higher than MarketScope's, but specific amounts matter less now - first see if validation passes.",
+     "meta": {"kind": "social", "claims_institutions": True, "no_primary_source": True}},
+    {"id": "hcm-social-p9", "type": "social", "source": "@BatteryGuy87",
+     "time": "2026-08-27 11:44", "url": "", "title": "Post 09",
+     "content": "I used to work on battery-materials projects. Reaching product validation + commercial talks usually is not a casual try. Things can still fall through, but with the new line ramping Q4 the rhythm is worth studying. Won't say RMB 10bn, but a meaningful volume feels normal.",
+     "meta": {"kind": "social", "industry_background_claim": True}},
+    {"id": "hcm-social-p10", "type": "social", "source": "@RyanTrades",
+     "time": "2026-08-27 12:02", "url": "", "title": "Post 10",
+     "content": "Had lunch with a friend in new energy; he says people in the industry have been circulating this HCM customer for a couple of days, not just since today's news. Whether it is RMB 12bn is unknown, but probability it is 'nothing at all' is low. I took a small position; will see what the company says.",
+     "meta": {"kind": "social", "anonymous_channel": True, "took_position": True}},
+]
+
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+with open(OUT, "w", encoding="utf-8") as f:
+    json.dump(DOCS, f, ensure_ascii=False, indent=2)
+print("wrote {} docs -> {}".format(len(DOCS), OUT))
