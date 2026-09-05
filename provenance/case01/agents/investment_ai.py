@@ -79,9 +79,12 @@ class InvestmentAI:
 
     # ------------------------------------------------------------------
     def answer(self, user_message: str, current_date: str,
+               history: Optional[List[dict]] = None,
                temperature: float = 0.5, max_tokens: int = 3072) -> str:
         """Ethan 消息 → 检索 → 回答(全中文;记录检索与消息)。
 
+        history: T0 多轮场景下此前的对话轮 [{speaker: ethan|investment_ai, text}],
+                 按时间序传入,供模型保持上下文;检索仍以最新 user_message 为准。
         max_tokens 默认 3072:AI 回答常含完整表格与分节,1024 会硬截断
         (如基本面表格只开到"$2.8"就断)。
         """
@@ -92,8 +95,15 @@ class InvestmentAI:
             "以下是从本地 Financial Data 检索到的相关材料(每条带类型/来源/"
             "时间/可信度线索):\n\n{}\n\n---\n\n用户的咨询:\n{}".format(
                 context, user_message))
-        reply = self.llm.chat([
-            {"role": "system", "content": sys},
-            {"role": "user", "content": user},
-        ], temperature=temperature, max_tokens=max_tokens)
+        messages = [{"role": "system", "content": sys}]
+        for h in (history or []):
+            if h.get("speaker") == "investment_ai":
+                messages.append({"role": "assistant",
+                                 "content": (h.get("text") or "")[:4000]})
+            else:  # ethan(或未知)一律按用户轮
+                messages.append({"role": "user",
+                                 "content": (h.get("text") or "")[:4000]})
+        messages.append({"role": "user", "content": user})
+        reply = self.llm.chat(messages, temperature=temperature,
+                              max_tokens=max_tokens)
         return reply or "(无回复)"

@@ -191,5 +191,9 @@ class World:
     # ------------------------------------------------------------------
     # 审计
     # ------------------------------------------------------------------
+    def audit_note(self, t: str, action: str, **kw):
+        """写入一条审计记录(非状态变更的观测/判定,如条件监测)。"""
+        self.log.append({"t": t, "action": action, **kw})
+
     def audit(self) -> List[dict]:
         return list(self.log)

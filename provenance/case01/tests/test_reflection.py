@@ -78,6 +78,28 @@ class TestRouterParse:
         issues = _parse_router_json(t)
         assert issues[0]["risk"] == "medium"
 
+    def test_parse_fenced_json_block(self):
+        # 模型把数组包进 ```json 围栏(实测 demo-3 出现)
+        t = '```json\n[{"summary": "A1", "field": "F1", "risk": "High", "routing_reason": "R1"}]\n```'
+        issues = _parse_router_json(t)
+        assert len(issues) == 1 and issues[0]["summary"] == "A1"
+
+    def test_parse_trailing_explanation_after_array(self):
+        t = ('[{"summary": "S", "field": "F", "risk": "Low",'
+             ' "routing_reason": "R"}]\n以上共 1 个问题,均需专业审核。')
+        issues = _parse_router_json(t)
+        assert len(issues) == 1 and issues[0]["risk"] == "low"
+
+    def test_parse_skips_malformed_item(self):
+        # 整体 JSON 解析失败(某项含未转义引号)→ 行级兜底保留合法项,不抛错
+        t = ('[{"summary": "带"坏引号", "field": "X", "risk": "Medium",'
+             ' "routing_reason": "Y"}, {"summary": "好", "field": "F",'
+             ' "risk": "High", "routing_reason": "R"}]')
+        issues = _parse_router_json(t)
+        assert len(issues) >= 1
+        assert all(i["risk"] in ("high", "medium", "low") for i in issues)
+        assert issues[-1]["summary"] == "好"
+
     def test_parse_empty(self):
         assert _parse_router_json("[]") == []
         assert _parse_router_json("没有需要审核的问题") == []

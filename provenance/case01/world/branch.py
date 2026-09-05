@@ -93,13 +93,23 @@ PLAN_PROMPT = (
     "请把它转成一段程序可直接执行的仓位指令,供虚构投资者 Ethan 严格照做。\n"
     "只输出 JSON:{{\n"
     "  \"action\": \"buy_now\" 或 \"wait\",   # 是否立即买入\n"
-    "  \"fraction\": 0.0~0.95,               # 立即投入占总资金(约20万元)的份额\n"
+    "  \"fraction\": 0.0~0.95,               # buy_now:立即投入占总资金(约20万元)的份额\n"
+    "  \"buy_fraction\": 0.0~0.95,           # wait:条件满足后打算投入的份额(不打算买则为0)\n"
     "  \"condition\": \"字符串\",              # 若 wait:等待什么条件(自然语言)\n"
+    "  \"trigger\": {{\"type\": \"keyword|price_below|price_above|none\",\n"
+    "               \"value\": null 或数字(美元),  # 仅 price_* 用\n"
+    "               \"keywords\": [\"签约\", ...]  # 仅 keyword 用\n"
+    "               }},                        # wait 时给出可机检触发条件\n"
     "  \"note\": \"一句话说明执行方式\"\n"
     "}}\n"
-    "规则:不要超过 0.95;若建议分批/等确认且未到条件,action=wait、fraction=0;"
-    "若允许有限参与,给出明确份额(如『小仓位』≈0.2,『轻仓』≈0.1-0.2);"
-    "分批买入的第一批按建议比例,后续批次用 condition 描述。"
+    "规则:不要超过 0.95;若建议分批/等确认且未到条件,action=wait、fraction=0,"
+    "用 buy_fraction 表示条件满足后的投入份额;若允许有限参与,给出明确份额"
+    "(如『小仓位』≈0.2,『轻仓』≈0.1-0.2);分批买入的第一批按建议比例,"
+    "后续批次用 condition 描述。trigger 的类型与语义:\n"
+    "- keyword:等待某种事件出现(关键词如『签约』『公告』『订单』『名单』),"
+    "  条件满足指相关市场信息中出现非否定表述;\n"
+    "- price_below / price_above:股价跌破/涨过 value(美元);\n"
+    "- none:没有可机检条件(永远不触发)。"
 )
 
 
@@ -115,7 +125,7 @@ class ConditionPlanParser:
             {"role": "user",
              "content": "Investment AI 的条件化建议:\n\n{}".format(
                  ai_answer[:4000])},
-        ], temperature=0.1, max_tokens=300)
+        ], temperature=0.1, max_tokens=400)
         plan = self._parse_json(text)
         return self._sanitize(plan)
 
@@ -128,17 +138,135 @@ class ConditionPlanParser:
         except json.JSONDecodeError:
             return {}
 
+    @staticmethod
+    def _clamp(v, lo=0.0, hi=0.95) -> float:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return lo
+        return max(lo, min(f, hi))
+
     def _sanitize(self, p: dict) -> dict:
         action = p.get("action") if p.get("action") in ("buy_now", "wait") else "wait"
-        try:
-            frac = float(p.get("fraction", 0.0))
-        except (TypeError, ValueError):
-            frac = 0.0
-        frac = max(0.0, min(frac, 0.95))
+        frac = self._clamp(p.get("fraction"))
+        buy_frac = self._clamp(p.get("buy_fraction"))
+        condition = str(p.get("condition", "") or "")
+        trig = p.get("trigger")
+        if isinstance(trig, dict):
+            trig = self._sanitize_trigger(trig)
+        else:
+            trig = derive_trigger(condition)
+        # wait 但条件解析后连 buy_fraction 都没给:按不可触发处理
+        if action == "wait" and not condition and trig.get("type") == "none":
+            buy_frac = 0.0
         return {
             "action": action,
             "fraction": frac,
-            "condition": str(p.get("condition", "") or ""),
+            "buy_fraction": buy_frac,
+            "condition": condition,
+            "trigger": trig,
             "note": str(p.get("note", "") or ""),
             "judge": "llm-plan",
         }
+
+    @staticmethod
+    def _sanitize_trigger(t: dict) -> dict:
+        typ = t.get("type") if t.get("type") in (
+            "keyword", "price_below", "price_above", "none") else "none"
+        out = {"type": typ}
+        if typ.startswith("price_"):
+            try:
+                out["value"] = float(t.get("value"))
+            except (TypeError, ValueError):
+                out["type"] = "none"
+                out["value"] = None
+        else:
+            out["value"] = None
+        kws = t.get("keywords")
+        if isinstance(kws, list):
+            out["keywords"] = [str(k).strip() for k in kws if str(k).strip()]
+        else:
+            out["keywords"] = []
+        if typ == "keyword" and not out["keywords"]:
+            out["type"] = "none"
+        return out
+
+
+# ---- Branch C 触发条件的规则推导与求值(01 六 / 03 八:程序监测条件) ----
+# 条件文本常由模型自然语言给出;这里做最小机检:
+#   - 价格条件:跌破/回调到/跌至 X → price_below;涨破/涨过/突破 X → price_above
+#   - 事件条件:出现『签约/订单/公告/名单』等 → keyword 类型(事件摘要中含关键词
+#     且该句未被否定才算满足)
+# 求值是"程序监测",不在节点上重新征求 Investment AI 判断。
+_NEG_WORDS = ["未", "没有", "不", "否认", "无法确认", "尚未", "不能确认", "无正式",
+              "仍未", "并未", "不会"]
+_PRICE_PATTERNS = [
+    (re.compile(r"(跌破|跌至|跌到|回调到|回调至|低于|回到)\s*(\d+(?:\.\d+)?)\s*(美元|USD|刀)?"),
+     "price_below"),
+    (re.compile(r"(涨破|涨过|涨至|涨到|突破|高于|站上|站稳|站回|回到)\s*(\d+(?:\.\d+)?)\s*(美元|USD|刀)?"),
+     "price_above"),
+]
+_CONFIRM_KEYWORDS = ["签约", "签署", "订单", "正式供货", "采购名单", "公告确认",
+                     "确认获得", "进入名单", "纳入", "拿到"]
+
+
+def derive_trigger(condition: str) -> dict:
+    """从自然语言条件推导机检触发(LLM 未给出 trigger 时的兜底)。"""
+    c = condition or ""
+    for pat, typ in _PRICE_PATTERNS:
+        m = pat.search(c)
+        if m:
+            after = c[m.end():m.end() + 8]
+            if any(w in after for w in ("以上", "之上", "上方")):
+                typ = "price_above"
+            elif any(w in after for w in ("以下", "之下", "下方", "以内")):
+                typ = "price_below"
+            return {"type": typ, "value": float(m.group(2)), "keywords": []}
+    kws = [k for k in _CONFIRM_KEYWORDS if k in c]
+    if kws or any(w in c for w in ("公告", "等公司", "等待公司", "官宣")):
+        if "公告" in c and not kws:
+            kws = ["公告"]
+        return {"type": "keyword", "value": None, "keywords": kws}
+    return {"type": "none", "value": None, "keywords": []}
+
+
+def _clauses(summary: str):
+    for s in re.split(r"[。；;!?！？\n]", summary or ""):
+        s = s.strip()
+        if s:
+            yield s
+
+
+def evaluate_trigger(trigger: dict, day_events: list,
+                     day_close: float = None) -> bool:
+    """某节点触发条件求值。
+
+    day_events: 该日释放的公开事件(dict 列表,含 kind/summary/price_usd)
+    day_close:  该日收盘价(price 事件)
+    语义:
+    - price_below/price_above:当日收盘价与 value 比较;
+    - keyword:事件摘要中任一句含任一关键词、且该句未被否定 → 触发
+      (『未签署』『否认订单』等否定句不触发);
+    - none/缺省:永不触发。
+    """
+    t = trigger or {}
+    typ = t.get("type")
+    if typ == "price_below":
+        return day_close is not None and t.get("value") is not None \
+            and day_close < t["value"]
+    if typ == "price_above":
+        return day_close is not None and t.get("value") is not None \
+            and day_close > t["value"]
+    if typ == "keyword":
+        kws = t.get("keywords") or []
+        if not kws:
+            return False
+        for ev in day_events or []:
+            for s in _clauses(ev.get("summary", "")):
+                if not any(k in s for k in kws):
+                    continue
+                if any(n in s for n in _NEG_WORDS):
+                    continue
+                return True
+        return False
+    return False

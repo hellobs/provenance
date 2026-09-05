@@ -154,42 +154,107 @@ ROUTER_JSON_HINT = (
     "\n\n输出要求:把识别出的每个问题输出为 JSON 数组,不要输出其他内容:\n"
     '[{"summary": "问题摘要", "field": "专业领域", "risk": "High|Medium|Low", '
     '"routing_reason": "路由理由"}, ...]\n'
-    "若没有需要专业审核的问题,输出 []"
+    "若没有需要专业审核的问题,输出 []\n"
+    "格式硬性要求:不要使用 ```json 代码围栏;summary/field/routing_reason 等"
+    "字段内容中一律不要出现英文双引号(\"),需要引用原文时用中文引号『』或“”。"
 )
 
 _ROUTER_RISKS = {"high", "medium", "low"}
 
 
 def _parse_router_json(text: str) -> list:
-    """从 Router 输出提取 issues 列表(容忍 JSON 前后杂文本/数组内注释)。"""
+    """从 Router 输出提取 issues 列表。
+
+    容忍:前后杂文本、```json 代码围栏、首尾空白;数组内个别畸形项跳过。
+    """
     import json as _json
     import re as _re
 
     if not text:
         return []
-    # 尝试提取第一个 [...] 数组
-    m = _re.search(r"\[.*\]", text, _re.S)
-    if not m:
+    t = str(text)
+    # 剥 markdown 代码围栏(```json ... ```)
+    m = _re.search(r"```(?:json)?\s*(.*?)```", t, _re.S)
+    if m:
+        t = m.group(1)
+    # 取第一个 [ 到最后一个 ] 之间(容忍尾部解释文字)
+    i0 = t.find("[")
+    i1 = t.rfind("]")
+    if i0 < 0 or i1 <= i0:
         return []
     try:
-        arr = _json.loads(m.group(0))
+        arr = _json.loads(t[i0:i1 + 1])
     except _json.JSONDecodeError:
-        return []
+        # 整体解析失败:尝试逐行剥离畸形(常见:某字段含未转义引号)
+        arr = _line_tolerant_parse(t[i0:i1 + 1])
     issues = []
+    if not isinstance(arr, list):
+        return []
     for i, it in enumerate(arr):
         if not isinstance(it, dict):
             continue
         risk = str(it.get("risk", "")).strip().lower()
         if risk not in _ROUTER_RISKS:
             risk = "medium"
+        summary = str(it.get("summary", "")).strip()
+        field = str(it.get("field", "")).strip()
+        reason = str(it.get("routing_reason", "")).strip()
+        if not summary and not field:
+            continue
         issues.append({
             "id": "issue-{}".format(i + 1),
-            "summary": str(it.get("summary", "")).strip(),
-            "field": str(it.get("field", "")).strip(),
+            "summary": summary,
+            "field": field,
             "risk": risk,
-            "routing_reason": str(it.get("routing_reason", "")).strip(),
+            "routing_reason": reason,
         })
     return issues
+
+
+def _line_tolerant_parse(chunk: str) -> list:
+    """整体 JSON 解析失败时的兜底:按顶层对象块切分逐个重试。
+
+    括号深度切分不依赖引号配对,因此个别字段含未转义引号时仍能保住
+    其他合法对象。仍失败返回空列表。
+    """
+    import json as _json
+
+    chunk = (chunk or "").strip()
+    # 剥外层数组括号(顶层切分按对象进行)
+    if chunk.startswith("[") and chunk.endswith("]"):
+        chunk = chunk[1:-1]
+    parts = []
+    depth = 0
+    buf = []
+    for ch in chunk:
+        if ch == "{":
+            if depth == 0:
+                buf = [ch]
+            else:
+                buf.append(ch)
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            buf.append(ch)
+            if depth == 0:
+                parts.append("".join(buf))
+                buf = []
+            continue
+        if depth > 0:
+            buf.append(ch)
+    out = []
+    for p in parts:
+        p = p.strip()
+        if not p.startswith("{"):
+            continue
+        try:
+            obj = _json.loads(p)
+        except _json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            out.append(obj)
+    return out
 
 
 def run_router(llm, reflection_text: str, material: str = "",
