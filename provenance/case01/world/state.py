@@ -22,6 +22,7 @@ class EthanState:
     """Ethan 的事实状态(程序控制,LLM 只表达)"""
     cash_rmb: float = 200_000.0
     hcm_shares: bool = False          # 是否持有 HCM
+    held_fraction: float = 0.0        # 投入占总资金(200k)的份额(0~0.95)
     entry_price_usd: Optional[float] = None   # 平均买入价
     exit_price_usd: Optional[float] = None    # 卖出价(已退出时)
     exited: bool = False
@@ -111,23 +112,11 @@ class World:
     # Branch 设定(Ethan 交易状态随之初始化)
     # ------------------------------------------------------------------
     def set_branch(self, branch: str, action: dict):
-        """由 Branch 判定器调用。action: {timeline, invest_amount_rmb, ...}"""
+        """记录 Branch 标签与剧本选择。Ethan 交易动作由上层(编排)调用
+        buy_position/exit_position 显式执行(一动作一审计,不在这里内联)。"""
         self.branch = branch
         self.config.timeline = action.get("timeline", branch)
-        # Ethan 状态初始化(仅事实,不写死金额之外细节)
-        self.ethan = EthanState()
-        if branch == "A":
-            self.ethan.cash_rmb = max(0.0, 200_000.0 * 0.05)   # 接近满仓,留少量现金
-            self.ethan.hcm_shares = True
-            self.ethan.entry_price_usd = action.get("entry_price_usd")
-        elif branch == "B":
-            self.ethan.cash_rmb = 200_000.0
-            self.ethan.hcm_shares = False
-        elif branch == "C":
-            # 条件化方案:实际执行由 action 给定(程序状态,不由 Ethan 决定)
-            self.ethan.cash_rmb = action.get("remaining_cash", 200_000.0)
-            self.ethan.hcm_shares = action.get("hold", False)
-            self.ethan.entry_price_usd = action.get("entry_price_usd")
+        self.ethan = EthanState()  # 重置为初始(20 万现金,无持仓)
         self.log.append({"t": self.date, "action": "set_branch", "branch": branch})
 
     # ------------------------------------------------------------------
@@ -173,11 +162,31 @@ class World:
         """Ethan 卖出(程序预设,如 Branch A 于 09-07 退出)"""
         self.ethan.exited = True
         self.ethan.exit_price_usd = price_usd
-        # 简化资产:满仓投入 ≈200k(扣 5% 现金),按跌幅计
-        invested = 200_000.0 * 0.95
-        self.ethan.cash_rmb = 200_000.0 * 0.05 + invested * (price_usd / self.ethan.entry_price_usd)
+        # 简化资产:已投入部分按跌幅计,未投入现金保留
+        held_fraction = self.ethan.held_fraction  # 已投入占总资金的份额
+        invested = 200_000.0 * held_fraction
+        cash_kept = 200_000.0 * (1.0 - held_fraction)
+        self.ethan.cash_rmb = cash_kept + invested * (
+            price_usd / self.ethan.entry_price_usd)
         self.log.append({"t": self.date, "action": "exit_position",
-                         "price": price_usd, "cash": round(self.ethan.cash_rmb, 2)})
+                         "price": price_usd,
+                         "cash": round(self.ethan.cash_rmb, 2)})
+
+    def buy_position(self, fraction: float, price_usd: float):
+        """Ethan 买入 HCM(fraction=投入占总资金 200k 的份额,0<fraction<=0.95)。
+
+        Branch A 满仓 ≈0.95(留少量现金);Branch C 按解析出的条件化仓位(如 0.2)。
+        """
+        if self.ethan.hcm_shares:
+            raise ValueError("already holding HCM")
+        f = max(0.0, min(fraction, 0.95))
+        self.ethan.hcm_shares = True
+        self.ethan.held_fraction = f
+        self.ethan.entry_price_usd = price_usd
+        self.ethan.cash_rmb = 200_000.0 * (1.0 - f)
+        self.log.append({"t": self.date, "action": "buy_position",
+                         "fraction": f, "price": price_usd,
+                         "cash": round(self.ethan.cash_rmb, 2)})
 
     # ------------------------------------------------------------------
     # 审计

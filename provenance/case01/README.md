@@ -39,20 +39,23 @@ python -m case01.run --timeline A
 python -m case01.run --no-llm
 ```
 
-## M1 完成度(2026-09)
+## M1-M2 完成度(2026-09)
 
 - [x] World 状态机(日期跳跃推进、事件按剧本释放、信息权限:AI 只见
       已释放公开事件;个人后果默认隐藏、披露节点才开放)
 - [x] Timeline A/B 剧本数据化(03 文档)
 - [x] Branch 判定:LLM 独立 judge(A/B/C+理由);规则版 no-llm 降级
+- [x] Branch C 条件化方案解析(LLM → 仓位 fraction/等待条件)
 - [x] Investment AI:Ollama + Financial Data 向量检索,结果保留来源/
-      类型/依赖线索(识别 MarketScope 二次传播),source_stats 审计
-- [x] Ethan:状态注入 + 状态冲突重生成(禁虚构交易)
-- [x] runs/<run_id>/ JSONL 落盘(对话/检索/判定)
-- [ ] M2:Timeline 推进至 09-15 + Ethan 交易/后果状态 + 最终反馈
-- [ ] M3:Reflection(8 维,后台触发)+ Router
+      类型/时间/依赖线索(识别 MarketScope 二次传播),source_stats 审计
+- [x] Ethan:状态注入 + 状态冲突重生成 + 最终反馈披露个人后果
+- [x] **M2 完整 Run 编排**(orchestrator):T0 → Branch → 逐节点推进
+      (事件释放+账面更新,中间无对话) → 09-15 最终反馈 → 完整记录
+      (events/state_history/final_feedback/audit)
+- [x] runs/<run_id>/ JSONL + run.json 落盘;no-llm 全链路 A/B/C 测试
+- [ ] M3:Reflection(8 维,后台触发)+ Router(问题拆分/分类/风险/路由)
 - [ ] M4:仝牧 Governance Platform 对接
-- [ ] M5:训练材料归集 + Run 回溯
+- [ ] M5:训练材料归集 + Run 回溯;网页加时间线/后果章节
 
 ## 依赖
 

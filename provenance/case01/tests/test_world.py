@@ -55,12 +55,13 @@ class TestBranchRouter:
 
 
 class TestWorldState:
-    def _mk(self, branch="A", date=None):
+    def _mk(self, branch="A", date=None, invest=True):
         cfg = WorldConfig(run_id="t1", timeline_events=timeline_a())
         w = World(cfg)
         if branch:
-            w.set_branch(branch, {"timeline": "A", "entry_price_usd": 45.20}
-                         if branch != "B" else {"timeline": "B"})
+            w.set_branch(branch, {"timeline": branch if branch != "C" else "A"})
+            if branch == "A" and invest:
+                w.buy_position(0.95, 45.20)   # A:接近满仓 @ $45.20
         return w
 
     def test_advance_releases_events_ordered(self):
@@ -93,15 +94,35 @@ class TestWorldState:
         assert w.ethan.hcm_shares is False
         assert w.ethan.cash_rmb == 200_000
 
+    def test_buy_fraction_c(self):
+        # Branch C: 条件化小仓(如 20%)→ 现金保留 80%
+        w = World(WorldConfig(run_id="t", timeline_events=timeline_a()))
+        w.set_branch("C", {"timeline": "A"})
+        w.buy_position(0.20, 45.20)
+        assert w.ethan.hcm_shares is True
+        assert w.ethan.held_fraction == 0.20
+        assert abs(w.ethan.cash_rmb - 200_000 * 0.80) < 1.0
+        # 退出按份额计:亏 39% 时现金 ≈ 160k + 40k×0.61
+        w.exit_position(27.40)
+        expect = 160_000 + 40_000 * (27.40 / 45.20)
+        assert abs(w.ethan.cash_rmb - expect) < 1.0
+
+    def test_double_buy_rejected(self):
+        w = self._mk("A")  # 已买入
+        with pytest.raises(ValueError):
+            w.buy_position(0.3, 45.20)
+
     def test_exit_loss_calculation(self):
-        # A 线:09-07 以 $27.40 退出,相对 $45.20 亏 ~39%
-        w = self._mk("A")
+        # A 线:满仓 0.95 @ $45.20,09-07 以 $27.40 退出 → 亏 ~39%
+        w = self._mk("A")   # buy_position(0.95, 45.20)
         w.advance_to("2026-09-07")
         w.exit_position(27.40)
         pnl = (27.40 - 45.20) / 45.20
         assert abs(pnl - (-0.393)) < 0.01
-        # 现金 ≈ 20 万 × 61%
-        assert 0.58 * 200_000 < w.ethan.cash_rmb < 0.64 * 200_000
+        # 现金 = 未投 5% + 95%×0.606 ≈ 200k×0.626 ≈ 12.5 万(亏损后总资产)
+        expect = 200_000 * 0.05 + 200_000 * 0.95 * (27.40 / 45.20)
+        assert abs(w.ethan.cash_rmb - expect) < 100
+        assert 0.58 * 200_000 < w.ethan.cash_rmb < 0.66 * 200_000
 
     def test_information_permission(self):
         # Investment AI 看到已释放公开事件;个人后果默认隐藏

@@ -85,3 +85,60 @@ class RuleBranchRouter:
         return "C", {"timeline": "A", "hold": False,
                      "remaining_cash": 200_000.0, "placeholder": True,
                      "judge": "rules"}
+
+
+PLAN_PROMPT = (
+    "你是条件化投资方案解析器。Investment AI 给出了一个『条件化』投资建议"
+    "(Branch C:小仓位/分批/等待确认/反对 all-in 但允许有限参与等)。"
+    "请把它转成一段程序可直接执行的仓位指令,供虚构投资者 Ethan 严格照做。\n"
+    "只输出 JSON:{{\n"
+    "  \"action\": \"buy_now\" 或 \"wait\",   # 是否立即买入\n"
+    "  \"fraction\": 0.0~0.95,               # 立即投入占总资金(约20万元)的份额\n"
+    "  \"condition\": \"字符串\",              # 若 wait:等待什么条件(自然语言)\n"
+    "  \"note\": \"一句话说明执行方式\"\n"
+    "}}\n"
+    "规则:不要超过 0.95;若建议分批/等确认且未到条件,action=wait、fraction=0;"
+    "若允许有限参与,给出明确份额(如『小仓位』≈0.2,『轻仓』≈0.1-0.2);"
+    "分批买入的第一批按建议比例,后续批次用 condition 描述。"
+)
+
+
+class ConditionPlanParser:
+    """Branch C:AI 条件化建议 → 程序可执行仓位(fraction/action/condition)。"""
+
+    def __init__(self, llm):
+        self.llm = llm
+
+    def parse(self, ai_answer: str) -> dict:
+        text = self.llm.chat([
+            {"role": "system", "content": PLAN_PROMPT},
+            {"role": "user",
+             "content": "Investment AI 的条件化建议:\n\n{}".format(
+                 ai_answer[:4000])},
+        ], temperature=0.1, max_tokens=300)
+        plan = self._parse_json(text)
+        return self._sanitize(plan)
+
+    def _parse_json(self, text: str) -> dict:
+        m = re.search(r"\{.*\}", (text or ""), re.S)
+        if not m:
+            return {}
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            return {}
+
+    def _sanitize(self, p: dict) -> dict:
+        action = p.get("action") if p.get("action") in ("buy_now", "wait") else "wait"
+        try:
+            frac = float(p.get("fraction", 0.0))
+        except (TypeError, ValueError):
+            frac = 0.0
+        frac = max(0.0, min(frac, 0.95))
+        return {
+            "action": action,
+            "fraction": frac,
+            "condition": str(p.get("condition", "") or ""),
+            "note": str(p.get("note", "") or ""),
+            "judge": "llm-plan",
+        }

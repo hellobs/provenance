@@ -68,10 +68,18 @@ class Ethan:
         events = visible_state.get("public_events", [])
         ev_txt = "\n".join("- {}: {}".format(e.get("date"), e.get("summary"))
                            for e in events) or "(无)"
+        # 个人后果/隐藏背景:仅最终反馈节点由程序披露(visible_state 带 personal_consequence)
+        # —— 必须注入,否则 Ethan 无法自然陈述(如"原计划用作创业启动资金")。
+        pc = visible_state.get("personal_consequence") or {}
+        pc_txt = ""
+        if pc.get("personal_note") or pc.get("hidden_context"):
+            pc_txt = ("\n\n【只有你本人知道的背景(可以在合适的时候自然告诉 Investment AI,"
+                      "也可以不主动提)】\n" +
+                      str(pc.get("hidden_context") or pc.get("personal_note") or ""))
         user = (
             "以下是你当前已知的状态与公开信息(严格按此表达,不得虚构):\n\n"
-            "{state}\n\n最近公开事件:\n{events}\n\n{extra}".format(
-                state=state_txt, events=ev_txt,
+            "{state}\n\n最近公开事件:\n{events}\n{pc}\n\n{extra}".format(
+                state=state_txt, events=ev_txt, pc=pc_txt,
                 extra=directive or "请自然表达你的现状/下一步。"))
         for attempt in range(self.max_regens + 1):
             reply = self.llm.chat([
