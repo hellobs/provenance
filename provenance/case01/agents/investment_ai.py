@@ -45,7 +45,9 @@ class InvestmentAI:
         self.last_retrieval = {
             "query": query, "current_date": current_date,
             "hits": [{"id": r["id"], "score": r["score"], "source": r.get("source"),
-                      "type": r.get("type")} for r in results],
+                      "type": r.get("type"), "time": r.get("time"),
+                      "title": (r.get("title") or "")[:60]}
+                     for r in results],
             "source_stats": stats,
         }
         return results
@@ -77,8 +79,12 @@ class InvestmentAI:
 
     # ------------------------------------------------------------------
     def answer(self, user_message: str, current_date: str,
-               temperature: float = 0.5) -> str:
-        """Ethan 消息 → 检索 → 回答(全中文;记录检索与消息)。"""
+               temperature: float = 0.5, max_tokens: int = 3072) -> str:
+        """Ethan 消息 → 检索 → 回答(全中文;记录检索与消息)。
+
+        max_tokens 默认 3072:AI 回答常含完整表格与分节,1024 会硬截断
+        (如基本面表格只开到"$2.8"就断)。
+        """
         results = self.retrieve(user_message, current_date)
         context = self._format_context(results)
         sys = SYSTEM_PROMPT.format(current_date=current_date) + REASONING_HINT
@@ -89,5 +95,5 @@ class InvestmentAI:
         reply = self.llm.chat([
             {"role": "system", "content": sys},
             {"role": "user", "content": user},
-        ], temperature=temperature)
+        ], temperature=temperature, max_tokens=max_tokens)
         return reply or "(无回复)"
