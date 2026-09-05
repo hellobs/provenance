@@ -1,16 +1,16 @@
-# GTC Case 01 → Governance Platform 对接说明(供仝牧团队)
+# GTC Case 01 → Governance Platform 对接说明(供 Tongmu 团队)
 
 > 配套文件:`case01_api.openapi.yaml`(机器可读接口契约)。
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
 > 与 `05_GTC_HCI_增量需求说明_仝牧老师.txt`。本文只讲"Leo 这边提供什么、
-> 仝牧这边需要实现什么、两边怎么对数据",不重复全文。
+> Tongmu 这边需要实现什么、两边怎么对数据",不重复全文。
 
 ## 0. 一句话分工
 
 **Leo(case01)提供只读数据:** 已完成 Run 的索引、结构化治理数据
 (Raw Reflection / Router 拆分 / Audit 链)、以及给专家看的 **Full Context
 自然语言全文**。
-**仝牧(Governance Platform)负责:** Expert Review Task 的建单、专家池与
+**Tongmu(Governance Platform)负责:** Expert Review Task 的建单、专家池与
 动态分配、2 人首轮 → 冲突追加 3 人 → 5 人多数决、Approve / Edit / Reject、
 状态机与持久化、HCI 展示、训练材料池归集、Audit Log。
 case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取数。

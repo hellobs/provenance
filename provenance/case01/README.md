@@ -68,7 +68,7 @@ python -m case01.run --no-llm
 - [x] **③ Branch C 个人后果(方案 A)**:见下《设计决策》第 1 条
 - [x] Router 输出解析容错(剥代码围栏;整体失败按顶层对象恢复;
       输出约束:内容禁英文双引号)——实测 demo-3 由 0 条恢复到 7 条
-- [ ] M4:仝牧 Governance Platform 对接(专家审核 Approve/Edit/Reject)
+- [ ] M4:Governance Platform(Tongmu 团队)对接(专家审核 Approve/Edit/Reject)
 - [ ] M5:训练材料归集 + Run 回溯
 
 ## 与 0904 文档的设计决策与假设(2026-09-05)
