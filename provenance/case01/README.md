@@ -7,7 +7,7 @@ GTC Case 01(0904doc)的运行引擎:节点驱动的受控实验,
 
 ## 角色与联系人
 
-- **维护与实现**:ZZR(case01 引擎;supervised by Tongmu)。
+- **维护与实现**:ZZR。
 - **引擎侧职责对接**:Leo(0904 文档名义任务对象;接口语义问题由其确认)。
 - **Platform / HCI 侧**:Tongmu 团队(含 ZZR;负责 Expert Review Task、
   专家审核界面、Full Context 展示与平台持久化)。
@@ -103,7 +103,7 @@ python -m case01.render
 ## 与 0904 文档的设计决策与假设(2026-09-05)
 
 以下为 03/06 文档未明确处,case01 引擎实现所采用的设计(实现与仓库
-维护:ZZR;supervised by Tongmu),需研究侧确认或后续文档化:
+维护:ZZR),需研究侧确认或后续文档化:
 
 1. **Branch C 个人后果 = 方案 A(复用 A 线资金用途背景,按结果派生)**。
    06 §5.3 的 C 模板含 `{final_personal_consequence}` 槽位,但 03/06 从未

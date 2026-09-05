@@ -4,7 +4,7 @@
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
 > 与 `05_GTC_HCI_增量需求说明_仝牧老师.txt`。本文只讲"Leo 这边提供什么、
 > Tongmu 这边需要实现什么、两边怎么对数据",不重复全文。
-> 维护:ZZR(case01 引擎实现;supervised by Tongmu);引擎侧职责对接:Leo;
+> 维护:ZZR;引擎侧职责对接:Leo;
 > Platform / HCI 侧实现:Tongmu 团队(含 ZZR)。
 
 ## 0. 一句话分工
