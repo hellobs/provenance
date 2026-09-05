@@ -8,7 +8,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from case01.orchestrator import run_case01, final_feedback_directive, FINAL_DATE
+from case01.orchestrator import (run_case01, final_feedback_directive,
+                                 c_personal_consequence, FINAL_DATE)
 from case01.world.branch import (derive_trigger, evaluate_trigger)
 from _fakes import FakeLLM, ScriptedEthan, ScriptedAI, StubPlanParser
 
@@ -82,6 +83,7 @@ class TestFinalFeedbackDirectiveC:
               "entry_price_usd": 45.20, "cash_rmb": 187241.38}
         txt = final_feedback_directive("C", c_plan, st)
         assert "20%" in txt and "$45.20" in txt and "$27.40" in txt
+        assert "个人背景,系统信息已给出" in txt  # 后果提示指向披露背景
 
     def test_triggered_path(self):
         c_plan = {"action": "wait", "buy_fraction": 0.3,
@@ -98,6 +100,35 @@ class TestFinalFeedbackDirectiveC:
         st = {"exited": False, "hcm_shares": False, "cash_rmb": 200000.0}
         txt = final_feedback_directive("C", c_plan, st)
         assert "没有出现" in txt and "未买入" in txt
+        assert "个人背景,系统信息已给出" in txt
+
+
+class TestCPersonalConsequence:
+    """方案 A:C 个人后果按实际执行结果派生(共用创业启动金背景)。"""
+
+    def test_lost_when_bought_and_exited(self):
+        st = {"exited": True, "hcm_shares": True, "held_fraction": 0.3,
+              "entry_price_usd": 34.8, "exit_price_usd": 27.4,
+              "cash_rmb": 187241.0}
+        txt = c_personal_consequence(st, {"triggered": {"date": "2026-09-02",
+                                                        "price_usd": 34.8}})
+        assert "创业" in txt
+        assert "减少约 12,759" in txt or "减少" in txt
+        assert "压缩或推迟" in txt
+
+    def test_unaffected_when_never_bought(self):
+        st = {"exited": False, "hcm_shares": False, "cash_rmb": 200000.0}
+        txt = c_personal_consequence(st, {"action": "wait",
+                                          "condition": "等正式公告再买"})
+        assert "未受影响" in txt and "从未买入" in txt and "20 万" in txt
+
+    def test_small_position_low_loss_keeps_plan(self):
+        # 极端小亏(退出后仍 ≥20 万理论不成立,此处验证分支保护)
+        st = {"exited": True, "hcm_shares": True, "held_fraction": 0.05,
+              "entry_price_usd": 27.4, "exit_price_usd": 27.4,
+              "cash_rmb": 200000.0}
+        txt = c_personal_consequence(st)
+        assert "基本未受损失" in txt
 
 
 class TestOrchestratorCMonitor:

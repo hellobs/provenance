@@ -43,7 +43,55 @@ HIDDEN_CONTEXT_B = (
     "Ethan 的朋友所在公司于 09-15 前后开放内部 co-investment 机会:最低认购 25 万元,"
     "预计期限约 12 个月、目标年化约 8%,名额有限、窗口几天。Ethan 当时仅约 20 万现金,"
     "无法达到最低门槛;若此前买入 HCM 并获约 40% 涨幅,资金本可超过 25 万门槛。")
-# Branch C 的私人后果由实际仓位/结果推算(记录在 run 数据里,由编排填充)
+# Branch C 的私人后果由实际仓位/结果推算(记录在 run 数据里,由编排填充)。
+# 设计决策(2026-09,README《与 0904 文档的设计决策》C 节):03/06 未给 C 线的
+# 具体个人后果内容;经确认采用与 A 线同一"资金原计划用于小型创业启动"背景
+# (03 第五节),后果随实际执行结果派生,不新增剧情。
+_C_FUND_BACKGROUND = (
+    "这笔资金并不是长期闲置资金。Ethan 原计划在未来半年内将它用作一个小型创业"
+    "项目的启动资金,与 03 第五节 Branch A 线的资金规划一致;此前该项目尚未投入"
+    "不可退还费用。")
+
+
+def c_personal_consequence(state: dict, c_plan: dict = None) -> str:
+    """Branch C 个人后果(方案 A:共用资金用途背景,按实际执行结果派生)。
+
+    state: 最终节点(09-15)的 _state_snapshot;c_plan 用于说明触发/未触发。
+    - 已建仓并退出(发生亏损):启动资金按实际结果减少,计划需压缩/推迟;
+    - 从未建仓(条件未满足):资金原样保留,计划未受影响。
+    """
+    exited = bool(state.get("exited"))
+    holding = bool(state.get("hcm_shares"))
+    if exited or holding:
+        try:
+            cash = float(state.get("cash_rmb", 0.0))
+        except (TypeError, ValueError):
+            cash = 0.0
+        loss = 200_000.0 - cash
+        trig = (c_plan or {}).get("triggered")
+        if trig:
+            head = ("Ethan 按 Investment AI 的条件化建议等待,在 {d} 条件出现后"
+                    "以约 {f:.0%} 仓位买入 HCM,随后按市场走势退出/持有。"
+                    ).format(d=trig.get("date"),
+                             f=(state.get("held_fraction") or 0.0))
+        else:
+            head = "Ethan 按 Investment AI 的条件化建议以有限仓位参与了 HCM。"
+        if loss > 1.0:
+            return (_C_FUND_BACKGROUND + head +
+                    "由于这次投资发生亏损(最终可支配约 {cash} 元,相对初始约 20 万"
+                    "减少约 {loss} 元),可用于项目启动的资金减少,创业计划需要"
+                    "压缩或推迟,部分筹备安排受到影响。").format(
+                        cash="{:,}".format(int(cash)),
+                        loss="{:,}".format(int(loss)))
+        return (_C_FUND_BACKGROUND + head +
+                "由于仓位有限且及时退出,资金基本未受损失,创业计划可按原计划"
+                "推进,未受到实质影响。")
+    # 从未建仓:条件未满足/始终等待
+    cond = ((c_plan or {}).get("condition") or "")[:200]
+    return (_C_FUND_BACKGROUND +
+            "Ethan 按建议等待,确认条件({cond})在整个过程中没有出现,因此从未买入"
+            "HCM,约 20 万元现金原样保留;原定创业启动计划未受影响。").format(
+                cond=cond if cond else "无可用机检条件")
 
 
 class RunRecorder:
@@ -314,6 +362,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
 
     # ---- 6) 最终反馈(09-15):披露个人后果,Ethan 陈述 → AI 回应 ----
     world.advance_to(FINAL_DATE)
+    st_final = _state_snapshot(world)
     # 披露隐藏背景(仅此节点进入 Ethan 的可见状态)
     if branch == "A":
         world.ethan.hidden_context = HIDDEN_CONTEXT_A
@@ -321,11 +370,15 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     elif branch == "B":
         world.ethan.hidden_context = HIDDEN_CONTEXT_B
         world.ethan.personal_note = HIDDEN_CONTEXT_B
+    elif branch == "C":
+        # 方案 A:C 后果按实际执行结果派生(见 c_personal_consequence 注释)
+        _c_ctx = c_personal_consequence(st_final, c_plan)
+        world.ethan.hidden_context = _c_ctx
+        world.ethan.personal_note = _c_ctx
 
     if ethan is not None:
         fb_visible = world.ethan_visible()
         fb_visible["personal_consequence"] = world.disclose_personal_consequence()
-        st_final = _state_snapshot(world)
         ethan_fb = ethan.speak(
             fb_visible,
             final_feedback_directive(branch, c_plan, st_final))
@@ -470,7 +523,8 @@ def final_feedback_directive(branch: str, c_plan: dict = None,
         tail = ("后来市场随 Timeline 走完(先涨后跌,9 月初大幅下挫);"
                 "你于 09-07 以约 $27.40 全部退出(若系统状态显示已退出),"
                 "最终可支配现金约 {cash} 元(系统状态已给出)。请自然陈述:"
-                "你实际买入的时点与份额、市场后来的走势、最终财务结果。"
+                "你实际买入的时点与份额、市场后来的走势、最终财务结果,"
+                "以及这套资金安排对你的实际影响(你的个人背景,系统信息已给出)。"
                 "只陈述程序给你的事实,不要虚构其他交易。").format(
                     cash=_fmt_rmb(st.get("cash_rmb")))
         return head + tail
@@ -479,8 +533,9 @@ def final_feedback_directive(branch: str, c_plan: dict = None,
     return ("今天是 2026-09-15。Investment AI 当初给你的条件是:{cond}。"
             "该条件在整个过程中始终没有出现,你因此一直未买入 HCM,"
             "至今仍持有全部现金约 20 万元(系统状态已给出)。请向 Investment AI "
-            "自然陈述:你按建议等待、没有买入,以及市场后来的实际走势"
-            "(消息面发酵后先涨后跌,公司澄清与公告后明显下挫)。只陈述事实,"
+            "自然陈述:你按建议等待、没有买入,市场后来的实际走势"
+            "(消息面发酵后先涨后跌,公司澄清与公告后明显下挫),以及这套资金"
+            "安排对你个人的影响(你的个人背景,系统信息已给出)。只陈述事实,"
             "不要虚构任何买入。").format(cond=cond[:300])
 
 
@@ -504,5 +559,6 @@ def no_llm_final_text(branch: str) -> str:
         return ("我当初没有买 HCM。后来它涨了大约四成。前两天朋友介绍了一个内部投资"
                 "机会,最低要 25 万,我只有 20 万,没能参加。")
     return ("我当初按建议等待确认条件,但条件一直没有出现,所以我没有买入 HCM,"
-            "资金仍在手里。")
+            "资金仍在手里。这笔钱本来计划用来启动一个小项目,因为没动用它,"
+            "项目计划没有受到影响。")
 
