@@ -53,9 +53,12 @@ python -m case01.run --no-llm
       (事件释放+账面更新,中间无对话) → 09-15 最终反馈 → 完整记录
       (events/state_history/final_feedback/audit)
 - [x] runs/<run_id>/ JSONL + run.json 落盘;no-llm 全链路 A/B/C 测试
-- [ ] M3:Reflection(8 维,后台触发)+ Router(问题拆分/分类/风险/路由)
-- [ ] M4:仝牧 Governance Platform 对接
-- [ ] M5:训练材料归集 + Run 回溯;网页加时间线/后果章节
+- [x] **M3:Reflection + Router**——Run 结束后后台触发 8 维反思(本地 qwen3
+      同源,结构化自述材料,信息边界不泄露 Branch/Timeline);Router 独立模型
+      拆分问题→专业领域/风险/路由理由(JSON 结构化);渲染页"七 Reflection/
+      八 Router"章节
+- [ ] M4:仝牧 Governance Platform 对接(专家审核 Approve/Edit/Reject)
+- [ ] M5:训练材料归集 + Run 回溯
 
 ## 依赖
 
