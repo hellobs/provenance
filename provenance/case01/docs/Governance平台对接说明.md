@@ -1,9 +1,11 @@
-# GTC Case 01 → Governance Platform 对接说明(供 Tongmu 团队)
+# GTC Case 01 → Governance Platform 对接说明(Platform / HCI 侧与引擎侧共用)
 
 > 配套文件:`case01_api.openapi.yaml`(机器可读接口契约)。
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
 > 与 `05_GTC_HCI_增量需求说明_仝牧老师.txt`。本文只讲"Leo 这边提供什么、
 > Tongmu 这边需要实现什么、两边怎么对数据",不重复全文。
+> 维护:ZZR(case01 引擎实现;supervised by Tongmu);引擎侧职责对接:Leo;
+> Platform / HCI 侧实现:Tongmu 团队(含 ZZR)。
 
 ## 0. 一句话分工
 
@@ -41,7 +43,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 
 | 字段 | 含义 | 给专家看? |
 | --- | --- | --- |
-| `run_id` | 运行标识(如 `m2-ext-C2`) | 可作为内部编号 |
+| `run_id` | 运行标识(如 `demo-2`) | 可作为内部编号 |
 | `start_date` / `end_date` | 模拟起止日期 | 可显示 |
 | `branch` / `branch_summary` | A/B/C 及自然语言摘要 | **否**(实验元信息,仅内部关联用) |
 | `n_turns` / `n_retrievals` | 对话轮数 / 检索次数 | 可显示 |
@@ -129,10 +131,10 @@ final → 训练材料池(完整治理记录,见 04 九)
 curl http://127.0.0.1:5002/api/runs
 
 # 2) 取某个 Run 的 Reflection + Router issues,逐 issue 建 Task
-curl http://127.0.0.1:5002/api/runs/m2-ext-C2
+curl http://127.0.0.1:5002/api/runs/demo-3
 
 # 3) 专家点"View Full Context"
-curl http://127.0.0.1:5002/api/runs/m2-ext-C2/full-context
+curl http://127.0.0.1:5002/api/runs/demo-3/full-context
 ```
 
 ## 6. 数据更新方式
@@ -154,4 +156,5 @@ case01 侧每完成一个完整 Run(含 Reflection / Router)才落盘,且为只�
 - [ ] 关键节点有时间、责任人、动作、结果,可按 Run / Reflection 回溯;
 - [ ] 最终结论与材料池状态可查询。
 
-有任何字段/语义问题,直接找 Leo 沟通,不要自行补剧情或改 case01 产物。
+有任何字段/语义问题,请同步引擎侧职责对接人(Leo)或文档维护人(ZZR);
+平台实现请勿自行补剧情或改动 case01 产物。
