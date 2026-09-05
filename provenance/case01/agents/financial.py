@@ -67,15 +67,19 @@ class FinancialData:
                type_filter: Optional[str] = None,
                since: Optional[str] = None) -> List[dict]:
         """返回带 score 与元信息的文档列表(降序)。
-        since: 只返回 >= 该日期(模拟日期过滤,已释放过滤由上层做)。
+        since: 只返回 time <= since 的文档(信息权限:不得让模型看到
+        模拟日期之后才发生的资料——未来公告/事件泄露会污染判断)。
         """
         qv = self._vec(query)
         scored = []
         for d in self.docs:
             if type_filter and d.get("type") != type_filter:
                 continue
-            if since and str(d.get("time", ""))[:10] < since:
-                continue
+            if since:
+                d_time = str(d.get("time", ""))[:10]
+                # 无 time 的资料视为公司基础资料,允许(不随时间失效)
+                if d_time and d_time > since:
+                    continue
             text = "{} {} {}".format(d.get("title", ""), d.get("content", ""),
                                      d.get("source", ""))
             if qv is not None:

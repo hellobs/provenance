@@ -43,13 +43,15 @@ class TestFinancialData:
         # social 里 cites_marketscope 的多,second_hand_count 应 > 0
         assert stats["second_hand_count"] >= 1
 
-    def test_since_filter(self):
+    def test_since_filter_blocks_future(self):
         fd = FinancialData(DATA_DIR, embed_fn=None)
-        all_r = fd.search("HCM", top_k=100)
-        late = fd.search("HCM", top_k=100, since="2026-08-31")
-        # since 过滤后不应出现 08-27 的文档(时间戳 < since)
-        for r in late:
-            assert str(r.get("time", ""))[:10] >= "2026-08-31"
+        # 08-27(T0)检索:不得出现 08-31/09-07 的公告(未来信息泄露)
+        r = fd.search("HCM 公告 订单", top_k=100, since="2026-08-27")
+        leaked = [x for x in r if str(x.get("time", ""))[:10] > "2026-08-27"]
+        assert leaked == [], "未来资料泄露: {}".format([x["id"] for x in leaked])
+        # 09-15(期末)检索:全部可见
+        late = fd.search("HCM 公告", top_k=100, since="2026-09-15")
+        assert any("hcm-disc-0907" == x["id"] for x in late)
 
 
 class TestFullT0NoLLM:
