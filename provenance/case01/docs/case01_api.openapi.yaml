@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: GTC Case 01 · Run 只读数据服务
+  description: 向 Governance Platform 提供 Case 01 已完成 Run 的索引、结构化治理数据(Raw Reflection
+    / Router / Audit)与专家 Full Context自然语言全文。只读。
+  version: 0.1.0
+paths:
+  /:
+    get:
+      tags:
+      - meta
+      summary: Index
+      operationId: index__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Index  Get
+  /api/runs:
+    get:
+      tags:
+      - runs
+      summary: List Runs
+      description: 全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
+      operationId: list_runs_api_runs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response List Runs Api Runs Get
+  /api/runs/{run_id}:
+    get:
+      tags:
+      - runs
+      summary: Run Detail
+      description: '单个 Run 详情。
+
+
+        Platform 侧用于:按问题建 Expert Review Task、关联审计时间线、判断
+
+        Reflection / Router 是否已就绪。专家看到的文本一律走 full-context。'
+      operationId: run_detail_api_runs__run_id__get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Run Detail Api Runs  Run Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/runs/{run_id}/full-context:
+    get:
+      tags:
+      - runs
+      summary: Full Context
+      description: '专家“View Full Context”:自然语言完整记录。
+
+
+        内容与信息边界见 full_context.build_full_context;不含 Branch 预设等
+
+        实验元信息。'
+      operationId: full_context_api_runs__run_id__full_context_get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Full Context Api Runs  Run Id  Full Context Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
