@@ -33,6 +33,18 @@ class TestAsksPrivateInfo:
         # 无隐私话题的普通提问
         assert not asks_private_info("您认为这条消息可靠吗?")
 
+    def test_statement_with_priv_word_not_question(self):
+        # 陈述句(标题式"说明:")含"整体财务"与弱词"说明",不是追问
+        # (实测 demo-3 误报句)
+        assert not asks_private_info(
+            "> 📌 说明:**1.2–1.5 亿元订单,对 HCM 是重大但非颠覆性的收入增长**,"
+            "可显著改善盈利结构,但不会改变其整体财务模型")
+
+    def test_weak_word_alone_not_enough(self):
+        # "可以了解一下""说明一下"这类弱请求若无真疑问/请求语气不触发
+        assert not asks_private_info("这笔投资的资金用途说明如下:短线操作。")
+        assert asks_private_info("您可以说明一下这笔资金的用途吗?")
+
     def test_empty(self):
         assert not asks_private_info("")
 

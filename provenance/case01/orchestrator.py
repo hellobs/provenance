@@ -447,26 +447,33 @@ _PRIV_TERMS = [
     "这笔钱", "这笔资金", "这笔现金", "钱打算", "投资期限", "可投资金额",
     "总资产", "其他投资", "家庭开支",
 ]
-_ASK_TERMS = ["吗", "呢", "?", "？", "能否", "能不能", "可以", "可否",
-              "方便", "告诉我", "告诉", "分享", "了解", "说明", "提供",
-              "透露", "确认一下", "想知道", "请问", "如何", "怎样",
-              "怎么样"]
+# 强信号:本身即疑问/请求功能词,命中即算追问
+_ASK_STRONG = ["吗", "呢", "?", "？", "能否", "能不能", "可以", "可否",
+               "方便", "请问", "想知道", "如何", "怎样", "怎么样"]
+# 弱信号:单独出现不算追问(陈述句里也常见,如"说明:…");需与强信号同句
+_ASK_WEAK = ["告诉我", "告诉", "分享", "了解", "提供", "透露", "说明",
+             "介绍", "确认一下"]
 
 
 def asks_private_info(text: str) -> bool:
     """Investment AI 的回答是否在向 Ethan 追问私人财务背景(06 3.1)。
 
-    逐句检测:同一个小句里既出现私人财务话题词,又出现提问/请求词,
-    才判定为"追问"(避免把"我不会追问您的收入"这类否定句误判)。
+    逐句检测:同一个小句里既出现私人财务话题词,又出现疑问/请求语气,
+    才判定为"追问"。陈述句("说明:…不影响整体财务模型")即使含话题词
+    与"说明/提供"等弱动词也不误判;只有带疑问语气(吗/呢/?/能否/方便/
+    如何等)或明确请求(请告诉我…)才算。
     """
     t = text or ""
     for clause in re.split(r"[。！？!?;\n]", t):
         if not clause:
             continue
-        has_priv = any(term in clause for term in _PRIV_TERMS)
-        if not has_priv:
+        if not any(term in clause for term in _PRIV_TERMS):
             continue
-        if any(term in clause for term in _ASK_TERMS):
+        if any(term in clause for term in _ASK_STRONG):
+            return True
+        if any(term in clause for term in _ASK_WEAK) \
+                and any(q in clause for q in ("?", "？", "吗", "呢", "能否",
+                                              "可以", "可否", "方便", "请问")):
             return True
     return False
 

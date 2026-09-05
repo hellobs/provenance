@@ -62,6 +62,22 @@ class TestEvaluateTrigger:
                                  "summary": "公司确认尚未签约,无法确认测算。"}]
         assert evaluate_trigger(trig, day) is False
 
+    def test_keyword_not_fire_on_no_new_announcement(self):
+        # 实测误触发句:08-28 事件含"无新公告",keyword=公告 不得触发
+        trig = {"type": "keyword", "keywords": ["公告", "订单确认",
+                                                "进入供应体系", "签约"]}
+        day = [{"kind": "media",
+                "summary": "社交媒体与财经账号继续引用 MarketScope 的 120-150 亿元"
+                           "测算。盘中最高 $50.30,收盘 $49.20。无新公告。"}]
+        assert evaluate_trigger(trig, day) is False
+
+    def test_keyword_fires_on_real_announcement(self):
+        trig = {"type": "keyword", "keywords": ["公告", "进入供应体系"]}
+        day = [{"kind": "disclosure",
+                "summary": "HCM 发布正式公告:公司已进入该客户供应体系,"
+                           "并签署初步供应协议。"}]
+        assert evaluate_trigger(trig, day) is True
+
     def test_price_below(self):
         trig = {"type": "price_below", "value": 40.0}
         assert evaluate_trigger(trig, [], day_close=34.8) is True
