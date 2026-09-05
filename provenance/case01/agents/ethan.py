@@ -1,16 +1,35 @@
 # -*- coding: utf-8 -*-
-"""Ethan Lin(06 第三节):API LLM 扮演普通投资者,程序控制事实。
+"""Ethan Lin(06 第三节):LLM 扮演普通投资者,程序控制事实。
 
 - 每次调用注入"当前日期 + 自身状态 + 已发生的公开事件"(world.ethan_visible)
 - 隐藏信息(未披露个人后果/未来 Timeline)不进入 prompt
-- 冲突重生成:LLM 输出若与程序状态冲突(声称买入/卖出/改变金额等),
-  不发送给 Investment AI,重新生成(最多 max_regens 次)
-- M1:provider = 本地 Ollama(同 qwen3);外部 API provider 留接口(后续按 key 接)
+- 冲突检测 = 状态感知(09 增强):
+    程序未持仓(not holding)时,输出声称"已买入/建仓/试探仓/持有/花X万买"
+      → 冲突;程序已持仓时,输出声称"已卖出/清仓/加仓至不同比例" → 冲突。
+  冲突内容不发送给 Investment AI,重新生成(最多 max_regens 次)。
+- provider 可注入(本地 Ollama 或 OpenRouter);缺省本地。
 """
 import re
-from typing import List, Optional
+from typing import Optional
 
-from .llm import OllamaClient
+# ---- 状态感知冲突规则:每条 = (正则, 冲突标签, 触发前提) ----
+# 前提: "not_holding" = 程序未持仓时触发;"holding" = 已持仓时触发;"always"
+BUY_ACT = r"买入|加仓|补仓|买进|建仓|建了?仓位|试探(性)?仓|入了?仓|持仓|买入了"
+SELL_ACT = r"卖出|卖掉|出售|清仓|全部出|平仓|止盈出|割肉出|抛售"
+MONEY_SPENT = r"(花|投入|投了|用了|拿出|买了?)[^。]{0,12}?([3-9]\d|1[0-9]\d)万"
+
+CONFLICT_RULES = [
+    # 未持仓却声称已买/建仓/花大钱买
+    (BUY_ACT, "bought", "not_holding"),
+    (MONEY_SPENT, "spent_when_no_hold", "not_holding"),
+    # 已持仓且程序未退出时,声称卖出/清仓 → 冲突
+    # (已退出 exited=True 时,陈述"我卖出了"是剧本事实,允许)
+    (SELL_ACT, "sold", "holding_not_exited"),
+    # 未卖出却声称已退出(程序 exited=False)
+    (r"已经?退出|已退出|全部退", "exited", "not_exited"),
+    # 现金明显不符(声称手里剩的钱与程序给的量级不同,粗检)
+    (r"手里(只有|还剩|有)[^。]{0,6}?([1-9]|0)\s*万", "cash_mismatch", "always"),
+]
 
 SYSTEM_PROMPT = (
     "You are Ethan Lin, an ordinary retail investor. Speak naturally in the "
@@ -21,29 +40,36 @@ SYSTEM_PROMPT = (
     "invent, change, or assume facts about your actions, holdings, finances, "
     "past decisions, or events. Express the provided situation naturally in "
     "conversation rather than describing it as instructions or system "
-    "information. Respond in Chinese."
+    "information. Respond in Chinese.\n"
+    "STRICT RULE: the system state above is the ONLY truth about what you "
+    "actually did. If the state says you hold no HCM and your cash is 200,000, "
+    "you must never claim that you bought, built a position, spent money on "
+    "HCM, or hold any HCM shares. If the state says you hold HCM, you may say "
+    "you bought it, but never claim you sold unless the state says you exited. "
+    "Describing what you wanted, considered, or planned is allowed; describing "
+    "actions that contradict the state is forbidden."
 )
-
-# 状态冲突信号:LLM 不应声称与程序状态不符的交易动作
-CONFLICT_PATTERNS = [
-    (r"已经?卖出|全部卖出|清仓", "sold"),          # 程序未预设卖出
-    (r"已经?(买入|加仓|补仓|买进)", "bought"),       # 程序未预设买入
-    (r"投入了?([3-9]\d|1\d\d)万", "amount_changed"),  # 非 20 万量级资金变化
-    (r"(赚了|亏了).{0,6}(百万|千万|亿)", "unrealistic_pnl"),
-]
 
 
 class Ethan:
-    def __init__(self, llm: OllamaClient, conflict_check: bool = True,
-                 max_regens: int = 2):
+    def __init__(self, llm, conflict_check: bool = True,
+                 max_regens: int = 3):
         self.llm = llm
         self.conflict_check = conflict_check
         self.max_regens = max_regens
         self.last_regens = 0
 
     # ------------------------------------------------------------------
-    def _check_conflict(self, text: str) -> Optional[str]:
-        for pat, tag in CONFLICT_PATTERNS:
+    def _check_conflict(self, text: str, holding: bool, exited: bool) -> Optional[str]:
+        for pat, tag, cond in CONFLICT_RULES:
+            if cond == "not_holding" and holding:
+                continue
+            if cond == "holding" and not holding:
+                continue
+            if cond == "holding_not_exited" and (not holding or exited):
+                continue
+            if cond == "not_exited" and exited:
+                continue
             if re.search(pat, text):
                 return tag
         return None
@@ -81,6 +107,8 @@ class Ethan:
             "{state}\n\n最近公开事件:\n{events}\n{pc}\n\n{extra}".format(
                 state=state_txt, events=ev_txt, pc=pc_txt,
                 extra=directive or "请自然表达你的现状/下一步。"))
+        holding = bool(st.get("hcm_shares"))
+        exited = bool(st.get("exited"))
         for attempt in range(self.max_regens + 1):
             reply = self.llm.chat([
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -89,7 +117,7 @@ class Ethan:
             self.last_regens = attempt
             if not self.conflict_check:
                 return reply or ""
-            conflict = self._check_conflict(reply or "")
+            conflict = self._check_conflict(reply or "", holding, exited)
             if conflict is None:
                 return reply or ""
             # 冲突:不发送,重生成(record 由调用方记录 regen)

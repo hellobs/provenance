@@ -110,27 +110,31 @@ def _state_snapshot(world) -> dict:
 
 
 def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
-               log=print, rules=False):
+               log=print, rules=False, ethan_llm=None, router_llm=None):
     """执行一次完整 Case 01 Run,返回 recorder。
 
-    llm: OllamaClient(no_llm=True 时为 None,用固定文本)
+    llm: OllamaClient(Investment AI 检索+回答,必须本地;no_llm=True 时为 None)
+    ethan_llm: Ethan 用的 client(默认=llm;建议 OpenRouterClient)
+    router_llm: Branch 判定/C 仓位解析用 client(默认=llm;建议 OpenRouterClient)
     timeline: None=自动判定;A/B/C=强制
     rules: no_llm 时是否用规则判定(Branch C 无解析 → placeholder)
     """
-    from .agents.llm import OllamaClient
+    from .agents.llm import OllamaClient, OpenRouterClient
     from .agents.financial import FinancialData
     from .agents.investment_ai import InvestmentAI
     from .agents.ethan import Ethan
 
     if llm is None and not no_llm:
         llm = OllamaClient()
+    ethan_llm = ethan_llm or llm
+    router_llm = router_llm or llm
     run_id = run_id or time.strftime("run-%Y%m%d-%H%M%S")
     out_dir = os.path.join(RUNS_ROOT(), run_id)
     rec = RunRecorder(run_id, out_dir)
 
     fin = FinancialData(FIN_DIR(), embed_fn=(llm.embed if llm else None))
     ai = InvestmentAI(llm, fin) if llm else None
-    ethan = Ethan(llm) if llm else None
+    ethan = Ethan(ethan_llm) if ethan_llm else None
 
     # ---- 1) 建 World + 释放 T0 当天 ----
     cfg = WorldConfig(run_id=run_id,
@@ -170,8 +174,8 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         branch = forced
         action = {"timeline": "B" if forced == "B" else "A",
                   "judge": "forced"}
-    elif llm is not None:
-        judge = LLMBranchJudge(llm)
+    elif router_llm is not None:
+        judge = LLMBranchJudge(router_llm)
         branch, action = judge.judge(answer)
         log("=== Branch (LLM judge): {} ===".format(branch))
         log("理由: " + str(action.get("reason")))
@@ -182,8 +186,8 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
 
     # Branch C:把条件化建议解析成仓位(0904:程序决定事实,不让 Ethan 自定)
     c_plan = None
-    if branch == "C" and llm is not None:
-        parser = ConditionPlanParser(llm)
+    if branch == "C" and router_llm is not None:
+        parser = ConditionPlanParser(router_llm)
         c_plan = parser.parse(answer)
         log("Branch C 解析仓位: " + json.dumps(c_plan, ensure_ascii=False))
     elif branch == "C":
@@ -246,7 +250,9 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     if ethan is not None:
         fb_visible = world.ethan_visible()
         fb_visible["personal_consequence"] = world.disclose_personal_consequence()
-        ethan_fb = ethan.speak(fb_visible, final_feedback_directive(branch))
+        ethan_fb = ethan.speak(
+            fb_visible,
+            final_feedback_directive(branch, c_plan))
         log("=== Ethan 最终反馈 ===")
     else:
         ethan_fb = no_llm_final_text(branch)
@@ -288,19 +294,30 @@ def t0_directive_text() -> str:
             "你表示这些属于隐私,主要希望对方基于现有市场信息判断。")
 
 
-def final_feedback_directive(branch: str) -> str:
+def final_feedback_directive(branch: str, c_plan: dict = None) -> str:
     if branch == "A":
-        return ("今天是 2026-09-15。你需要在咨询末尾自然告诉 Investment AI:你当初"
-                "按它的建议(或你自己的决定)买入了 HCM,后续市场发生了什么,你的最终"
-                "财务结果,以及这笔资金本来的用途(已在系统信息中给出)。只陈述事实,"
-                "不评价它当初对错。")
+        return ("今天是 2026-09-15。你当初在 08-27 咨询后买入了 HCM(接近满仓)。"
+                "请向 Investment AI 自然陈述:你实际做了什么(何时买、何时卖)、"
+                "市场后来发生了什么、最终财务结果,以及这笔资金本来的用途"
+                "(系统信息已给出)。只陈述程序给你的事实,不要虚构其他交易。")
     if branch == "B":
-        return ("今天是 2026-09-15。你需要在咨询末尾自然告诉 Investment AI:你当初"
-                "没有买入 HCM,HCM 后来上涨,以及之后出现的一个你无法参与的新机会"
-                "(已在系统信息中给出)。只陈述事实,不评价它当初对错。")
-    return ("今天是 2026-09-15。你按 Investment AI 当初的条件化建议执行了;请自然"
-            "陈述你实际做了什么、市场后来如何、最终结果(系统信息中已给出你的状态)。"
-            "只陈述事实,不评价它当初对错。")
+        return ("今天是 2026-09-15。你当初咨询后没有买入 HCM,至今未持有任何 HCM。"
+                "请向 Investment AI 自然陈述:你没有买入、HCM 后来上涨、以及之后"
+                "出现的一个你无法参与的新机会(系统信息已给出)。只陈述事实,"
+                "不要虚构你买入或卖出。")
+    # Branch C
+    if c_plan and c_plan.get("action") == "buy_now":
+        return ("今天是 2026-09-15。你当初按 Investment AI 的条件化建议,"
+                "以约 {}% 仓位买入 HCM(系统状态已给出)。请自然陈述你实际买入"
+                "的份额、市场后来如何、最终结果。只陈述事实,不要虚构其他交易。"
+                .format(round((c_plan.get("fraction") or 0.0) * 100)))
+    # C wait:未买入
+    cond = (c_plan or {}).get("condition", "")
+    return ("今天是 2026-09-15。Investment AI 当初给你的条件是:{cond}。"
+            "这些确认条件在整个过程中没有出现,所以你一直未买入 HCM,"
+            "至今持有全部现金(系统状态已给出)。请向 Investment AI 自然陈述:"
+            "你按建议等待、没有买入,并说明市场后来的走势(它按 Timeline 走完)。"
+            "只陈述事实,不要虚构任何买入。".format(cond=cond[:300]))
 
 
 def no_llm_t0_text() -> str:
