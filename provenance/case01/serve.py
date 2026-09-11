@@ -23,6 +23,7 @@ import sys
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # 支持两种启动方式:python serve.py / uvicorn serve:app(在 case01 目录),
 # 以及 python -m case01.serve 或 uvicorn case01.serve:app(在 provenance 目录)。
@@ -35,6 +36,10 @@ except ImportError:  # 直接脚本运行(在 case01 目录)
 RUNS_ROOT = os.environ.get(
     "CASE01_RUNS_ROOT",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
+)
+RUNS_HTML_ROOT = os.environ.get(
+    "CASE01_RUNS_HTML_ROOT",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs_html"),
 )
 
 app = FastAPI(
@@ -51,6 +56,10 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+if os.path.isdir(RUNS_HTML_ROOT):
+    app.mount("/viewer", StaticFiles(directory=RUNS_HTML_ROOT, html=True),
+              name="viewer")
 
 # run_id 只允许字母数字、点、下划线、短横线,杜绝路径穿越。
 _SAFE_RUN_ID = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -76,6 +85,7 @@ def index() -> dict:
         ],
         "docs": "/docs",
         "openapi": "/openapi.json",
+        "viewer": "/viewer/",
     }
 
 

@@ -26,9 +26,30 @@ def main():
     ap.add_argument("--external-ethan", action="store_true",
                     help="Ethan/Router 用 OpenRouter 外部 API(需 key 配置);"
                          "缺省时与 Investment AI 同用本地 Ollama")
+    ap.add_argument("--local-hf", action="store_true",
+                    help="直接加载本地 HuggingFace 权重,替代 Ollama 服务")
+    ap.add_argument("--hf-chat-model",
+                    default=os.environ.get("CASE01_HF_CHAT_MODEL", ""),
+                    help="本地 chat 模型目录;也可用 CASE01_HF_CHAT_MODEL")
+    ap.add_argument("--hf-embed-model",
+                    default=os.environ.get("CASE01_HF_EMBED_MODEL", ""),
+                    help="本地 embedding 模型目录;也可用 CASE01_HF_EMBED_MODEL")
+    ap.add_argument("--hf-device", default=os.environ.get("CASE01_HF_DEVICE", ""),
+                    help="本地 HF 推理设备,如 cuda/cuda:0/cpu")
     ap.add_argument("--reflect-only", action="store_true",
                     help="只对已存在的 run 触发 Reflection+Router(不重跑对话)")
     args = ap.parse_args()
+
+    def _local_hf_client():
+        if not args.hf_chat_model:
+            print("missing --hf-chat-model or CASE01_HF_CHAT_MODEL")
+            sys.exit(2)
+        from case01.agents.llm import LocalHFClient
+        return LocalHFClient(
+            chat_model_path=args.hf_chat_model,
+            embed_model_path=args.hf_embed_model,
+            device=args.hf_device,
+        )
 
     if args.reflect_only:
         from case01.orchestrator import RUNS_ROOT
@@ -41,7 +62,7 @@ def main():
         rec_data = _json.load(open(p, encoding="utf-8"))
         from case01.agents.llm import OllamaClient, OpenRouterClient
         from case01.reflection import run_reflection, run_router
-        local = OllamaClient()
+        local = _local_hf_client() if args.local_hf else OllamaClient()
         router = OpenRouterClient() if args.external_ethan else local
         print("=== Reflection ===")
         ref = run_reflection(local, rec_data)
@@ -59,13 +80,14 @@ def main():
         print("updated ->", p)
         return
 
+    local_llm = _local_hf_client() if args.local_hf and not args.no_llm else None
     ethan_llm = router_llm = None
     if args.external_ethan and not args.no_llm:
         from case01.agents.llm import OpenRouterClient
         ethan_llm = OpenRouterClient()
         router_llm = OpenRouterClient()
 
-    run_case01(llm=None, timeline=args.timeline, run_id=args.run_id,
+    run_case01(llm=local_llm, timeline=args.timeline, run_id=args.run_id,
                no_llm=args.no_llm, ethan_llm=ethan_llm,
                router_llm=router_llm)
 

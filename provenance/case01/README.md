@@ -57,6 +57,11 @@ python -m case01.run --timeline A --run-id demo-a
 # 不调 LLM(规则判定,测全链路)
 python -m case01.run --no-llm
 
+# 直接加载本地 HuggingFace 权重(无需 Ollama 服务)
+python -m case01.run --timeline A --run-id demo-a --local-hf \
+  --hf-chat-model /data/haozhe/agent/GTC/Qwen3-4B-Instruct-2507 \
+  --hf-embed-model /data/haozhe/agent/GTC/Qwen3-Embedding-0.6B
+
 # 对已有 run 补 Reflection + Router(不重跑对话)
 python -m case01.run --reflect-only --run-id <run_id> --external-ethan
 
@@ -133,6 +138,9 @@ python -m case01.render
 
 - Ollama 本地:qwen3:4b-instruct-2507-q4_K_M(chat)、
   qwen3-embedding:0.6b-q8_0(检索);Reflection 与 Investment AI 必须本地
+- HuggingFace 本地权重:可用 `--local-hf` 直接加载 chat 与 embedding
+  safetensors 目录;需要运行环境已安装 `torch`、`transformers>=4.51`、
+  `safetensors`
 - Ethan / Router 经 `--external-ethan` 走 OpenRouter(minimax/minimax-m3:free),
   key 存 `case01/.secrets.json`(gitignored)或环境变量 `OPENROUTER_API_KEY`
 - 真实公司 Financial Data(10 家,研究侧提供后替换/扩充 HCM 样例;字段格式不变)

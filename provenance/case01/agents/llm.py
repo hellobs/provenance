@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """轻量 LLM client。
 - OllamaClient:本地 Ollama(OpenAI 兼容 /v1/chat/completions + /api/embed)
+- LocalHFClient:直接加载本地 HuggingFace 权重(chat + embedding)
 - OpenRouterClient:外部 API(OpenAI 兼容;key 从 secrets/环境变量读取,
   不落盘、不打印)——供 Ethan/Router 等非 Investment AI 角色使用
   (0904 规定 Investment AI 必须本地 Ollama 运行)。
@@ -136,6 +137,152 @@ class OllamaClient(_ChatMixin):
                 time.sleep(2 * (attempt + 1))
         raise RuntimeError("Ollama native_chat failed after {} retries: {}".format(
             self.retries, last_err))
+
+
+class LocalHFClient:
+    """本地 HuggingFace 权重 client。
+
+    用于没有 Ollama/vLLM 服务、但已有 safetensors 权重目录的环境。接口与
+    OllamaClient 对齐:chat()/native_chat()/embed()。
+    """
+
+    def __init__(self, chat_model_path: str,
+                 embed_model_path: str = "",
+                 device: str = "",
+                 embed_device: str = "",
+                 max_input_tokens: int = 32768,
+                 embed_max_length: int = 8192):
+        self.chat_model_path = chat_model_path
+        self.embed_model_path = embed_model_path
+        self.device = device
+        self.embed_device = embed_device or device
+        self.max_input_tokens = max_input_tokens
+        self.embed_max_length = embed_max_length
+        self.chat_model = None
+        self.chat_tokenizer = None
+        self.embed_model = None
+        self.embed_tokenizer = None
+
+    # ------------------------------------------------------------------
+    def _deps(self):
+        try:
+            import torch
+            import torch.nn.functional as F
+            from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
+        except ImportError as e:
+            raise RuntimeError(
+                "LocalHFClient 需要 torch/transformers/safetensors;当前环境缺少: {}"
+                .format(e.name or e))
+        return torch, F, AutoModel, AutoModelForCausalLM, AutoTokenizer
+
+    def _pick_device(self, requested: str = "") -> str:
+        torch, _F, _AutoModel, _AutoModelForCausalLM, _AutoTokenizer = self._deps()
+        if requested:
+            return requested
+        return "cuda" if torch.cuda.is_available() else "cpu"
+
+    def _ensure_chat(self):
+        if self.chat_model is not None:
+            return
+        if not self.chat_model_path:
+            raise RuntimeError("未配置本地 chat 模型路径")
+        torch, _F, _AutoModel, AutoModelForCausalLM, AutoTokenizer = self._deps()
+        dev = self._pick_device(self.device)
+        self.chat_tokenizer = AutoTokenizer.from_pretrained(
+            self.chat_model_path, local_files_only=True)
+        self.chat_model = AutoModelForCausalLM.from_pretrained(
+            self.chat_model_path, torch_dtype="auto", local_files_only=True)
+        self.chat_model.to(dev)
+        self.chat_model.eval()
+        self.device = dev
+
+    def _ensure_embed(self):
+        if self.embed_model is not None:
+            return
+        if not self.embed_model_path:
+            raise RuntimeError("未配置本地 embedding 模型路径")
+        torch, _F, AutoModel, _AutoModelForCausalLM, AutoTokenizer = self._deps()
+        dev = self._pick_device(self.embed_device)
+        self.embed_tokenizer = AutoTokenizer.from_pretrained(
+            self.embed_model_path, padding_side="left", local_files_only=True)
+        self.embed_model = AutoModel.from_pretrained(
+            self.embed_model_path, torch_dtype="auto", local_files_only=True)
+        self.embed_model.to(dev)
+        self.embed_model.eval()
+        self.embed_device = dev
+
+    # ------------------------------------------------------------------
+    def chat(self, messages: List[dict], temperature: float = 0.7,
+             max_tokens: int = 1024, num_ctx: Optional[int] = None) -> Optional[str]:
+        self._ensure_chat()
+        torch, _F, _AutoModel, _AutoModelForCausalLM, _AutoTokenizer = self._deps()
+        tokenizer = self.chat_tokenizer
+        model = self.chat_model
+        prompt = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True)
+        limit = num_ctx or self.max_input_tokens
+        inputs = tokenizer(
+            [prompt],
+            return_tensors="pt",
+            truncation=True,
+            max_length=limit,
+        ).to(model.device)
+        gen_kwargs = {
+            "max_new_tokens": max_tokens,
+            "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+        }
+        if temperature and temperature > 0:
+            gen_kwargs.update({
+                "do_sample": True,
+                "temperature": temperature,
+                "top_p": 0.8,
+                "top_k": 20,
+            })
+        else:
+            gen_kwargs["do_sample"] = False
+        with torch.inference_mode():
+            out = model.generate(**inputs, **gen_kwargs)
+        new_tokens = out[0][inputs.input_ids.shape[-1]:]
+        return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+    def native_chat(self, messages: List[dict], temperature: float = 0.4,
+                    max_tokens: int = 3072, num_ctx: int = 32768,
+                    timeout: float = 600.0) -> Optional[str]:
+        return self.chat(messages, temperature=temperature, max_tokens=max_tokens,
+                         num_ctx=num_ctx)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _last_token_pool(last_hidden_states, attention_mask):
+        torch = __import__("torch")
+        left_padding = attention_mask[:, -1].sum() == attention_mask.shape[0]
+        if left_padding:
+            return last_hidden_states[:, -1]
+        sequence_lengths = attention_mask.sum(dim=1) - 1
+        batch_size = last_hidden_states.shape[0]
+        return last_hidden_states[
+            torch.arange(batch_size, device=last_hidden_states.device),
+            sequence_lengths,
+        ]
+
+    def embed(self, text: str) -> Optional[List[float]]:
+        self._ensure_embed()
+        torch, F, _AutoModel, _AutoModelForCausalLM, _AutoTokenizer = self._deps()
+        tokenizer = self.embed_tokenizer
+        model = self.embed_model
+        batch = tokenizer(
+            [text or ""],
+            padding=True,
+            truncation=True,
+            max_length=self.embed_max_length,
+            return_tensors="pt",
+        ).to(model.device)
+        with torch.inference_mode():
+            outputs = model(**batch)
+            emb = self._last_token_pool(outputs.last_hidden_state,
+                                        batch["attention_mask"])
+            emb = F.normalize(emb, p=2, dim=1)
+        return emb[0].detach().float().cpu().tolist()
 
 
 class OpenRouterClient(_ChatMixin):
