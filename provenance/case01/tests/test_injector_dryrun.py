@@ -52,11 +52,13 @@ def test_external_state_and_interaction_callbacks():
     record = bridge.run()
 
     first = record["nodes"][0]
-    assert first["context"]["Investment AI"] == {"stress": 0.4}
+    # 交互主题会写入双方步级状态:发起方 current task,接收方 user request
+    assert first["context"]["Investment AI"] == {"stress": 0.4, "user request": "HCM 是否值得买入"}
     assert first["interactions"][0]["focus"] == "HCM 是否值得买入"
     # 回调返回"当前节点"的注入内容
     bridge.activate(nodes[0])
-    assert bridge.external_state("Ethan Lin", 1, "20260827-09:30", None) == {"suspicion": "high"}
+    assert bridge.external_state("Ethan Lin", 1, "20260827-09:30", None) == {
+        "suspicion": "high", "current task": "HCM 是否值得买入"}
     assert bridge.interaction_request(1, "20260827-09:30", None)[0]["from"] == "Ethan Lin"
     # 切到别的节点后,回调内容随之切换
     bridge.activate(nodes[1])

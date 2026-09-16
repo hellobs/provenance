@@ -74,6 +74,17 @@ class MavisBridge:
         self._current_node = node
         self._current_context = {r: dict(node.context.get(r, {})) for r in self.roles}
         self._current_requests = [dict(r) for r in node.interactions]
+        # 交互主题同时写入双方步级状态,确保话题进入 LLM 上下文
+        for req in self._current_requests:
+            src = req.get("from")
+            dst = req.get("to")
+            focus = str(req.get("focus", "") or "").strip()
+            if not focus:
+                continue
+            if src in self._current_context:
+                self._current_context[src].setdefault("current task", focus)
+            if dst in self._current_context:
+                self._current_context[dst].setdefault("user request", focus)
 
     def run(self) -> dict:
         """按节点推进,返回本次运行的记录。"""
@@ -82,6 +93,7 @@ class MavisBridge:
         for idx, node in enumerate(self.nodes, start=1):
             self.activate(node)
             self._apply_world(node)
+            dialogue_before = self._dialogue_count()
 
             retries = 0
             started = self._step_once(node, step_index=idx - 1,
@@ -101,6 +113,7 @@ class MavisBridge:
                 "interaction_started": bool(started),
                 "retries": retries,
                 "world": dict(node.world),
+                "dialogue": self._dialogue_tail(dialogue_before),
             })
         return self.run_record()
 
@@ -198,6 +211,29 @@ class MavisBridge:
     # ------------------------------------------------------------------
     # 工具
     # ------------------------------------------------------------------
+    def _dialogue_count(self) -> int:
+        """当前已记录的对话块数量（用于取本步新增部分）。"""
+        conv = getattr(self.game, "conversation", None) if self.game is not None else None
+        if not conv:
+            return 0
+        total = 0
+        for entries in conv.values():
+            total += len(entries) if isinstance(entries, list) else 1
+        return total
+
+    def _dialogue_tail(self, start_count: int) -> List[dict]:
+        """本步新增的对话块（dry-run 时为空）。"""
+        conv = getattr(self.game, "conversation", None) if self.game is not None else None
+        if not conv:
+            return []
+        blocks: List[dict] = []
+        for entries in conv.values():
+            if isinstance(entries, list):
+                blocks.extend(entries)
+            else:
+                blocks.append(entries)
+        return blocks[int(start_count):]
+
     def _start_time(self) -> str:
         date = self.nodes[0].date if self.nodes else "2026-08-27"
         return date.replace("-", "") + "-09:30"

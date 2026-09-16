@@ -102,7 +102,10 @@ def test_external_state_callback_returns_node_context(monkeypatch, tmp_path):
     bridge._build_mavis()
     nodes[0].context = {"Ethan Lin": {"stress": 0.6}}
     bridge.activate(nodes[0])
-    assert bridge.simulator.external_state("Ethan Lin", 1, "20260827-09:30", bridge.game) == {"stress": 0.6}
+    state = bridge.simulator.external_state("Ethan Lin", 1, "20260827-09:30", bridge.game)
+    assert state["stress"] == 0.6
+    # 节点自带的关键交互,其主题会额外写入发起方状态
+    assert "current task" in state
 
 
 def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
@@ -126,3 +129,21 @@ def test_stride_between_nodes(monkeypatch, tmp_path):
     assert bridge._stride_to_next(0) == 1440
     # 最后一个节点不再推进
     assert bridge._stride_to_next(len(nodes) - 1) == 0
+
+def test_dialogue_helpers_with_fake_game(monkeypatch, tmp_path):
+    _install_stub_provider(monkeypatch)
+    bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+
+    class _FakeGame:
+        def __init__(self):
+            self.conversation = {}
+
+    bridge.game = _FakeGame()
+    assert bridge._dialogue_count() == 0
+    assert bridge._dialogue_tail(0) == []
+
+    block = {"Ethan Lin -> Investment AI @ floor": [["Ethan Lin", "hi"], ["Investment AI", "hello"]]}
+    bridge.game.conversation["20260827-09:40"] = [block]
+    assert bridge._dialogue_count() == 1
+    assert bridge._dialogue_tail(0) == [block]
+    assert bridge._dialogue_tail(1) == []
