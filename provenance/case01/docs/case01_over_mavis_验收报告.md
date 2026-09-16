@@ -35,6 +35,16 @@
 - 单次 Reflection + Router：126–142 秒。
 - 成本主因是 mavis 每步的角色日程与行动生成，与注入机制无关。
 
+## 5.1 端到端跑出的三个真实缺陷（均已修复）
+
+1. **最终反馈日期错误**：节点序列只到 timeline 末条事件（B 线 09-11），使"最终反馈"错放；01/03 规定固定 09-15。已补空节点并标为必须交互。
+2. **强制交互会被"在移动/日程未初始化"挡住**：只改 config 无效，mavis 的前置条件看运行时状态。已改为运行时钉定（同格 + 清 path + 必要时补日程）。
+3. **模拟时钟取的是墙钟**：`Game` 默认 `Timer()` 用 `datetime.now()`，而 mavis 规定 23:00 后不发起对话——导致"真实运行成败取决于实际时间"（23 点后所有探针 `started=False`）。已显式注入按首节点日期 09:30 起算的 Timer，节点间按 stride 推进。
+
+修复后验证（墙钟已过 23:00，仍成功）：最终节点 `started=True retries=0`，Ethan 按规定汇报：
+"I didn't buy HCM. The market stayed stable and HCM rose about 40% from its T0 price. I still have RMB 200,000 in cash.
+I missed my friend's co-investment opportunity because it required at least RMB 250,000 …"（与 03 §七 B 线叙事一致，含个人后果）。
+
 ## 6. 已知缺口（未伪装为完成）
 
 1. Branch C 的"实际仓位"未实现（依赖 T0 方案解析），C 线当前不自动建仓，已在 `compat.gaps` 标注。
