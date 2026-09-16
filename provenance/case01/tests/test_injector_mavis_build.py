@@ -30,7 +30,7 @@ def _install_stub_provider(monkeypatch):
             return None
 
         def is_available(self):
-            return False
+            return True
 
         def get_summary(self):
             return {"provider": "stub"}
@@ -63,6 +63,9 @@ def test_build_mavis_wires_hooks_and_agents(monkeypatch, tmp_path):
     # 两个通用入口被接上
     assert bridge.simulator.external_state == bridge.external_state
     assert bridge.simulator.interaction_request == bridge.interaction_request
+    # provider 已初始化（mavis 在 Agent.reset() 里惰性创建,桥接显式调用了 reset_game）
+    assert bridge.game.get_agent(DEFAULT_ROLES[0]).llm_available() is True
+    assert bridge.game.get_agent(DEFAULT_ROLES[1]).llm_available() is True
     # case01_node 条件已注册
     from mavisframework.runtime.simulator import Simulator
     assert "case01_node" in Simulator.CONDITION_CHECKERS
