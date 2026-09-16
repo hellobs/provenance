@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 """MavisBridge:用 case01 的节点序列驱动 mavis 侧的两个角色。
 
-契约(见设计说明 §3-§6):
-- 事实由 case01 world 层维护,本桥只把"已释放"的信息转成 mavis 的 story 事件;
+契约（见设计说明 §3–§6）:
+- 事实由 case01 的 world 层维护,本桥只把"已释放"的信息转成 mavis 的 story 事件;
 - 临时状态通过 `Simulator(external_state=...)` 每步注入,不写记忆;
 - 关键交互通过 `Simulator(interaction_request=...)` 请求,内容仍由 LLM 生成;
 - 1 个节点 = 1 步;关键节点若未发生交互,在节点内重试(上限 max_retries)。
 
-dry_run=True 时完全不 import mavisframework,只产出与真实运行同构的记录,
-供联调、CI 与字段等价性对比使用。
+dry_run=True 时完全不 import mavisframework（dry-run 与 CI 使用）。
 """
+import datetime
 import json
 import os
-from dataclasses import asdict
 from typing import Dict, List, Optional, Tuple
 
 from .nodes import NodeSpec
@@ -31,6 +30,7 @@ class MavisBridge:
         run_id: str = "injector-run",
         max_retries: int = 5,
         dry_run: bool = True,
+        anchor_coord: Optional[List[int]] = None,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -38,13 +38,16 @@ class MavisBridge:
         self.run_id = run_id
         self.max_retries = int(max_retries)
         self.dry_run = bool(dry_run)
+        self.anchor_coord = list(anchor_coord) if anchor_coord else None
 
-        # mavis 侧对象(dry_run 时为 None)
+        # mavis 侧对象（dry_run 时为 None）
         self.game = None
         self.simulator = None
         self.config: dict = {}
+        # 当前节点 id（供 case01_node 条件读取）
+        self._node_state: Dict[str, str] = {"id": ""}
 
-        # 当前节点的注入内容(供 external_state / interaction_request 回调读取)
+        # 当前节点的注入内容（供两个回调读取）
         self._current_node: Optional[NodeSpec] = None
         self._current_context: Dict[str, dict] = {}
         self._current_requests: List[dict] = []
@@ -53,10 +56,10 @@ class MavisBridge:
         self.records: List[dict] = []
 
     # ------------------------------------------------------------------
-    # mavis 侧回调(两个通用入口的实参)
+    # mavis 侧回调（两个通用入口的实参）
     # ------------------------------------------------------------------
     def external_state(self, name: str, step: int, sim_time: str, game) -> dict:
-        """步级临时状态回调:返回该角色本节点的临时状态(不写记忆)。"""
+        """步级临时状态回调:返回该角色本节点的临时状态（不写记忆）。"""
         return dict(self._current_context.get(name, {}))
 
     def interaction_request(self, step: int, sim_time: str, game) -> List[dict]:
@@ -81,11 +84,12 @@ class MavisBridge:
             self._apply_world(node)
 
             retries = 0
-            started = self._step_once(node)
+            started = self._step_once(node, step_index=idx - 1,
+                                      stride=self._stride_to_next(idx - 1))
             if node.require_interaction and not started:
                 while retries < self.max_retries and not started:
                     retries += 1
-                    started = self._step_once(node)
+                    started = self._step_once(node, step_index=idx - 1, stride=0)
 
             self.records.append({
                 "node_id": node.node_id,
@@ -101,7 +105,7 @@ class MavisBridge:
         return self.run_record()
 
     def run_record(self) -> dict:
-        """本次运行的记录(schema 版本化,便于与 case01 run.json 对齐)。"""
+        """本次运行的记录（schema 版本化,便于与 case01 run.json 对齐）。"""
         return {
             "schema_version": "injector-0.1",
             "run_id": self.run_id,
@@ -125,40 +129,114 @@ class MavisBridge:
         return path
 
     # ------------------------------------------------------------------
-    # 内部
+    # mavis 装配与推进
     # ------------------------------------------------------------------
-    def _apply_world(self, node: NodeSpec) -> None:
-        """把该节点的世界事实写入(真实运行时写 case01 world 状态;dry-run 只记录)。"""
-        if self.dry_run:
-            return
-        # TODO(阶段 2):接入 case01.world.state 的日期推进与事件释放,
-        # 并把"已释放"的事件转成 story 事件写入 self._current_requests/事件池。
-        raise NotImplementedError("真实运行的世界推进尚未接入,见执行计划阶段 2")
-
-    def _step_once(self, node: NodeSpec) -> bool:
-        """推进 1 步;返回本节点是否发生了被请求的交互。"""
-        if self.dry_run:
-            # dry-run:关键节点视为已发生,非关键节点视为未请求
-            return bool(node.require_interaction or node.interactions)
-        self.simulator.simulate(
-            self.game, self.config, step=1, stride=0,
-            start_step=len(self.records), checkpoints_folder="",
-        )
-        if not self.simulator.interactions:
-            return False
-        return bool(self.simulator.interactions[-1].get("started"))
-
     def _build_mavis(self) -> None:
-        """构造 mavis 侧对象(懒加载,默认关闭时不 import mavisframework)。
-
-        阶段 2 待办:
-        1. 为两个角色准备 mavis 场景配置(agent.json / relationships / maze / storage);
-        2. load_config 后建 Game(不挂 governance)与 Simulator(传入两个回调);
-        3. 注册自定义条件类型(case01_node)用于"到点必发"的 story 事件。
-        """
+        """构造 mavis 侧对象（懒加载,默认关闭时不 import mavisframework）。"""
         if not self.scenario_dir:
             raise RuntimeError("dry_run=False 需要 --scenario-dir(含 mavis 场景配置的目录)")
-        raise NotImplementedError(
-            "mavis 场景装配为阶段 2 任务:需要两个角色的 mavis 配置与地图,"
-            "见执行计划阶段 2 与设计说明 §3"
+        scenario = os.path.abspath(self.scenario_dir)
+        config_path = os.path.join(scenario, "config.json")
+        if not os.path.exists(config_path):
+            raise RuntimeError("场景缺少 config.json: {}".format(config_path))
+
+        from mavisframework.config.loader import load_config
+        from mavisframework.runtime.game import Game
+        from mavisframework.runtime.simulator import Simulator
+
+        from .conditions import install_case01_node_condition
+
+        config = load_config(
+            start_time=self._start_time(), stride=0, agents=list(self.roles),
+            config_path=config_path, assets_root=scenario,
         )
+        self._apply_ethan_provider(config)
+        # 存档目录默认落在场景内,避免污染仓库根目录
+        os.environ.setdefault("MAVIS_CHECKPOINTS_ROOT", os.path.join(scenario, "checkpoints"))
+        install_case01_node_condition(self._node_state)
+
+        self.config = config
+        # case01 不挂 governance/consequence:不启用倾向与后果反馈机制
+        self.game = Game(self.run_id, scenario, config, {},
+                         governance=None, consequence_fn=None)
+        self.simulator = Simulator(
+            max_workers=max(1, len(self.roles)),
+            export_decisions=False,
+            external_state=self.external_state,
+            interaction_request=self.interaction_request,
+        )
+
+    def _apply_world(self, node: NodeSpec) -> None:
+        """设置当前节点:节点 id、本节点要释放的 story 事件、（可选）角色位置。"""
+        if self.dry_run:
+            return
+        if self.simulator is None:
+            raise RuntimeError("mavis 尚未装配(_build_mavis 未执行)")
+        self._node_state["id"] = node.node_id
+        # 只释放本节点的事件:未释放事件不进入任何角色上下文
+        self.simulator.story = [self._as_story_event(ev, node) for ev in node.events]
+        if self.anchor_coord:
+            for name in self.roles:
+                agent_cfg = self.config.get("agents", {}).get(name)
+                if agent_cfg is not None:
+                    agent_cfg["coord"] = list(self.anchor_coord)
+                    agent_cfg["path"] = []
+
+    def _step_once(self, node: NodeSpec, step_index: int = 0, stride: int = 0) -> bool:
+        """推进 1 步;返回本节点是否发生了被请求的交互。"""
+        if self.dry_run:
+            return bool(node.require_interaction or node.interactions)
+        self.simulator.interactions.clear()
+        self.simulator.simulate(
+            self.game, self.config, step=1, stride=stride,
+            start_step=step_index, checkpoints_folder="",
+        )
+        return any(r.get("started") for r in self.simulator.interactions)
+
+    # ------------------------------------------------------------------
+    # 工具
+    # ------------------------------------------------------------------
+    def _start_time(self) -> str:
+        date = self.nodes[0].date if self.nodes else "2026-08-27"
+        return date.replace("-", "") + "-09:30"
+
+    def _stride_to_next(self, idx: int) -> int:
+        """当前节点 -> 下一节点 的模拟分钟数（用于 mavis 时间推进）。"""
+        if idx + 1 >= len(self.nodes):
+            return 0
+        fmt = "%Y-%m-%d %H:%M"
+        try:
+            cur = datetime.datetime.strptime(self.nodes[idx].date + " 09:30", fmt)
+            nxt = datetime.datetime.strptime(self.nodes[idx + 1].date + " 09:30", fmt)
+        except ValueError:
+            return 0
+        return max(0, int((nxt - cur).total_seconds() // 60))
+
+    @staticmethod
+    def _as_story_event(ev: dict, node: NodeSpec) -> dict:
+        """节点事件 -> mavis story 事件（带 case01_node 条件,到点必发）。"""
+        return {
+            "id": ev.get("id") or "{}-ev".format(node.node_id),
+            "time": ev.get("time", "09:30"),
+            "event_type": ev.get("event_type", "market"),
+            "content": ev.get("content", ""),
+            "targets": list(ev.get("targets") or ["all"]),
+            "importance": int(ev.get("importance", 6) or 6),
+            "condition": {"type": "case01_node", "node_id": node.node_id},
+        }
+
+    def _apply_ethan_provider(self, config: dict) -> None:
+        """Ethan 走外部 API 时,从环境变量注入（密钥不进仓库、不进记录）。"""
+        base_url = os.environ.get("CASE01_ETHAN_BASE_URL", "").strip()
+        model = os.environ.get("CASE01_ETHAN_MODEL", "").strip()
+        if not (base_url and model):
+            return
+        target = config.get("agents", {}).get(self.roles[1])
+        if target is None:
+            return
+        target.setdefault("think", {})["llm"] = {
+            "provider": "openai",
+            "model": model,
+            "base_url": base_url,
+            "api_key": os.environ.get("CASE01_ETHAN_API_KEY", "").strip(),
+        }

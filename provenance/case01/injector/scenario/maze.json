@@ -1,0 +1,3697 @@
+{
+ "world": "the Ville",
+ "tile_size": 32,
+ "size": [
+  24,
+  27
+ ],
+ "map": {
+  "asset": "map",
+  "tileset_groups": {
+   "group_1": [
+    "CuteRPG_Field_B",
+    "CuteRPG_Field_C",
+    "CuteRPG_Harbor_C",
+    "CuteRPG_Village_B",
+    "CuteRPG_Forest_B",
+    "CuteRPG_Desert_C",
+    "CuteRPG_Mountains_B",
+    "CuteRPG_Desert_B",
+    "CuteRPG_Forest_C",
+    "interiors_pt1",
+    "interiors_pt2",
+    "interiors_pt3",
+    "interiors_pt4",
+    "interiors_pt5",
+    "Room_Builder_32x32"
+   ]
+  },
+  "layers": [
+   {
+    "name": "Bottom Ground",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Exterior Ground",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Exterior Decoration L2",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Interior Ground",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Wall",
+    "tileset_group": [
+     "CuteRPG_Field_C",
+     "Room_Builder_32x32"
+    ]
+   },
+   {
+    "name": "Interior Furniture L1",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Interior Furniture L2 ",
+    "tileset_group": "group_1"
+   },
+   {
+    "name": "Foreground L1",
+    "tileset_group": "group_1",
+    "depth": 2
+   },
+   {
+    "name": "Foreground L2",
+    "tileset_group": "group_1",
+    "depth": 2
+   },
+   {
+    "name": "Collisions",
+    "tileset_group": [
+     "blocks"
+    ],
+    "depth": -1,
+    "collision": {
+     "exclusion": [
+      -1
+     ]
+    }
+   }
+  ]
+ },
+ "camera": {
+  "zoom_factor": 1,
+  "zoom_range": [
+   0.3,
+   4,
+   0.01
+  ]
+ },
+ "tile_address_keys": [
+  "world",
+  "sector",
+  "arena",
+  "game_object"
+ ],
+ "tiles": [
+  {
+   "coord": [
+    4,
+    4
+   ],
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    4
+   ],
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    4
+   ],
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    4
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    4
+   ],
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    0,
+    5
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    1,
+    5
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    2,
+    5
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    3,
+    5
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    4,
+    5
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Market Screen"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Market Screen"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Market Screen"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Market Screen"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    5
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    5
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Sofa"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Sofa"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    5
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    5
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    6
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    6
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Trading Terminal"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Trading Terminal"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    7
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    7
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Podium"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    8
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    8
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Trading Terminal"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "Trading Terminal"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    9
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    9
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor",
+    "Seat"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    10
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    10
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    11
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    11
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    11
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    11
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    11
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    11
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    12
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    12
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    12
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    12
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room",
+    "File Cabinet"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    12
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    12
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    4,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    13
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    13
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    13
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    13
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    13
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    23,
+    13
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    24,
+    13
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    4,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    14
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    14
+   ],
+   "address": [
+    "Trading Center",
+    "Trading Floor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    14
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    14
+   ],
+   "address": [
+    "Trading Center",
+    "Market Analysis Room"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    14
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    14
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    26,
+    14
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    4,
+    15
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    5,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    7,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    15
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    1,
+    16
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    2,
+    16
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    3,
+    16
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    4,
+    16
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    5,
+    16
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    8,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    16
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    16
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    16
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    17
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    17
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    17
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    17
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    18
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    18
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    18
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    18
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    9,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    10,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    11,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    13,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    19
+   ],
+   "address": [
+    "Trading Center",
+    "Corridor"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    19
+   ],
+   "collision": true,
+   "address": [
+    "Trading Center"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    19
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    19
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    8,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    9,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    10,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    11,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    12,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    13,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    14,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    15,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    16,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    17,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    18,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    19,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    20,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    21,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    22,
+    20
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    25,
+    20
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    20
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    6,
+    21
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    7,
+    21
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    24,
+    21
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    21
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    21
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    14,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    23,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    24,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    22
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    12,
+    23
+   ],
+   "collision": true
+  },
+  {
+   "coord": [
+    14,
+    23
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    15,
+    23
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    16,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    17,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    18,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    19,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    20,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    22,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    23,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    24,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    25,
+    23
+   ],
+   "collision": true,
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge"
+   ]
+  },
+  {
+   "coord": [
+    26,
+    23
+   ],
+   "address": [
+    "奥克山学院宿舍",
+    "Lounge",
+    "宿舍Lounge"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    15
+   ],
+   "address": [
+    "Trading Center",
+    "Break Room",
+    "Bed"
+   ]
+  },
+  {
+   "coord": [
+    21,
+    16
+   ],
+   "address": [
+    "Trading Center",
+    "Break Room",
+    "Bed"
+   ]
+  }
+ ]
+}

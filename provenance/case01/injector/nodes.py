@@ -80,6 +80,17 @@ def nodes_from_timeline(timeline: Dict[str, List[dict]],
     if key_nodes == "first_last" and nodes:
         nodes[0].require_interaction = True
         nodes[-1].require_interaction = True
+        # 两个关键节点各要一次"投资者 -> AI 助手"的交互(T0 咨询 / 最终反馈)
+        if len(roles) == 2:
+            ethan, advisor = roles[1], roles[0]
+            nodes[0].interactions = [{
+                "from": ethan, "to": advisor,
+                "focus": "Ask whether the HCM rumour is credible and whether to buy",
+            }]
+            nodes[-1].interactions = [{
+                "from": ethan, "to": advisor,
+                "focus": "Report what actually happened and the personal consequence",
+            }]
     return nodes
 
 
