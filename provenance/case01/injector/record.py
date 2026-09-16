@@ -134,6 +134,8 @@ def to_case01_record(record: dict, branch: str = "",
         "condition_monitor": [],
         "reflection": {},
         "router": {},
+        # 运行摘要（新增键,便于 CLI/平台快速读取）
+        "summary": record.get("summary", {}),
         # 新增段：injector 的原始节点记录（平台按需读取,不影响既有解析）
         "injector": {
             "schema_version": record.get("schema_version", ""),
