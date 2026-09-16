@@ -45,3 +45,25 @@ def test_pipeline_attach_reflection_uses_case01_modules(tmp_path, monkeypatch):
     assert calls["router"]["text"] == "反思文本"
     assert record["compat"]["reflection_attached"] is True
     assert not any(g.startswith("reflection/router") for g in record["compat"]["gaps"])
+
+def test_pipeline_from_existing_raw_record(tmp_path):
+    raw = {
+        "schema_version": "injector-0.1", "run_id": "raw-1", "mode": "mavis",
+        "branch": "A", "roles": ["Investment AI", "Ethan Lin"],
+        "nodes": [{
+            "node_id": "node-1", "date": "2026-08-27", "step": 1,
+            "events": [{"id": "e1", "event_type": "disclosure", "content": "x", "date": "2026-08-27"}],
+            "world_state": {"date": "2026-08-27", "branch": "A", "hcm_shares": True},
+            "dialogue": [{"A -> B": [["Ethan Lin", "q"], ["Investment AI", "a"]]}],
+            "interactions": [], "interaction_started": True, "retries": 0,
+        }],
+        "world_audit": [{"t": "2026-08-27", "action": "set_branch", "branch": "A"}],
+        "summary": {"node_count": 1},
+    }
+    out = tmp_path / "mapped.json"
+    record = run_pipeline(branch="A", raw_record=raw, out_path=str(out))
+    assert out.exists()
+    assert record["run_id"] == "raw-1"
+    assert len(record["state_history"]) == 1
+    assert len(record["turns"]) == 2
+    assert any(a.get("action") == "set_branch" for a in record["audit"])

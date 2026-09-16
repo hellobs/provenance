@@ -43,15 +43,24 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                  roles: Tuple[str, ...] = DEFAULT_ROLES, dry_run: bool = False,
                  max_retries: int = 2, reflect: bool = False,
                  external_router: bool = False, llm=None, router_llm=None,
-                 out_path: str = "") -> dict:
-    """跑一条完整流水线,返回 case01 兼容记录。"""
+                 out_path: str = "", raw_record: Optional[dict] = None) -> dict:
+    """跑一条完整流水线,返回 case01 兼容记录。
+
+    raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
+    """
     scenario_dir = scenario_dir or DEFAULT_SCENARIO
-    run_id = run_id or "injector-{}".format(branch)
-    nodes = default_nodes(branch, roles=list(roles))
-    bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
-                         run_id=run_id, max_retries=max_retries, dry_run=dry_run,
-                         branch=branch)
-    raw = bridge.run()
+    branch = branch or (raw_record or {}).get("branch", "B")
+    run_id = run_id or (raw_record or {}).get("run_id") or "injector-{}".format(branch)
+
+    if raw_record is not None:
+        raw = raw_record
+    else:
+        nodes = default_nodes(branch, roles=list(roles))
+        bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
+                             run_id=run_id, max_retries=max_retries, dry_run=dry_run,
+                             branch=branch)
+        raw = bridge.run()
+
     record = to_case01_record(raw, branch=branch)
     record.setdefault("compat", {})["reflection_attached"] = False
 
@@ -79,6 +88,8 @@ def main():
     ap.add_argument("--external-router", action="store_true",
                     help="Router 用外部 API（需 OPENROUTER_API_KEY）")
     ap.add_argument("--out", default="")
+    ap.add_argument("--from-record", default="",
+                    help="对已有的 injector 原始记录做映射/接反思(不重新驱动)")
     args = ap.parse_args()
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
@@ -86,10 +97,19 @@ def main():
         print("--roles 需要正好两个角色名")
         sys.exit(2)
 
+    raw = None
+    if args.from_record:
+        with open(args.from_record, encoding="utf-8") as f:
+            raw = json.load(f)
+        # 容错:误把"已映射记录"当输入时,回退到其中的 injector 原始段
+        if "nodes" not in raw and isinstance(raw.get("injector"), dict):
+            raw = raw["injector"]
+
     record = run_pipeline(
         branch=args.branch, scenario_dir=args.scenario_dir, run_id=args.run_id,
         roles=roles, dry_run=args.dry_run, max_retries=args.max_retries,
         reflect=args.reflect, external_router=args.external_router, out_path=args.out,
+        raw_record=raw,
     )
     if args.out:
         print("saved ->", args.out)
