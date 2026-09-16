@@ -108,6 +108,7 @@ class MavisBridge:
                 "date": node.date,
                 "step": idx,
                 "released_events": [e.get("id") for e in node.events],
+                "events": [dict(e, date=node.date) for e in node.events],
                 "context": {k: dict(v) for k, v in self._current_context.items()},
                 "interactions": [dict(r) for r in self._current_requests],
                 "interaction_started": bool(started),
