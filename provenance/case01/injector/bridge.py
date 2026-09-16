@@ -12,6 +12,7 @@ dry_run=True 时完全不 import mavisframework（dry-run 与 CI 使用）。
 import datetime
 import json
 import os
+import time
 from typing import Dict, List, Optional, Tuple
 
 from .nodes import NodeSpec
@@ -94,6 +95,7 @@ class MavisBridge:
             self.activate(node)
             self._apply_world(node)
             dialogue_before = self._dialogue_count()
+            node_t0 = time.time()
 
             retries = 0
             started = self._step_once(node, step_index=idx - 1,
@@ -115,6 +117,7 @@ class MavisBridge:
                 "retries": retries,
                 "world": dict(node.world),
                 "dialogue": self._dialogue_tail(dialogue_before),
+                "elapsed_s": round(time.time() - node_t0, 1),
             })
         return self.run_record()
 
@@ -131,6 +134,7 @@ class MavisBridge:
                 "node_count": len(self.records),
                 "interaction_started": sum(1 for r in self.records if r["interaction_started"]),
                 "retries": sum(r["retries"] for r in self.records),
+                "elapsed_s": round(sum(r.get("elapsed_s", 0) or 0 for r in self.records), 1),
             },
             # 与 case01 run.json 的字段级对齐属于阶段 3 的验收项,此处显式标注未完成
             "case01_run_compatible": False,
