@@ -1,35 +1,59 @@
-# case01 injector（骨架）
+# case01 injector
 
 把 case01 的节点剧本作为"mavis 上的一套事件参数约束"注入。设计依据见
 `../docs/case01_over_mavis_设计说明.md`，执行步骤见 `../docs/case01_over_mavis_执行计划.md`。
 
-## 现状
+## 现状（2026-09-16）
 
-- 已完成：节点序列生成（`nodes.py`）、桥接与记录（`bridge.py`）、dry-run CLI（`run_injector.py`）。
-- 未完成（阶段 2）：mavis 场景装配（两个角色的 mavis 配置与地图）、自定义条件注册、世界推进接入。
-  `bridge._build_mavis()` 与 `bridge._apply_world()` 中标注了待办。
+已完成：
+
+- 节点序列生成：`nodes.py`（timeline 按日聚节点；关键节点标记必须发生交互并附 focus）。
+- mavis 装配：`bridge.py` 的 `_build_mavis`（复用通用注入钩子，不挂 governance）；
+  装配后显式 `Game.reset_game()` 初始化 LLM provider。
+- 到点必发：`conditions.py` 用 `Simulator.register_condition` 注册 `case01_node`（不改框架主逻辑）。
+- 关键交互：`Simulator(interaction_request=...)` + 节点内重试；真实 Ollama 已验证
+  （单节点约 2–3 分钟，重试 1 次内成功）。
+- 字段对齐：`record.py` 把运行记录映射成 case01 `run.json` 兼容结构，顶层键齐全，
+  与真实 `runs/demo-3/run.json` 交叉校验通过。
+- 完整流水线：`pipeline.py`（可接 case01 的 Reflection/Router）。
+- 场景：`scenario/`（两个角色 + 复用投资地图），说明见该目录 README。
+
+未完成：
+
+- `state_history`：尚未接入 case01 的 world 状态机（逐日资金/持仓），当前留空并在
+  `compat.gaps` 标注。
+- 整条线（6 节点）的耗时与记录完整性仍在实测。
+- CI 未覆盖 case01 测试（阶段 0 已决定不做）。
 
 ## 用法
 
 ```bash
-# dry-run：不加载 mavis，只产出与真实运行同构的记录
-python -m case01.injector.run_injector --timeline B --dry-run --out runs_injector/dry-B.json
+# dry-run：不加载 mavis，输出 case01 兼容记录（CI/联调）
+python -m case01.injector.pipeline --branch B --dry-run --out runs_injector/B.json
 
-# 真实运行（阶段 2 完成后）
-python -m case01.injector.run_injector --timeline B --scenario-dir <mavis 场景目录>
+# 真实运行（需本地 Ollama；可选接 Reflection/Router）
+python -m case01.injector.pipeline --branch B --reflect --out runs_injector/B.json
+
+# 只驱动节点、不接反思（单节点调试）
+python -m case01.injector.pipeline --branch A --out /tmp/A.json
 ```
 
-## 与 mavis 的接口
+## mavis 侧依赖的三个通用能力
 
-本桥提供两个回调，直接传给 `Simulator`：
+都是纯新增、默认关闭，不传时行为与之前完全一致（见 mavis 分支
+`feat/generic-injection-hooks`）：
 
-- `external_state(name, step, sim_time, game) -> dict`：步级临时状态，非空时进入提示词，不写记忆。
-- `interaction_request(step, sim_time, game) -> [{"from","to","focus"}]`：请求一次交互，跳过冷却与概率门。
+- `Simulator(external_state=fn)` / `Agent.set_step_context()`：步级临时状态，进提示词、不写记忆。
+- `Simulator(interaction_request=fn)` / `Agent.request_interaction()`：请求一次交互，跳过冷却与概率门。
+- agent 配置 `role_directive`：角色指令，非空时进提示词。
 
-两者都是纯新增、默认关闭的能力；不传时 mavis 行为与之前完全一致。
+## 记录与兼容
 
-## 记录
+`record.py` 输出 case01 `run.json` 的顶层键（`turns` / `events` / `retrievals` /
+`final_feedback` / `audit` 等），并新增两段：
 
-`run_record()` 输出 `schema_version=injector-0.1`，含每个节点的日期、步骤、释放事件、临时状态、
-交互与重试次数。与 case01 `run.json` 的字段级对齐是阶段 3 的验收项，当前显式标记
-`case01_run_compatible: false`。
+- `injector`：原始节点记录（含对话、临时状态、交互与重试）。
+- `compat`：`level`（当前为 `schema`）、`missing_keys`、`gaps`（哪些字段是留空而非真值）、
+  `reflection_attached`。
+
+取不到真值的字段一律留空并写进 `gaps`，不伪造。

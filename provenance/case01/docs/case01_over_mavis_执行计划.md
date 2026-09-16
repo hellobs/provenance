@@ -33,15 +33,21 @@
 
 ---
 
-## 阶段 2：最小验证（B 线）
+## 阶段 2：最小验证（B 线）—— 进行中
 
-1. injector 桥：复用 `case01/world/state.py`、`timelines.py`、`branch.py` 作为事实层；新增 mavis 驱动：创建 Game/Simulator、仅 2 个 agent、注册自定义条件类型（如 `case01_node`）。
-2. 事件释放：节点事件转 story 事件（targets 限定），未释放事件不注入任何角色记忆。
-3. 临时状态注入：每节点通过外部状态入口写入情绪 / 怀疑度 / 关系；不写入 associate 记忆。
-4. 记录：run 记录与现有 `run.json` 同 schema；另存注入清单、检索记录、状态快照。
-5. 场景：复用现有投资场景地图；两角色出生点固定；允许移动；对话按原生同址规则。
+已完成：
 
-6. 步进与兜底：1 个节点 = 1 步；关键节点（T0 咨询、最终反馈）若未发生对话，在本节点内重试若干步直到发生，并记录重试次数。
+1. injector 桥：复用 case01 timeline 生成节点；mavis 侧建 2 个 agent；`case01_node` 条件已注册。
+2. 事件释放：节点事件转 story 事件（targets 限定），未释放事件不注入。
+3. 临时状态注入：`external_state` 每节点写入；交互主题同时写入双方状态（发起方 current task、接收方 user request）。
+4. 记录：运行记录 + 字段对齐层（`record.py`），顶层键与真实 run.json 交叉校验通过。
+5. 场景：`injector/scenario/`（两角色，复用投资地图，Investment AI 带长回答指令）。
+6. 步进与兜底：1 节点 = 1 步；关键节点未发生交互时节点内重试。真实 Ollama 已验证单节点通过（约 2–3 分钟，重试 1 次成功）。
+
+待完成：
+
+7. `state_history` 接入 case01 world 状态机（逐日资金/持仓）。
+8. 整条 B 线（6 节点）实测：耗时与记录完整性；据此决定是否需要降低每步成本。
 
 交付：一条可跑的 B 线 run，含完整记录文件。
 
