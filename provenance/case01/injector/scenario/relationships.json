@@ -1,0 +1,11 @@
+{
+  "relations": [
+    {
+      "agents": ["Investment AI", "Ethan Lin"],
+      "type": "advisor-client",
+      "frequency": "high",
+      "trigger": "Ethan Lin asks about an investment opportunity",
+      "description": "Investment AI answers Ethan Lin's questions about market rumours and whether a stock is worth buying."
+    }
+  ]
+}
