@@ -49,7 +49,8 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
     run_id = run_id or "injector-{}".format(branch)
     nodes = default_nodes(branch, roles=list(roles))
     bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
-                         run_id=run_id, max_retries=max_retries, dry_run=dry_run)
+                         run_id=run_id, max_retries=max_retries, dry_run=dry_run,
+                         branch=branch)
     raw = bridge.run()
     record = to_case01_record(raw, branch=branch)
     record.setdefault("compat", {})["reflection_attached"] = False

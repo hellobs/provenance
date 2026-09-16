@@ -103,16 +103,33 @@ def _final_feedback(nodes: List[dict]) -> dict:
     return {"date": last.get("date", ""), "ethan": ethan, "ai": ai}
 
 
+def _state_history(nodes: List[dict]) -> List[dict]:
+    """优先用事实层快照(case01 World 同口径);没有则留空。"""
+    out: List[dict] = []
+    for node in nodes:
+        state = node.get("world_state")
+        if state:
+            out.append({"date": node.get("date", ""), "state": dict(state)})
+    return out
+
+
 def to_case01_record(record: dict, branch: str = "",
                      t0_rounds: int = 0, c_plan: Optional[dict] = None) -> dict:
     """把 injector 记录映射成 case01 run.json 兼容结构。"""
     nodes = list(record.get("nodes") or [])
     compat_gaps: List[str] = []
 
-    state_history: List[dict] = []
-    compat_gaps.append("state_history:未接入 case01 world 状态机,留空")
+    state_history = _state_history(nodes)
+    if not state_history:
+        compat_gaps.append("state_history:未接入 case01 world 状态机,留空")
+    if not record.get("world_audit"):
+        compat_gaps.append("world_audit:未接入 case01 world 审计,留空")
+    compat_gaps.append("condition_monitor:仅 Branch C 使用(带 C 方案时由事实层填充)")
     compat_gaps.append("reflection/router:由 case01.reflection 在运行后补齐,此处留空")
-    compat_gaps.append("condition_monitor:仅 Branch C 使用,当前留空")
+
+    branch = branch or record.get("branch", "")
+    if branch == "C":
+        compat_gaps.append("Branch C 实际仓位依赖 T0 方案,当前未自动建仓")
 
     mapped = {
         "run_id": record.get("run_id", ""),
@@ -130,8 +147,9 @@ def to_case01_record(record: dict, branch: str = "",
         "events": _events(nodes),
         "state_history": state_history,
         "final_feedback": _final_feedback(nodes),
-        "audit": _audit(nodes),
-        "condition_monitor": [],
+        # world 审计在前(事实层),injector 注入/交互记录在后
+        "audit": list(record.get("world_audit") or []) + _audit(nodes),
+        "condition_monitor": list(record.get("condition_monitor") or []),
         "reflection": {},
         "router": {},
         # 运行摘要（新增键,便于 CLI/平台快速读取）

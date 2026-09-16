@@ -32,6 +32,8 @@ class MavisBridge:
         max_retries: int = 5,
         dry_run: bool = True,
         anchor_coord: Optional[List[int]] = None,
+        branch: str = "A",
+        use_case01_facts: bool = True,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -40,11 +42,17 @@ class MavisBridge:
         self.max_retries = int(max_retries)
         self.dry_run = bool(dry_run)
         self.anchor_coord = list(anchor_coord) if anchor_coord else None
+        self.branch = branch
+        self.use_case01_facts = bool(use_case01_facts)
 
         # mavis 侧对象（dry_run 时为 None）
         self.game = None
         self.simulator = None
         self.config: dict = {}
+        # 事实层（case01 World 的注入侧封装,dry_run 时不建）
+        self.facts = None
+        self._node_facts: Dict[str, dict] = {}
+        self._world_audit: List[dict] = []
         # 当前节点 id（供 case01_node 条件读取）
         self._node_state: Dict[str, str] = {"id": ""}
 
@@ -116,6 +124,7 @@ class MavisBridge:
                 "interaction_started": bool(started),
                 "retries": retries,
                 "world": dict(node.world),
+                "world_state": (self._node_facts.get(node.node_id) or {}).get("state"),
                 "dialogue": self._dialogue_tail(dialogue_before),
                 "elapsed_s": round(time.time() - node_t0, 1),
             })
@@ -127,9 +136,12 @@ class MavisBridge:
             "schema_version": "injector-0.1",
             "run_id": self.run_id,
             "mode": "dry-run" if self.dry_run else "mavis",
+            "branch": self.branch,
             "roles": list(self.roles),
             "scenario_dir": self.scenario_dir,
             "nodes": list(self.records),
+            "world_audit": list(self._world_audit),
+            "condition_monitor": list(self.facts.condition_monitor) if self.facts else [],
             "summary": {
                 "node_count": len(self.records),
                 "interaction_started": sum(1 for r in self.records if r["interaction_started"]),
@@ -185,6 +197,10 @@ class MavisBridge:
             external_state=self.external_state,
             interaction_request=self.interaction_request,
         )
+        if self.use_case01_facts:
+            from .worldfacts import Case01Facts
+
+            self.facts = Case01Facts(self.branch, run_id=self.run_id)
 
     def _apply_world(self, node: NodeSpec) -> None:
         """设置当前节点:节点 id、本节点要释放的 story 事件、（可选）角色位置。"""
@@ -195,6 +211,10 @@ class MavisBridge:
         self._node_state["id"] = node.node_id
         # 只释放本节点的事件:未释放事件不进入任何角色上下文
         self.simulator.story = [self._as_story_event(ev, node) for ev in node.events]
+        # 事实层推进(日期/价格/公开事件/Ethan 状态),与 case01 同口径
+        if self.facts is not None:
+            self._node_facts[node.node_id] = self.facts.apply_node(node)
+            self._world_audit = self.facts.audit()
         if self.anchor_coord:
             for name in self.roles:
                 agent_cfg = self.config.get("agents", {}).get(name)
