@@ -174,6 +174,7 @@ class MavisBridge:
             raise RuntimeError("场景缺少 config.json: {}".format(config_path))
 
         from mavisframework.config.loader import load_config
+        from mavisframework.core.timer import Timer
         from mavisframework.runtime.game import Game
         from mavisframework.runtime.simulator import Simulator
 
@@ -189,9 +190,12 @@ class MavisBridge:
         install_case01_node_condition(self._node_state)
 
         self.config = config
+        # 模拟时钟必须显式注入:Game 默认用墙钟(Timer() 取 datetime.now()),
+        # 而 mavis 规定 23:00 后不发起对话 → 真实运行会随实际时间成败。
+        timer = Timer(self._start_time())
         # case01 不挂 governance/consequence:不启用倾向与后果反馈机制
         self.game = Game(self.run_id, scenario, config, {},
-                         governance=None, consequence_fn=None)
+                         timer=timer, governance=None, consequence_fn=None)
         # mavis 的 LLM provider 在 Agent.reset() 里惰性创建,必须显式初始化一次
         self.game.reset_game()
         self.simulator = Simulator(
