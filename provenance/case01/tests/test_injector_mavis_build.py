@@ -214,3 +214,15 @@ def test_required_interaction_pins_runtime_state(monkeypatch, tmp_path):
     # 日程补建在真实模型下生效;stub 模式下只要不抛异常即可
     assert isinstance(a.schedule.daily_schedule, list)
     assert isinstance(b.schedule.daily_schedule, list)
+
+def test_simulated_clock_is_node_based_not_wall_clock(monkeypatch, tmp_path):
+    """模拟时钟必须按节点日期起算,不能取墙钟(否则 23 点后 mavis 拒绝对话)。"""
+    _install_stub_provider(monkeypatch)
+    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge._build_mavis()
+    stamp = bridge.game._timer.get_date("%Y-%m-%d %H:%M")
+    assert stamp == nodes[0].date + " 09:30"
+    # 节点间按 stride 推进到下一节点同一时刻
+    stride = bridge._stride_to_next(0)
+    bridge.game._timer.forward(stride)
+    assert bridge.game._timer.get_date("%Y-%m-%d %H:%M") == nodes[1].date + " 09:30"
