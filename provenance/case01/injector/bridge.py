@@ -215,6 +215,13 @@ class MavisBridge:
         if self.facts is not None:
             self._node_facts[node.node_id] = self.facts.apply_node(node)
             self._world_audit = self.facts.audit()
+            # 最终反馈节点:把分支专属的个人处境注入发起方(镜像 03 §五/§七)
+            if node is self.nodes[-1]:
+                context = self.facts.final_feedback_context()
+                for req in self._current_requests:
+                    src = req.get("from")
+                    if src in self._current_context:
+                        self._current_context[src].setdefault("personal situation", context)
         if self.anchor_coord:
             for name in self.roles:
                 agent_cfg = self.config.get("agents", {}).get(name)

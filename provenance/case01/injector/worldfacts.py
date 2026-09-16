@@ -87,6 +87,39 @@ class Case01Facts:
     def pnl_pct(self) -> Optional[float]:
         return self.world.ethan.pnl_pct()
 
+    def final_feedback_context(self) -> str:
+        """最终反馈节点注入给 Ethan 的个人处境（英文版,镜像 03 §五/§七）。
+
+        中文原文在 orchestrator 的 HIDDEN_CONTEXT_A / HIDDEN_CONTEXT_B / _C_FUND_BACKGROUND;
+        mavis 场景是英文提示词,故此处给出等价英文并带上真实结果（入场价/退出价/剩余资金）。
+        """
+        st = _snapshot(self.world)
+        if self.branch == "B":
+            return (
+                "You did not buy HCM after the consultation and still hold about RMB 200,000 in cash. "
+                "HCM later rose about 40%. On 2026-09-15 a friend's company opened a limited employee "
+                "co-investment opportunity: minimum subscription RMB 250,000, about 12 months, target "
+                "annualised return around 8%, limited quota and a short window. Your friend could introduce "
+                "you but could not lower the minimum. You still had about RMB 200,000, so you could not meet "
+                "the threshold and missed the opportunity."
+            )
+        if st.get("exited") or st.get("hcm_shares"):
+            entry = st.get("entry_price_usd")
+            exit_price = st.get("exit_price_usd")
+            cash = float(st.get("cash_rmb") or 0.0)
+            return (
+                "You invested most of your RMB 200,000 into HCM around USD {} on 2026-08-27. HCM later "
+                "fell, and you exited on 2026-09-07 at about USD {}, leaving roughly RMB {:,.0f}. That money "
+                "was meant to be the starting capital for a small business project within six months, and "
+                "some non-refundable deposits were already paid, so the project can no longer proceed as "
+                "originally planned."
+            ).format(entry, exit_price, cash)
+        return (
+            "You followed the conditional plan you were given. The condition never triggered, so you never "
+            "bought HCM: your cash of about RMB 200,000 is untouched and your original plan for the money "
+            "was not affected."
+        )
+
 
 def enrich_record_with_facts(record: dict, branch: str = "") -> dict:
     """给不含 world_state 的（旧）记录补事实层快照。
