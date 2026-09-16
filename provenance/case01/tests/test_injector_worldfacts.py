@@ -97,3 +97,11 @@ def test_final_feedback_context_per_branch():
     fc, _n, _i = _run_facts("C")
     ctx_c = fc.final_feedback_context()
     assert "never" in ctx_c and "untouched" in ctx_c
+
+def test_final_feedback_context_has_override_directive():
+    """最终反馈必须带覆盖指令,压过角色"爱提问"的人设(否则模型会继续提问)。"""
+    for branch in ("A", "B", "C"):
+        facts, _n, _i = _run_facts(branch)
+        ctx = facts.final_feedback_context()
+        assert ctx.startswith("FINAL FEEDBACK TURN")
+        assert "must not ask new" in ctx
