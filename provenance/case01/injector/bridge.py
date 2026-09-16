@@ -159,6 +159,8 @@ class MavisBridge:
         # case01 不挂 governance/consequence:不启用倾向与后果反馈机制
         self.game = Game(self.run_id, scenario, config, {},
                          governance=None, consequence_fn=None)
+        # mavis 的 LLM provider 在 Agent.reset() 里惰性创建,必须显式初始化一次
+        self.game.reset_game()
         self.simulator = Simulator(
             max_workers=max(1, len(self.roles)),
             export_decisions=False,
