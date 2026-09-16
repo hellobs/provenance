@@ -231,19 +231,42 @@ class MavisBridge:
                 if agent_cfg is not None:
                     agent_cfg["coord"] = list(self.anchor_coord)
                     agent_cfg["path"] = []
-        # 必须交互的节点:强制同址 + 静止,否则强制交互会被"在移动/不同处"挡住
+        # 必须交互的节点:强制同址 + 静止,否则强制交互会被"在移动/不同处/无行动"挡住
         if node.require_interaction and node.interactions:
-            coord = self.meeting_coord
-            if coord is None:
-                first = self.roles[0]
-                if first in (self.game.agents or {}):
-                    coord = list(self.game.get_agent(first).coord)
+            self._pin_for_interaction(node)
+
+    def _pin_for_interaction(self, node: NodeSpec) -> None:
+        """强制交互前把两个角色放到同一格、清空路径、必要时补日程。
+
+        mavis 的对话前置条件看的是运行时状态（agent.path / agent.action / daily_schedule）,
+        只改 config 不够;这里用既有公开方法（move / make_schedule）把状态摆好,不改框架。
+        """
+        coord = self.meeting_coord
+        if coord is None and self.roles:
+            first = self.roles[0]
+            if first in (self.game.agents or {}):
+                coord = list(self.game.get_agent(first).coord)
+        for name in self.roles:
+            agent = (self.game.agents or {}).get(name)
+            if agent is None:
+                continue
+            try:
+                if len(getattr(agent.schedule, "daily_schedule", []) or []) < 1:
+                    agent.make_schedule()
+            except Exception as e:      # 日程生成失败不阻塞(下一步会再试)
+                self.game.logger.warning(
+                    "pin: make_schedule failed for {}: {}".format(name, e))
             if coord is not None:
-                for name in self.roles:
-                    agent_cfg = self.config.get("agents", {}).get(name)
-                    if agent_cfg is not None:
-                        agent_cfg["coord"] = list(coord)
-                        agent_cfg["path"] = []
+                try:
+                    agent.move(list(coord), [])
+                except Exception as e:
+                    self.game.logger.warning(
+                        "pin: move failed for {}: {}".format(name, e))
+            agent.path = []
+            cfg = self.config.get("agents", {}).get(name)
+            if cfg is not None and coord is not None:
+                cfg["coord"] = list(coord)
+                cfg["path"] = []
 
     def _step_once(self, node: NodeSpec, step_index: int = 0, stride: int = 0) -> bool:
         """推进 1 步;返回本节点是否发生了被请求的交互。"""
