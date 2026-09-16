@@ -43,12 +43,16 @@ class NodeSpec:
 
 def nodes_from_timeline(timeline: Dict[str, List[dict]],
                         roles: Optional[List[str]] = None,
-                        key_nodes: str = "first_last") -> List[NodeSpec]:
+                        key_nodes: str = "first_last",
+                        final_date: str = "2026-09-15",
+                        append_final: bool = True) -> List[NodeSpec]:
     """把 timeline(date -> [事件])聚成节点序列。
 
     timeline 结构见 `case01.world.timelines`:{date: [{kind, summary, source?, price_usd?}, ...]}
     roles:该场景的角色名列表,用于 story 事件的 targets(为空时用 ["all"])。
     key_nodes:"first_last"(默认,首尾节点必须发生交互)/ "none"。
+    final_date:最终反馈日(01 文档固定 2026-09-15);晚于最后一条事件时补一个空节点,
+        使"最终反馈"落在正确日期上。
     """
     roles = list(roles or [])
     nodes: List[NodeSpec] = []
@@ -76,6 +80,9 @@ def nodes_from_timeline(timeline: Dict[str, List[dict]],
             events=events,
             world=world,
         ))
+
+    if append_final and final_date and (not nodes or nodes[-1].date < final_date):
+        nodes.append(NodeSpec(node_id="node-final", date=final_date, events=[]))
 
     if key_nodes == "first_last" and nodes:
         nodes[0].require_interaction = True

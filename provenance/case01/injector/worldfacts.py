@@ -98,7 +98,16 @@ def enrich_record_with_facts(record: dict, branch: str = "") -> dict:
 
     branch = branch or record.get("branch") or "A"
     facts = Case01Facts(branch, run_id=record.get("run_id", "injector"))
+    # 旧记录可能只有事件 id:按 timeline 重新展开事件原文(纯逻辑,同一套转换)
+    from .nodes import nodes_from_timeline
+
+    specs = {n.date: n for n in nodes_from_timeline(
+        facts.events_by_date, roles=[], key_nodes="none", append_final=False)}
     for node in record.get("nodes") or []:
+        if not node.get("events"):
+            spec = specs.get(node.get("date", ""))
+            if spec is not None:
+                node["events"] = [dict(e, date=node.get("date", "")) for e in spec.events]
         if node.get("world_state"):
             continue
         info = facts.apply_node(SimpleNamespace(date=node.get("date", "")))

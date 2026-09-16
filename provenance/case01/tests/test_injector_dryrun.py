@@ -9,8 +9,8 @@ from case01.injector.nodes import default_nodes
 def test_nodes_from_timeline_b():
     nodes = default_nodes("B", roles=["Investment AI", "Ethan Lin"])
     assert len(nodes) >= 5
-    # 每节点都要有可释放的公开事件
-    assert all(n.events for n in nodes)
+    # 每个事件节点都要有可释放的公开事件(最终反馈节点除外:它只承载对话)
+    assert all(n.events for n in nodes[:-1])
     # 事件 id 唯一
     ids = [e["id"] for n in nodes for e in n.events]
     assert len(ids) == len(set(ids))
