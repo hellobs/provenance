@@ -87,3 +87,27 @@ def test_pipeline_fill_facts_on_legacy_record(tmp_path):
     last = record["state_history"][-1]["state"]
     assert last["exited"] is True and last["exit_price_usd"] == 27.40
     assert any(a.get("action") == "set_branch" for a in record["audit"])
+
+def test_final_node_at_case01_final_date():
+    """最终反馈必须落在 01 文档固定的 2026-09-15,而不是最后一条事件日。"""
+    from case01.injector.nodes import default_nodes
+
+    nodes = default_nodes("B", roles=["Investment AI", "Ethan Lin"])
+    assert nodes[-1].date == "2026-09-15"
+    assert nodes[-1].events == []
+    assert nodes[-1].require_interaction is True
+    assert nodes[-1].interactions[0]["from"] == "Ethan Lin"
+    assert "actually happened" in nodes[-1].interactions[0]["focus"]
+    # 09-11 那条事件节点仍存在,且不是最终节点
+    assert any(n.date == "2026-09-11" for n in nodes[:-1])
+
+
+def test_legacy_record_events_rebuilt_from_timeline(tmp_path):
+    raw = {
+        "schema_version": "injector-0.1", "run_id": "legacy-2", "mode": "mavis",
+        "nodes": [{"node_id": "node-1", "date": "2026-08-27", "released_events": ["node1-1"]}],
+        "summary": {"node_count": 1},
+    }
+    record = run_pipeline(branch="A", raw_record=raw, fill_facts=True)
+    assert record["events"], "旧记录应按 timeline 补算事件原文"
+    assert record["events"][0]["kind"]
