@@ -86,3 +86,24 @@ class Case01Facts:
 
     def pnl_pct(self) -> Optional[float]:
         return self.world.ethan.pnl_pct()
+
+
+def enrich_record_with_facts(record: dict, branch: str = "") -> dict:
+    """给不含 world_state 的（旧）记录补事实层快照。
+
+    事实层是纯逻辑（分支 + timeline + 节点日期即可重算），因此可以事后补齐,
+    不改动已有的对话与注入内容。
+    """
+    from types import SimpleNamespace
+
+    branch = branch or record.get("branch") or "A"
+    facts = Case01Facts(branch, run_id=record.get("run_id", "injector"))
+    for node in record.get("nodes") or []:
+        if node.get("world_state"):
+            continue
+        info = facts.apply_node(SimpleNamespace(date=node.get("date", "")))
+        node["world_state"] = info["state"]
+    record["world_audit"] = facts.audit()
+    record["condition_monitor"] = list(facts.condition_monitor)
+    record.setdefault("branch", branch)
+    return record
