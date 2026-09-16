@@ -194,3 +194,23 @@ def test_required_interaction_pins_both_agents(monkeypatch, tmp_path):
     bridge.activate(nodes[1])
     bridge._apply_world(nodes[1])
     assert nodes[1].require_interaction is False
+
+def test_required_interaction_pins_runtime_state(monkeypatch, tmp_path):
+    """钉定必须作用在运行时状态(agent.path/coord),否则 mavis 的前置条件仍会判否。"""
+    _install_stub_provider(monkeypatch)
+    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge._build_mavis()
+
+    a = bridge.game.get_agent(DEFAULT_ROLES[0])
+    b = bridge.game.get_agent(DEFAULT_ROLES[1])
+    a.path = [[1, 1], [2, 2]]      # 模拟"正在移动"
+    b.path = [[3, 3]]
+
+    bridge.activate(nodes[0])
+    bridge._apply_world(nodes[0])   # require_interaction=True
+
+    assert a.path == [] and b.path == []
+    assert list(a.coord) == list(b.coord)
+    # 日程补建在真实模型下生效;stub 模式下只要不抛异常即可
+    assert isinstance(a.schedule.daily_schedule, list)
+    assert isinstance(b.schedule.daily_schedule, list)
