@@ -147,3 +147,21 @@ def test_dialogue_helpers_with_fake_game(monkeypatch, tmp_path):
     assert bridge._dialogue_count() == 1
     assert bridge._dialogue_tail(0) == [block]
     assert bridge._dialogue_tail(1) == []
+
+def test_story_event_stops_matching_after_node_switch(monkeypatch, tmp_path):
+    """隔离验证:切到下一节点后,上一节点的 story 事件不再命中。"""
+    _install_stub_provider(monkeypatch)
+    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge._build_mavis()
+
+    bridge.activate(nodes[0])
+    bridge._apply_world(nodes[0])
+    ev0 = bridge.simulator.story[0]
+    assert bridge.simulator._trigger_fired(ev0, bridge.game) is True
+
+    bridge.activate(nodes[1])
+    bridge._apply_world(nodes[1])
+    assert bridge._node_state["id"] == nodes[1].node_id
+    assert bridge.simulator._trigger_fired(ev0, bridge.game) is False
+    ids = {e["condition"]["node_id"] for e in bridge.simulator.story}
+    assert ids == {nodes[1].node_id}
