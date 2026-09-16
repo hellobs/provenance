@@ -83,3 +83,17 @@ def test_record_without_world_state_reports_gap():
     gaps = mapped["compat"]["gaps"]
     assert any(g.startswith("state_history") for g in gaps)
     assert any("Branch C" in g for g in gaps)
+
+def test_final_feedback_context_per_branch():
+    fa, _n, _i = _run_facts("A")
+    ctx_a = fa.final_feedback_context()
+    assert "45.2" in ctx_a and "27.4" in ctx_a
+    assert "business project" in ctx_a and "deposits" in ctx_a
+
+    fb, _n, _i = _run_facts("B")
+    ctx_b = fb.final_feedback_context()
+    assert "did not buy" in ctx_b and "250,000" in ctx_b and "missed" in ctx_b
+
+    fc, _n, _i = _run_facts("C")
+    ctx_c = fc.final_feedback_context()
+    assert "never" in ctx_c and "untouched" in ctx_c

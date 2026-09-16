@@ -165,3 +165,14 @@ def test_story_event_stops_matching_after_node_switch(monkeypatch, tmp_path):
     assert bridge.simulator._trigger_fired(ev0, bridge.game) is False
     ids = {e["condition"]["node_id"] for e in bridge.simulator.story}
     assert ids == {nodes[1].node_id}
+
+def test_final_node_injects_personal_situation(monkeypatch, tmp_path):
+    _install_stub_provider(monkeypatch)
+    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge.branch = "B"
+    bridge._build_mavis()
+    bridge.activate(nodes[-1])
+    bridge._apply_world(nodes[-1])
+    state = bridge.simulator.external_state("Ethan Lin", len(nodes), "20260915-09:30", bridge.game)
+    assert "personal situation" in state
+    assert "250,000" in state["personal situation"]
