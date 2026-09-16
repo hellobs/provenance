@@ -34,6 +34,7 @@ class MavisBridge:
         anchor_coord: Optional[List[int]] = None,
         branch: str = "A",
         use_case01_facts: bool = True,
+        meeting_coord: Optional[List[int]] = None,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -44,6 +45,8 @@ class MavisBridge:
         self.anchor_coord = list(anchor_coord) if anchor_coord else None
         self.branch = branch
         self.use_case01_facts = bool(use_case01_facts)
+        # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
+        self.meeting_coord = list(meeting_coord) if meeting_coord else None
 
         # mavis 侧对象（dry_run 时为 None）
         self.game = None
@@ -228,6 +231,19 @@ class MavisBridge:
                 if agent_cfg is not None:
                     agent_cfg["coord"] = list(self.anchor_coord)
                     agent_cfg["path"] = []
+        # 必须交互的节点:强制同址 + 静止,否则强制交互会被"在移动/不同处"挡住
+        if node.require_interaction and node.interactions:
+            coord = self.meeting_coord
+            if coord is None:
+                first = self.roles[0]
+                if first in (self.game.agents or {}):
+                    coord = list(self.game.get_agent(first).coord)
+            if coord is not None:
+                for name in self.roles:
+                    agent_cfg = self.config.get("agents", {}).get(name)
+                    if agent_cfg is not None:
+                        agent_cfg["coord"] = list(coord)
+                        agent_cfg["path"] = []
 
     def _step_once(self, node: NodeSpec, step_index: int = 0, stride: int = 0) -> bool:
         """推进 1 步;返回本节点是否发生了被请求的交互。"""

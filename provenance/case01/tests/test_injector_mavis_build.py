@@ -176,3 +176,21 @@ def test_final_node_injects_personal_situation(monkeypatch, tmp_path):
     state = bridge.simulator.external_state("Ethan Lin", len(nodes), "20260915-09:30", bridge.game)
     assert "personal situation" in state
     assert "250,000" in state["personal situation"]
+
+def test_required_interaction_pins_both_agents(monkeypatch, tmp_path):
+    """必须交互的节点:两角色被钉到同一格且路径清空(否则强制交互会被移动/异地挡住)。"""
+    _install_stub_provider(monkeypatch)
+    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge._build_mavis()
+
+    bridge.activate(nodes[0])
+    bridge._apply_world(nodes[0])       # T0:require_interaction=True
+    coords = {n: bridge.config["agents"][n]["coord"] for n in DEFAULT_ROLES}
+    paths = {n: bridge.config["agents"][n]["path"] for n in DEFAULT_ROLES}
+    assert coords[DEFAULT_ROLES[0]] == coords[DEFAULT_ROLES[1]]
+    assert all(p == [] for p in paths.values())
+
+    # 非交互节点不做钉定
+    bridge.activate(nodes[1])
+    bridge._apply_world(nodes[1])
+    assert nodes[1].require_interaction is False
