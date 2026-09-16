@@ -43,10 +43,12 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                  roles: Tuple[str, ...] = DEFAULT_ROLES, dry_run: bool = False,
                  max_retries: int = 2, reflect: bool = False,
                  external_router: bool = False, llm=None, router_llm=None,
-                 out_path: str = "", raw_record: Optional[dict] = None) -> dict:
+                 out_path: str = "", raw_record: Optional[dict] = None,
+                 fill_facts: bool = False) -> dict:
     """跑一条完整流水线,返回 case01 兼容记录。
 
     raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
+    fill_facts: 对不含 world_state 的旧记录,用纯逻辑重算事实层快照。
     """
     scenario_dir = scenario_dir or DEFAULT_SCENARIO
     branch = branch or (raw_record or {}).get("branch", "B")
@@ -54,6 +56,10 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
 
     if raw_record is not None:
         raw = raw_record
+        if fill_facts:
+            from .worldfacts import enrich_record_with_facts
+
+            enrich_record_with_facts(raw, branch=branch)
     else:
         nodes = default_nodes(branch, roles=list(roles))
         bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
@@ -90,6 +96,8 @@ def main():
     ap.add_argument("--out", default="")
     ap.add_argument("--from-record", default="",
                     help="对已有的 injector 原始记录做映射/接反思(不重新驱动)")
+    ap.add_argument("--fill-facts", action="store_true",
+                    help="对旧记录用纯逻辑补算事实层快照(world_state/world_audit)")
     args = ap.parse_args()
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
@@ -109,7 +117,7 @@ def main():
         branch=args.branch, scenario_dir=args.scenario_dir, run_id=args.run_id,
         roles=roles, dry_run=args.dry_run, max_retries=args.max_retries,
         reflect=args.reflect, external_router=args.external_router, out_path=args.out,
-        raw_record=raw,
+        raw_record=raw, fill_facts=args.fill_facts,
     )
     if args.out:
         print("saved ->", args.out)

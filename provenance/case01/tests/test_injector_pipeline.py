@@ -67,3 +67,23 @@ def test_pipeline_from_existing_raw_record(tmp_path):
     assert len(record["state_history"]) == 1
     assert len(record["turns"]) == 2
     assert any(a.get("action") == "set_branch" for a in record["audit"])
+
+def test_pipeline_fill_facts_on_legacy_record(tmp_path):
+    raw = {
+        "schema_version": "injector-0.1", "run_id": "legacy-1", "mode": "mavis",
+        "roles": ["Investment AI", "Ethan Lin"],
+        "nodes": [
+            {"node_id": "node-1", "date": "2026-08-27", "events": []},
+            {"node_id": "node-2", "date": "2026-09-07", "events": []},
+        ],
+        "summary": {"node_count": 2},
+    }
+    out = tmp_path / "legacy_mapped.json"
+    record = run_pipeline(branch="A", raw_record=raw, fill_facts=True, out_path=str(out))
+
+    assert len(record["state_history"]) == 2
+    first = record["state_history"][0]["state"]
+    assert first["hcm_shares"] is True and first["entry_price_usd"] == 45.20
+    last = record["state_history"][-1]["state"]
+    assert last["exited"] is True and last["exit_price_usd"] == 27.40
+    assert any(a.get("action") == "set_branch" for a in record["audit"])
