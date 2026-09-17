@@ -1,6 +1,16 @@
-# case01 — GTC Case 01 执行引擎(provenance 仓内子包)
+# case01 — GTC Case 01(provenance 仓内子包)
 
-GTC Case 01(0904doc)的运行引擎:节点驱动的受控实验,
+> **归档注记(2026-09-17)**：本目录原有的**独立执行引擎**(节点驱动的受控实验:
+> `orchestrator.py` / `run.py` / `serve.py` / `render.py` 等)已作为
+> **旧引擎归档**,标记 `archive/case01-old-engine`(基线 `d41cdec`,
+> demo-1/2/3 与对接契约均冻结于该点)。当前 case01 的运行架构迁移到
+> **mavis 体系**:case01 定位为"作用于 mavis 的一套事件参数约束",
+> 由 `case01/injector/` 作为注入与驱动层,世界事实由 injector 复用
+> case01 `world/` 决定,mavis 只负责角色表达与交互。
+> 迁移依据与验收见 `case01/docs/case01_over_mavis_*.md`。
+> 下方旧引擎介绍保留供回溯。
+
+<旧引擎>GTC Case 01(0904doc)的运行引擎:节点驱动的受控实验,
 非 MAVIS 连续仿真。Ethan Lin(普通投资者)× Investment AI(本地 Ollama
 + Financial Data 检索)→ Branch(A/B/C)→ Timeline 推进 → 最终反馈
 → Reflection → Router → 专家审核(后置里程碑,平台侧)。
@@ -71,6 +81,21 @@ python -m uvicorn case01.serve:app --port 5002   # 需在 provenance 包根目�
 # 渲染演示页(case01/runs_html/)
 python -m case01.render
 ```
+
+## 新架构用法(mavis + injector,当前路径)
+
+```bash
+# dry-run(不加载 mavis,出 case01 兼容记录,CI 可用)
+python -m case01.injector.pipeline --branch B --dry-run --out runs_injector/B.json
+# 真实运行 + 反思(Branch A/B/C;单次约 9–10 分钟,反思约 1.5 分钟)
+python -m case01.injector.pipeline --branch B --reflect --out runs_injector/B.json
+# 后处理已有记录(补事实层/接反思/Router)
+python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
+```
+
+需要健康 Ollama(`qwen3:4b-instruct-2507-q4_K_M`);Ethan 可经
+`CASE01_ETHAN_BASE_URL` / `CASE01_ETHAN_MODEL` 环境变量走外部 API。
+详细接口见 `case01/injector/README.md`。
 
 ## 完成度(2026-09)
 
