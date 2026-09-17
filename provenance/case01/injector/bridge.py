@@ -66,6 +66,8 @@ class MavisBridge:
 
         # 记录
         self.records: List[dict] = []
+        # Branch C 的条件化方案(在 T0 节点落地后解析,见 _install_c_plan)
+        self._c_plan: Optional[dict] = None
 
     # ------------------------------------------------------------------
     # mavis 侧回调（两个通用入口的实参）
@@ -131,6 +133,11 @@ class MavisBridge:
                 "dialogue": self._dialogue_tail(dialogue_before),
                 "elapsed_s": round(time.time() - node_t0, 1),
             })
+            # Branch C:首个节点(T0)落地后,用 Investment AI 的答案解析条件化方案并
+            # 注入事实层(buy_now 立即建仓 / wait 留待后续节点监测触发)。
+            if self.branch == "C" and not self.dry_run \
+                    and self.facts is not None and node is self.nodes[0]:
+                self._install_c_plan(self.records[-1], node)
         return self.run_record()
 
     def run_record(self) -> dict:
@@ -145,6 +152,7 @@ class MavisBridge:
             "nodes": list(self.records),
             "world_audit": list(self._world_audit),
             "condition_monitor": list(self.facts.condition_monitor) if self.facts else [],
+            "c_plan": self._c_plan,
             "summary": {
                 "node_count": len(self.records),
                 "interaction_started": sum(1 for r in self.records if r["interaction_started"]),
@@ -282,6 +290,51 @@ class MavisBridge:
             start_step=step_index, checkpoints_folder="",
         )
         return any(r.get("started") for r in self.simulator.interactions)
+
+    def _install_c_plan(self, rec: dict, node: NodeSpec) -> None:
+        """从 T0 节点的对话里取出 Investment AI 的答案,解析成条件化方案并注入事实层。
+
+        只在该节点落地后调用(此时 T0 对话已生成、facts 已推进到 T0 当天)。
+        buy_now 会立即建仓 → 重取 T0 节点的状态快照;wait 的方案由后续 apply_node 监测。
+        """
+        ai_answer = self._extract_role_answer(rec, self.roles[0])
+        plan: dict = {}
+        if ai_answer and self.facts is not None:
+            from ..agents.llm import OllamaClient
+            from ..world.branch import ConditionPlanParser
+
+            try:
+                plan = ConditionPlanParser(OllamaClient()).parse(ai_answer)
+                plan.setdefault("source", "T0")
+            except Exception as e:
+                if self.game is not None:
+                    self.game.logger.warning(
+                        "C plan parse failed at {}: {}".format(
+                            node.node_id, e))
+                plan = {"action": "wait", "fraction": 0.0, "buy_fraction": 0.0,
+                        "condition": "(parse-failed)",
+                        "trigger": {"type": "none", "value": None,
+                                    "keywords": []},
+                        "judge": "llm-plan-error"}
+            self.facts.set_c_plan(plan)
+            rec["world_state"] = self.facts.state_snapshot()
+            self._node_facts[node.node_id] = {"state": self.facts.state_snapshot()}
+        rec["c_plan"] = plan or None
+        self._c_plan = plan or None
+
+    @staticmethod
+    def _extract_role_answer(rec: dict, role: str) -> str:
+        """从一条节点记录的 dialogue 里取某角色最后一条发言文本。"""
+        answers: List[str] = []
+        for block in rec.get("dialogue") or []:
+            if not isinstance(block, dict):
+                continue
+            for lines in block.values():
+                for line in lines or []:
+                    if (isinstance(line, (list, tuple)) and len(line) == 2
+                            and str(line[0]) == role):
+                        answers.append(str(line[1]))
+        return answers[-1] if answers else ""
 
     # ------------------------------------------------------------------
     # 工具
