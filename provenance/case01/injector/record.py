@@ -124,12 +124,20 @@ def to_case01_record(record: dict, branch: str = "",
         compat_gaps.append("state_history:未接入 case01 world 状态机,留空")
     if not record.get("world_audit"):
         compat_gaps.append("world_audit:未接入 case01 world 审计,留空")
-    compat_gaps.append("condition_monitor:仅 Branch C 使用(带 C 方案时由事实层填充)")
+    if branch == "C" and not record.get("condition_monitor"):
+        compat_gaps.append("condition_monitor:未发生条件监测(真实运行且带 C 方案时由事实层填充)")
     compat_gaps.append("reflection/router:由 case01.reflection 在运行后补齐,此处留空")
 
     branch = branch or record.get("branch", "")
     if branch == "C":
-        compat_gaps.append("Branch C 实际仓位依赖 T0 方案,当前未自动建仓")
+        has_c_position = (
+            any((s.get("state") or {}).get("hcm_shares") for s in state_history)
+            or any(a.get("action") == "buy_position"
+                   for a in (record.get("world_audit") or [])))
+        if not has_c_position:
+            compat_gaps.append(
+                "Branch C 实际仓位:未建仓(需 Ollama 解析 T0 方案;"
+                "dry-run 或条件未触发则不建仓)")
 
     mapped = {
         "run_id": record.get("run_id", ""),
