@@ -64,3 +64,22 @@ I missed my friend's co-investment opportunity because it required at least RMB 
 
 阶段 3 四项验收全部通过，可进入阶段 4（替换、归档、demo 重录、文档同步）。
 进入阶段 4 前需要确认两件事：是否现在替换已冻结的旧引擎；Branch C 仓位是否要在替换前补齐。
+（说明：Branch C 仓位已于 2026-09-17 补齐并补测试，见第 8 节。）
+
+## 8. 三线定版重跑（2026-09-17，Branch C 修复后的代码）
+
+用修好的代码把 A/B/C 三条线各跑一遍，产物覆盖写入 `case01/runs/demo-{A,B,C}-mavis/run.json`，
+serve 只读接口与 full-context 均已复核（full-context 10245–10506 字）。
+
+- **A 线（积极买入）**：整跑 437 秒（其中 Reflection+Router 108 秒）；7 节点、2 次关键交互、0 次重试；
+  turns 9、state_history 7、Router 问题 4 个；末态持有 HCM、现金约 125,177（与 03 §四 约 61% 一致）。
+  最终反馈实录："I bought HCM at USD 45.2 on August 27 … sold at USD 27.4. The market never confirmed any order."
+- **B 线（建议回避）**：整跑 390 秒（Reflection+Router 89 秒）；7 节点、2 次关键交互、0 次重试；
+  turns 8、state_history 7、问题 4 个；全程未建仓、现金 200,000；最终反馈含"错过 25 万门槛合投机会"。
+- **C 线（条件化等待）**：整跑 417 秒（Reflection+Router 97 秒）；7 节点、2 次关键交互、**1 次重试**；
+  turns 8、state_history 7、问题 5 个；解析出的 T0 方案为 `action=wait, buy_fraction=0.2`
+  （keyword 触发），`condition_monitor` 逐节点 3 次 `fired=false` → 未建仓、现金 200,000
+  （符合 03 §八：C 走 Timeline A，条件未出现即不建仓）。
+
+三条线的差异点全部落在"判断与后果"上（A 建仓亏损 / B 未建仓错失 / C 条件未触发维持现金），
+说明节点驱动 + 事实层 + 反思链路对不同分支都能产出可比较材料。
