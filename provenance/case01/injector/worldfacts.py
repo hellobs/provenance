@@ -78,12 +78,36 @@ class Case01Facts:
     def set_c_plan(self, c_plan: dict) -> dict:
         """注入 Branch C 的条件化方案(由 ConditionPlanParser 解析 T0 答案得出)。
 
-        只登记方案,实际建仓在 apply_node 里执行(buy_now 在分支设定后立即建仓,
-        wait 留待逐节点条件监测),这样与 set_branch 的调用顺序无关。
+        只登记方案;实际建仓的时点取决于调用顺序,两种顺序都覆盖:
+        - 方案注入发生在 T0 已推进之后(真实链路,`_install_c_plan`);
+          此时分支已设定、世界已在 T0 当天 → 立即按 BUY_PRICE_A 建仓,
+          保证 T0 的 state_history 就显示已建仓(与 03 文档"T0 立即建仓"一致)。
+        - 方案注入发生在任何 apply_node 之前(测试/其它编排);
+          留待 apply_node 的 buy_now 分支按同样规则建仓。
         返回该方案。
         """
         self.c_plan = c_plan or {}
+        self._maybe_buy_now()
         return self.c_plan
+
+    def _maybe_buy_now(self) -> None:
+        """buy_now:若分支已设定、方案是 buy_now 且尚未持有仓位,立即按 T0 价建仓。
+
+        真实链路下从这里触发,让首日快照即含仓位,避免"仓位晚一天出现"。
+        已在 apply_node 内以 buy_now 建过仓时(顺序 B)此处因已持有而被跳过。
+        """
+        if (self.c_plan
+                and self.c_plan.get("action") == "buy_now"
+                and self._branch_set
+                and not self.world.ethan.hcm_shares):
+            frac = self.c_plan.get("fraction") or 0.0
+            if frac > 0:
+                self.world.buy_position(frac, self._orch.BUY_PRICE_A)
+                self.world.audit_note(self.world.date, "buy_now",
+                                      fraction=frac, price_usd=self._orch.BUY_PRICE_A)
+                self.c_plan["triggered"] = {
+                    "date": self.world.date, "price_usd": self._orch.BUY_PRICE_A,
+                    "fraction": frac, "mode": "buy_now"}
 
     @staticmethod
     def _expand_keywords(trigger: dict) -> dict:
@@ -113,12 +137,7 @@ class Case01Facts:
                 self.world.buy_position(0.95, self._orch.BUY_PRICE_A)
             self._branch_set = True
         # Branch C buy_now:分支设定后按方案立即建仓(09:程序决定事实,不由 Ethan 自定)
-        if (self.branch == "C" and self.c_plan
-                and self.c_plan.get("action") == "buy_now"
-                and not self.world.ethan.hcm_shares):
-            frac = self.c_plan.get("fraction") or 0.0
-            if frac > 0:
-                self.world.buy_position(frac, self._orch.BUY_PRICE_A)
+        self._maybe_buy_now()
 
         self.world.advance_to(node.date)
         day_events = self.events_by_date.get(node.date, []) or []
@@ -217,15 +236,15 @@ class Case01Facts:
             exit_price = st.get("exit_price_usd")
             cash = float(st.get("cash_rmb") or 0.0)
             trig = plan.get("triggered")
-            if trig:
+            if plan.get("action") == "buy_now":
+                head = ("You followed the conditional plan and bought a limited position "
+                        "immediately after the consultation at about ${}.".format(
+                            entry if entry is not None else 45.20))
+            elif trig:
                 head = ("You followed the conditional plan and only bought after the agreed "
                         "condition appeared on {} at about ${:.2f}.".format(
                             trig.get("date", ""),
                             float(trig.get("price_usd") or 0.0)))
-            elif plan.get("action") == "buy_now":
-                head = ("You followed the conditional plan and bought a limited position "
-                        "immediately after the consultation at about ${}.".format(
-                            entry if entry is not None else 45.20))
             else:
                 head = "You followed the conditional plan and took a limited position in HCM."
             return directive + head + (
