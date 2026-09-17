@@ -49,8 +49,14 @@ I missed my friend's co-investment opportunity because it required at least RMB 
 
 ## 6. 已知缺口（未伪装为完成）
 
-1. Branch C 的"实际仓位"未实现（依赖 T0 方案解析），C 线当前不自动建仓，已在 `compat.gaps` 标注。
-2. `condition_monitor` 仅 Branch C 使用，当前为空。
+1. ~~Branch C 的"实际仓位"未实现~~ —— **已补齐(2026-09-17)**：`worldfacts.set_c_plan`
+   注入 T0 条件化方案，`apply_node` 按 action 执行 `buy_now`（分支设定后立即建仓）或
+   `wait`（逐节点监测触发后建仓）；`bridge._install_c_plan` 在 T0 落地后用
+   `ConditionPlanParser` 解析 Investment AI 的答案注入事实层。真实 C 线整跑已验证：
+   方案解析成功（`action=wait, buy_fraction=0.2`,keyword 触发）,Timeline A 否定句
+   全部不触发 → 未建仓、现金 20 万不变（符合 C 线"订单落空→谨慎不买"剧情）。
+2. `condition_monitor` 仅 Branch C 使用；真实 C 线运行已在 `condition_monitor` 落
+   逐节点 fired=false 记录。
 3. 记录未包含模型身份（后端/权重/dtype/device）——阶段 0 已决定不做该组修复。
 4. CI 仍不覆盖 case01 测试（阶段 0 决定不做）。
 
