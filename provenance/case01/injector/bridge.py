@@ -35,6 +35,7 @@ class MavisBridge:
         branch: str = "A",
         use_case01_facts: bool = True,
         meeting_coord: Optional[List[int]] = None,
+        c_plan_llm: Optional[object] = None,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -47,6 +48,8 @@ class MavisBridge:
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
+        # Branch C 方案解析用的 LLM:可注入(如 Leo 的 HF 权重客户端),缺省回退本地 Ollama
+        self.c_plan_llm = c_plan_llm
 
         # mavis 侧对象（dry_run 时为 None）
         self.game = None
@@ -300,11 +303,15 @@ class MavisBridge:
         ai_answer = self._extract_role_answer(rec, self.roles[0])
         plan: dict = {}
         if ai_answer and self.facts is not None:
-            from ..agents.llm import OllamaClient
             from ..world.branch import ConditionPlanParser
 
+            llm = self.c_plan_llm
+            if llm is None:
+                from ..agents.llm import OllamaClient
+
+                llm = OllamaClient()
             try:
-                plan = ConditionPlanParser(OllamaClient()).parse(ai_answer)
+                plan = ConditionPlanParser(llm).parse(ai_answer)
                 plan.setdefault("source", "T0")
             except Exception as e:
                 if self.game is not None:
