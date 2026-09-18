@@ -19,6 +19,15 @@ CASE01_TOP_KEYS = [
 ]
 
 
+def _timeline_of(branch: str) -> str:
+    """分支 -> 实际市场时间线。C 走 A(旧引擎 demo-3 同口径)。"""
+    try:
+        from ..world.timelines import BRANCH_TO_TIMELINE
+    except Exception:            # 纯映射场景下也能降级工作
+        return str(branch or "")
+    return BRANCH_TO_TIMELINE.get(str(branch or ""), str(branch or ""))
+
+
 def _turns(nodes: List[dict]) -> List[dict]:
     turns: List[dict] = []
     for node in nodes:
@@ -145,7 +154,10 @@ def to_case01_record(record: dict, branch: str = "",
         "end_date": nodes[-1].get("date", "") if nodes else "",
         "branch": branch or "",
         "branch_action": {
-            "timeline": branch or "",
+            # Branch C 没有第三条市场世界,按 03 文档第八节走 Timeline A
+            # (case01.world.timelines.BRANCH_TO_TIMELINE = {A:A, B:B, C:A})。
+            # 与已冻结的旧引擎记录(demo-2/demo-3 的 branch_action.timeline 均为 A)一致。
+            "timeline": _timeline_of(branch),
             "judge": "preset(mavis 路径不调 LLM judge)",
             "c_plan": dict(c_plan or {}),
             "t0_rounds": int(t0_rounds or 0),

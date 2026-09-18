@@ -68,6 +68,18 @@ def test_turns_events_and_final_feedback_mapping():
     assert any("state_history" in g for g in mapped["compat"]["gaps"])
 
 
+def test_branch_action_timeline_matches_frozen_engine():
+    """branch_action.timeline 必须与已冻结的旧引擎记录一致:C 走 Timeline A。
+
+    旧引擎实测(demo-2 是 A、demo-3 是 C)里两条记录的 timeline 都是 "A";
+    case01.world.timelines.BRANCH_TO_TIMELINE 也写明 {A:A, B:B, C:A}。
+    """
+    for branch, expected in (("A", "A"), ("B", "B"), ("C", "A")):
+        mapped = to_case01_record(_sample_bridge_record(), branch=branch)
+        assert mapped["branch"] == branch
+        assert mapped["branch_action"]["timeline"] == expected
+
+
 def test_mapping_covers_real_case01_run_json():
     """与仓库里真实的 run.json 交叉校验（demo run 不入库,CI 上自动跳过）。"""
     path = os.path.join(RUNS, "demo-3", "run.json")

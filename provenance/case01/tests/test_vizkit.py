@@ -198,6 +198,22 @@ class TestFieldCoercion:
             "the Ville:Trading Center:Trading Floor"
         assert as_text(None) == "" and as_text("x") == "x"
 
+    def test_agent_state_action_dict_uses_inner_event_describe(self):
+        """真实 mavis 结构:{event:{describe,...}, obj_event, start, duration}。"""
+        from case01.vizkit.events import as_text
+
+        raw = {
+            "event": {"subject": "投资 AI", "predicate": "分析", "object": "公告",
+                      "describe": "Analyzing HCM filings", "address": ["a"], "emoji": ""},
+            "obj_event": None,
+            "start": "20260828-09:15:00",
+            "duration": 20,
+        }
+        assert as_text(raw) == "Analyzing HCM filings"
+        # describe 为空时退化成 主语 谓词 宾语,仍然不含 start/duration
+        raw["event"]["describe"] = ""
+        assert as_text(raw) == "投资 AI 分析 公告"
+
     def test_snapshot_prefers_role_keyed_agents(self):
         from case01.vizkit.events import events_from_record
 

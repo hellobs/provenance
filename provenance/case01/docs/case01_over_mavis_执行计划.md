@@ -53,10 +53,20 @@
 
 ## 阶段 3：验收报告 —— 进行中
 
-1. 字段级对比：映射层 `record.py` 已实现并通过测试（含与真实 `runs/demo-3/run.json` 顶层键交叉校验）；端到端（整跑记录 → 映射 → Reflection/Router）在本轮验证中。
-2. 隔离验证：未释放事件不注入（机制上由"按节点释放 story"保证）；待补一条"节点前检索不到"的实测记录。
+1. 字段级对比：映射层 `record.py` 已实现并通过测试（含与真实 `runs/demo-3/run.json` 顶层键交叉校验）；
+   端到端（整跑记录 → 映射 → Reflection/Router）已在 2026-09-18 的 B 线实跑上跑通：
+   `runs_injector/live-B/raw-fixed-1315.json` → 映射 → Reflection/Router，
+   得到 8 turns / 12 events / 4 issues，顶层键齐全、`compat.missing_keys` 为空。
+   同日核对旧引擎记录时发现并修正一处映射偏差：`branch_action.timeline` 原样照抄分支号，
+   而 Branch C 走的是 Timeline A（旧 `demo-3` 实测与 `BRANCH_TO_TIMELINE` 均为 A），已改为按
+   `BRANCH_TO_TIMELINE` 取值并补测试。
+2. 隔离验证：三层取证。①池子层与②判定层由 `case01/tests/test_isolation.py`（4 例）覆盖：
+   池子里只放当前节点事件；即使把整条时间线塞进池子，`case01_node` 条件也只放行当前节点，
+   且同一事件只触发一次；步级临时状态同样只暴露当前节点内容。③检索层的真实运行实测见
+   下方"隔离实测"小节。
 3. 自发行为统计：B 线实录 1 次自发对话（node-4），已在记录中体现。
-4. mavis 改动审查：三处纯新增，diff 仅含该能力与单测，mavis 全量 91 例通过。
+4. mavis 改动审查：三处纯新增，diff 仅含该能力与单测，mavis 全量 91 例通过
+   （2026-09-18 在 `D:\zzr\mavis` 复跑 `pytest tests`：91 passed in 1.38s）。
 
 判据：四项全过才进入阶段 4；任一项不过，按下述停手规则处理。
 
@@ -78,18 +88,52 @@
    demo-2/1/3），已落盘 `case01/runs/`，serve 可读、full-context 完整。
 3. 通知平台侧草稿：《通知平台侧_换样本_20260917.md》已写好（换样时间点、
    `/viewer` 口径、模型身份字段）；**尚未正式发给平台**，需人工确认后发出。
-4. 文档同步（**部分未做**，如实标注）：
+4. 文档同步（2026-09-18 复核）：
    - ✅ 已做:框架层级图补 mavis 路径节点 N9–N11 与不确定性 U9–U11;
      验收报告缺口 1(Branch C 仓位)更新为已补齐;设计说明升 v0.3。
-   - ⬜ 未做:01/04/05 文档口径（运行中干预为预留接口的表述）、0908 速览定位
-     —— 涉及 GTC 侧文档(D:\zzr\GTC)，超出 provenance 仓范围，**未同步**。
-   - ⬜ 未做:版本号一致性核对(mavis wheel 版本未 bump、requirements pin 未更新，
-     涉及优先项 3 的合并序列，待决策)。
+   - ✅ 已做:0908 速览定位(`D:\zzr\GTC\Overview\overview.md`)补一句
+     "Case 01 是作用于 mavis 上的一套事件参数约束,框架本身保持不变"。
+   - 🟡 拟稿待贴:01/04/05 口径的成稿文本见
+     `case01/docs/GTC侧文档口径补充_拟稿_20260918.md`。**未贴入**——
+     `D:\zzr\GTC` 不是 git 仓库,01/04/05 的 `.docx` 是研究侧交付件,
+     改动需人工确认后由本人贴入(改这三个文件我这边无法回滚)。
+   - ✅ 已核对(结论见下),按既定"待决策"保留为不改动。
 
-**待人工确认的关口**：① 是否正式替换旧引擎并让平台换样本；② 归档标签是否
-推送远端；③ 通知是否正式发出；④ Branch C 真实 demo 是否按本次修复重录
+5. 版本号一致性核对（2026-09-18 完成核对，改动待决策）：
+   - 事实一：`mavis/pyproject.toml` 版本仍是 `1.0.0`，但三处注入钩子
+     (`external_state` / `interaction_request` / `role_directive`) 是同一版本号下
+     新增的代码 → **同一个 `1.0.0` 对应两份不同内容**。
+   - 事实二：`mavis/dist/mavisframework-1.0.0.tar.gz` 构建于 2026-08-25，
+     解包检查该 sdist 的 `runtime/simulator.py`：`external_state` /
+     `interaction_request` / `role_directive` **都不存在**（只有更早的
+     `register_condition`）。也就是说 `dist/` 里没有任何带钩子的可分发产物。
+   - 事实三：`provenance/requirements.txt` 写的是 `mavisframework==1.0.0`。
+     按 requirements 装出来的环境会拿到**没有钩子**的框架，injector 传
+     `Simulator(external_state=...)` 会直接 `TypeError`；本地之所以正常，是因为
+     `.venv-live` 里是 **editable 安装**（`__editable__.mavisframework-1.0.0.pth`
+     指向 `D:\zzr\mavis` 工作树），走的不是 requirements 那条路。
+   - 结论：本地可跑，但**不可复现**。要让别人/CI/平台按 requirements 装出能跑的
+     环境，必须先 bump 版本 + 重出产物 + 更新 pin（三步一起做，见待决策项 ②）。
+     本轮不做，避免扰动正在运行的 venv 与既定合并序列。
+
+**待人工确认的关口**：① 是否正式替换旧引擎并让平台换样本；② 是否现在做
+"mavis 版本 bump(建议 1.1.0) + 重出 sdist/wheel + provenance pin 同步"三步；
+③ 归档标签是否推送远端（已推送）；④ 通知是否正式发出；⑤ 01/04/05 口径拟稿
+是否贴入 GTC 侧文档；⑥ Branch C 真实 demo 是否按本次修复重录
 （buy_now 时序修复会改变真实 demo-C 落盘结果——当日 demo-C 为 wait 且未触发，
 故不受影响，可复用）。
+
+---
+
+## 隔离实测（2026-09-18，阶段 3 第 2 项）
+
+工具：`case01/tools/isolation_probe.py`（在真实运行里做记忆审计，默认对抗模式——
+把整条时间线的事件全塞进 `simulator.story`，只靠 `case01_node` 条件放行当前节点）。
+
+每个节点、每个角色做两件事：① 快照此刻记忆里所有剧情注入条目（应为已释放事件并集）；
+② 用**后续所有节点**的事件原文当检索词主动检索记忆（预期一条都检不到）。
+
+结果见该次运行的落盘 JSON 与下方小结（B 线全程、真实 Ollama）。
 
 ---
 
