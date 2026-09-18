@@ -36,6 +36,7 @@ class MavisBridge:
         use_case01_facts: bool = True,
         meeting_coord: Optional[List[int]] = None,
         c_plan_llm: Optional[object] = None,
+        visualizers: Optional[List[object]] = None,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -50,6 +51,10 @@ class MavisBridge:
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
         # Branch C 方案解析用的 LLM:可注入(如 Leo 的 HF 权重客户端),缺省回退本地 Ollama
         self.c_plan_llm = c_plan_llm
+
+        # 可插拔可视化:引擎只产生事件,插件自己决定怎么画(见 vizkit/)
+        self._agent_trace: Dict[int, Dict[str, dict]] = {}
+        self._fanout = self._build_fanout(visualizers)
 
         # mavis 侧对象（dry_run 时为 None）
         self.game = None
@@ -134,6 +139,7 @@ class MavisBridge:
                 "world": dict(node.world),
                 "world_state": (self._node_facts.get(node.node_id) or {}).get("state"),
                 "dialogue": self._dialogue_tail(dialogue_before),
+                "agents": dict(self._agent_trace.get(idx, {})),
                 "elapsed_s": round(time.time() - node_t0, 1),
             })
             # Branch C:首个节点(T0)落地后,用 Investment AI 的答案解析条件化方案并
@@ -214,7 +220,18 @@ class MavisBridge:
             export_decisions=False,
             external_state=self.external_state,
             interaction_request=self.interaction_request,
+            on_agent=self._viz_on_agent,
+            on_step=self._viz_on_step,
+            on_story=self._viz_on_story,
         )
+        if self._fanout is not None:
+            from ..vizkit.events import init_event
+
+            # 对话逐句回调是 mavis 的模块级钩子(provenance live 同样这么接)
+            import mavisframework.core.agent_core as _fw_agent
+
+            _fw_agent.chat_callback = self._viz_on_chat_line
+            self._fanout.emit(init_event(list(self.roles)))
         if self.use_case01_facts:
             from .worldfacts import Case01Facts
 
@@ -282,6 +299,59 @@ class MavisBridge:
             if cfg is not None and coord is not None:
                 cfg["coord"] = list(coord)
                 cfg["path"] = []
+
+    # ------------------------------------------------------------------
+    # 可插拔可视化接线(引擎只产生事件,插件自己画)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _build_fanout(visualizers):
+        """visualizers:[插件实例] / ["town","report","console"] / None(不接)。"""
+        if not visualizers:
+            return None
+        from ..vizkit import Fanout, create
+
+        instances = [create(v) if isinstance(v, str) else v for v in visualizers]
+        return Fanout(instances, on_error=lambda name, exc: None)
+
+    def _viz_on_agent(self, name, state, step, sim_time):
+        state = state or {}
+        self._agent_trace.setdefault(int(step), {})[name] = {
+            "coord": list(state.get("coord") or []),
+            "action": str(state.get("action") or ""),
+            "location": str(state.get("location") or ""),
+            "currently": str(state.get("currently") or ""),
+        }
+        if self._fanout is not None:
+            from ..vizkit.events import agent_event
+
+            self._fanout.emit(agent_event(
+                name, state.get("coord"), state.get("action", ""),
+                state.get("location", ""), state.get("currently", ""),
+                state.get("path"), sim_time))
+
+    def _viz_on_step(self, config):
+        if self._fanout is not None:
+            from ..vizkit.events import time_event
+
+            config = config or {}
+            self._fanout.emit(time_event(str(config.get("time", "")), config.get("step")))
+
+    def _viz_on_chat_line(self, speaker, text):
+        if self._fanout is not None:
+            from ..vizkit.events import chat_event
+
+            self._fanout.emit(chat_event(speaker, text))
+
+    def _viz_on_story(self, ev):
+        if self._fanout is not None:
+            from ..vizkit.events import story_event
+
+            self._fanout.emit(story_event(dict(ev or {})))
+
+    def close(self) -> None:
+        """收尾:关闭可视化插件(刷盘/关连接)。"""
+        if self._fanout is not None:
+            self._fanout.close()
 
     def _step_once(self, node: NodeSpec, step_index: int = 0, stride: int = 0) -> bool:
         """推进 1 步;返回本节点是否发生了被请求的交互。"""
