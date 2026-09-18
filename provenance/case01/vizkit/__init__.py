@@ -91,3 +91,4 @@ class Fanout:
 from .plugins import console as _console      # noqa: E402,F401
 from .plugins import report as _report        # noqa: E402,F401
 from .plugins import town as _town            # noqa: E402,F401
+from .plugins import live as _live            # noqa: E402,F401
