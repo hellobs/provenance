@@ -115,7 +115,7 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 - **不在 mavis 触点里,也不是 mavis 的消费者**:它只消费"事件字典"的键名(契约见其 README),
   运行时零 import mavisframework。case01 通过 `case01/vizkit/live_run.py`(薄 CLI,业务别名
   与前端根留在 case01 侧)与 `bridge.py` 把 roles / alias / scenario / 前端资源根喂给
-  `mavis_vizkit.create("live", ...)`。它的大铁皮落在 `mavis.runtime.protocol` 的键名,
+  `mavis_vizkit.create("live", ...)`。它的契约落在 `mavisframework.runtime.protocol` 的键名,
   靠"协议漂移测试"(测试期 import 框架断言键名仍在)兜住,而不是运行时耦合。
 
 ## 四、越界项与收编计划
@@ -145,8 +145,12 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 ## 六、怎么快速核对有没有新增越界
 
 ```
-# 看 case01 碰 mavis 的全部位置(应只出现在 bridge / conditions / 探针 三处)
-rg -n "mavisframework|agent\.|game\.|simulator\." provenance/case01/injector --glob "*.py"
+# 真 import mavis 的位置(应只出现在 bridge / viz_plugin / conditions 三个文件,
+# 都在 injector/ 下;肉眼核对 import 后的调用是否符合白名单)
+rg -n "import mavisframework|from mavisframework" provenance/case01/injector provenance/case01/tools --glob "*.py"
+
+# 触及 mavis API 的全部引用点(按白名单逐条比对;注意探针在 tools/ 下,不在 injector/)
+rg -n "agent\.|game\.|simulator\.|\.associate" provenance/case01/injector provenance/case01/tools --glob "*.py"
 
 # 看框架有没有被污染(应无输出)
 cd D:/zzr/mavis && git grep -in "case01\|case 01\|ethan\|investment ai\|hcm" -- mavisframework
@@ -154,5 +158,17 @@ cd D:/zzr/mavis && git grep -in "case01\|case 01\|ethan\|investment ai\|hcm" -- 
 # 契约有没有被破坏
 cd D:/zzr/mavis && python -m pytest tests/test_extension_surface.py -q
 ```
+
+两条 rg 的命令命中里,哪些是**真触点**、哪些只是**文档串/注释提及**(非触点,不必算越界):
+
+- 真触点(会 import 或调用 mavis):
+  1. `injector/bridge.py` —— 特性探测 + 懒加载构造 Game/Simulator/agent_core(第三节已逐行列);
+  2. `injector/viz_plugin.py` —— 接入插件面:继承 `mavisframework.plugin.Plugin`(仅插件面存在时);
+  3. `injector/conditions.py` —— 注册 `Simulator.register_condition("case01_node")`(仅真实运行时);
+  4. `tools/isolation_probe.py`(探针,在 `tools/` 下,不是 injector/)—— 不直接 import
+     mavisframework,而是操作注入进来的 `game.simulator/agent` 对象(**越界**取证,见第三节)。
+- 仅是文档串/注释提及(非触点):`injector/__init__.py:11`、`bridge.py:10/218` 的 docstring、
+  `viz_plugin.py:8`、`conditions.py:5` 的注释里出现 "mavisframework" 字样,描述依赖关系但
+  自身不调用框架。
 
 新增了白名单以外的触点,就在本文件第三节补一行,并说明为什么绕不开。
