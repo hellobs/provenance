@@ -78,6 +78,39 @@ def test_build_mavis_wires_hooks_and_agents(monkeypatch, tmp_path):
     assert "ordinary retail investor" in str(ethan.role_directive)
 
 
+def test_build_mavis_uses_relative_assets_root(monkeypatch, tmp_path):
+    """装配用的 assets_root 必须是相对根,否则 POSIX 上路径会翻倍。
+
+    mavis 的 load_config 把 assets_root 交给 _resolve_assets_root,后者
+    `os.path.join(*assets_root.split("/"))` 会把绝对 POSIX 路径的前导斜杠吃掉、
+    变成相对路径;Game.load_static 再把结果拼到 static_root(= 场景目录)下,
+    于是 maze.json 变成"场景目录 + 场景目录/maze.json"。Windows 上绝对路径不含
+    正斜杠、原样通过,所以这个错在开发机上永远看不见——2026-09-18 合并进 main 后
+    首次 CI 红的根因就是它。
+
+    断言取"精确值"而不是 os.path.isabs:被吃掉斜杠的路径在 POSIX 上恰好不是绝对
+    路径,用它当断言会假通过。
+    """
+    _install_stub_provider(monkeypatch)
+    bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    bridge._build_mavis()
+
+    assert bridge.config["maze"]["path"] == "maze.json"
+    for role in DEFAULT_ROLES:
+        assert bridge.config["agents"][role]["config_path"] == os.path.join(
+            "agents", role, "agent.json"
+        )
+
+    # 不只是字符串对:拼到 static_root 下必须真的能打开,即确实落在场景目录内
+    assert os.path.isfile(
+        os.path.join(bridge.game.static_root, bridge.config["maze"]["path"])
+    )
+    for role in DEFAULT_ROLES:
+        assert os.path.isfile(os.path.join(
+            bridge.game.static_root, bridge.config["agents"][role]["config_path"]
+        ))
+
+
 def test_apply_world_sets_node_and_story_condition(monkeypatch, tmp_path):
     _install_stub_provider(monkeypatch)
     bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)

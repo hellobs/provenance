@@ -230,9 +230,15 @@ class MavisBridge:
 
         from .conditions import install_case01_node_condition
 
+        # assets_root 必须是"相对根"——mavis 契约写明它会拼到 Game.static_root 下。
+        # 这里传 "" 而不是 scenario:绝对路径在 POSIX 上会被 mavis 的 _resolve_assets_root
+        # (内部 os.path.join(*p.split("/"))) 吃掉前导斜杠、变成相对路径,再被
+        # Game.load_static 拼一次 static_root,得到"场景目录+场景目录/maze.json"的翻倍路径。
+        # Windows 上绝对路径不含正斜杠、原样通过,所以这个错在开发机上永远看不见
+        # (2026-09-18 合并进 main 后首次 CI 红的根因)。static_root 已经是场景目录。
         config = load_config(
             start_time=self._start_time(), stride=0, agents=list(self.roles),
-            config_path=config_path, assets_root=scenario,
+            config_path=config_path, assets_root="",
         )
         self._apply_ethan_provider(config)
         # 存档目录默认落在场景内,避免污染仓库根目录
