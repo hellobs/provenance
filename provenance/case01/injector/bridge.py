@@ -25,6 +25,28 @@ from .nodes import NodeSpec
 DEFAULT_ROLES: Tuple[str, str] = ("Investment AI", "Ethan Lin")
 
 
+def _plugin_surface_available() -> bool:
+    """特性探测:mavis 是否具备通用插件面(纯新增,main 上还没有)。
+
+    provenance 的 CI 从 GitHub mavis 的 main 装框架,main 上没有
+    `mavisframework.plugin` 与 `Simulator(plugins=)`。这里一次性探测
+    "插件面三个要件"都在,才让 bridge 走插件面;否则回退到旧回调写法。
+    """
+    try:
+        import inspect
+
+        import mavisframework.plugin  # noqa: F401
+        from mavisframework.core import agent_core
+        from mavisframework.runtime.simulator import Simulator
+
+        return (
+            hasattr(agent_core, "subscribe_chat_line")
+            and "plugins" in inspect.signature(Simulator.__init__).parameters
+        )
+    except Exception:
+        return False
+
+
 class MavisBridge:
     """节点序列 -> mavis 驱动 + 记录。"""
 
@@ -60,6 +82,12 @@ class MavisBridge:
         # 可插拔可视化:引擎只产生事件,插件自己决定怎么画(见 vizkit/)
         self._agent_trace: Dict[int, Dict[str, dict]] = {}
         self._fanout = self._build_fanout(visualizers)
+        # 插件面迁移状态(默认关闭,由 _build_mavis 决定):
+        # _plugin_mode=True 时走 mavis 插件面且不再覆盖全局 chat_callback;
+        # _set_chat_callback 只在回退路径(无插件面)设置过全局钩子时置 True。
+        self._plugin_mode = False
+        self._set_chat_callback = False
+        self._adapter = None
 
         # mavis 侧对象（dry_run 时为 None）
         self.game = None
@@ -221,24 +249,43 @@ class MavisBridge:
         # mavis 的 LLM provider 在 Agent.reset() 里惰性创建,必须显式初始化一次
         # (已知行为,见 mavis docs/tutorial-extension.md §5;不是绕框架)
         self.game.reset_game()
-        self.simulator = Simulator(
+        self._plugin_mode = _plugin_surface_available()
+        # mavis 插件面存在时,可视化事件经薄适配器(case01 侧的 Plugin 子类)转发给
+        # vizkit Fanout;对话逐句也不再用"覆盖全局 chat_callback"的方式接入
+        # (由 Simulator 自动订阅对话总线 → 适配器 → fanout),消除同进程互相顶掉。
+        adapter = None
+        if self._fanout is not None and self._plugin_mode:
+            from .viz_plugin import VizForwarder
+
+            adapter = VizForwarder(self)
+            self._adapter = adapter
+        sim_kwargs = dict(
             max_workers=max(1, len(self.roles)),
             export_decisions=False,
             external_state=self.external_state,
             interaction_request=self.interaction_request,
-            on_agent=self._viz_on_agent,
-            on_step=self._viz_on_step,
-            on_story=self._viz_on_story,
+            on_agent=self._viz_on_agent,     # 记录侧总走这里(_agent_trace 需要 step)
+            on_step=self._viz_on_step,       # time/snapshot(config 自带 step)
         )
+        if adapter is not None:
+            sim_kwargs["plugins"] = [adapter]
+        if self._fanout is not None and not self._plugin_mode:
+            # 回退:无插件面时 story 事件只能走 on_story 回调
+            sim_kwargs["on_story"] = self._viz_on_story
+        self.simulator = Simulator(**sim_kwargs)
         if self._fanout is not None:
             from mavis_vizkit.events import init_event
 
-            # 对话逐句回调是 mavis 的模块级钩子(provenance live 同样这么接);
-            # 注意它是进程级全局单例,同进程只能有一个消费者(见触点白名单第三节)
-            import mavisframework.core.agent_core as _fw_agent
-
-            _fw_agent.chat_callback = self._viz_on_chat_line
+            # init 事件不在插件总线上(由消费方自行构造),这里直接发给 fanout
             self._fanout.emit(init_event(list(self.roles)))
+            if not self._plugin_mode:
+                # 回退:无插件面时对话逐句只能走全局钩子(旧写法);
+                # 运行结束由 close() 把它清回 None,避免污染同进程其它消费者。
+                import mavisframework.core.agent_core as _fw_agent
+
+                if _fw_agent.chat_callback is None:
+                    self._set_chat_callback = True
+                    _fw_agent.chat_callback = self._viz_on_chat_line
         if self.use_case01_facts:
             from .worldfacts import Case01Facts
 
@@ -328,8 +375,9 @@ class MavisBridge:
         instances = [create(v) if isinstance(v, str) else v for v in visualizers]
         return Fanout(instances, on_error=lambda name, exc: None)
 
-    def _viz_on_agent(self, name, state, step, sim_time):
-        from mavis_vizkit.events import agent_event, as_text
+    def _trace_agent(self, name, state, step, sim_time):
+        """记录侧:把本步节点的 agent 状态落进 _agent_trace(两种模式都必须)。"""
+        from mavis_vizkit.events import as_text
 
         state = state or {}
         action = as_text(state.get("action"))
@@ -341,14 +389,30 @@ class MavisBridge:
             "location": location,
             "currently": currently,
         }
-        role_type = "user"
+
+    def _role_type(self, name: str) -> str:
         agent = (self.game.agents or {}).get(name) if self.game is not None else None
-        if agent is not None:
-            role_type = getattr(agent, "role_type", "user") or "user"
-        if self._fanout is not None:
-            self._fanout.emit(agent_event(
-                name, state.get("coord"), action, location, currently,
-                state.get("path"), sim_time, role_type))
+        return getattr(agent, "role_type", "user") or "user"
+
+    def _emit_agent(self, name, state, sim_time):
+        """可视化侧:发一条 agent 事件给 fanout(适配器转发;不需要 step)。"""
+        if self._fanout is None:
+            return
+        from mavis_vizkit.events import agent_event, as_text
+
+        state = state or {}
+        action = as_text(state.get("action"))
+        location = as_text(state.get("location"))
+        currently = as_text(state.get("currently"))
+        self._fanout.emit(agent_event(
+            name, state.get("coord"), action, location, currently,
+            state.get("path"), sim_time, self._role_type(name)))
+
+    def _viz_on_agent(self, name, state, step, sim_time):
+        """on_agent 回调:记录侧总走这里;_plugin_mode 下可视化事件由适配器转发。"""
+        self._trace_agent(name, state, step, sim_time)
+        if not self._plugin_mode:
+            self._emit_agent(name, state, sim_time)
 
     def _viz_on_step(self, config):
         if self._fanout is not None:
@@ -377,9 +441,23 @@ class MavisBridge:
             self._fanout.emit(story_event(dict(ev or {})))
 
     def close(self) -> None:
-        """收尾:关闭可视化插件(刷盘/关连接)。"""
+        """收尾:关闭可视化插件,并按所走的路径退订对话接线。"""
         if self._fanout is not None:
             self._fanout.close()
+        if self.simulator is None:
+            return
+        if self._plugin_mode:
+            # 插件面路径:退订 Simulator 自动挂到 agent_core 的对话订阅
+            self.simulator.plugin_teardown()
+        elif self._set_chat_callback:
+            # 回退路径:清掉我们设置过的全局 chat_callback,避免污染同进程其它消费者。
+            # 注意:按方法相等(==)比较,而非 is——每次属性访问 `self._viz_on_chat_line`
+            # 都会新建一个绑定期程对象,`is` 永远为假,会导致这里清不掉。
+            import mavisframework.core.agent_core as _fw_agent
+
+            if _fw_agent.chat_callback == self._viz_on_chat_line:
+                _fw_agent.chat_callback = None
+            self._set_chat_callback = False
 
     def _step_once(self, node: NodeSpec, step_index: int = 0, stride: int = 0) -> bool:
         """推进 1 步;返回本节点是否发生了被请求的交互。"""
