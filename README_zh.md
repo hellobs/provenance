@@ -21,12 +21,14 @@ Provenance(平台,本仓库)
 
 平台与框架分离:mavisframework 独立维护于
 [hellobs/mavis](https://github.com/hellobs/mavis),平台通过
-`requirements.txt` 中的 `mavisframework==1.0.0` 依赖它。角色配置工具
+`requirements.txt` 中的 `mavisframework==1.1.0` 依赖它。角色配置工具
 (config_tool)亦属框架仓库。
 
 ## 2. 环境准备与框架安装
 
-平台依赖框架 `mavisframework==1.0.0`(不在 PyPI,需从源码构建)。按顺序执行:
+平台依赖框架 `mavisframework==1.1.0`(不在 PyPI,需从源码构建)。不要退回 1.0.0:
+那份已发布制品早于 case01 需要的三处注入钩子(external_state / interaction_request /
+role_directive),用钩子构造 Simulator 会直接 TypeError。按顺序执行:
 
 ```bash
 # 2.1 克隆框架仓库并构建 wheel(装进平台环境)
@@ -34,19 +36,19 @@ Provenance(平台,本仓库)
 git clone https://github.com/hellobs/mavis.git ../mavis
 # 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # 生成 dist/mavisframework-1.0.0-py3-none-any.whl
+uv build                              # 生成 dist/mavisframework-1.1.0-py3-none-any.whl
 cd ../provenance
 
 # 2.2 创建环境并安装依赖(uv 或 conda)
 # uv
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.1.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
-pip install ../mavis/dist/mavisframework-1.0.0-py3-none-any.whl
+pip install ../mavis/dist/mavisframework-1.1.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 

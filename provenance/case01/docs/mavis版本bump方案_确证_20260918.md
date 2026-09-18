@@ -60,3 +60,30 @@
 ## 4. 待人工拍板
 
 - 是否现在执行（转接文档 §7.2 的关口）—— 方案已就绪，点头即可落地。
+
+---
+
+## 5. 执行记录（2026-09-18 已落地，由 zzr 执行）
+
+人工点头后按本文第 2/3 节顺序执行完毕：
+
+1. **mavis 合主线**：`feat/generic-injection-hooks`（`64780ac`）快进合并进 `main` 并推送
+   （`0bc18de..64780ac`）。合并后 main 测试 **96 passed**。
+2. **bump + 重建**：main 上 `1.0.0 → 1.1.0`（提交 `ca0af12`），改动
+   `pyproject.toml` / `mavisframework/__init__.py` / `uv.lock` / `README.md` / `README_zh.md`。
+   `python -m build --no-isolation` 产出 sdist + wheel：
+   - sdist SHA256 `4C19459EC838696374434184FFA1B9569A2C8A968498E5E36DE2519678226452`
+   - wheel SHA256 `C2F4889F0B2F97F4E4E5F02297A3EADC6D0818685C1E8603131A701BCB11DBD0`
+   - 解包校验：两份产物里 `external_state` / `interaction_request` / `role_directive`
+     全部存在；wheel METADATA `Version: 1.1.0`。
+3. **隔离对照验证**（新建临时 venv，**在非源码目录里跑**）：
+   - 装 1.1.0 wheel → `Simulator(max_workers=2, external_state=..., interaction_request=...)`
+     构造成功，`mavisframework.__version__ == "1.1.0"`；
+   - `--force-reinstall` 旧 1.0.0 sdist → 精确复现
+     `TypeError: Simulator.__init__() got an unexpected keyword argument 'external_state'`。
+4. **provenance pin 同步**：`requirements.txt` → `mavisframework==1.1.0`，
+   并写明"不要退回 1.0.0"及原因；`README.md` / `README_zh.md` 的版本号与 wheel 文件名同步。
+
+踩坑记录（值得下一棒记住）：第一次验证时 shell 的 cwd 在 `D:\zzr\mavis`，
+`import mavisframework` 命中了工作树源码而不是 venv 里的 site-packages，
+于是"装旧包也照样通过"——**验证已安装包必须换到无关目录再跑**。

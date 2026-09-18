@@ -68,8 +68,9 @@
    （2026-09-16 的记录在 node-4；2026-09-18 两次实跑都在 node-3），
    都已在记录里体现，符合"接受并记录"的既定取舍。关键节点的请求式交互
    （node-1 / node-final）两轮都发生、零重试。
-4. mavis 改动审查：三处纯新增，diff 仅含该能力与单测，mavis 全量 91 例通过
-   （2026-09-18 在 `D:\zzr\mavis` 复跑 `pytest tests`：91 passed in 1.38s）。
+4. mavis 改动审查：三处纯新增，diff 仅含该能力与单测，mavis 全量 96 例通过
+   （2026-09-18 在 `D:\zzr\mavis` 复跑 `pytest tests`：96 passed in 1.62s；
+   其中 5 例是 Location 转移默认关闭的回归测试，见 `64780ac`）。
 
 判据：四项全过才进入阶段 4；任一项不过，按下述停手规则处理。
 
@@ -102,22 +103,29 @@
      改动需人工确认后由本人贴入(改这三个文件我这边无法回滚)。
    - ✅ 已核对(结论见下),按既定"待决策"保留为不改动。
 
-5. 版本号一致性核对（2026-09-18 完成核对，改动待决策）：
+5. 版本号一致性核对 → **已修复（2026-09-18）**：
    - 事实一：`mavis/pyproject.toml` 版本仍是 `1.0.0`，但三处注入钩子
      (`external_state` / `interaction_request` / `role_directive`) 是同一版本号下
      新增的代码 → **同一个 `1.0.0` 对应两份不同内容**。
    - 事实二：`mavis/dist/mavisframework-1.0.0.tar.gz` 构建于 2026-08-25，
-     解包检查该 sdist 的 `runtime/simulator.py`：`external_state` /
-     `interaction_request` / `role_directive` **都不存在**（只有更早的
-     `register_condition`）。也就是说 `dist/` 里没有任何带钩子的可分发产物。
+     解包检查该 sdist 的 `runtime/simulator.py`：钩子符号一个都不存在。
    - 事实三：`provenance/requirements.txt` 写的是 `mavisframework==1.0.0`。
      按 requirements 装出来的环境会拿到**没有钩子**的框架，injector 传
      `Simulator(external_state=...)` 会直接 `TypeError`；本地之所以正常，是因为
-     `.venv-live` 里是 **editable 安装**（`__editable__.mavisframework-1.0.0.pth`
-     指向 `D:\zzr\mavis` 工作树），走的不是 requirements 那条路。
-   - 结论：本地可跑，但**不可复现**。要让别人/CI/平台按 requirements 装出能跑的
-     环境，必须先 bump 版本 + 重出产物 + 更新 pin（三步一起做，见待决策项 ②）。
-     本轮不做，避免扰动正在运行的 venv 与既定合并序列。
+     `.venv-live` 里是 **editable 安装**，走的不是 requirements 那条路。
+   - **处置（三步已按序执行完）**：
+     ① mavis `feat/generic-injection-hooks` 快进合并进 main（`64780ac`）并推送，
+        钩子进入主线；
+     ② main 上 bump `1.0.0 → 1.1.0`（`ca0af12`，含 `pyproject.toml` /
+        `mavisframework/__init__.py` / `uv.lock` / 两份 README），重建 sdist + wheel；
+        产物校验：sdist 与 wheel 内 `external_state` / `interaction_request` /
+        `role_directive` 全部存在，wheel METADATA `Version: 1.1.0`；
+        干净 venv 对照验证：装 1.1.0 → 构造成功；装旧 1.0.0 sdist →
+        `TypeError: Simulator.__init__() got an unexpected keyword argument 'external_state'`；
+     ③ `provenance/requirements.txt` pin 改 `1.1.0`，并写明"不要退回 1.0.0"及原因，
+        两份 README 同步。
+   - 结论：可复现性缺口已关闭（mavis main 96 例通过）。**遗留**：`dist/` 被 gitignore，
+     产物不入库，仍需"自行构建 wheel"；如需彻底锁内容，可改成按 commit 的 git URL 依赖。
 
 **待人工确认的关口**：① 是否正式替换旧引擎并让平台换样本；② 是否现在做
 "mavis 版本 bump(建议 1.1.0) + 重出 sdist/wheel + provenance pin 同步"三步；
