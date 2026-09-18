@@ -61,24 +61,14 @@ def env(monkeypatch, tmp_path):
     """隔离 agent_core 的全局 chat 状态 + 装配 stub provider。"""
     import mavisframework.core.agent_core as ac
 
-    saved_cb = ac.chat_callback
-    saved_subs = set(ac._chat_subscribers)
-    ac.chat_callback = None
-    ac._chat_subscribers = set()
-    import builtins
-
-    _real = builtins.__import__
-
-    def _reset():
-        ac.chat_callback = saved_cb
-        ac._chat_subscribers = set(saved_subs)
-
+    # 都交给 monkeypatch 管:结束后自动还原,不手工保存/恢复,避免污染模块级状态。
+    # (订阅者集合在测试里会被原地 add/remove,monkeypatch 按引用还原,干净。)
     monkeypatch.setattr(ac, "chat_callback", None)
+    monkeypatch.setattr(ac, "_chat_subscribers", set())
     _install_stub_provider(monkeypatch)
     monkeypatch.setenv("MAVIS_CHECKPOINTS_ROOT", str(tmp_path / "checkpoints"))
     monkeypatch.delenv("CASE01_ETHAN_BASE_URL", raising=False)
     monkeypatch.delenv("CASE01_ETHAN_MODEL", raising=False)
-    yield _reset
 
 
 def _bridge_with_fanout(recorders, monkeypatch, tmp_path):
@@ -138,17 +128,51 @@ def test_plugin_mode_bus_reaches_fanout(env, monkeypatch, tmp_path):
 
 
 def test_plugin_mode_teardown_unsubscribes_chat(env, monkeypatch, tmp_path):
+    import mavisframework.core.agent_core as ac
+
     rec = _Recorder()
     bridge, _nodes = _bridge_with_fanout([rec], monkeypatch, tmp_path)
     bridge._build_mavis()
 
+    # 先触发真实运行里由 simulate 触发的那次自动订阅(否则 close 前根本没有订阅者,
+    # 无法区分"订阅过又退订"与"从未订阅")。
+    bridge.simulator._ensure_plugins(None, {})
+    ac._emit_chat_line("Investment AI", "退订前")
+    assert any(e.get("type") == "chat_line" and e.get("text") == "退订前"
+               for e in rec.events)
+
     bridge.close()          # plugin_teardown 退订对话订阅并 teardown 适配器
     assert rec.events[-1]["type"] == "close"
-    # 收货后的对话不再到达 fanout(已退订),说明退订干净
+    # 退订后的对话不再到达 fanout,说明退订干净("退订前"那条属退订前的历史记录)
+    ac._emit_chat_line("X", "再发一句")
+    assert not any(e.get("type") == "chat_line" and e.get("text") == "再发一句"
+                   for e in rec.events)
+
+
+def test_real_chain_agent_core_emit_reaches_fanout(env, monkeypatch, tmp_path):
+    """真实链路:agent_core._emit_chat_line → 插件总线 → 适配器 → fanout。
+
+    走 mavis 的单一分发点 _emit_chat_line(而非 simulator.emit_chat_line),
+    覆盖"由 Simulator.simulate 触发的自动订阅"这条真实路径。
+    """
     import mavisframework.core.agent_core as ac
 
-    ac._emit_chat_line("X", "再发一句")
-    assert not any(e.get("type") == "chat_line" for e in rec.events)
+    rec = _Recorder()
+    bridge, _nodes = _bridge_with_fanout([rec], monkeypatch, tmp_path)
+    bridge._build_mavis()
+
+    # 真实运行里由 simulate 触发的那次自动订阅
+    bridge.simulator._ensure_plugins(None, {})
+    ac._emit_chat_line("Investment AI", "真实链路")
+    got = [e for e in rec.events if e.get("type") == "chat_line"]
+    assert any((e.get("speaker"), e.get("text")) == ("Investment AI", "真实链路")
+               for e in got)
+
+    # 收尾:退订 + teardown,退订后再发不再到达 fanout
+    bridge.close()
+    ac._emit_chat_line("X", "收尾后再发")
+    assert not any(e.get("type") == "chat_line" and e.get("text") == "收尾后再发"
+                   for e in rec.events)
 
 
 def test_fallback_path_uses_chat_callback_and_clears(env, monkeypatch, tmp_path):
