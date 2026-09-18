@@ -24,13 +24,17 @@ jobs:
           git clone --depth 1 https://github.com/hellobs/mavis.git ../mavis
           pip install ../mavis
 
-      - name: Install test dependencies
-        run: |
-          pip install pytest fastapi uvicorn websockets jinja2 httpx
-
       - name: Install mavis-vizkit (editable, packages/mavis-vizkit)
         run: |
           pip install -e packages/mavis-vizkit
+
+      - name: Install dependencies (single source, provenance/requirements.txt) + pytest
+        # 单一来源:从 provenance/requirements.txt 装全部运行依赖,避免手维护的裸清单
+        # 与 requirements 漂移(曾致 OpenAPI 守卫测试缺 pyyaml 在 CI 必红)。
+        # mavisframework/mavis-vizkit 已在上面两步分别以源码/editable 装好,此时 pip
+        # 认为 "already satisfied",不会去 PyPI 拉取这两个本地包。
+        run: |
+          pip install -r provenance/requirements.txt pytest
 
       - name: Backend API + page render tests
         run: |

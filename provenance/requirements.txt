@@ -17,8 +17,18 @@ uvicorn>=0.29
 websockets>=12.0
 jinja2>=3.1
 
+# 测试客户端:fastapi.testclient 依赖 starlette.testclient,新版本(随 fastapi 解析到)
+# 要求 httpx2(优先)或 httpx。CI 单源从本文件安装时若缺它,用 TestClient 的测试会
+# 报 RuntimeError("requires httpx2")。本行必须保留。
+httpx2>=0.28
+
 # 导出倾向曲线 PNG(export-chart 接口,matplotlib 渲染)
 matplotlib>=3.8
+
+# OpenAPI 漂移守卫测试(case01/tests/test_serve.py 在函数体内 import yaml,
+# 读 docs/case01_api.openapi.yaml 做"静态契约 vs 实际路由/枚举"对齐断言)。
+# 本行必须保留:CI 从本文件单源安装依赖,缺它守卫测试在 CI 必红(ModuleNotFoundError)。
+pyyaml>=6.0
 
 # 可选:向量记忆检索(默认 SimpleStore 纯 stdlib 不需要;要用向量才装)
 # llama-index>=0.10
