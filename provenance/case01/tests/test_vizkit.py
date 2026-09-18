@@ -177,3 +177,32 @@ def test_town_fallback_works_on_mapped_record():
     agents = [m for m in town.messages() if m["type"] == "agent"]
     assert len(agents) == 2
     assert all(m["coord"] for m in agents)
+
+class TestFieldCoercion:
+    """前端按字符串处理 action/location(msg.action.slice),必须收敛掉 dict/list。"""
+
+    def test_dict_action_becomes_readable_text(self):
+        from case01.vizkit.events import agent_event
+
+        ev = agent_event("Investment AI", [10, 6],
+                         {"describe": "answering Ethan about HCM", "predicate": "正在"},
+                         {"a": 1}, None, [], "t", "ai_tool")
+        assert isinstance(ev["action"], str) and "answering Ethan" in ev["action"]
+        assert isinstance(ev["location"], str)
+        assert ev["role_type"] == "ai_tool"
+
+    def test_list_location_is_joined(self):
+        from case01.vizkit.events import as_text
+
+        assert as_text(["the Ville", "Trading Center", "Trading Floor"]) == \
+            "the Ville:Trading Center:Trading Floor"
+        assert as_text(None) == "" and as_text("x") == "x"
+
+    def test_snapshot_prefers_role_keyed_agents(self):
+        from case01.vizkit.events import events_from_record
+
+        rec = {"roles": ["A"], "nodes": [{"node_id": "n1", "date": "d", "step": 1,
+                                          "agents": {"A": {"coord": [1, 2]}},
+                                          "world_state": {"cash_rmb": 1}}]}
+        snap = [e for e in events_from_record(rec) if e["type"] == "snapshot"][-1]
+        assert "A" in snap["agents"] and "world" not in snap["agents"]
