@@ -314,20 +314,26 @@ class MavisBridge:
         return Fanout(instances, on_error=lambda name, exc: None)
 
     def _viz_on_agent(self, name, state, step, sim_time):
+        from ..vizkit.events import agent_event, as_text
+
         state = state or {}
+        action = as_text(state.get("action"))
+        location = as_text(state.get("location"))
+        currently = as_text(state.get("currently"))
         self._agent_trace.setdefault(int(step), {})[name] = {
             "coord": list(state.get("coord") or []),
-            "action": str(state.get("action") or ""),
-            "location": str(state.get("location") or ""),
-            "currently": str(state.get("currently") or ""),
+            "action": action,
+            "location": location,
+            "currently": currently,
         }
+        role_type = "user"
+        agent = (self.game.agents or {}).get(name) if self.game is not None else None
+        if agent is not None:
+            role_type = getattr(agent, "role_type", "user") or "user"
         if self._fanout is not None:
-            from ..vizkit.events import agent_event
-
             self._fanout.emit(agent_event(
-                name, state.get("coord"), state.get("action", ""),
-                state.get("location", ""), state.get("currently", ""),
-                state.get("path"), sim_time))
+                name, state.get("coord"), action, location, currently,
+                state.get("path"), sim_time, role_type))
 
     def _viz_on_step(self, config):
         if self._fanout is not None:

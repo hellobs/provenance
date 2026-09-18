@@ -24,14 +24,40 @@ def time_event(time: str, step: Optional[int] = None) -> dict:
     return ev
 
 
-def agent_event(name: str, coord=None, action: str = "", location: str = "",
-                currently: str = "", path=None, time: str = "") -> dict:
+def as_text(value) -> str:
+    """把 mavis 的字段安全转成字符串。
+
+    `AgentState.action` 实际是 `action.to_dict()`(dict),`location` 可能是列表;
+    前端按字符串处理(`msg.action.slice(...)`),这里统一收敛,避免前端 TypeError。
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("describe", "description", "text", "summary", "action"):
+            v = value.get(key)
+            if isinstance(v, str) and v.strip():
+                return v
+        parts = [as_text(v) for v in value.values() if v not in (None, "", [], {})]
+        return " / ".join(p for p in parts if p)
+    if isinstance(value, (list, tuple)):
+        return ":".join(as_text(v) for v in value if v not in (None, ""))
+    return str(value)
+
+
+def agent_event(name: str, coord=None, action="", location="",
+                currently="", path=None, time: str = "",
+                role_type: str = "user") -> dict:
     return {
         "type": "agent", "name": name,
         "coord": list(coord) if coord else [],
         "path": list(path or []),
-        "action": action or "", "location": location or "",
-        "currently": currently or "", "time": time,
+        "action": as_text(action),
+        "location": as_text(location),
+        "currently": as_text(currently),
+        "role_type": role_type or "user",
+        "time": time,
     }
 
 
@@ -96,7 +122,9 @@ def events_from_record(record: dict) -> List[dict]:
                 for line in lines or []:
                     if isinstance(line, (list, tuple)) and len(line) == 2:
                         out.append(chat_event(str(line[0]), str(line[1]), t))
-        if node.get("world_state"):
+        if node.get("agents"):
+            out.append(snapshot_event({n: dict(st) for n, st in node["agents"].items()}, t))
+        elif node.get("world_state"):
             out.append(snapshot_event({"world": node["world_state"]}, t))
     return out
 
