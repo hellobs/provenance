@@ -24,17 +24,34 @@ def time_event(time: str, step: Optional[int] = None) -> dict:
     return ev
 
 
+def _event_text(value: dict) -> str:
+    """mavis 的 Event.to_dict() -> 可读文本(优先 describe,退化为 主语 谓词 宾语)。"""
+    describe = str(value.get("describe") or "").strip()
+    if describe:
+        return describe
+    bits = [str(value.get(k) or "").strip()
+            for k in ("subject", "predicate", "object")]
+    return " ".join(b for b in bits if b)
+
+
 def as_text(value) -> str:
     """把 mavis 的字段安全转成字符串。
 
     `AgentState.action` 实际是 `action.to_dict()`(dict),`location` 可能是列表;
     前端按字符串处理(`msg.action.slice(...)`),这里统一收敛,避免前端 TypeError。
+    action 的结构是 {"event": {...}, "obj_event": ..., "start": ..., "duration": ...},
+    取内层 event 的可读描述,不要把 start/duration 拼进来。
     """
     if value is None:
         return ""
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
+        inner = value.get("event")
+        if isinstance(inner, dict):
+            text = _event_text(inner)
+            if text:
+                return text
         for key in ("describe", "description", "text", "summary", "action"):
             v = value.get(key)
             if isinstance(v, str) and v.strip():
