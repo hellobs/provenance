@@ -51,6 +51,14 @@ jobs:
         run: |
           node tests/frontend_smoke.js tests/_pages
 
+      - name: mavis-vizkit suite (package's own tests)
+        # 补盲区:此前 CI 只跑外层与 case01 两套,mavis-vizkit 自己的 25 个测试从未在 CI 上跑过,
+        # vizkit 内部回归(如事件契约键名漂移)只能靠 case01 间接照到一部分。包内 pyproject
+        # 自带 testpaths/addopts,故 cd 进包目录直接跑。
+        run: |
+          cd packages/mavis-vizkit
+          python -m pytest
+
       - name: Case01 + vizkit suite (requires mavis-vizkit installed above)
         run: |
           cd provenance
