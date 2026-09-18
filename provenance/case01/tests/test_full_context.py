@@ -53,7 +53,7 @@ def _sample_run():
         "reflection": {"text": "我过度依赖情景测算……(反思全文)", "material": "m"},
         "router": {"issues": [
             {"id": "issue-1", "summary": "对情景测算过度采信",
-             "field": "信息甄别", "risk": "High",
+             "field": "信息甄别", "risk": "low",
              "routing_reason": "源头单一且未被公司确认"}]},
         "audit": [{"t": "2026-08-27", "action": "set_branch", "branch": "A"}],
         # 三条 mavis 样本的真实顶层附加键(引擎内部,平台不读)

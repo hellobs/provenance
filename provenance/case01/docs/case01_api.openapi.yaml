@@ -1,3 +1,16 @@
+# GTC Case 01 · Run 只读数据服务 —— 机器可读契约(OpenAPI 3.1)
+#
+# 本文件只覆盖【平台对接端点】;/api/runs、/api/runs/{run_id}、
+# /api/runs/{run_id}/full-context 是平台侧的正式对接面。
+# 不含 /viewer:它是引擎侧调试挂载(serve.app.mount("/viewer", StaticFiles),
+# 依赖 gitignored 的 runs_html/ 目录,且 FastAPI 自身的 /openapi.json 也不含它,
+# 不是 API 操作端点、不是平台对接面)。详见 prose 契约 Governance平台对接说明.md §1.1。
+#
+# 顶层键读/写约定(对应 run.json;页面 prose 契约 §2.2):
+#   平台要读:run_id / 日期 / turns / retrievals / events / state_history /
+#            final_feedback / audit / condition_monitor / reflection / router。
+#   引擎侧附加键、平台不读:summary / injector / compat。其中 injector 含 Branch
+#           实验元信息与逐节点 dialogue 原文,不得进专家视图(与 full-context 同一边界)。
 openapi: 3.1.0
 info:
   title: GTC Case 01 · Run 只读数据服务
@@ -33,9 +46,20 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 type: object
-                title: Response List Runs Api Runs Get
+                title: RunsList
+                properties:
+                  runs:
+                    type: array
+                    description: 全部已完成 Run 的简短索引(按结束日期倒序)。
+                    items:
+                      $ref: '#/components/schemas/RunSummary'
+                  count:
+                    type: integer
+                    description: Run 数量。
+                required:
+                - runs
+                - count
   /api/runs/{run_id}:
     get:
       tags:
@@ -46,7 +70,20 @@ paths:
 
         Platform 侧用于:按问题建 Expert Review Task、关联审计时间线、判断
 
-        Reflection / Router 是否已就绪。专家看到的文本一律走 full-context。'
+
+        Reflection / Router 是否已就绪。专家看到的文本一律走 full-context。
+
+
+        服务端返回的是聚合 meta(n_turns 等为计数);若平台需要 turns/retrievals/
+
+
+        events/state_history/condition_monitor 全文,另行约定。此处绝不含引擎侧
+
+
+        附加键 summary/injector/compat——它们只在 run.json 落盘,平台不读,
+
+
+        其中 injector 含 Branch 实验元信息,不得进专家视图。'
       operationId: run_detail_api_runs__run_id__get
       parameters:
       - name: run_id
@@ -62,8 +99,70 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
-                title: Response Run Detail Api Runs  Run Id  Get
+                title: RunDetail
+                properties:
+                  run_id:
+                    type: string
+                    description: Run 标识(作为复合主键的组成部分)。
+                  start_date:
+                    type: string
+                    description: Run 开始日期(YYYY-MM-DD)。
+                  end_date:
+                    type: string
+                    description: Run 结束日期(YYYY-MM-DD)。
+                  branch:
+                    type: string
+                    description: 分支标签;仅供平台内部关联,不对外叙事。
+                  branch_summary:
+                    type: string
+                    description: 分支的人话摘要。
+                  n_turns:
+                    type: integer
+                    description: 对话回合数。
+                  n_retrievals:
+                    type: integer
+                    description: 检索条数。
+                  n_events:
+                    type: integer
+                    description: 公开事件条数。
+                  final_feedback_date:
+                    type: string
+                    description: 最终反馈日期(YYYY-MM-DD),空串表示无。
+                  reflection:
+                    type: object
+                    title: ReflectionBlock
+                    properties:
+                      generated:
+                        type: boolean
+                        description: Reflection 是否已生成。
+                      text:
+                        type: string
+                        description: Reflection 原文(专家结构审核的依据)。
+                    required:
+                    - generated
+                    - text
+                  router:
+                    type: object
+                    title: RouterBlock
+                    description: Router 拆分结果。issues[].id 是 run 内序号,跨 run
+                      会重名;平台建单/幂等主键必须是 (run_id, issue_id)。
+                    properties:
+                      ran:
+                        type: boolean
+                        description: Router 是否已运行。
+                      issues:
+                        type: array
+                        description: 拆分出的待专业审核问题。
+                        items:
+                          $ref: '#/components/schemas/Issue'
+                    required:
+                    - ran
+                    - issues
+                  audit:
+                    type: array
+                    description: 该 Run 世界侧动作时间线(释放事件/买卖/状态推进)。
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
         '422':
           description: Validation Error
           content:
@@ -80,7 +179,8 @@ paths:
 
         内容与信息边界见 full_context.build_full_context;不含 Branch 预设等
 
-        实验元信息。'
+
+        实验元信息(即不含 injector 段任何字段)。'
       operationId: full_context_api_runs__run_id__full_context_get
       parameters:
       - name: run_id
@@ -96,8 +196,21 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
-                title: Response Full Context Api Runs  Run Id  Full Context Get
+                title: FullContext
+                properties:
+                  run_id:
+                    type: string
+                    description: Run 标识。
+                  format:
+                    type: string
+                    description: '"text/plain; charset=utf-8" —— 全文为纯文本。'
+                  full_context:
+                    type: string
+                    description: 专家可读的自然语言完整记录,不含实验元信息。
+                required:
+                - run_id
+                - format
+                - full_context
         '422':
           description: Validation Error
           content:
@@ -106,6 +219,94 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    RunSummary:
+      type: object
+      description: Run 索引条目。
+      properties:
+        run_id:
+          type: string
+          description: Run 标识。
+        start_date:
+          type: string
+          description: 开始日期。
+        end_date:
+          type: string
+          description: 结束日期。
+        branch:
+          type: string
+          description: 分支标签(平台内部关联用)。
+        branch_summary:
+          type: string
+          description: 分支人话摘要。
+        n_turns:
+          type: integer
+          description: 对话回合数。
+        n_retrievals:
+          type: integer
+          description: 检索条数。
+        has_reflection:
+          type: boolean
+          description: 是否已有 Reflection。
+        router_issue_count:
+          type: integer
+          description: Router 拆分出的问题数。
+      required:
+      - run_id
+      - start_date
+      - end_date
+      - branch
+      - branch_summary
+      - n_turns
+      - n_retrievals
+      - has_reflection
+      - router_issue_count
+    Issue:
+      type: object
+      description: 'Router 拆分出的一个待审核问题。id 是 run 内序号(issue-1..issue-N),
+        跨 run 会重名;平台建单/幂等主键必须是 (run_id, issue_id) —— 否则不同 run 各自的
+        issue-1 会被错配成同一条任务(见 prose 契约 §2.2)。'
+      properties:
+        id:
+          type: string
+          description: run 内序号,形如 issue-1..issue-N。
+        summary:
+          type: string
+          description: 问题摘要(自然语言)。
+        field:
+          type: string
+          description: 专业类别,用于匹配专家池。
+        risk:
+          type: string
+          enum: [low, medium, high]
+          description: 风险等级,路由代码 `_parse_router_json` 归一化为小写;非法值落回
+            medium。比较时应忽略大小写(兼容历史大写记录)。
+        routing_reason:
+          type: string
+          description: 路由理由,说明为何需要该领域专家。
+      required:
+      - id
+      - summary
+      - field
+      - risk
+      - routing_reason
+      additionalProperties: false
+    AuditEntry:
+      type: object
+      description: 世界侧动作时间线单条。
+      properties:
+        t:
+          type: string
+          description: 日期。
+        action:
+          type: string
+          description: 动作。
+        kind:
+          type: string
+          description: 类别。
+        summary:
+          type: string
+          description: 摘要。
+      additionalProperties: true
     HTTPValidationError:
       properties:
         detail:

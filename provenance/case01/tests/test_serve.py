@@ -154,3 +154,40 @@ class TestOpenApi:
         assert "/api/runs" in paths
         assert "/api/runs/{run_id}" in paths
         assert "/api/runs/{run_id}/full-context" in paths
+
+
+YAML_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "docs", "case01_api.openapi.yaml")
+
+# 排除项及其理由:
+#   /docs、/docs/oauth2-redirect、/redoc、/openapi.json —— FastAPI/Starlette 自动生成,
+#     由框架维护,不写进静态 YAML。
+#   /viewer —— 引擎侧调试挂载(serve.app.mount("/viewer", StaticFiles)),依赖 gitignored
+#     的 runs_html/ 目录,且 serve.app.openapi() 本身也不含它(不是 API 操作端点);
+#     不在平台对接契约内,故不写进 YAML。见 YAML 顶部注释与 prose 契约 §1.1。
+# 其余 serve 路由若与静态 YAML 不一致,说明任一方向发生了漂移,守卫生效。
+_EXCLUDED_PATHS = {"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json",
+                   "/viewer"}
+
+
+def _static_yaml_paths():
+    import yaml
+    spec = yaml.safe_load(open(YAML_PATH, encoding="utf-8"))
+    return spec["paths"]
+
+
+class TestOpenApiStaticDriftGuard:
+    def test_static_yaml_paths_match_serve_routes(self):
+        yaml_paths = set(_static_yaml_paths())
+        actual_paths = {getattr(r, "path", None) for r in serve.app.routes}
+        actual_paths.discard(None)
+        biz = actual_paths - _EXCLUDED_PATHS
+        assert yaml_paths == biz
+
+    def test_static_yaml_risk_enum_matches_code(self):
+        import yaml
+        from case01.reflection import _ROUTER_RISKS
+        spec = yaml.safe_load(open(YAML_PATH, encoding="utf-8"))
+        enum = spec["components"]["schemas"]["Issue"]["properties"]["risk"]["enum"]
+        assert set(enum) == _ROUTER_RISKS
