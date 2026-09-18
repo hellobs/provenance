@@ -100,6 +100,9 @@ paths:
               schema:
                 type: object
                 title: RunDetail
+                # 严格度说明(与 Issue 不同):RunDetail 是只读聚合展示面,顶层刻意
+                # 不设 additionalProperties:false / required,以容纳对接确认单允许
+                # 的"仅追加 add-only"扩展;而 Issue 是平台建单/幂等契约,须闭合。
                 properties:
                   run_id:
                     type: string
