@@ -2,9 +2,12 @@
 """隔离验证实测:未释放事件在节点前"检索不到"(执行计划阶段 3 第 2 项)。
 
 做的事:跑一条真实的节点序列(默认 B 线全程),每个节点开始前对两个角色做两件事——
-  1. 快照记忆:列出此刻记忆里所有"剧情注入"条目(应为"已释放事件"的并集);
-  2. 主动检索:用**后续所有节点**的事件原文当检索词去检索记忆,记录命中情况
-     (预期:一条都命中不了)。
+  1. 快照记忆:列出此刻记忆里所有"剧情注入"条目(应为"已释放事件"的并集),
+     并直接检查"后续节点的事件原文"有没有一条已经在记忆里(主判据,预期 0 条);
+  2. 主动检索:用**后续所有节点**的事件原文当检索词去检索记忆,看返回的条目里
+     有没有真的包含未释放事件原文(预期 0 条)。
+     注意 mavis 的检索是 top-k 相似度、没有相关度阈值,所以"有返回"不等于"泄漏",
+     只有命中文本里真的出现未释放事件原文才算泄漏。
 
 `--full-pool` 为对抗模式:把整条时间线的事件全部塞进 simulator.story,只靠
 `case01_node` 条件放行当前节点。默认开启——隔离结论要在"池子里什么都有"的前提下
@@ -53,11 +56,34 @@ class ProbeBridge(MavisBridge):
         return super().external_state(name, step, sim_time, game)
 
     # ---------------------------------------------------------------- 审计
+    @staticmethod
+    def _all_event_nodes(agent):
+        """全量事件记忆。
+
+        不能用 `retrieve_events()`:它按 `retention`(默认 8 条)截断,
+        窗口外的剧情条目会被漏掉,审计就不是全量。这里直接按记忆索引取。
+        失败时退回 `retrieve_events()`(窗口视图,弱一些但不会中断审计)。
+        """
+        assoc = agent.associate
+        try:
+            ids = list((assoc.memory or {}).get("event") or [])
+        except Exception:
+            return list(assoc.retrieve_events() or [])
+        if not ids:
+            return list(assoc.retrieve_events() or [])
+        out = []
+        for node_id in ids:
+            try:
+                out.append(assoc.to_concept(assoc._index.find_node(node_id)))
+            except Exception:
+                continue
+        return out
+
     def _story_memory(self, name: str):
-        """该角色记忆里所有剧情注入条目(describe 文本)。"""
+        """该角色记忆里所有剧情注入条目(describe 文本,全量)。"""
         agent = self.game.get_agent(name)
         items = []
-        for concept in agent.associate.retrieve_events() or []:
+        for concept in self._all_event_nodes(agent):
             event = getattr(concept, "event", None)
             if event is None or getattr(event, "subject", "") != "环境":
                 continue
@@ -86,6 +112,9 @@ class ProbeBridge(MavisBridge):
         foreign = [d for d in memory
                    if not any(c and c in d for c in released)]
 
+        # 主判据:后续节点的事件原文有没有一条已经躺在记忆里
+        future_in_memory = [c for c in future if c and any(c in d for d in memory)]
+
         snapshot = {
             "node_id": node.node_id,
             "step": step,
@@ -94,6 +123,7 @@ class ProbeBridge(MavisBridge):
             "memory_count": len(memory),
             "memory": memory,
             "foreign": foreign,
+            "future_in_memory": future_in_memory,
         }
         self.probe["per_node"].append(snapshot)
 
@@ -101,12 +131,16 @@ class ProbeBridge(MavisBridge):
             if not content:
                 continue
             hits = self._retrieve(name, content)
+            # 检索是 top-k 相似度,没有相关度阈值 → 永远会返回"最像的已释放记忆"。
+            # 因此只有命中的文本真的包含某条**未释放**事件原文,才算泄漏。
+            leaked = any(content in h and not any(r and r in h for r in released)
+                         for h in hits)
             self.probe["queries"].append({
                 "node_id": node.node_id,
                 "role": name,
                 "query": content,
                 "hits": hits,
-                "leaked": bool(hits),
+                "leaked": bool(leaked),
             })
 
 
@@ -116,6 +150,7 @@ def summarise(probe: dict) -> dict:
     return {
         "snapshots": len(snapshots),
         "foreign_total": sum(len(s["foreign"]) for s in snapshots),
+        "future_in_memory_total": sum(len(s["future_in_memory"]) for s in snapshots),
         "queries": len(queries),
         "leaked_queries": [q for q in queries if q["leaked"]],
         "memory_equals_released": all(not s["foreign"] for s in snapshots),
