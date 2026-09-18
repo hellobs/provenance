@@ -331,10 +331,17 @@ class MavisBridge:
 
     def _viz_on_step(self, config):
         if self._fanout is not None:
-            from ..vizkit.events import time_event
+            from ..vizkit.events import snapshot_event, time_event
 
             config = config or {}
-            self._fanout.emit(time_event(str(config.get("time", "")), config.get("step")))
+            step = int(config.get("step") or 0)
+            sim_time = str(config.get("time", ""))
+            self._fanout.emit(time_event(sim_time, step))
+            # 每步补一份快照:实时前端可用它刷新全量状态,新连入的客户端也能立刻有画面
+            trace = self._agent_trace.get(step) or {}
+            if trace:
+                self._fanout.emit(snapshot_event(
+                    {name: dict(st) for name, st in trace.items()}, sim_time))
 
     def _viz_on_chat_line(self, speaker, text):
         if self._fanout is not None:

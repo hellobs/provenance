@@ -39,7 +39,7 @@
 - `vizkit.Fanout`：把事件广播给多个插件；**单个插件抛错会被隔离**，不影响引擎与其它插件。
 - `vizkit.replay`：回放驱动（可加 pacing），也能把事件写成 JSONL 交给外部播放器/服务。
 
-内置三个插件：
+内置四个插件：
 
 1. `console`：收集/打印事件（默认，CI 与调试用）。
 2. `report`：把整份记录渲染成审查页（复用 `case01.viz`），输出静态 HTML。
@@ -47,7 +47,9 @@
    - 角色贴图别名（`ROLE_TEXTURE_ALIAS`）：case01 的两个角色映射到小镇素材池里的已有贴图，
      不新增美术资源；
    - 坐标回退：老记录没有逐节点坐标时，用场景配置的初始坐标占位；
-   - 可选 JSONL 落盘，供实时回放服务逐条推送。
+   - 可选 JSONL 落盘，供离线播放/调试。
+4. `live`：**实时**推送（见 §6）——在本机起一个只读服务，直接复用现成小镇前端页面，
+   运行中把事件边产生边广播给所有客户端。
 
 ## 4. 注入层怎么接
 
@@ -64,13 +66,29 @@
 
 已可用：
 
-- 审查页：`python -m case01.viz`（或 report 插件）→ `runs_html/viz/*.html`；
-- 回放文件：`python -m case01.vizkit.replay --record <run.json> --town out.jsonl`
-  → 已验证 demo-C-mavis 产出 36 条消息（init 1 / time 7 / story 13 / chat_line 8 / snapshot 7）。
+- **实时（小镇风格，推荐）**：`python -m case01.vizkit.live_run --branch B --port 5010`
+  → 浏览器打开 `http://127.0.0.1:5010/`，运行过程中角色移动、对话气泡、状态面板**实时**出现。
+  这就是原来的 Phaser 前端（`frontend/templates/index.html` + `main_script.html`），**前端零改动**。
+- 审查页（离线）：`python -m case01.viz`（或 report 插件）→ `runs_html/viz/*.html`；
+- 回放文件（离线）：`python -m case01.vizkit.replay --record <run.json> --town out.jsonl`。
 
-还差一步（下一步做）：
+## 6. 实时插件（live）如何工作
 
-- **回放服务**：把 JSONL/记录按时间逐条推给现有小镇前端（WS `/ws`），并做两件事：
-  1. 前端只需 2 个角色，需要按别名贴图与初始位置渲染；
-  2. 与 `5001`/`5002` 的既有服务并存（回放服务独立端口，只读记录，不改引擎）。
-- 老记录缺坐标：`agents` 字段是新加的，旧 demo 靠场景初始坐标回退；重跑一次即可带上真实坐标。
+- uvicorn 跑在守护线程；引擎线程每产生一个事件就调 `on_event()`，
+  经 `asyncio.run_coroutine_threadsafe` 投递到事件循环广播给所有 WS 客户端；
+- 客户端连上先收 `init`（含角色与贴图别名），随后立即收到当前 `snapshot` 与积压事件；
+- 每步结束补发一份 `snapshot`（含两角色的 coord/action/location），因此刷新页面也能立刻有画面；
+- 每 5 秒一次 `ping`（与既有前端心跳一致）；
+- **角色贴图别名**：把 `/static/assets/village/agents/<角色>/` 挂载到已有角色目录
+  （Investment AI→AI Advisor，Ethan Lin→Mr. Zhou），不需要新增美术资源；
+- 服务未启动时事件进缓冲（`pending`），便于单测与无头运行，不丢语义。
+
+实测（2026-09-18，`--branch B --nodes 1`）：WS 客户端在运行过程中陆续收到
+`ping@15.1s`、`chat_line@15.3/17.7/20.0s`、`agent@24.1/24.4s`、`time@24.4s`、`snapshot@24.4s`，
+随后每 5 秒 ping —— 属**实时**推送，不是跑完再回放。
+
+还差 / 可继续做的：
+
+- 真实坐标：`nodes[].agents` 是本次新增的字段，旧 demo 靠场景初始坐标回退；重跑一次即可带上真实走动轨迹。
+- 前端角色数为 2：地图与素材沿用小镇版本，若要专门的两人工位场景，只需替换 `scenario/` 与 tilemap，插件不用改。
+- 平台侧专家审核界面（任务队列/Approve-Edit-Reject/冲突/归池）仍属平台范围，接口沿用 5002 三端点 + full-context。

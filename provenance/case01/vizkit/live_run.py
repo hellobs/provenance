@@ -1,0 +1,77 @@
+# -*- coding: utf-8 -*-
+"""跑一次真实运行,并把事件**实时**推给小镇风格前端。
+
+用法(在 provenance/provenance 下):
+    python -m case01.vizkit.live_run --branch B --port 5010
+然后浏览器打开 http://127.0.0.1:5010/ —— 运行过程中角色移动/对话会实时出现。
+跑完后默认再保持 60 秒(--hold)方便观察,随后关闭服务。
+"""
+import argparse
+import json
+import os
+import sys
+import time
+
+from ..injector.bridge import DEFAULT_ROLES, MavisBridge
+from ..injector.nodes import default_nodes
+from . import create
+
+SCENARIO = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "injector", "scenario")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="case01 实时可视化(小镇风格)")
+    ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
+    ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
+    ap.add_argument("--scenario-dir", default="")
+    ap.add_argument("--run-id", default="")
+    ap.add_argument("--port", type=int, default=5010)
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--max-retries", type=int, default=3)
+    ap.add_argument("--hold", type=float, default=60.0, help="运行结束后保持服务的秒数")
+    ap.add_argument("--nodes", type=int, default=0, help="只跑前 N 个节点(0=全部;冒烟用)")
+    ap.add_argument("--out", default="", help="可选:同时保存运行记录 JSON")
+    args = ap.parse_args(argv)
+
+    roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
+    if len(roles) != 2:
+        print("--roles 需要正好两个角色名")
+        return 2
+
+    scenario = args.scenario_dir or SCENARIO
+    live = create("live", host=args.host, port=args.port, roles=list(roles),
+                  scenario_dir=scenario)
+    live.start()
+    print("实时可视化已启动: {}  (Ctrl+C 结束)".format(live.url()))
+
+    nodes = default_nodes(args.branch, roles=list(roles))
+    if args.nodes > 0:
+        nodes = nodes[:args.nodes]
+    bridge = MavisBridge(
+        nodes=nodes, roles=roles, scenario_dir=scenario,
+        run_id=args.run_id or "live-{}".format(args.branch),
+        dry_run=False, max_retries=args.max_retries, branch=args.branch,
+        visualizers=[live],
+    )
+    exit_code = 0
+    try:
+        record = bridge.run()
+        print("运行完成:", json.dumps(record.get("summary") or {}, ensure_ascii=False))
+        if args.out:
+            bridge.save(args.out)
+            print("记录已保存 ->", args.out)
+        if args.hold > 0:
+            print("保持服务 {:.0f} 秒供观察…".format(args.hold))
+            time.sleep(args.hold)
+    except KeyboardInterrupt:
+        print("已中断")
+        exit_code = 130
+    finally:
+        bridge.close()
+        print("服务已关闭")
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
