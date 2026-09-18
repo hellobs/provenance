@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-"""实时可视化插件:把运行中的事件**边跑边推**给现有小镇前端(不是回放)。
+"""实时可视化插件:把运行中的事件**边跑边推**给前端(不是回放)。
 
 复用点
 ------
-- 页面:provenance 现成的 `frontend/templates/index.html` + `main_script.html`
-  (Phaser 场景、气泡、面板),契约与 mavis protocol 一致,前端零改动;
-- 角色贴图别名:case01 的两个角色不在小镇素材池里 → 把
-  `/static/assets/village/agents/<角色>/` 别名挂载到已有角色目录(只影响贴图);
+- 页面:由调用方传入 `static_root` / `template_dir`(前端资源根);
+  角色的贴图别名经 alias 挂载到既有目录(只影响贴图);
 - 快照:新连入的客户端先收 `init` + 当前 `snapshot`,随后接收实时事件。
 
 实现要点
@@ -21,40 +19,44 @@ import threading
 from typing import Dict, List, Optional
 
 from .. import Visualizer, register
-from .town import DEFAULT_SCENARIO, ROLE_TEXTURE_ALIAS, scenario_coords
-
-_PKG_ROOT = os.path.dirname(                      # provenance/provenance
-    os.path.dirname(                              # case01
-        os.path.dirname(                          # case01/vizkit
-            os.path.dirname(os.path.abspath(__file__)))))   # case01/vizkit/plugins
-FRONTEND_DIR = os.path.join(_PKG_ROOT, "frontend")
+from .town import scenario_coords
 
 
 class LiveVisualizer(Visualizer):
-    """实时推送插件(启动本地服务,hook 运行中的 mavis 事件)。"""
+    """实时推送插件(启动本地服务,hook 运行中的事件)。"""
 
     name = "live"
 
     def __init__(self, host: str = "127.0.0.1", port: int = 5010,
-                 roles: Optional[List[str]] = None,
                  alias: Optional[dict] = None,
-                 scenario_dir: str = "",
-                 static_root: str = "", template_dir: str = "",
+                 roles: Optional[List[str]] = None,
+                 scenario_dir: Optional[str] = None,
+                 static_root: Optional[str] = None,
+                 template_dir: Optional[str] = None,
                  ping_interval: float = 5.0, stride: int = 0,
-                 start_datetime: str = ""):
+                 start_datetime: str = "",
+                 nodes_key: str = "nodes", meta_key: Optional[str] = None):
+        if not alias:
+            raise ValueError(
+                "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
+        if not scenario_dir:
+            raise ValueError(
+                "live 插件需要 scenario_dir(角色坐标场景目录),由调用方提供")
+        if not static_root or not template_dir:
+            raise ValueError(
+                "live 插件需要 static_root 与 template_dir(前端资源根),由调用方提供")
         self.host = host
         self.port = int(port)
-        self.alias = dict(alias or ROLE_TEXTURE_ALIAS)
+        self.alias = dict(alias)
         self.roles = list(roles or self.alias.keys())
-        self.scenario_dir = scenario_dir or DEFAULT_SCENARIO
-        self.static_root = static_root or os.path.join(FRONTEND_DIR, "static")
-        self.template_dir = template_dir or os.path.join(FRONTEND_DIR, "templates")
+        self.scenario_dir = scenario_dir
+        self.static_root = static_root
+        self.template_dir = template_dir
         self.ping_interval = float(ping_interval)
         self.stride = int(stride)
-        # 前端 Date.parse 用;默认给一个与 case01 无关的稳定起点
         self.start_datetime = start_datetime or "2026-08-27T09:30:00"
 
-        self.init_pos = scenario_coords(self.scenario_dir, self.roles)
+        self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
         self._pending: List[dict] = []
         self._last_snapshot: Optional[dict] = None
@@ -67,7 +69,8 @@ class LiveVisualizer(Visualizer):
         from .town import TownVisualizer
 
         self._town = TownVisualizer(alias=self.alias, scenario_dir=self.scenario_dir,
-                                    roles=self.roles)
+                                    roles=self.roles, nodes_key=nodes_key,
+                                    meta_key=meta_key)
 
     # ------------------------------------------------------------------
     # 生命周期
@@ -146,7 +149,7 @@ class LiveVisualizer(Visualizer):
         from fastapi.staticfiles import StaticFiles
         from fastapi.templating import Jinja2Templates
 
-        app = FastAPI(title="Case01 实时可视化(小镇风格)")
+        app = FastAPI(title="mavis-vizkit 实时可视化(小镇风格)")
         templates = Jinja2Templates(directory=self.template_dir)
 
         # 角色贴图别名:先挂具体路径,再挂整个 /static
@@ -173,7 +176,6 @@ class LiveVisualizer(Visualizer):
                 "stride": self.stride,
                 "sec_per_step": self.stride,
                 "persona_init_pos": dict(self.init_pos),
-                # 前端用它初始化模拟时钟(Date.parse 需要可解析的日期串)
                 "start_datetime": self.start_datetime,
                 "all_movement": {
                     "description": {r: "" for r in (self.init_pos or self.roles)},

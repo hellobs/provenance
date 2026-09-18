@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-"""事件归一化:把 run 记录 / mavis 实时回调,变成统一的可视化事件流。
+"""事件归一化:把 run 记录 / 实时回调,变成统一的可视化事件流。
 
-契约直接采用 mavis `runtime.protocol` 的键名(前端/Unity/平台都按它解析):
+契约键名(前端/Unity/平台都按它解析,见 README):
 - {"type":"init","agents":[...],"time":str}
 - {"type":"time","time":str}
 - {"type":"agent","name","coord","path","action","location","currently","time"}
 - {"type":"chat_line","speaker","text"}
 - {"type":"story","id","event_type","content","targets","time"}
 - {"type":"snapshot","agents":{name: {...}}, "time"}
-任何插件(小镇 Phaser / 审查页 / 平台嵌入 / 控制台)都只按这套键读取。
+
+记录布局:节点列表可以挂在任意键下。多数调用方用默认的 `nodes`;
+若调用方把节点挂在别的键下(如带版次前缀的映射段),传 `nodes_key=` 即可,
+**本包不写死任何调用方的布局键名**。
 """
 from typing import Dict, List, Optional
 
@@ -25,7 +28,7 @@ def time_event(time: str, step: Optional[int] = None) -> dict:
 
 
 def _event_text(value: dict) -> str:
-    """mavis 的 Event.to_dict() -> 可读文本(优先 describe,退化为 主语 谓词 宾语)。"""
+    """事件对象 -> 可读文本(优先 describe,退化为 主语 谓词 宾语)。"""
     describe = str(value.get("describe") or "").strip()
     if describe:
         return describe
@@ -35,12 +38,11 @@ def _event_text(value: dict) -> str:
 
 
 def as_text(value) -> str:
-    """把 mavis 的字段安全转成字符串。
+    """把常见字段安全转成字符串。
 
-    `AgentState.action` 实际是 `action.to_dict()`(dict),`location` 可能是列表;
-    前端按字符串处理(`msg.action.slice(...)`),这里统一收敛,避免前端 TypeError。
-    action 的结构是 {"event": {...}, "obj_event": ..., "start": ..., "duration": ...},
-    取内层 event 的可读描述,不要把 start/duration 拼进来。
+    `action` 可能是 dict(形如 {"event": {...}, "start": ..., "duration": ...}),
+    `location` 可能是 list;前端按字符串处理,这里统一收敛,避免 TypeError。
+    优先取内层 event 的可读描述,不把 start/duration 拼进来。
     """
     if value is None:
         return ""
@@ -98,28 +100,40 @@ def snapshot_event(agents: Dict[str, dict], time: str = "") -> dict:
     return {"type": "snapshot", "agents": dict(agents or {}), "time": time}
 
 
-def normalize_record(record: dict) -> dict:
-    """兼容两种记录布局:bridge 原始记录(顶层 nodes)与映射后的 run.json(injector.nodes)。"""
-    if record.get("nodes"):
+def normalize_record(record: dict, nodes_key: str = "nodes",
+                     meta_key: Optional[str] = None) -> dict:
+    """把记录归一成"节点挂在 nodes_key 下"的统一形态,供回放/插件消费。
+
+    兼容两种布局:
+    1) 节点直接挂在 `nodes_key`(默认 "nodes")下 → 原样返回;
+    2) 节点挂在某个嵌套段(其键由 `meta_key` 指定)下 → 上提合并。
+    两个键名都可由调用方指定,**包内不写死调用方的布局名**。
+
+    缺省行为:未给 `meta_key` 时只处理 `nodes_key` 直接命中,不做任何上提——
+    需要上提的调用方(其映射段键名是业务侧约定)自行传 `meta_key=`。
+    """
+    if record.get(nodes_key):
         return record
-    inner = record.get("injector")
-    if isinstance(inner, dict) and inner.get("nodes"):
-        merged = dict(record)
-        merged["nodes"] = inner.get("nodes")
-        merged.setdefault("roles", inner.get("roles") or [])
-        merged.setdefault("run_id", inner.get("run_id") or record.get("run_id", ""))
-        return merged
+    if meta_key:
+        inner = record.get(meta_key)
+        if isinstance(inner, dict) and inner.get(nodes_key):
+            merged = dict(record)
+            merged[nodes_key] = inner.get(nodes_key)
+            merged.setdefault("roles", inner.get("roles") or [])
+            merged.setdefault("run_id", inner.get("run_id") or record.get("run_id", ""))
+            return merged
     return record
 
 
-def events_from_record(record: dict) -> List[dict]:
+def events_from_record(record: dict, nodes_key: str = "nodes",
+                       meta_key: Optional[str] = None) -> List[dict]:
     """一份 run 记录 → 可视化事件序列(离线回放)。
 
-    兼容 bridge 原始记录与映射后的 run.json(节点在 injector.nodes)。
-    顺序:init → 逐节点(time → story* → agent* → chat_line* → snapshot)
+    顺序:init → 逐节点(time → story* → agent* → chat_line* → snapshot)。
+    `nodes_key` / `meta_key` 传给 normalize_record;节点挂在别处时由调用方指定。
     """
-    record = normalize_record(record)
-    nodes = record.get("nodes") or []
+    record = normalize_record(record, nodes_key=nodes_key, meta_key=meta_key)
+    nodes = record.get(nodes_key) or []
     out: List[dict] = [init_event(list(record.get("roles") or []))]
     for node in nodes:
         t = str(node.get("date", ""))
@@ -147,7 +161,7 @@ def events_from_record(record: dict) -> List[dict]:
 
 
 def live_hooks(fanout) -> Dict[str, object]:
-    """返回可直接传给 mavis Simulator 的回调(在线事件流,协议键)."""
+    """返回可直接传给 Simulator 的回调(在线事件流,协议键)。"""
     def on_agent(name, state, step, sim_time):
         state = state or {}
         fanout.emit(agent_event(name, state.get("coord"), state.get("action", ""),

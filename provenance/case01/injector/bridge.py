@@ -231,7 +231,7 @@ class MavisBridge:
             on_story=self._viz_on_story,
         )
         if self._fanout is not None:
-            from ..vizkit.events import init_event
+            from mavis_vizkit.events import init_event
 
             # 对话逐句回调是 mavis 的模块级钩子(provenance live 同样这么接);
             # 注意它是进程级全局单例,同进程只能有一个消费者(见触点白名单第三节)
@@ -323,13 +323,13 @@ class MavisBridge:
         """visualizers:[插件实例] / ["town","report","console"] / None(不接)。"""
         if not visualizers:
             return None
-        from ..vizkit import Fanout, create
+        from mavis_vizkit import Fanout, create
 
         instances = [create(v) if isinstance(v, str) else v for v in visualizers]
         return Fanout(instances, on_error=lambda name, exc: None)
 
     def _viz_on_agent(self, name, state, step, sim_time):
-        from ..vizkit.events import agent_event, as_text
+        from mavis_vizkit.events import agent_event, as_text
 
         state = state or {}
         action = as_text(state.get("action"))
@@ -352,7 +352,7 @@ class MavisBridge:
 
     def _viz_on_step(self, config):
         if self._fanout is not None:
-            from ..vizkit.events import snapshot_event, time_event
+            from mavis_vizkit.events import snapshot_event, time_event
 
             config = config or {}
             step = int(config.get("step") or 0)
@@ -366,13 +366,13 @@ class MavisBridge:
 
     def _viz_on_chat_line(self, speaker, text):
         if self._fanout is not None:
-            from ..vizkit.events import chat_event
+            from mavis_vizkit.events import chat_event
 
             self._fanout.emit(chat_event(speaker, text))
 
     def _viz_on_story(self, ev):
         if self._fanout is not None:
-            from ..vizkit.events import story_event
+            from mavis_vizkit.events import story_event
 
             self._fanout.emit(story_event(dict(ev or {})))
 

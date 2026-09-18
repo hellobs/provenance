@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
-"""实时可视化插件测试:WS 握手、实时投递、事件缓冲、页面可渲染。"""
+"""实时可视化插件测试(经 mavis-vizkit 接真实前端):WS 握手、实时投递、事件缓冲、页面可渲染。"""
 import os
 
 import pytest
 
-from case01.vizkit import create
-from case01.vizkit.plugins.live import LiveVisualizer
+from mavis_vizkit import create
+from mavis_vizkit.plugins.live import LiveVisualizer
 
 SCENARIO = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "injector", "scenario")
+FRONTEND = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "frontend")
 ROLES = ["Investment AI", "Ethan Lin"]
+ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
 
 
 def _live(port=5099):
-    return create("live", port=port, roles=ROLES, scenario_dir=SCENARIO,
+    return create("live", port=port, roles=ROLES, alias=ALIAS, scenario_dir=SCENARIO,
+                  static_root=os.path.join(FRONTEND, "static"),
+                  template_dir=os.path.join(FRONTEND, "templates"),
                   ping_interval=30.0)
 
 
@@ -27,7 +33,6 @@ def test_registered_and_config():
 
 
 def test_events_buffered_before_server_starts():
-    """服务未起时事件进缓冲,不丢语义(无头运行/单测可用)。"""
     live = _live()
     live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [9, 7], "time": "t"})
     live.on_event({"type": "chat_line", "speaker": "Ethan Lin", "text": "hi", "time": "t"})
@@ -48,7 +53,6 @@ def test_websocket_handshake_and_live_delivery():
         assert first["agents"] == ROLES
         assert first["textures"]["Investment AI"] == "AI Advisor"
 
-        # 服务器线程里的事件应实时到达(不是回放)
         live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [9, 7],
                        "action": "asking", "time": "2026-08-27"})
         msg = ws.receive_json()
@@ -82,7 +86,6 @@ def test_index_page_renders_with_alias_assets():
     assert page.status_code == 200
     body = page.text
     assert "Investment AI" in body and "Ethan Lin" in body
-    # 角色贴图别名可直接取到(前端按 /static/assets/village/agents/<角色>/portrait.png)
     assert client.get("/static/assets/village/agents/Investment AI/portrait.png").status_code == 200
     assert client.get("/static/assets/village/agents/Ethan Lin/portrait.png").status_code == 200
     health = client.get("/health").json()

@@ -28,6 +28,10 @@ jobs:
         run: |
           pip install pytest fastapi uvicorn websockets jinja2 httpx
 
+      - name: Install mavis-vizkit (editable, packages/mavis-vizkit)
+        run: |
+          pip install -e packages/mavis-vizkit
+
       - name: Backend API + page render tests
         run: |
           python -m pytest tests -v
@@ -35,3 +39,8 @@ jobs:
       - name: Frontend JS smoke test (node, reads pytest-rendered HTML)
         run: |
           node tests/frontend_smoke.js tests/_pages
+
+      - name: Case01 + vizkit suite (requires mavis-vizkit installed above)
+        run: |
+          cd provenance
+          python -m pytest case01/tests -q

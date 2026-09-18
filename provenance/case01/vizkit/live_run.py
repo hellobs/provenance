@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""跑一次真实运行,并把事件**实时**推给小镇风格前端。
+"""厚 CLI:把 case01 的注入驱动与 mavis-vizkit 的实时可视化插件接起来。
+
+可视化实现已抽到独立包 mavis-vizkit;本命令只负责把 case01 侧的
+roles / alias / scenario / 前端资源根 作为参数喂给它,不再含渲染逻辑。
 
 用法(在 provenance/provenance 下):
     python -m case01.vizkit.live_run --branch B --port 5010
@@ -12,10 +15,15 @@ import os
 import sys
 import time
 
+import mavis_vizkit
 from ..injector.bridge import DEFAULT_ROLES, MavisBridge
 from ..injector.nodes import default_nodes
-from . import create
 
+# case01 业务侧的角色贴图别名与前端根(属于 case01,不属于 mavis-vizkit)
+ROLE_TEXTURE_ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
+_FRONTEND = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "frontend")
 SCENARIO = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "injector", "scenario")
 
@@ -40,8 +48,11 @@ def main(argv=None):
         return 2
 
     scenario = args.scenario_dir or SCENARIO
-    live = create("live", host=args.host, port=args.port, roles=list(roles),
-                  scenario_dir=scenario)
+    live = mavis_vizkit.create(
+        "live", host=args.host, port=args.port, roles=list(roles),
+        alias=ROLE_TEXTURE_ALIAS, scenario_dir=scenario,
+        static_root=os.path.join(_FRONTEND, "static"),
+        template_dir=os.path.join(_FRONTEND, "templates"))
     live.start()
     print("实时可视化已启动: {}  (Ctrl+C 结束)".format(live.url()))
 

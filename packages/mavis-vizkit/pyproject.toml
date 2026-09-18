@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mavis-vizkit"
+version = "0.1.0"
+description = "Observer/visualizer plugin set for any mavis consumer (event-dict contract only)"
+requires-python = ">=3.12"
+# 零运行时依赖:只消费"事件字典"的键名,不 import mavisframework
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "fastapi>=0.110", "uvicorn>=0.29", "mavisframework==1.1.0"]
+
+[project.entry-points."mavis_vizkit.plugins"]
+console = "mavis_vizkit.plugins.console:ConsoleVisualizer"
+report = "mavis_vizkit.plugins.report:ReportVisualizer"
+town = "mavis_vizkit.plugins.town:TownVisualizer"
+live = "mavis_vizkit.plugins.live:LiveVisualizer"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

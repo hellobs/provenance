@@ -97,6 +97,20 @@ python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
 `CASE01_ETHAN_BASE_URL` / `CASE01_ETHAN_MODEL` 环境变量走外部 API。
 详细接口见 `case01/injector/README.md`。
 
+## 实时可视化(mavis-vizkit 独立包)
+
+可视化实现已抽到 `packages/mavis-vizkit`(独立包,只消费"事件字典"契约,
+不 import mavisframework)。case01 侧 `case01/vizkit/live_run.py` 是薄 CLI:
+把 roles / 角色贴图别名 / scenario / 前端资源根喂给 `mavis_vizkit.create("live", ...)`。
+
+```bash
+# 实时可视化(小镇 Phaser 前端,端口 5010)
+python -m case01.vizkit.live_run --branch B --port 5010 --hold 1800 \
+    --out case01\runs_injector\live-B\raw.json
+```
+
+包契约、四种插件与协议键见 `packages/mavis-vizkit/README.md`。
+
 ## 完成度(2026-09)
 
 - [x] World 状态机(日期跳跃推进、事件按剧本释放、信息权限:AI 只见

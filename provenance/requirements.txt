@@ -1,6 +1,15 @@
-﻿# Provenance 平台运行依赖(Python 3.12)
-# 框架:mavisframework(独立仓库 hellobs/mavis,先构建 wheel 再安装)
-mavisframework==1.0.0
+# Provenance 平台运行依赖(Python 3.12)
+# 框架:mavisframework(独立仓库 hellobs/mavis)
+#   1.1.0 起含 case01 需要的三处注入钩子(external_state / interaction_request /
+#   role_directive)。1.0.0 的已发布制品不含钩子,装了会在构造 Simulator 时
+#   TypeError,所以不要退回 1.0.0。
+#   本仓不发布到 PyPI:先在 mavis 仓构建 wheel 再安装
+#   (mavis main 的 1.1.0 提交为 ca0af12;dist/ 不入库,需自行 python -m build)。
+mavisframework==1.1.0
+
+# 可视化插件集(独立包,见 packages/mavis-vizkit;editable 安装,只消费事件字典契约)
+# 本仓不发布到 PyPI:先 pip install -e packages/mavis-vizkit(CI 亦如此)。
+mavis-vizkit==0.1.0
 
 # 实时服务(FastAPI + WebSocket + 模板渲染)
 fastapi>=0.110

@@ -85,6 +85,14 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 - 15–20 `Simulator.register_condition("case01_node")` —— 白名单内;框架不带业务条件类型,
   由 case01 在自己进程里注册。
 
+可视化(`packages/mavis-vizkit`)
+
+- **不在 mavis 触点里,也不是 mavis 的消费者**:它只消费"事件字典"的键名(契约见其 README),
+  运行时零 import mavisframework。case01 通过 `case01/vizkit/live_run.py`(薄 CLI,业务别名
+  与前端根留在 case01 侧)与 `bridge.py` 把 roles / alias / scenario / 前端资源根喂给
+  `mavis_vizkit.create("live", ...)`。它的大铁皮落在 `mavis.runtime.protocol` 的键名,
+  靠"协议漂移测试"(测试期 import 框架断言键名仍在)兜住,而不是运行时耦合。
+
 ## 四、越界项与收编计划
 
 两处越界都不改语义、只在 case01 侧,先按"记录 + 注释"处理,不急着推给 mavis:
@@ -106,7 +114,7 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
   跨角色消费随机顺序不确定。case01 侧 `random.seed(n)` 只能收敛,不能保证。
   对外不要说"可复现",只能说"同配置下稳定产出同量级结果"。
 - **`agent.action` 是 dict**:`AgentState.action` 落库是 `action.to_dict()`,
-  前端按字符串用会炸(已在 `vizkit.events.as_text()` 收敛)。记录里也按文本存。
+  前端按字符串用会炸(已在 `mavis_vizkit.events.as_text()` 收敛)。记录里也按文本存。
 - **23:00 后不发起对话**:必须显式注入按首节点日期起算的 `Timer`,否则运行成败取决于真实时间。
 
 ## 六、怎么快速核对有没有新增越界
