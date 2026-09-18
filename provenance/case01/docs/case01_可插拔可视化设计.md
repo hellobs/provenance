@@ -1,6 +1,9 @@
 # Case 01 可插拔可视化设计
 
-> 版本：v0.1（2026-09-17）· 范围：`case01/vizkit/` 与 `case01/viz.py`
+> 版本：v0.1（2026-09-17）· 更新（2026-09-18）。
+> 范围：`packages/mavis-vizkit`（独立包，本文件原说的是 `case01/vizkit/` 与 `case01/viz.py`，
+> 可视实现已在 2026-09-18 抽到独立包 `mavis_vizkit`；`case01/vizkit/` 只留 `live_run.py` 薄 CLI，
+> `case01/viz.py` 属已归档旧引擎）。
 > 目标：**一份数据、多种画法**——引擎/注入层只产生事件，可视化后端按插件接入。
 
 ## 1. 为什么要可插拔
@@ -34,31 +37,40 @@
 
 ## 3. 插件机制
 
-- `vizkit.Visualizer`：基类，`on_event(evt)` 处理事件流，`on_record(rec)` 可直接吃整份记录。
-- `vizkit.register(name, factory)` / `create(name, **kw)` / `names()`：注册表。
-- `vizkit.Fanout`：把事件广播给多个插件；**单个插件抛错会被隔离**，不影响引擎与其它插件。
-- `vizkit.replay`：回放驱动（可加 pacing），也能把事件写成 JSONL 交给外部播放器/服务。
+（可视化实现已抽到 `packages/mavis-vizkit`，以下均为 `mavis_vizkit` 的接口；case01 侧
+`case01/vizkit/__init__.py` 是只做 re-export 的兼容壳。）
+
+- `mavis_vizkit.Visualizer`：基类，`on_event(evt)` 处理事件流，`on_record(rec)` 可直接吃整份记录。
+- `mavis_vizkit.register(name, factory)` / `create(name, **kw)` / `names()`：注册表。
+- `mavis_vizkit.Fanout`：把事件广播给多个插件；**单个插件抛错会被隔离**，不影响引擎与其它插件。
+- `mavis_vizkit.replay`：回放驱动（可加 pacing），也能把事件写成 JSONL 交给外部播放器/服务。
 
 内置四个插件：
 
 1. `console`：收集/打印事件（默认，CI 与调试用）。
-2. `report`：把整份记录渲染成审查页（复用 `case01.viz`），输出静态 HTML。
+2. `report`：把整份记录渲染成审查页，输出静态 HTML。单页渲染回调（`page_fn`）与总览
+   回调（`index_fn`）由调用方注入，本插件不绑定任何业务渲染器（不再复用什么 `case01.viz`）。
 3. `town`：把事件翻译成**现有 Phaser 前端**可消费的消息，并处理：
-   - 角色贴图别名（`ROLE_TEXTURE_ALIAS`）：case01 的两个角色映射到小镇素材池里的已有贴图，
-     不新增美术资源；
-   - 坐标回退：老记录没有逐节点坐标时，用场景配置的初始坐标占位；
+   - 角色贴图别名（`alias`）：由调用方传入（case01 的两个角色映射到小镇素材池里的已有
+     贴图，不新增美术资源）；缺省会报错，不内置 `ROLE_TEXTURE_ALIAS` 之类的默认映射；
+   - 坐标回退：老记录没有逐节点坐标时，用 `scenario_dir`（调用方给）里场景配置的初始坐标占位；
    - 可选 JSONL 落盘，供离线播放/调试。
 4. `live`：**实时**推送（见 §6）——在本机起一个只读服务，直接复用现成小镇前端页面，
    运行中把事件边产生边广播给所有客户端。
 
 ## 4. 注入层怎么接
 
-`MavisBridge(..., visualizers=["town", "report"])`：
+`MavisBridge(..., visualizers=[town, report])`（`town` / `report` 是**插件实例**，不是名字字符串）：
 
 - 装配时把 `on_agent / on_step / on_story` 接到 mavis，并设置逐句对话回调；
 - 每个 agent 步骤都会把 `coord / action / location / currently` **落进节点记录**（`nodes[].agents`），
   因此小镇风格视图与后续任何位置相关视图都有数据；
 - 跑完调用 `bridge.close()` 让插件收尾（刷盘/关连接）。
+
+**带必传配置的插件只能用实例、不能用名字创建**：`town` 需要 `alias` / `scenario_dir`，
+`report` 需要 `page_fn` / `index_fn`。若写 `visualizers=["town", "report"]`，装配时会走
+`create("town")` / `create("report")`，缺参直接抛 ValueError。正确写法是先 `create(...)` 拿到
+实例再放进列表，如 `visualizers=[create("town", alias=..., scenario_dir=...), report_inst]`。
 
 不传 `visualizers` 时，行为与之前完全一致（不产生事件、不引入任何可视化依赖）。
 
@@ -66,11 +78,15 @@
 
 已可用：
 
-- **实时（小镇风格，推荐）**：`python -m case01.vizkit.live_run --branch B --port 5010`
+- 实时（小镇风格，推荐）：`python -m case01.vizkit.live_run --branch B --port 5010`
   → 浏览器打开 `http://127.0.0.1:5010/`，运行过程中角色移动、对话气泡、状态面板**实时**出现。
   这就是原来的 Phaser 前端（`frontend/templates/index.html` + `main_script.html`），**前端零改动**。
-- 审查页（离线）：`python -m case01.viz`（或 report 插件）→ `runs_html/viz/*.html`；
-- 回放文件（离线）：`python -m case01.vizkit.replay --record <run.json> --town out.jsonl`。
+  （`case01.vizkit.live_run` 是薄 CLI：roles / alias / scenario / 前端资源根由它传给 `mavis_vizkit` 的 live 插件。）
+- 审查页（离线）：report 插件需要调用方注入单页渲染回调（`page_fn`）与总览回调（`index_fn`），
+  无法只给一份 run 记录就自动生成——需由 case01 侧提供渲染回调后实例化（不再使用已归档的 `python -m case01.viz`）。
+- 回放文件（离线）：`python -m mavis_vizkit.replay --record <run.json> --town out.jsonl
+  --alias "Investment AI=AI Advisor,Ethan Lin=Mr. Zhou" --scenario-dir <case01 场景目录>`
+  （town 插件需要 `alias` 与 `scenario-dir`，缺省会报错；这两个参数放不进 `--record`，必须显式传）。
 
 ## 6. 实时插件（live）如何工作
 
@@ -80,7 +96,8 @@
 - 每步结束补发一份 `snapshot`（含两角色的 coord/action/location），因此刷新页面也能立刻有画面；
 - 每 5 秒一次 `ping`（与既有前端心跳一致）；
 - **角色贴图别名**：把 `/static/assets/village/agents/<角色>/` 挂载到已有角色目录
-  （Investment AI→AI Advisor，Ethan Lin→Mr. Zhou），不需要新增美术资源；
+  （case01 的 Investment AI→AI Advisor、Ethan Lin→Mr. Zhou）。别名表在 case01 侧由
+  `live_run` 注入（传给 `mavis_vizkit` 的 live/town 插件），插件不内置这份映射，不需要新增美术资源；
 - 服务未启动时事件进缓冲（`pending`），便于单测与无头运行，不丢语义。
 
 实测（2026-09-18，`--branch B --nodes 1`）：WS 客户端在运行过程中陆续收到
