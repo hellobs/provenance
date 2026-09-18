@@ -33,6 +33,16 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 (全部结构化记录 + 生成后的 Reflection / Router 结果)等文件。
 **专家端永远不直接读这些文件/JSON**,一律经由 API。
 
+### 1.1 端口归属与 5001 的边界(核对日期 2026-09-18)
+
+本契约只冻结 **5002**(`case01/serve.py`)的三个只读端点(§2)。**5001 不在本冻结契
+约内**:5001 是 `live_fastapi.py`(实时可视化服务,`live/routes.py` 承载路由)的默认
+端口,提供 `/embed/scene`、`/embed/goals`、`/embed/explain`、`/embed/timeline`、
+`/embed/reflections` 五个嵌入式面板,面向实时运行画面与治理面板,不是"已完成 Run
+的治理数据"的只读接口。**平台不应依赖 5001**;若要把它用于正式展示,需另行约定。
+其中 `/embed/reflections` 面板引擎侧自述为"反思标记 → LoRA 线数据入口",这只说明
+它能看到反思标记,不等于它是专家审核的数据源,别把这条写进平台契约。
+
 ## 2. 三个只读端点
 
 ### 2.1 `GET /api/runs` —— Run 索引
@@ -59,7 +69,27 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
   平台必须原样保留,任何专家修改不得覆盖它**);
 - `router`: `{ran, issues:[…]}` —— Router 拆分结果。每个 issue:
   `summary`(问题摘要,自然语言)、`field`(专业类别,用于匹配专家池)、
-  `risk`(Low / Medium / High)、`routing_reason`(路由理由);
+  `risk`(**小写** `low` / `medium` / `high`,平台侧比较时忽略大小写即可)、
+  `routing_reason`(路由理由);
+
+> 口径说明(`risk` 取值来源与核对日期 2026-09-18):六份已落盘记录
+> `demo-1` / `demo-2` / `demo-3`(旧引擎)与 `demo-A-mavis` / `demo-B-mavis` /
+> `demo-C-mavis` 的 `router.issues[].risk` 实测均为小写 `high` / `medium` / `low`
+> (见各 `runs/<run_id>/run.json`)。本契约以小写为准,平台侧勿按大写匹配。
+> **不要为了迁就本说明去改记录。**
+
+> **issue 主键口径(核对日期 2026-09-18):** `router.issues[].id` 是 **run 内序号**
+> (`issue-1` .. `issue-N`),跨 run 会重名——实测六份记录里每份都以 `issue-1` 起,
+> id 本身不带 run 前缀。因此平台侧建单/幂等的**主键必须是 `(run_id, issue_id)` 复合**:
+> 单独用 `issue_id` 会把"不同 run 各自的 issue-1"错配成同一条任务,
+> 造成同一条 Expert Review 建单重复、且跨 run 串数据。契约依此固定主键结构。
+
+> **顶层附加键(核对日期 2026-09-18):** 三条 mavis 样本(`demo-A-mavis` /
+> `demo-B-mavis` / `demo-C-mavis`)的 `run.json` 顶层比本文其它节多出三个键——
+> `summary`(运行统计:节点数/交互/耗时)、`injector`(injector 状态机内部结构)、
+> `compat`(兼容性检查结果)。这三个都是引擎侧**内部附加键,平台不读**。
+> 其中 `injector` 段含 Branch 实验元信息与逐节点 dialogue **原文,属于实验元数据,
+> 不得进专家面向的任何展示**(与 §2.3 的信息边界同一约束)。
 - `audit`: 该 Run 世界侧动作时间线(释放事件 / 买卖 / 状态推进),
   每条含 `t`(日期)、`action`、`kind`、`summary` 等——可作追溯链素材;
 - 另含 `n_turns`、`n_events`、`final_feedback_date` 等计数/线索字段。

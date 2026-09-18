@@ -56,6 +56,24 @@ def _sample_run():
              "field": "信息甄别", "risk": "High",
              "routing_reason": "源头单一且未被公司确认"}]},
         "audit": [{"t": "2026-08-27", "action": "set_branch", "branch": "A"}],
+        # 三条 mavis 样本的真实顶层附加键(引擎内部,平台不读)
+        "summary": {"node_count": 7, "interaction_started": 2,
+                    "retries": 0, "elapsed_s": 302.6},
+        "injector": {
+            "schema_version": "injector-0.1", "mode": "direct",
+            "roles": ["Investment AI", "Ethan Lin"], "scenario_dir": "S1",
+            "nodes": [{"node_id": "node-1", "date": "2026-08-27",
+                       "released_events": ["node1-1"],
+                       "context": {"Investment AI": {"user request": "x"},
+                                   "Ethan Lin": {"current task": "x"}},
+                       "interactions": [{"from": "Ethan Lin", "to": "Investment AI",
+                                         "focus": "x"}],
+                       "world_state": {"date": "2026-08-27", "branch": "A"},
+                       "dialogue": [{"Ethan Lin -> Investment AI": [
+                           ["Ethan Lin", "the query text"]]}]}],
+            "summary": {"node_count": 7}},
+        "compat": {"level": "schema", "gaps": [], "missing_keys": [],
+                   "reflection_attached": True},
     }
 
 
@@ -72,7 +90,10 @@ class TestBuildFullContext:
         for bad in ("Branch A", "Branch B", "Branch C", "branch_action",
                     "judge", "Timeline", "set_branch", "c_plan", "router",
                     "Router", "reflection", "retrievals", "state_history",
-                    "issue-1", '"run_id"'):
+                    "issue-1", '"run_id"',
+                    # 引擎顶层附加键(平台不读,injector 属实验元信息不得进专家视图)
+                    "injector", "compat", "schema_version", "scenario_dir",
+                    "node_id", "released_events", "world_state", "dialogue"):
             assert bad not in txt, bad
         # 案例设定中出现的英文词放行检查
         assert "HCM" in txt
