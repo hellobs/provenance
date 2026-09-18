@@ -35,7 +35,9 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 
 - `Simulator(...)` 全部构造参数,其中 case01 实际用到:
   `external_state=`、`interaction_request=`、`on_agent=`、`on_step=`、`on_story=`、
-  `max_workers=`、`export_decisions=`
+  `max_workers=`、`export_decisions=`、`plugins=`(插件面存在时,把 `VizForwarder`
+  适配器挂进 Simulator 插件管理)
+- `Simulator.plugin_teardown()`(插件面路径的收尾:`close()` 用它退订对话订阅并 teardown)
 - `Simulator.simulate(game, config, step, stride=, start_step=)`
 - `Simulator.story`(写:只放当前节点事件)、`Simulator.interactions`(读:交互审计)
 - `Simulator.register_condition("<type>")` 与 `Simulator.CONDITION_CHECKERS`
@@ -52,38 +54,61 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 
 进程级
 
-- `mavisframework.core.agent_core.chat_callback`(实时可视化逐句回调)
+- `mavisframework.core.agent_core.chat_callback`(实时可视化逐句回调;**仅插件面不存在时**
+  的回退路径才直接赋值,见第三节;插件面存在时不再覆盖它)
+- `mavisframework.plugin.Plugin`(适配器 `case01/injector/viz_plugin.py` 继承它;
+  **可选依赖**,特性探测不到就不加载,见第三节)
 
 ## 三、当前触点清单(实际在用,含越界项)
 
+> 行号核对日期:2026-09-18。bridge.py 因阶段 1/2/3 变长,行号会随文件变长漂移;
+> 若下方行号与代码对不上,说明本清单已过期,需重新机械核对一遍再更新核对日期。
+
 `case01/injector/bridge.py`
 
-- 217 `game.reset_game()` —— 白名单内,但**语义上是个坑**:provider 在 `Agent.reset()`
+- 252 `_plugin_surface_available()` —— bridge 自己的特性探测;要求 mavis 三个要件齐备
+  (`mavisframework.plugin` 可导入 + `agent_core.subscribe_chat_line` + `Simulator` 签名含
+  `plugins=`),否则 case01 走回退路径。只读不动框架。
+- 251 `game.reset_game()` —— 白名单内,但**语义上是个坑**:provider 在 `Agent.reset()`
   里惰性创建,构造完不调一次就报"缺少可用 LLM"。已在 `tutorial-extension.md` §5 记为
   已知行为。
-- 231–233 `agent_core.chat_callback = ...` —— 白名单内的进程级钩子;
-  注意它是**全局单例**,同进程只能有一个消费者(与 provenance 实时服务共用时要协调)。
-- 248 `simulator.story = [...]` —— 白名单内(只放当前节点事件,隔离验证的基础)。
-- 279–282 `game.agents` / `game.get_agent(...).coord` —— 白名单内(只读)。
-- 286 `agent.schedule.daily_schedule` —— **越界(半公开)**:读了 `schedule` 子对象的
+- 288 `agent_core.chat_callback = ...` —— **仅回退路径**(插件面不存在,即 mavis main)
+  才直接赋值全局钩子;`close()`(458/459)`==` 比较后清回。插件面存在时对话经
+  `Simulator(plugins=[VizForwarder])` 自动订阅走插件总线,**不覆盖**全局 `chat_callback`,
+  多消费者经 `agent_core.subscribe_chat_line` 共存。
+- 271/275 `Simulator(..., plugins=[adapter])` —— 插件面路径:把 case01 侧适配器
+  `viz_plugin.VizForwarder` 挂进 Simulator 插件管理,由 simulate 首次触发 setup/订阅。
+- 451 `simulator.plugin_teardown()` —— `close()` 插件面收尾:退订对话订阅 + teardown 适配器。
+- 302 `simulator.story = [...]` —— 白名单内(只放当前节点事件,隔离验证的基础)。
+- 340 `game.get_agent(...).coord` —— 白名单内(只读)。
+- 347 `agent.schedule.daily_schedule` —— **越界(半公开)**:读了 `schedule` 子对象的
   内部字段,只为判断"日程是否已生成"。
-- 293 `agent.move(...)`、287 `agent.make_schedule()` —— 白名单内。
-- 297 `agent.path = []` —— **越界(内部状态直写)**:mavis 的对话前置条件看运行时
+- 348 `agent.make_schedule()`、354 `agent.move(...)` —— 白名单内。
+- 359 `agent.path = []` —— **越界(内部状态直写)**:mavis 的对话前置条件看运行时
   `path`,清空路径只能用这种方式。
-- 373/378 `simulator.interactions` —— 白名单内(读交互审计,判断关键交互是否发生)。
-- 374 `simulator.simulate(...)` —— 白名单内(case01 自己控制轮次与 stride)。
-
-`case01/tools/isolation_probe.py`(仅验证工具,不参与正式运行)
-
-- 67–77 `agent.associate.memory` / `associate._index.find_node(...)` —— **越界(私有)**:
-  为了拿"全量事件记忆"(公开的 `retrieve_events()` 会被 `retention=8` 截断),
-  探针直接读了联想记忆的索引。
-- 96 `agent.associate.retrieve_events(text=...)` —— 白名单内的公开读侧。
+- 466/467 `simulator.interactions` / `simulator.simulate(...)` —— 白名单内(读交互审计,
+  判断关键交互是否发生;case01 自己控制轮次与 stride)。
 
 `case01/injector/conditions.py`
 
-- 15–20 `Simulator.register_condition("case01_node")` —— 白名单内;框架不带业务条件类型,
-  由 case01 在自己进程里注册。
+- 15/17 `Simulator.register_condition("case01_node")`(import 在 15,注册在 17) —— 白名单内;
+  框架不带业务条件类型,由 case01 在自己进程里注册。
+
+`case01/tools/isolation_probe.py`(仅验证工具,不参与正式运行)
+
+- 74 `agent.associate.memory` / 83 `associate._index.find_node(...)` —— **越界(私有)**:
+  为了拿"全量事件记忆"(公开的 `retrieve_events()` 会被 `retention=8` 截断),
+  探针直接读了联想记忆的索引。
+- 102 `agent.associate.retrieve_events(text=...)` —— 白名单内的公开读侧。
+
+测试专用触点(仅测试,不参与正式运行)
+
+- `case01/tests/test_viz_plugin_wiring.py` 里的
+  `agent_core.subscribe_chat_line` / `agent_core.unsubscribe_chat_line` /
+  `agent_core._emit_chat_line` —— 只有测试文件直接调用,正式运行不经它们;
+  `_emit_chat_line` 是 mavis 侧的单一分发点,验证"多消费者共存、单订阅者抛错隔离、
+  退订干净、真实订阅链路"时使用。生产路径下,case01 的对话订阅由 Simulator
+  自动挂到 `agent_core`,case01 侧代码不直接调这三个。
 
 可视化(`packages/mavis-vizkit`)
 
@@ -97,10 +122,10 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 
 两处越界都不改语义、只在 case01 侧,先按"记录 + 注释"处理,不急着推给 mavis:
 
-1. `agent.schedule.daily_schedule`(bridge 286):改为**不读内部字段**——
+1. `agent.schedule.daily_schedule`(bridge 347):改为**不读内部字段**——
    直接调 `agent.make_schedule()` 让 mavis 自己判断是否需要生成(重复调用应由框架幂等),
    或改用公开的日程读取方法(若后续补上)。
-2. `agent.path = []`(bridge 297):与 `agent.move(coord, [])` 语义重叠,先确认
+2. `agent.path = []`(bridge 359):与 `agent.move(coord, [])` 语义重叠,先确认
    `move(coord, [])` 是否已经清空路径;若已清空就删掉这行。
 3. 探针的 `associate.memory` / `_index`:属于**验证工具**的取证需要。要么向 mavis 提一个
    通用只读方法(例如"导出全部事件记忆"),要么在文档里写明"探针允许越界,但结论必须

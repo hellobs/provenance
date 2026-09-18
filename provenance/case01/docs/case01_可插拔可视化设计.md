@@ -30,15 +30,29 @@
 
 两条来源都归一到这套事件：
 
-- **在线**：mavis `Simulator` 的 `on_agent / on_step / on_story` 回调，加上 `agent_core.chat_callback`
-  的逐句对话（provenance live 也是这么接的）；
+- **在线**：有两条路，都由 case01 侧的薄适配器 `case01/injector/viz_plugin.py`
+  （`VizForwarder`）把落地端统一接到本包。(a) 插件面存在时——`on_agent`/`on_step` 回调
+  （负责记录侧与 time/snapshot，由 `MavisBridge._viz_on_agent/_viz_on_step` 接），加上经
+  适配器从 mavis 插件总线转发的 `agent`/`story`/`chat_line`（多消费者经
+  `agent_core.subscribe_chat_line` 共存）；(b) 插件面不存在时——回退到 `on_story` 回调
+  加全局 `chat_callback`，收尾清回。（provenance live 也是这么接的）；
 - **离线**：一份 run 记录 → `events_from_record()`。同时兼容两种布局：
   bridge 原始记录（顶层 `nodes`）与映射后的 `run.json`（节点在 `injector.nodes`）。
 
 ## 3. 插件机制
 
-（可视化实现已抽到 `packages/mavis-vizkit`，以下均为 `mavis_vizkit` 的接口；case01 侧
-`case01/vizkit/__init__.py` 是只做 re-export 的兼容壳。）
+本设计里"插件"有**两层**，不要把两者混为一谈：
+
+1. **mavis 的通用插件面**（`mavisframework/plugin.py` 的 `Plugin` / `PluginManager`）：
+  框架提供、与可视化无关；case01 的薄适配器 `VizForwarder` 是 `Plugin` 的子类，
+  挂在它上面把插件总线事件接进本包的实时侧。特性探测不到该面时（适配器不加载）
+  回退到旧回调写法（见 §2 在线来源的路径 b）。
+2. **mavis-vizkit 的可视化插件**（本包内 `Visualizer` / `Fanout`）：可视化后端；
+  适配器把总线事件转给它，它是两层之间**唯一的桥**。mavis-vizkit 仍**零 mavis
+  依赖**（运行时不 import mavisframework），只消费事件字典的键名。
+
+可视化实现已抽到 `packages/mavis-vizkit`，以下为这一层的接口；case01 侧
+`case01/vizkit/__init__.py` 是只做 re-export 的兼容壳。
 
 - `mavis_vizkit.Visualizer`：基类，`on_event(evt)` 处理事件流，`on_record(rec)` 可直接吃整份记录。
 - `mavis_vizkit.register(name, factory)` / `create(name, **kw)` / `names()`：注册表。
