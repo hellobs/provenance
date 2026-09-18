@@ -63,10 +63,15 @@ class ProbeBridge(MavisBridge):
         不能用 `retrieve_events()`:它按 `retention`(默认 8 条)截断,
         窗口外的剧情条目会被漏掉,审计就不是全量。这里直接按记忆索引取。
         失败时退回 `retrieve_events()`(窗口视图,弱一些但不会中断审计)。
+
+        [越界] `associate.memory` 与 `associate._index` 是私有成员,不属于 mavis 的
+        公开扩展面(见 `docs/case01_触点白名单.md` 第三、四节)。仅本验证工具使用,
+        不参与正式运行;收编计划:向 mavis 提一个通用的"导出全部事件记忆"只读方法,
+        或在公开检索侧复现同样结论(当前结论已有公开侧证据:60 次主动检索 0 泄漏)。
         """
         assoc = agent.associate
         try:
-            ids = list((assoc.memory or {}).get("event") or [])
+            ids = list((assoc.memory or {}).get("event") or [])   # [越界] 私有
         except Exception:
             return list(assoc.retrieve_events() or [])
         if not ids:
@@ -74,6 +79,7 @@ class ProbeBridge(MavisBridge):
         out = []
         for node_id in ids:
             try:
+                # [越界] _index 私有;见本方法 docstring 的收编计划
                 out.append(assoc.to_concept(assoc._index.find_node(node_id)))
             except Exception:
                 continue

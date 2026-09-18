@@ -8,6 +8,11 @@
 - 1 个节点 = 1 步;关键节点若未发生交互,在节点内重试(上限 max_retries)。
 
 dry_run=True 时完全不 import mavisframework（dry-run 与 CI 使用）。
+
+接入边界:case01 只依赖 mavis 的**公开扩展面**(见 mavis `docs/tutorial-extension.md`),
+越界处在本文件里都有 `[越界]` 注释并登记在 `docs/case01_触点白名单.md`;
+mavis 侧对应的契约测试是 `tests/test_extension_surface.py`。
+新增需求按白名单第一节的顺序办:配置 → 既有扩展点 → case01 自己解决 → 才提新扩展点。
 """
 import datetime
 import json
@@ -214,6 +219,7 @@ class MavisBridge:
         self.game = Game(self.run_id, scenario, config, {},
                          timer=timer, governance=None, consequence_fn=None)
         # mavis 的 LLM provider 在 Agent.reset() 里惰性创建,必须显式初始化一次
+        # (已知行为,见 mavis docs/tutorial-extension.md §5;不是绕框架)
         self.game.reset_game()
         self.simulator = Simulator(
             max_workers=max(1, len(self.roles)),
@@ -227,7 +233,8 @@ class MavisBridge:
         if self._fanout is not None:
             from ..vizkit.events import init_event
 
-            # 对话逐句回调是 mavis 的模块级钩子(provenance live 同样这么接)
+            # 对话逐句回调是 mavis 的模块级钩子(provenance live 同样这么接);
+            # 注意它是进程级全局单例,同进程只能有一个消费者(见触点白名单第三节)
             import mavisframework.core.agent_core as _fw_agent
 
             _fw_agent.chat_callback = self._viz_on_chat_line
@@ -272,6 +279,12 @@ class MavisBridge:
 
         mavis 的对话前置条件看的是运行时状态（agent.path / agent.action / daily_schedule）,
         只改 config 不够;这里用既有公开方法（move / make_schedule）把状态摆好,不改框架。
+
+        越界声明（见 `docs/case01_触点白名单.md` 第三、四节）:下面两处碰了 mavis 的
+        半公开/内部状态,暂留并已登记收编计划:
+        - 读 `agent.schedule.daily_schedule` 只为判断"日程是否已生成";
+        - 直写 `agent.path = []`,因为清空运行时路径没有公开入口。
+        两处都只影响 case01 自己的进程,不改 mavis 语义;收编放到 mavis 下次动扩展面时。
         """
         coord = self.meeting_coord
         if coord is None and self.roles:
@@ -283,6 +296,7 @@ class MavisBridge:
             if agent is None:
                 continue
             try:
+                # [越界·半公开] schedule.daily_schedule 是子对象内部字段
                 if len(getattr(agent.schedule, "daily_schedule", []) or []) < 1:
                     agent.make_schedule()
             except Exception as e:      # 日程生成失败不阻塞(下一步会再试)
@@ -294,6 +308,7 @@ class MavisBridge:
                 except Exception as e:
                     self.game.logger.warning(
                         "pin: move failed for {}: {}".format(name, e))
+            # [越界·内部状态] 清空运行时路径:没有公开入口,只能直写
             agent.path = []
             cfg = self.config.get("agents", {}).get(name)
             if cfg is not None and coord is not None:
