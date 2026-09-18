@@ -24,15 +24,18 @@ Provenance (platform, this repo)
 
 The platform and the engine are separated: **mavisframework** lives in
 [hellobs/mavis](https://github.com/hellobs/mavis); this platform depends on it
-via `mavisframework==1.1.0` in `requirements.txt`. The role configuration tool
+via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. The role configuration tool
 (config_tool) also belongs to the engine repo.
 
 ## 2. Environment & Engine Setup
 
-The platform depends on `mavisframework==1.1.0` (not on PyPI; built from
-source). Do not downgrade to 1.0.0: its published artifact predates the three
-case01 injection hooks (`external_state` / `interaction_request` /
-`role_directive`) and constructing `Simulator` with them raises `TypeError`.
+The platform depends on `mavisframework>=1.2.0,<2.0.0` (not on PyPI; built from
+source). Do not go below 1.2.0: 1.0.0 predates the three case01 injection hooks
+(`external_state` / `interaction_request` / `role_directive`) and constructing
+`Simulator` with them raises `TypeError`, while 1.1.0 predates the generic plugin
+surface (`mavisframework.plugin`, `Simulator(plugins=)`,
+`agent_core.subscribe_chat_line`). CI asserts that surface is present, via
+`tools/check_engine_baseline.py`, before running any test.
 Execute in order:
 
 ```bash
@@ -42,19 +45,19 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 #   or SSH (requires a configured SSH key added to your GitHub account):
 # git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # produces dist/mavisframework-1.1.0-py3-none-any.whl
+uv build                              # produces dist/mavisframework-1.2.0-py3-none-any.whl
 cd ../provenance
 
 # 2.2 Create the environment and install dependencies (uv or conda)
 # uv
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.1.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
-pip install ../mavis/dist/mavisframework-1.1.0-py3-none-any.whl
+pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 

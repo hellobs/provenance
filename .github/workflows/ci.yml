@@ -36,6 +36,13 @@ jobs:
         run: |
           pip install -r provenance/requirements.txt pytest
 
+      - name: Assert engine baseline exposes plugin surface
+        # 决策材料 §3 要求的前置断言:依赖装好后、任何测试之前先验"基线上确实有插件面"。
+        # 若容器错装到 <=1.1.0 的旧制品,这里先红,而不是让 case01 的特性探测静默回退、
+        # 测试"照样通过"。脚本同时打印 mavisframework.__file__,便于排查"从工作树源码装的"。
+        run: |
+          python tools/check_engine_baseline.py
+
       - name: Backend API + page render tests
         run: |
           python -m pytest tests -v

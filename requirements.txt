@@ -1,7 +1,7 @@
 # Provenance 平台运行依赖(Python 3.12)
 # 本文件是"单源指针"：真实依赖以内层 provenance/requirements.txt 为准。
 # 原因：README 的安装流程在仓库根执行 pip install -r requirements.txt（cwd 命中本文件），
-# 内层才是 mavisframework==1.1.0 + mavis-vizkit==0.1.0 的正确版本。
-# 若在此直接写旧 pin(mavisframework==1.0.0) 会顶掉刚装好的 1.1.0 且解析失败，
+# 内层才是 mavisframework>=1.2.0,<2.0.0 + mavis-vizkit==0.1.0 的正确版本。
+# 若在此直接写旧 pin(如 mavisframework==1.1.0) 会顶掉刚装好的源码版且解析失败，
 # 也会漏装 mavis-vizkit。保持此文件仅含一行嵌套引用，避免漂移。
 -r provenance/requirements.txt

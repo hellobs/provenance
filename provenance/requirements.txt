@@ -1,11 +1,16 @@
 # Provenance 平台运行依赖(Python 3.12)
 # 框架:mavisframework(独立仓库 hellobs/mavis)
-#   1.1.0 起含 case01 需要的三处注入钩子(external_state / interaction_request /
-#   role_directive)。1.0.0 的已发布制品不含钩子,装了会在构造 Simulator 时
-#   TypeError,所以不要退回 1.0.0。
+#   >=1.2.0 起含 case01 需要的全部扩展点:三处注入钩子(external_state /
+#   interaction_request / role_directive)与通用插件面(mavisframework.plugin、
+#   Simulator(plugins=)、agent_core.subscribe_chat_line)。
+#   1.1.0 的制品不含插件面;1.0.0 连钩子都不含,装了会在构造 Simulator 时
+#   TypeError。所以下界必须是 1.2.0。
 #   本仓不发布到 PyPI:先在 mavis 仓构建 wheel 再安装
-#   (mavis main 的 1.1.0 提交为 ca0af12;dist/ 不入库,需自行 python -m build)。
-mavisframework==1.1.0
+#   (mavis main 的 1.2.0 提交为 55e7be9,tag v1.2.0;dist/ 不入库,需自行 python -m build)。
+# 写法用"下界 1.2.0 + 上界 <2.0.0":CI 以 git clone --depth 1 ... main 装框架,
+# main 是移动目标,写死 == 会在 mavis 每次次版本 bump 时把 CI 误打红(那种红不代表缺陷);
+# "基线至少含插件面"这件事由 tools/check_engine_baseline.py 的能力断言独立保证。
+mavisframework>=1.2.0,<2.0.0
 
 # 可视化插件集(独立包,见 packages/mavis-vizkit;editable 安装,只消费事件字典契约)
 # 本仓不发布到 PyPI:先 pip install -e packages/mavis-vizkit(CI 亦如此)。
