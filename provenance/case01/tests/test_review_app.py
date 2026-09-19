@@ -84,6 +84,44 @@ def test_old_engine_run_has_no_injector_section():
     assert d["turns"] and d["router"]["issues"] and d["reflection"]["text"]
 
 
+def test_runs_list_marks_engine():
+    """列表摘要要标出引擎归属:mavis(成品)/ legacy(旧引擎对照)。
+
+    面板靠它把默认值落在成品三线上,并给旧记录标"无 injector 段";
+    只凭 run_id 猜(比如看名字里有没有 -mavis)不够稳。
+    """
+    by = {x["run_id"]: x for x in _client().get("/api/review/runs").json()["runs"]}
+    assert by[MAVIS_RUN]["engine"] == "mavis"
+    assert by[OLD_RUN]["engine"] == "legacy"
+
+
+def test_both_retrieval_shapes_are_reachable():
+    """两种检索形态都要能在 API 里取到(面板据此分别渲染)。
+
+    mavis(成品): date / mode / query / injected[]
+    旧引擎对照:  current_date / query / hits[] / source_stats
+    2026-09-19 首版面板只认前一套,旧记录的命中明细(hits/source_stats)被整个丢掉。
+    """
+    mavis = _client().get("/api/review/run/{}".format(MAVIS_RUN)).json()["retrievals"][0]
+    assert "injected" in mavis and "date" in mavis and "mode" in mavis
+    assert "hits" not in mavis
+
+    legacy = _client().get("/api/review/run/{}".format(OLD_RUN)).json()["retrievals"][0]
+    assert "hits" in legacy and legacy["hits"], "旧记录必须有 hits 明细"
+    assert "current_date" in legacy and "source_stats" in legacy
+    assert "injected" not in legacy
+    # 命中元素要有可渲染的字段(面板直接读这几个)
+    for key in ("time", "source", "type", "title", "score"):
+        assert key in legacy["hits"][0], key
+
+
+def test_legacy_run_lacks_injector_and_summary():
+    """旧引擎记录没有 injector/summary/compat——面板据此分段渲染,不能渲染成 0/空。"""
+    d = _client().get("/api/review/run/{}".format(OLD_RUN)).json()
+    for absent in ("injector", "summary", "compat"):
+        assert absent not in d, absent
+
+
 def test_index_page_is_self_contained():
     html = _client().get("/").text
     assert "<script>" in html

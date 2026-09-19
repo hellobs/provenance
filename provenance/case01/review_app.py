@@ -57,6 +57,9 @@ def _brief(run_id):
     router = data.get("router") or {}
     return {
         "run_id": run_id,
+        # 引擎归属:mavis 路径的记录有 injector 段;旧引擎(archive d41cdec)没有。
+        # 面板要靠它分组与选默认值,不能只靠 run_id 猜。
+        "engine": "mavis" if "injector" in data else "legacy",
         "branch": data.get("branch", ""),
         "branch_summary": data.get("branch_summary", ""),
         "start_date": data.get("start_date", ""),
@@ -167,7 +170,7 @@ const TABS = [
   ["states",     "状态",     d => (d.state_history || []).length],
   ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0)],
   ["router",     "问题分流", d => ((d.router || {}).issues || []).length],
-  ["injector",   "注入器",   d => (((d.injector || {}).nodes) || []).length],
+  ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null],
   ["audit",      "审计",     d => (d.audit || []).length],
 ];
 let DATA = null, TAB = "overview";
@@ -191,35 +194,50 @@ function renderNav() {
 }
 
 function paneOverview(d) {
+  // 旧引擎记录(archive d41cdec)没有 injector / summary / compat 段。
+  // 之前这里无条件读它们,于是把"没有这一段"渲染成 mode= · schema= 与"节点 0 个"——
+  // 那是谎报。现在按有没有 injector 分段渲染,并明说旧引擎缺哪一段。
+  const hasInj = ("injector" in d);
   const s = d.summary || {}, inj = d.injector || {}, ba = d.branch_action || {}, cp = d.compat || {};
   const fb = d.final_feedback || {};
   const nodes = inj.nodes || [];
   const released = nodes.reduce((a, n) => a + ((n.released_events || []).length), 0);
   const allEvents = nodes.reduce((a, n) => a + ((n.events || []).length), 0);
+  const dash = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
+  const rows = [
+    ["run_id", esc(d.run_id)],
+    ["引擎记录", hasInj
+      ? '<span class="chip k">mavis（成品三线）</span>'
+      : '<span class="chip">旧引擎（对照）· 无 injector 段</span>'],
+    ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
+    ["日期区间", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
+    ["判定方式", dash(ba.judge)],
+  ];
+  if (hasInj) {
+    rows.push(["注入器", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / ")) || "—"}`]);
+    rows.push(["节点", `<span class="num">${dash(s.node_count)} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</span>`]);
+    rows.push(["交互", `<span class="num">interaction_started ${dash(s.interaction_started)} · 重试 ${dash(s.retries)} · 耗时 ${dash(s.elapsed_s)} 秒</span>`]);
+  } else {
+    rows.push(["节点 / 注入器", '该记录早于 mavis 路径，<b>没有 <code>injector</code> 与 <code>summary</code> 段</b>；不是"0 个节点"']);
+  }
+  if ("compat" in d) {
+    rows.push(["记录完整度", `compat.level=${dash(cp.level)} · 缺键 ${((cp.missing_keys || []).length)} 个 · 反思已附 ${esc(cp.reflection_attached)}`]);
+  }
   return `
   <div class="card"><h2>这一次运行</h2>
-    <div class="kv">
-      <div class="k">run_id</div><div>${esc(d.run_id)}</div>
-      <div class="k">branch</div><div><span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}</div>
-      <div class="k">日期区间</div><div class="num">${esc(d.start_date)} → ${esc(d.end_date)}</div>
-      <div class="k">判定方式</div><div>${esc(ba.judge || "")}</div>
-      <div class="k">注入器</div><div>mode=${esc(inj.mode)} · schema=${esc(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / "))}</div>
-      <div class="k">节点</div><div class="num">${s.node_count || 0} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</div>
-      <div class="k">交互</div><div class="num">interaction_started ${s.interaction_started || 0} · 重试 ${s.retries || 0} · 耗时 ${s.elapsed_s || 0} 秒</div>
-      <div class="k">记录完整度</div><div>compat.level=${esc(cp.level)} · 缺键 ${((cp.missing_keys || []).length)} 个 · 反思已附 ${esc(cp.reflection_attached)}</div>
-    </div>
+    <div class="kv">${rows.map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join("")}</div>
   </div>
   <div class="card"><h2>最终反馈（${esc(fb.date || "")}）</h2>
     <div class="m"><b>咨询者</b></div><div class="t">${esc(fb.ethan)}</div>
     <div class="m" style="margin-top:10px"><b>Investment AI</b></div><div class="t">${esc(fb.ai)}</div>
-  </div>
+  </div>` + (nodes.length ? `
   <div class="card"><h2>各节点释放量</h2>
     ${nodes.map(n => {
       const rel = (n.released_events || []).length, tot = (n.events || []).length || 1;
       return `<div style="margin-bottom:8px"><div class="m num">${esc(n.node_id)} · ${esc(n.date)} · step ${esc(n.step)} —— 释放 ${rel}/${tot}</div>
         <div class="bar"><i style="width:${Math.round(rel / tot * 100)}%"></i></div></div>`;
-    }).join("") || '<div class="empty">无节点</div>'}
-  </div>`;
+    }).join("")}
+  </div>` : "");
 }
 
 function paneTurns(d) {
@@ -232,14 +250,37 @@ function paneTurns(d) {
 }
 
 function paneRetrievals(d) {
+  // 两种记录形态都要认:
+  //   mavis(成品): {date, mode, query, injected:[{kind,source,summary}]}
+  //   旧引擎对照:  {current_date, query, hits:[{id,score,source,type,time,title}], source_stats}
+  // 之前只读 mavis 那一套,旧记录的命中明细(hits/source_stats)被整个丢掉。
   const r = d.retrievals || [];
   if (!r.length) return '<div class="card"><div class="empty">无检索</div></div>';
-  return r.map((x, i) => `<div class="card">
-    <div class="m">#${i + 1} · ${esc(x.date)} · mode=${esc(x.mode)}</div>
-    <div class="t"><b>查询：</b>${esc(x.query)}</div>
-    <div style="margin-top:8px">${(x.injected || []).map(f => `<div style="margin-bottom:6px">
-      <span class="chip k">${esc(f.kind)}</span> <span class="t">${esc(f.summary)}</span></div>`).join("")}</div>
-  </div>`).join("");
+  const dash = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
+  return r.map((x, i) => {
+    const date = x.date || x.current_date || "";
+    const head = [`#${i + 1}`];
+    if (date) head.push(esc(date));
+    if (x.mode) head.push("mode=" + esc(x.mode));
+    let body;
+    if (Array.isArray(x.injected)) {
+      body = x.injected.length
+        ? x.injected.map(f => `<div style="margin-bottom:6px"><span class="chip k">${esc(f.kind)}</span> <span class="t">${esc(f.summary)}</span>${f.source ? ` <span class="chip">${esc(f.source)}</span>` : ""}</div>`).join("")
+        : '<div class="m">该日 <b>未注入任何事实</b>（injected 为空——这是记录内容，不是面板读不到）</div>';
+    } else if (Array.isArray(x.hits)) {
+      const st = x.source_stats || {};
+      body = `<div class="m">旧引擎形态：命中 ${x.hits.length} 条 · 来源 ${dash(st.n_sources)} 个 · 其中二手 ${dash(st.second_hand_count)} 条</div>
+        <table><thead><tr><th>时间</th><th>来源</th><th>类型</th><th>标题</th><th>相关分</th></tr></thead>
+        <tbody>${x.hits.map(h => `<tr><td class="num">${esc(h.time)}</td><td>${esc(h.source)}</td>
+          <td>${esc(h.type)}</td><td>${esc(h.title)}</td><td class="num">${esc(h.score)}</td></tr>`).join("")}</tbody></table>`;
+    } else {
+      body = '<div class="m">该记录未存检索明细</div>';
+    }
+    return `<div class="card">
+      <div class="m">${head.join(" · ")}</div>
+      <div class="t"><b>查询：</b>${esc(x.query)}</div>
+      <div style="margin-top:8px">${body}</div></div>`;
+  }).join("");
 }
 
 function paneEvents(d) {
@@ -253,12 +294,14 @@ function paneEvents(d) {
 function paneStates(d) {
   const h = d.state_history || [];
   if (!h.length) return '<div class="card"><div class="empty">无状态历史</div></div>';
+  // 空数值渲染成 "—" 而不是留白:留白看着像面板坏了,实际是"那天没有这个值"。
+  const cell = v => (v === undefined || v === null || v === "") ? '<span style="color:#bbb">—</span>' : esc(v);
   return `<div class="card"><table><thead><tr>
     <th>日期</th><th>现金(元)</th><th>持 HCM</th><th>仓位</th><th>买入价</th><th>卖出价</th><th>已退出</th>
   </tr></thead><tbody>${h.map(x => { const s = x.state || {}; return `<tr>
-    <td class="num">${esc(s.date || x.date)}</td><td class="num">${esc(s.cash_rmb)}</td>
-    <td>${s.hcm_shares ? "是" : "否"}</td><td class="num">${esc(s.held_fraction)}</td>
-    <td class="num">${esc(s.entry_price_usd)}</td><td class="num">${esc(s.exit_price_usd)}</td>
+    <td class="num">${cell(s.date || x.date)}</td><td class="num">${cell(s.cash_rmb)}</td>
+    <td>${s.hcm_shares ? "是" : "否"}</td><td class="num">${cell(s.held_fraction)}</td>
+    <td class="num">${cell(s.entry_price_usd)}</td><td class="num">${cell(s.exit_price_usd)}</td>
     <td>${s.exited ? "是" : "否"}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 
@@ -323,8 +366,11 @@ function render() {
     : '<div class="card"><div class="empty">选择一次运行</div></div>';
   if (DATA) {
     const s = DATA.summary || {};
+    const isMavis = ("injector" in DATA);
+    const eng = isMavis ? "mavis" : "旧引擎（无 injector 段）";
+    const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
     document.getElementById("hmeta").innerHTML =
-      `${esc(DATA.run_id)} · branch ${esc(DATA.branch)} · ${s.node_count || 0} 节点 · ${s.elapsed_s || 0} 秒　` +
+      `${esc(DATA.run_id)} · ${esc(eng)} · branch ${esc(DATA.branch)} · ${tail}　` +
       `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`;
   }
 }
@@ -339,11 +385,15 @@ async function boot() {
   const r = await fetch("/api/review/runs");
   const d = await r.json();
   const sel = document.getElementById("pick");
+  const tag = x => x.engine === "mavis" ? "mavis" : "旧引擎";
   sel.innerHTML = d.runs.map(x =>
-    `<option value="${esc(x.run_id)}">${esc(x.run_id)} — ${esc(x.branch || "")} ${esc((x.branch_summary || "").slice(0, 18))}</option>`).join("");
+    `<option value="${esc(x.run_id)}">${esc(tag(x))} · ${esc(x.run_id)} — ${esc(x.branch || "")} ${esc((x.branch_summary || "").slice(0, 16))}</option>`).join("");
   sel.onchange = () => pick(sel.value);
-  if (d.runs.length) { await pick(d.runs[0].run_id); }
-  else { document.getElementById("main").innerHTML = '<div class="card"><div class="empty">case01/runs 下没有 run.json</div></div>'; }
+  // 默认落在成品三线(mavis)上,不要落在旧引擎对照记录上——
+  // 否则一打开看到的就是"注入器:无注入器记录"那条,最容易让人以为面板坏了。
+  const first = d.runs.find(x => x.engine === "mavis") || d.runs[0];
+  if (first) { await pick(first.run_id); }
+  else { document.getElementById("main").innerHTML = '<div class="card"><div class="empty">记录根下没有 run.json</div></div>'; }
 }
 boot();
 </script>

@@ -122,6 +122,16 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
   不依赖 Phaser、不需要构建步骤。分九块：概览 / 对话(turns) / 检索(retrievals) / 事件(events) /
   状态(state_history) / 反思(reflection) / 问题分流(router) / 注入器(injector) / 审计(audit)；
   六条记录（mavis 三条 + 旧引擎三条）都能选；旧引擎记录没有 `injector` 段，面板显示"无注入器记录"。
+- **`case01/tools/review_panel_probe.js`**（2026-09-19）：审阅面板的**无头自查**——把页面里的
+  `<script>` 抽出来、用最小 DOM stub 在 Node 里真跑一遍九个 pane 的渲染函数（默认把
+  `/api/review/runs` 里每条记录都跑一遍），抓"pane 抛异常"与"输出里出现 undefined /
+  `[object Object]` / NaN"。**没有浏览器时这是唯一能抓 JS 运行期错误的手段**（`node --check`
+  只查语法）。用法见文件头；需要面板服务在跑。
+- **两种记录形态必须都认**：mavis 的检索是 `date/mode/injected[]`，旧引擎是
+  `current_date/hits[]/source_stats`。首版只认前者，把旧记录的命中明细**整个丢了**
+  （修复后 `demo-3` 的检索块从 1174 字符涨到 4764）。同理旧记录没有 `injector`/`summary`/`compat`，
+  面板要分段渲染并明说"该记录早于 mavis 路径"，**不能**渲染成 `mode= / 节点 0 个`。
+  另外默认选中的必须是成品三线（mavis），不能落在旧引擎对照记录上。
 
 **还没组件化：case01 的注入器本体。** 它目前仍是 provenance 内的模块（`case01/injector/` + `case01/world/`）。
 阶段 3 设计稿 `case01/docs/任务_阶段3_抽包设计稿_20260918.md` 已于 2026-09-19 评审通过，
