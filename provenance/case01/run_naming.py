@@ -47,3 +47,29 @@ def live_run_id(branch: str, when: str = "", case: str = "case01",
 def sample_run_id(case: str, engine: str, branch: str, date: str) -> str:
     """样本:`<YYMMDD>-demo-<case>-<engine>-<branch>`(不带时刻)。"""
     return "{}-demo-{}-{}-{}".format(date, case, engine, branch)
+
+
+def unique_run_id(base: str, roots=("case01/runs", "case01/runs_injector")) -> str:
+    """给 `base` 找一个**还没被占用**的 run_id(占用了就加 `-2`、`-3`…)。
+
+    为什么需要(2026-09-19 用户反馈"重开一局这个功能有问题"时查出来的):
+    实跑名字只精确到分钟(`...-B-2147`),而"重开一局"可以在**同一分钟**内再开一局
+    (尤其带 `--nodes` 的小跑或快机)。撞名之后新一局的 `runs_injector/<id>/raw.json`
+    与 `runs/<id>/run.json` 会**直接覆盖上一局**,上一局的记录就静默消失了 ——
+    这属于"静默处理",必须拦住。
+
+    返回可用的名字;调用方负责把它落到盘上。roots 里任一目录存在同名子目录即视为占用。
+    """
+    import os
+
+    def taken(rid: str) -> bool:
+        return any(os.path.isdir(os.path.join(r, rid)) for r in roots)
+
+    if not taken(base):
+        return base
+    n = 2
+    while taken("{}-{}".format(base, n)):
+        n += 1
+        if n > 99:                      # 兜底,别无限循环
+            break
+    return "{}-{}".format(base, n)

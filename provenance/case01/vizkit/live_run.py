@@ -32,7 +32,7 @@ import time
 import mavis_vizkit
 from ..injector.bridge import DEFAULT_ROLES, MavisBridge
 from ..injector.nodes import default_nodes
-from ..run_naming import live_run_id
+from ..run_naming import live_run_id, unique_run_id
 
 # case01 业务侧的角色贴图别名与前端根(属于 case01,不属于 mavis-vizkit)
 ROLE_TEXTURE_ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
@@ -130,6 +130,9 @@ def main(argv=None):
                     help="只服务界面(小镇 + 结果记录),不跑推演;用于随时翻成品记录")
     ap.add_argument("--no-restart", dest="no_restart", action="store_true",
                     help="不提供页面上的『重开一局』按钮(默认提供)")
+    ap.add_argument("--exit-after-hold", dest="exit_after_hold", action="store_true",
+                    help="保持期(--hold)结束后就退出(默认:只要页面上还有『重开一局』"
+                         "按钮就一直等,免得按钮点了没反应)")
     ap.add_argument("--no-map", dest="no_map", action="store_true",
                     help="跑完不自动映射成成品记录(默认自动映射,由本进程顺序做)")
     args = ap.parse_args(argv)
@@ -179,6 +182,8 @@ def main(argv=None):
                          run_id=args.run_id, scenario_dir=scenario,
                          branch=args.branch, branch_mode=args.branch_mode,
                          on_restart=None if args.no_restart else request_restart)
+    # 页面上有没有「重开一局」按钮(没注册回调就没有)
+    can_restart = not args.no_restart
     live.start()
     print("界面已启动: {}  (小镇 + 右栏“结果记录”卡片;Ctrl+C 结束)".format(live.url()))
 
@@ -220,7 +225,15 @@ def main(argv=None):
             # **真实运行时间**;记录里的 start_date/end_date 是模拟剧情日期,不是一回事。
             # judge 模式下真正的分支要等 T0 跑完才知道,所以名字里的分支先按兜底值,
             # 记录写完(raw 落盘)后由 pipeline 的 branch 覆盖 —— 提示会打出来。
-            run_id = args.run_id if (args.run_id and not ran_once) else live_run_id(branch)
+            # --run-id 是调用方点名的名字(第一局),之后每一局现铸;同名会被 unique_run_id
+            # 让开(否则同一分钟内重开一局会覆盖上一局的记录)。
+            if args.run_id and not ran_once:
+                run_id = args.run_id
+            else:
+                base = live_run_id("auto" if branch_mode == "judge" else branch)
+                run_id = unique_run_id(base)
+                if run_id != base:
+                    print("名字 {} 已被占用(上一局),改用 {}".format(base, run_id))
             ran_once = True
             out = os.path.join("case01", "runs_injector", run_id, "raw.json")
             print("本次 run_id: {} (分支方式={} 兜底分支={})".format(run_id, branch_mode, branch))
@@ -287,7 +300,22 @@ def main(argv=None):
                 # 真正的关闭放到进程退出时(finally 外层)。
                 bridge.close(keep_visualizers=True)
             if not restart_flag.is_set():
-                break
+                # 保持期到了,但**页面上还挂着「重开一局」按钮**:这时如果直接退出,
+                # 按钮就变成谎言 —— 点了没反应(用户反馈"重开一局这个功能有问题"的最常见来源)。
+                # 所以默认**不退出**,继续等服务被 Ctrl+C;要旧行为请显式 --exit-after-hold。
+                if can_restart and not args.exit_after_hold:
+                    print("保持期结束,但页面上仍有「重开一局」按钮:"
+                          "服务继续等(要退出请 Ctrl+C,或启动时加 --exit-after-hold)")
+                    restart_flag.clear()
+                    try:
+                        while not restart_flag.wait(timeout=3600):
+                            print("仍在等待「重开一局」…(服务在线,记录已生成)")
+                    except KeyboardInterrupt:
+                        print("已中断")
+                        break
+                    print("收到重开请求,开始新的一局")
+                else:
+                    break
             print("重开:开始新的一局(分支 {})".format(branch))
     finally:
         live.close()      # 进程要退出了:现在才关服务本身

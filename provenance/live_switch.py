@@ -271,7 +271,9 @@ def start(case, args):
             # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
             # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
             # (名字写岔会让 5002 与结果面板对同一条记录显示两个名字,实测踩过)。
-            run_id = args.run_id or live_run_id(args.branch)
+            # judge 模式下分支要等 T0 跑完才定,名字里就不该写一个假的分支字母(用 auto);
+    # 重开一局时循环里现铸的名字也走同一套口径(见 live_run.py)。
+    run_id = args.run_id or live_run_id("auto" if args.branch_mode == "judge" else args.branch)
             out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                    "--branch-mode", args.branch_mode,
