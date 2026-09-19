@@ -187,9 +187,10 @@ body { margin: 0; }
         padding:10px 12px; font-size:11px; max-width:420px; max-height:60vh; overflow-y:auto;"></div>
 {% endif %}
 
-<!-- Left column: developer console -->
+<!-- Left column: developer console。top 要让开左上角那两块(时钟 top:60 与
+     运行状态 top:100,状态块底边约 130)——原来写 120 会被状态块压住一部分。 -->
 {% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
-<div style="position: fixed; left: 16px; top: 120px; width: 320px; z-index: 150;">
+<div style="position: fixed; left: 16px; top: 146px; width: 320px; z-index: 150;">
 
     <!-- Developer console (live message stream, collapsible, scrollable) -->
     <div id="dev-console" style="background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
