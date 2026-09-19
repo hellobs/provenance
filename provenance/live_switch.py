@@ -30,9 +30,13 @@
 用法(在 `provenance/provenance` 下执行)
 --------------------------------------
     python live_switch.py --status
-    python live_switch.py --start case01 [--nodes 2] [--hold 1800] [--branch B]
+    python live_switch.py --start case01 [--nodes 2] [--hold 1800] [--branch B] [--no-map]
     python live_switch.py --start case00 [--stride 2]
     python live_switch.py --stop case01 | case00 | all
+
+`--start case01` **默认跑完自动映射**(看护进程等 `raw.json` 写好,再跑 pipeline 生成
+`case01/runs/<run_id>/run.json`)。理由见"不允许静默"那条铁律:实跑成功了却没有成品记录,
+面板上就是一片空白,而没人会知道为什么。`--no-map` 可关掉,手工映射的命令仍会打印出来。
 """
 import argparse
 import json
@@ -193,6 +197,27 @@ def stop(case, quiet=False):
     return len(pids)
 
 
+def _start_mapper(run_id, args, raw_out):
+    """起一个脱离的看护进程:等原始记录写好,自动映射成成品记录。
+
+    "实跑成功了但面板里什么都没有"是静默后果,不允许——所以默认自动映射,
+    `--no-map` 可关掉(见 case01/tools/map_after_run.py)。
+    """
+    mapper_log = os.path.join(LOG_DIR, "live_%s.map.log" % "case01")
+    cmd = [sys.executable, "-m", "case01.tools.map_after_run",
+           "--run-id", run_id, "--branch", args.branch,
+           "--raw", raw_out, "--port", str(LIVE["case01"])]
+    try:
+        with open(mapper_log, "ab") as f:
+            subprocess.Popen(cmd, cwd=HERE, stdout=f, stderr=f,
+                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+    except Exception as e:  # noqa: BLE001 - 起不来也要说清楚,不能静默
+        print("  ⚠ 看护进程没起来({}: {}),跑完请手工跑上面那条映射命令"
+              .format(type(e).__name__, e))
+        return ""
+    return mapper_log
+
+
 def start(case, args):
     other = "case01" if case == "case00" else "case00"
     print("按「同时只允许一个实时面」的规则——先停另一个,再停本 case 的旧实例(防游离):")
@@ -230,13 +255,14 @@ def start(case, args):
                          creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
+    mapper_log = ""
     if run_id:
         print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
         print("  原始记录将落盘到: {}".format(out))
-        print("  跑完后映射成成品记录(名字保持一致,别改):")
-        print("    python -m case01.injector.pipeline --branch {} --run-id {}".format(args.branch, run_id))
-        print("        --from-record {} --reflect".format(out))
-        print("        --out case01{0}runs{0}{1}{0}run.json".format(os.sep, run_id))
+        final = os.path.join("case01", "runs", run_id, "run.json")
+        print("  跑完自动映射成成品记录: {}".format(final))
+        print("    (手动等价命令: python -m case01.injector.pipeline --branch {} --run-id {}"
+              " --from-record {} --reflect --out {})".format(args.branch, run_id, out, final))
 
     # 校验:进程活着 **且端口真绑上了**。只等端口不够——绑不上时进程还会继续跑模拟。
     bound = False
@@ -258,6 +284,11 @@ def start(case, args):
         if tail.strip():
             print("    stderr 尾部:\n" + tail.strip())
         return 1
+
+    if run_id and not args.no_map:
+        mapper_log = _start_mapper(run_id, args, out)
+        if mapper_log:
+            print("  看护进程已起:跑完(原始记录写好后)自动映射,日志 {}".format(mapper_log))
 
     print("\n现状:")
     for c in ("case00", "case01"):
@@ -284,6 +315,8 @@ def main():
     ap.add_argument("--stride", type=int, default=2, help="case00:步长(分钟)")
     ap.add_argument("--no-sim", action="store_true",
                     help="case00:只服务 Web 层不跑模拟(不算实时面,但仍占端口)")
+    ap.add_argument("--no-map", dest="no_map", action="store_true",
+                    help="case01:跑完不自动映射成成品记录(默认自动映射)")
     args = ap.parse_args()
 
     if args.start:

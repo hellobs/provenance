@@ -121,12 +121,6 @@ _PAGE = r"""<!DOCTYPE html>
   header h1 { font-size:16px; margin:0; font-weight:600; }
   header select { background:#26493b; color:#fff; border:1px solid #3c6353; border-radius:6px;
                   padding:5px 8px; font-size:13px; max-width:560px; }
-  /* 一行"说人话"的口径说明。之前没有它,而标签又是黑话("mavis · demo-A-mavis — A"),
-     于是用户反馈看不懂——面板不该要求读者先读过设计文档。 */
-  .legend { max-width:1080px; margin:10px auto 0; padding:0 14px; color:#5b6b66;
-            font-size:12px; line-height:1.9; }
-  .legend b { color:#2d6cdf; }
-  .legend .br { color:#b26a00; font-weight:600; }
   header .meta { font-size:12px; color:#cfe3d8; margin-left:auto; }
   header a { color:#cfe3d8; font-size:12px; }
   .wrap { max-width:1080px; margin:16px auto; padding:0 14px; display:flex; gap:16px; align-items:flex-start; }
@@ -175,7 +169,6 @@ _PAGE = r"""<!DOCTYPE html>
   body.embed header h1 { display:none; }
   body.embed header select { max-width:240px; font-size:12px; }
   body.embed header .meta { font-size:11px; }
-  body.embed .legend { display:none; }   /* 嵌入时由平台自带上下文,省这点高度 */
   body.embed .wrap { margin:0; padding:6px 8px 10px; gap:10px; max-width:none; }
   body.embed nav { position:static; flex:0 0 132px; }
   body.embed .card { padding:9px 12px; margin-bottom:9px; }
@@ -187,19 +180,6 @@ _PAGE = r"""<!DOCTYPE html>
   <select id="pick"></select>
   <span class="meta" id="hmeta">加载中…</span>
 </header>
-<div class="legend">
-  这六条记录 = <b>三条剧情线</b> × <b>两个引擎版本</b>。
-  <span class="br">A 线</span>＝建议买入（当事人投入接近全部资金）；
-  <span class="br">B 线</span>＝不建议买入（当事人没买）；
-  <span class="br">C 线</span>＝条件化等待（按条件执行，可能一直不触发）。
-  <b>mavis 新架构</b>＝当前的 case01（注入器挂在 mavis 上）；<b>旧引擎对照</b>＝归档的旧实现，留着做对照、不是废弃数据。
-  左边九块依次是：概览 · 对话（逐轮问答）· 检索（当天查到什么）· 事件（剧情事件何时释放）·
-  状态（资金与持仓）· 反思（8 维反思全文）· 问题分流（拆成待专家审的问题）·
-  注入器（节点与事件定义）· 审计（每一步的操作留痕）。鼠标停在页签上也有说明。
-  <br>注意<b>两种日期别混</b>：记录名里的日期（如 <code>live-B-20260919-1424</code>）是<b>真实运行时间</b>；
-  记录里的 <code>start_date</code> → <code>end_date</code>（08-27 → 09-15）是<b>模拟剧情日期</b>，属于案例内部时间线。
-  每次实跑都会生成一个带真实时间的名字，所以同一分支跑多次也能分辨。
-</div>
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="main"></main>
@@ -266,7 +246,7 @@ function paneOverview(d) {
       ? '<span class="chip k">mavis 新架构（成品三线）</span>'
       : '<span class="chip">旧引擎对照 · 无注入器段</span>'],
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
-    ["日期区间", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
+    ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
   ];
   if (hasInj) {
@@ -498,9 +478,8 @@ _COMBINED = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div class="bar"><b>GTC Case 01</b> · 实时小镇（Phaser）＋ 成品记录审阅
-  <span class="sp">小镇源 <code>__LIVE__</code>｜同一时刻只应有一个实时面在跑｜
-  <a href="/embed/review" target="_blank" rel="noreferrer">单独打开结果窗 ↗</a></span></div>
+<div class="bar"><b>GTC Case 01</b> · 实时小镇 ＋ 成品记录审阅
+  <span class="sp"><a href="/embed/review" target="_blank" rel="noreferrer">单独打开结果窗 ↗</a></span></div>
 <div class="split">
   <div class="pane">
     <h2>① 实时小镇（Phaser，mavis 推演）</h2>
