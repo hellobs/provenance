@@ -136,16 +136,24 @@ def main(argv=None):
     # (不能在回调里直接跑推演,那是 HTTP 线程池的活)。
     restart_flag = threading.Event()
     restart_req = {"branch": ""}
+    # 闭包里要读"当前分支":回调是 HTTP 线程池里跑的,不能直接用 args
+    branch_now = [args.branch]
 
     def request_restart(payload=None):
         branch = str((payload or {}).get("branch") or "").strip().upper()
         if branch not in ("A", "B", "C"):
-            branch = args.branch          # 没选/选了怪值 → 沿用当前分支
+            branch = branch_now[0]        # 没选/选了怪值 → 沿用当前分支
         restart_req["branch"] = branch
         restart_flag.set()
         # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
         # pending 里那条上一局的 done,变成"重开后又突然说推演结束"(用户实测反馈)。
         live.begin_run()
+        # 同时把"实时记录"来源撤掉:此刻上一局的成品记录还在映射(~1-2 分钟),
+        # 留着 provider 会让面板继续显示上一局的实时记录(7/7),看着像没重开。
+        # 撤掉后面板会切到上一局的成品记录(或"尚未生成"提示);新一局开跑时再挂上。
+        from ..review_app import clear_live, set_current_run
+        clear_live()
+        set_current_run("", "")
         print("收到重开请求:下一局分支 {};当前这一局跑完(或保持期结束)后立刻开".format(branch))
         return {"ok": True, "detail": "已受理:下一局走 {} 线".format(branch), "branch": branch}
 
@@ -181,6 +189,7 @@ def main(argv=None):
             if restart_req["branch"]:
                 branch = restart_req["branch"]
                 restart_req["branch"] = ""
+            branch_now[0] = branch        # 回调里读"当前分支"用
             nodes = default_nodes(branch, roles=list(roles))
             if args.nodes > 0:
                 nodes = nodes[:args.nodes]
