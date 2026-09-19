@@ -1,0 +1,37 @@
+{
+  "title": "投资咨询小镇 · 布景(像素场景,不需要引擎/LLM/平台)",
+  "loop": true,
+  "steps": [
+    {"t": 0.0, "time": "20260827-09:30"},
+    {"t": 1.0, "move": {"AI Advisor": [10, 9]},
+     "act": {"AI Advisor": {"action": "把公告与传闻分开摆上桌面", "location": "Trading Floor"}}},
+    {"t": 1.8, "move": {"Michael Chen": [8, 9]},
+     "act": {"Michael Chen": {"action": "翻开昨天写到一半的研究报告", "location": "Trading Floor"}}},
+    {"t": 2.6, "move": {"Wendy Lin": [12, 9]},
+     "act": {"Wendy Lin": {"action": "重跑风险评级", "location": "Trading Floor"}}},
+    {"t": 3.4, "move": {"Daniel Shen": [9, 11]},
+     "act": {"Daniel Shen": {"action": "把客户的资产配置表推到一边", "location": "Trading Floor"}}},
+    {"t": 4.2, "move": {"Kevin Su": [10, 11]},
+     "act": {"Kevin Su": {"action": "调出昨天的动量回测", "location": "Trading Floor"}}},
+    {"t": 5.0, "move": {"Mr. Zhou": [11, 11]},
+     "act": {"Mr. Zhou": {"action": "盯着盘口,不说话", "location": "Trading Floor"}},
+     "say": ["Mr. Zhou", "先别急着下结论——今天 HCM 那条公告,客户盯得很紧。"]},
+    {"t": 6.4, "story": {
+        "event_type": "disclosure",
+        "content": "HCM 公告确认正与国际新能源汽车制造商开展高镍正极材料产品验证及商务沟通。10:30 约 $42.60,收盘 $45.80。",
+        "targets": ["AI Advisor", "Daniel Shen", "Kevin Su", "Michael Chen", "Mr. Zhou", "Wendy Lin"],
+        "time": "09:30"}},
+    {"t": 8.0, "say": ["Wendy Lin", "风险评级得重跑:公告只说『验证与沟通』,不是订单。"]},
+    {"t": 9.2, "say": ["AI Advisor", "把三类材料分开:公告可核、媒体转述、卖方测算。只有第一类能进结论。"]},
+    {"t": 10.6, "story": {
+        "event_type": "media",
+        "content": "媒体转述『120–150 亿元』情景测算,来源为卖方研究,未获公司确认。",
+        "targets": ["AI Advisor", "Mr. Zhou"], "time": "10:30"}},
+    {"t": 12.0, "say": ["Kevin Su", "回测里这种『合格供应商』的消息,十次有七次是情绪脉冲。"]},
+    {"t": 13.2, "say": ["Daniel Shen", "客户昨天问我能不能把创业的那笔钱挪进来,我没敢接。"]},
+    {"t": 14.6, "act": {"AI Advisor": {"action": "写下结论:证据不足时给条件化方案,不给满仓建议",
+                                       "location": "Trading Floor"}},
+     "say": ["AI Advisor", "结论先记下:证据不足时,给条件化方案,不给满仓建议。"]},
+    {"t": 16.0, "say": ["Mr. Zhou", "记住这句话。三十年了,上头的人从来不是被消息打败的,是被自己打败的。"]}
+  ]
+}
