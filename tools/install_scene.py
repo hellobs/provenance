@@ -173,12 +173,41 @@ def build_maze(map_json, gid_map, world):
 
 
 def check_spawns(maze, scenario_dirs):
-    """换图后角色的出生/会议坐标是否还可走(不可走必须立刻看到)。"""
+    """换图后角色的出生/会议坐标是否还可走,以及**是否还连得通**。
+
+    2026-09-19 修两个坑(都实测踩到):
+    1. 场景目录原来按 `maze.json` 往上推两级算,case01 的 maze 在 `injector/scenario/` 下,
+       推出来是 `injector/`,那里没有 `agents/` → 检查被 `continue` **静默跳过**,
+       于是打印出"所有角色坐标都可走"这句假话。现在场景目录就是 maze 所在目录,
+       并且找不到 `agents/` 会明确警告。
+    2. 只查"坐标是不是阻挡格"不够:画墙时很容易把某个房间**整体封死** ——
+       格子本身可走,但和主区域不连通,人走不过去。这里顺手算连通块并报出来。
+    """
     blocked_cells = {tuple(t["coord"]) for t in maze["tiles"] if t.get("collision")}
-    problems = []
+    H, W = maze["size"][0], maze["size"][1]
+    free = {(x, y) for y in range(H) for x in range(W) if (x, y) not in blocked_cells}
+    seen, comps = set(), []
+    for c in sorted(free):
+        if c in seen:
+            continue
+        stack, comp = [c], set()
+        seen.add(c)
+        while stack:
+            x, y = stack.pop()
+            comp.add((x, y))
+            for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if n in free and n not in seen:
+                    seen.add(n)
+                    stack.append(n)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    main = comps[0] if comps else set()
+
+    problems, checked = [], 0
     for d in scenario_dirs:
         agents_dir = os.path.join(d, "agents")
         if not os.path.isdir(agents_dir):
+            problems.append(("(找不到场景目录)", d))
             continue
         for name in sorted(os.listdir(agents_dir)):
             p = os.path.join(agents_dir, name, "agent.json")
@@ -190,9 +219,79 @@ def check_spawns(maze, scenario_dirs):
             except Exception:  # noqa: BLE001
                 continue
             coord = cfg.get("coord")
-            if coord and tuple(coord) in blocked_cells:
-                problems.append((name, coord))
-    return problems
+            if not coord:
+                continue
+            checked += 1
+            c = tuple(coord)
+            if c in blocked_cells:
+                problems.append((name, "{} 落在这张图的阻挡格上".format(list(c))))
+            elif c not in main:
+                problems.append((name, "{} 与主区域不连通(被墙隔开)".format(list(c))))
+    return problems, checked, len(free), [len(c) for c in comps[:3]]
+
+
+def nearest_free(coord, blocked, H, W, main):
+    """在**主连通块**里找离 coord 最近的空格(给 --fix-spawns 用)。"""
+    if tuple(coord) in main:
+        return list(coord)
+    best, best_d = None, None
+    for c in main:
+        d = abs(c[0] - coord[0]) + abs(c[1] - coord[1])
+        if best_d is None or d < best_d:
+            best, best_d = c, d
+    return list(best) if best else None
+
+
+def fix_spawns(maze, scenario_dirs, write=False):
+    """把落在阻挡格/孤岛上的角色坐标挪到主连通块里最近的空格(改 scenario 的 agent.json)。
+
+    默认只报告不写;写盘时留 `.bak`。**必须打印改动明细** —— 改研究侧给的场景数据
+    不是小事,不能静默。
+    """
+    blocked = {tuple(t["coord"]) for t in maze["tiles"] if t.get("collision")}
+    H, W = maze["size"][0], maze["size"][1]
+    free = {(x, y) for y in range(H) for x in range(W) if (x, y) not in blocked}
+    seen, comps = set(), []
+    for c in sorted(free):
+        if c in seen:
+            continue
+        st, comp = [c], set()
+        seen.add(c)
+        while st:
+            x, y = st.pop()
+            comp.add((x, y))
+            for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if n in free and n not in seen:
+                    seen.add(n)
+                    st.append(n)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    main = comps[0] if comps else set()
+
+    changes = []
+    for d in scenario_dirs:
+        agents_dir = os.path.join(d, "agents")
+        if not os.path.isdir(agents_dir):
+            continue
+        for name in sorted(os.listdir(agents_dir)):
+            p = os.path.join(agents_dir, name, "agent.json")
+            if not os.path.exists(p):
+                continue
+            with open(p, encoding="utf-8") as f:
+                cfg = json.load(f)
+            coord = cfg.get("coord")
+            if not coord or tuple(coord) in main:
+                continue
+            new = nearest_free(coord, blocked, H, W, main)
+            if not new:
+                continue
+            changes.append((d, name, list(coord), new))
+            if write:
+                shutil.copy2(p, p + "." + time.strftime("%Y%m%d-%H%M") + ".bak")
+                cfg["coord"] = new
+                with open(p, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, ensure_ascii=False, indent=2)
+    return changes
 
 
 def main(argv=None):
@@ -208,6 +307,8 @@ def main(argv=None):
     ap.add_argument("--scenario", action="append", default=[],
                     help="要检查出生点的场景目录(默认由 --maze 的上级推出)")
     ap.add_argument("--map-name", default="tilemap.json", help="安装成哪个地图文件名")
+    ap.add_argument("--fix-spawns", action="store_true",
+                    help="把落在阻挡格/孤岛的角色坐标挪到主连通块里最近的空格(改 agent.json,留 .bak)")
     args = ap.parse_args(argv)
 
     write = args.install and not args.dry_run
@@ -246,15 +347,24 @@ def main(argv=None):
         for kind, gid, nm in placeholders:
             print("   {:>8} gid={} 占位名={}".format(kind, gid, nm))
 
-    scenarios = args.scenario or [os.path.dirname(os.path.dirname(os.path.abspath(m)))
-                                  for m in args.maze]
-    problems = check_spawns(maze, scenarios)
+    scenarios = args.scenario or [os.path.dirname(os.path.abspath(m)) for m in args.maze]
+    problems, checked, n_free, top = check_spawns(maze, scenarios)
+    print("可走格 {} 个,连通块大小前 3: {}".format(n_free, top))
     if problems:
-        print("**注意:这些角色的出生坐标在新图里是阻挡格**(要改场景配置或换个位置):")
-        for name, coord in problems:
-            print("   {} coord={}".format(name, coord))
+        print("**注意:这些角色的坐标在新图里有问题**(场景配置要改,或在 Tiled 里放通):")
+        for name, why in problems:
+            print("   {} {}".format(name, why))
+        if args.fix_spawns:
+            changes = fix_spawns(maze, scenarios, write=write)
+            print("--fix-spawns:{} 个坐标需要挪;{}".format(
+                len(changes), "已写盘(留了 .bak)" if write else "未写盘(加 --install 才写)"))
+            for d, name, old, new in changes:
+                print("   {} {} : {} → {}".format(os.path.basename(os.path.dirname(d)),
+                                                  name, old, new))
+        else:
+            print("   (想自动挪到最近的空格:加 --fix-spawns;它会打印改动明细并留 .bak)")
     else:
-        print("出生点检查:所有场景里的角色坐标在新图里都可走")
+        print("出生点检查:{} 个角色坐标都还可走、且都在主连通块里".format(checked))
 
     if not write:
         print("\n(未写盘;加 --install 才真正替换)")
