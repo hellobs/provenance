@@ -123,8 +123,15 @@ def _state_history(nodes: List[dict]) -> List[dict]:
 
 
 def to_case01_record(record: dict, branch: str = "",
-                     t0_rounds: int = 0, c_plan: Optional[dict] = None) -> dict:
-    """把 injector 记录映射成 case01 run.json 兼容结构。"""
+                     t0_rounds: int = 0, c_plan: Optional[dict] = None,
+                     run_id: str = "") -> dict:
+    """把 injector 记录映射成 case01 run.json 兼容结构。
+
+    run_id: 显式指定输出记录的 run_id;不传则沿用原始记录里的(既有行为)。
+    **这条很重要**:映射路径下如果忽略调用方给的 run_id,输出的记录 id 就会和
+    落盘目录名不一致——5002 契约按记录里的 run_id 列,5004 审阅面板按目录名列,
+    同一条记录会出现两个名字(2026-09-19 实测踩到)。
+    """
     nodes = list(record.get("nodes") or [])
     compat_gaps: List[str] = []
 
@@ -149,7 +156,7 @@ def to_case01_record(record: dict, branch: str = "",
                 "dry-run 或条件未触发则不建仓)")
 
     mapped = {
-        "run_id": record.get("run_id", ""),
+        "run_id": run_id or record.get("run_id", ""),
         "start_date": nodes[0].get("date", "") if nodes else "",
         "end_date": nodes[-1].get("date", "") if nodes else "",
         "branch": branch or "",

@@ -68,6 +68,29 @@ def test_pipeline_from_existing_raw_record(tmp_path):
     assert len(record["turns"]) == 2
     assert any(a.get("action") == "set_branch" for a in record["audit"])
 
+def test_pipeline_run_id_override_applies_in_mapping_path(tmp_path):
+    """`--run-id` 在"从原始记录映射"这条路径上也要生效。
+
+    2026-09-19 实测踩到:传了 `--run-id live-B-mavis`,run_pipeline 把它算出来了,
+    却没传给 to_case01_record,于是输出记录的 run_id 沿用了原始记录的 `live-B`。
+    后果是两个面不一致——5002 契约按记录里的 run_id 列(显示 live-B),
+    5004 审阅面板按目录名列(显示 live-B-mavis),同一条记录出现两个名字。
+    """
+    raw = {
+        "schema_version": "injector-0.1", "run_id": "raw-1", "mode": "mavis",
+        "branch": "B", "roles": ["Investment AI", "Ethan Lin"],
+        "nodes": [{"node_id": "node-1", "date": "2026-08-27", "step": 1, "events": [],
+                   "world_state": {"date": "2026-08-27", "branch": "B"}}],
+        "world_audit": [], "summary": {"node_count": 1},
+    }
+    out = tmp_path / "mapped.json"
+    record = run_pipeline(branch="B", raw_record=raw, run_id="live-B-mavis", out_path=str(out))
+    assert record["run_id"] == "live-B-mavis"
+    assert json.load(open(out, encoding="utf-8"))["run_id"] == "live-B-mavis"
+    # 不传 run_id 时仍沿用原始记录里的 —— 既有行为不变
+    assert run_pipeline(branch="B", raw_record=raw)["run_id"] == "raw-1"
+
+
 def test_pipeline_fill_facts_on_legacy_record(tmp_path):
     raw = {
         "schema_version": "injector-0.1", "run_id": "legacy-1", "mode": "mavis",

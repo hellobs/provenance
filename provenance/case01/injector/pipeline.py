@@ -67,7 +67,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                              branch=branch)
         raw = bridge.run()
 
-    record = to_case01_record(raw, branch=branch,
+    record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
     record.setdefault("compat", {})["reflection_attached"] = False
 
