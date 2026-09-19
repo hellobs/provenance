@@ -205,6 +205,15 @@ def test_router_pane_shows_risk_note_and_question_flag():
     assert "仍是疑问句" in html
 
 
+def test_end_of_run_notifications_are_wired():
+    """用户明确要求"推演结束后要有提示":小镇页有结束横幅,面板有"已生成"绿条。"""
+    page = _client().get("/review").text
+    assert "成品记录已生成(含反思与问题分流),已切到这一条" in page
+    assert "note ok" in page
+    # 小镇页(index.html + main_script.html)那一侧由 test_vizkit_live 里查:
+    # showDoneBanner / #done-banner
+
+
 def test_live_mode_is_wired_into_the_page():
     """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
     html = _client().get("/review").text

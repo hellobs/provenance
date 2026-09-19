@@ -232,6 +232,7 @@ _PAGE = r"""<!DOCTYPE html>
          font-family:ui-monospace,Consolas,monospace; }
   .note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px;
           padding:8px 12px; font-size:12px; margin-bottom:10px; }
+  .note.ok { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .wrap { max-width:1080px; margin:16px auto; padding:0 14px; display:flex; gap:16px; align-items:flex-start; }
   nav { flex:0 0 152px; background:var(--card); border:1px solid var(--line); border-radius:12px;
         padding:6px; position:sticky; top:64px; }
@@ -351,6 +352,8 @@ let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见
 const LIVE_ID = "__live__";
 let LIVE_META = null;   // {run_id, done_nodes, total_nodes}
 let liveTimer = null;
+// 成品记录刚生成时的一句话(绿色) —— 跑完那一刻要有明确提示,不能悄悄换记录。
+let MAPPED_NOTE = "";
 
 // ---- 嵌入 / 深链参数 ----
 //   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
@@ -619,6 +622,10 @@ async function loadLive(first) {
     // 实跑结束了:回到列表,优先落在刚跑完那条的成品记录上。
     stopLive();
     LIVE_META = null;
+    if (d.mapped) {
+      // 映射刚跑完(面板自动从"实时"切到成品):**明确说一声**,别让人莫名其妙换了内容。
+      MAPPED_NOTE = `<div class="note ok">成品记录已生成(含反思与问题分流),已切到这一条。</div>`;
+    }
     await boot();
     return;
   }
@@ -643,8 +650,8 @@ async function boot() {
   // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
   const cur = String(d.current_run_id || "").trim();
   const curInList = cur && (d.runs || []).some(x => x.run_id === cur);
-  LIVE_HINT = "";
-  if (cur && !curInList && !live.live) {
+  LIVE_HINT = MAPPED_NOTE;
+  if (!LIVE_HINT && cur && !curInList && !live.live) {
     LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
   const sel = document.getElementById("pick");
@@ -664,7 +671,7 @@ async function boot() {
     ((BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9)) ||
     String(a.run_id).localeCompare(String(b.run_id)));
   sel.innerHTML = liveOpt + sorted.map(optHtml).join("");
-  sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); pick(sel.value); };
+  sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); MAPPED_NOTE = ""; pick(sel.value); };
   // 有实跑就默认看实时(用户要"同步看全程");否则落在 mavis 记录上,
   // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。

@@ -117,6 +117,22 @@ def test_page_shows_visible_run_status():
         assert state in body, "状态机缺少 {} 分支".format(state)
 
 
+def test_page_has_loud_end_of_run_banner():
+    """用户明确要求:"要保证推演结束后有提示"。
+
+    状态块那行小字不够——必须有一条居中的大横幅,并且把"成品记录还在生成"说清楚。
+    """
+    from fastapi.testclient import TestClient
+
+    body = TestClient(_live(port=5092).app).get("/").text
+    assert 'id="done-banner"' in body
+    assert "showDoneBanner" in body
+    for piece in ("推演结束", "成品记录正在生成", "推演被中断", "推演出错"):
+        assert piece in body, "结束提示缺少 {} 文案".format(piece)
+    # 结束横幅要盖在剧情事件横幅之上(结束是最该被看见的)
+    assert "z-index: 320" in body
+
+
 def test_finish_broadcasts_done_to_connected_client():
     """跑完要主动广播 done:不让页面停在"人不动、也没人解释"的状态。"""
     from fastapi.testclient import TestClient

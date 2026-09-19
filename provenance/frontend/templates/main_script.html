@@ -184,6 +184,41 @@
 		window.__sim_status = state;
 		devLog("sys", "状态 → " + (text || state));
 	}
+	// ================= 推演结束的醒目提示 =================
+	// 用户明确要求:"要保证推演结束后有提示"。状态块那行小字不够醒目,
+	// 所以结束(含出错/中断)时给一条居中大横幅;成品记录还在生成也一起说清楚。
+	function showDoneBanner(reason, extra) {
+		var b = document.getElementById("done-banner");
+		var text, color;
+		if (String(reason).indexOf("error") === 0) {
+			text = "推演出错:" + String(reason).replace(/^error:?/, "") +
+				"　结果可能不完整,请看右栏与日志";
+			color = "rgba(201,42,42,0.95)";
+		} else if (reason === "interrupted") {
+			text = "推演被中断(没跑完),结果可能不完整";
+			color = "rgba(178,106,0,0.95)";
+		} else if (reason === "review_only") {
+			text = "仅审阅模式:没有在推演";
+			color = "rgba(75,85,99,0.95)";
+		} else {
+			text = "推演结束" + (extra || "") +
+				"<br><span style='font-weight:normal;font-size:12.5px'>" +
+				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它" +
+				"(那时才有反思与问题分流)</span>";
+			color = "rgba(15,157,88,0.95)";
+		}
+		if (!b) { devLog("sys", "推演结束:" + reason); return; }
+		b.style.background = color;
+		b.innerHTML = text;
+		b.style.display = "block";
+		b.style.animation = "none";
+		void b.offsetWidth;
+		b.style.animation = "storyFlash 0.5s ease-in-out 3";
+		devLog("sys", "结束提示已显示:" + reason);
+		// 25 秒后收起横幅,但状态块会一直写着"已结束",不会回到"看不出在不在跑"。
+		setTimeout(function() { b.style.display = "none"; }, 25000);
+	}
+
 	// ================= Global error capture (into console) =================
 	// 1) JS runtime errors
 	window.onerror = function(msg, src, line, col, err) {
@@ -257,6 +292,7 @@
 				var reason = msg.reason || "";
 				devLog("sys", "Simulation finished" + (reason ? " (" + reason + ")" : ""));
 				sim_finished = true;
+				showDoneBanner(reason, "");
 				if (reason.indexOf("error") === 0) {
 					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
 				} else if (reason === "interrupted") {
