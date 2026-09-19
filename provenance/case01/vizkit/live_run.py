@@ -18,6 +18,7 @@ import time
 import mavis_vizkit
 from ..injector.bridge import DEFAULT_ROLES, MavisBridge
 from ..injector.nodes import default_nodes
+from ..run_naming import run_id_for
 
 # case01 业务侧的角色贴图别名与前端根(属于 case01,不属于 mavis-vizkit)
 ROLE_TEXTURE_ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
@@ -59,9 +60,15 @@ def main(argv=None):
     nodes = default_nodes(args.branch, roles=list(roles))
     if args.nodes > 0:
         nodes = nodes[:args.nodes]
+    # 每跑一次就该有一个能唯一定位的名字,而且名字里带**真实运行日期时刻**——
+    # 旧默认 "live-<分支>" 不带时间,同一分支跑第二次就分不清哪条是哪次了
+    # (2026-09-19 指出)。注意:名字里的日期是真实运行时间,记录里的
+    # start_date/end_date 是模拟剧情日期,两者不是一回事。
+    run_id = args.run_id or run_id_for(args.branch)
+    print("本次 run_id: {}".format(run_id))
     bridge = MavisBridge(
         nodes=nodes, roles=roles, scenario_dir=scenario,
-        run_id=args.run_id or "live-{}".format(args.branch),
+        run_id=run_id,
         dry_run=False, max_retries=args.max_retries, branch=args.branch,
         visualizers=[live],
     )

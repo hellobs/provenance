@@ -70,11 +70,23 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 - **旧引擎对照**（archive 基线 `d41cdec` 的产物，保留不删）：`runs/demo-1|2|3/`
   （`run.json` + `turns.jsonl` + `retrievals.jsonl` + `branch.json`）
 - **注入器原始与映射**：`runs_injector/`——`def-B/{raw.json,mapped.json}`（默认剧本）、
-  `live-B/{raw.json,record-B-mavis.json}`（真实跑一次）、`smoke/`、`isolation/probe-B.json`
+  `live-B-<日期>/raw.json`（真实跑一次的原始记录）、`smoke/`、`isolation/probe-B.json`
 - **静态审查页**：`runs_html/`（index + 6 个 demo 页 + viz 子目录）
+
+**实跑记录的命名（2026-09-19 定的约定）**：每次实跑生成一个**带真实日期**的名字
+`live-<分支>-<YYYYMMDD-HHMM>`，例如 `live-B-20260919-1424`。规则有三条：
+
+- **目录名必须等于记录里的 `run_id`**。不一致的后果实测过：5002 契约按记录里的 `run_id` 列，
+  5004 面板按目录名列，同一条记录会显示成两个名字。
+- `demo-*` 是**固定的样本名**（平台通知 `通知平台侧_换样本_20260917.md` 里点名引用），不随时间变；
+  只有实跑记录带日期。
+- **两种日期别混**：名字里的日期是**真实运行时间**；记录里的 `start_date` → `end_date`
+  （08-27 → 09-15）是**模拟剧情日期**，属于案例内部时间线。实跑记录里**没有**墙上时钟字段，
+  所以真实运行时间只存在于名字里——这也是名字必须带时间的根本原因。
 
 一次新跑的固定链路：`live_run.py` 出 `raw.json` → `case01.injector.pipeline --from-record <raw> --reflect`
 出 case01 兼容的 `run.json`（补齐 Reflection 与 Router）→ 5002 自动发现新的 `run_id`。
+`live_switch.py --start case01` 会把这条链路的命令连同生成好的 `run_id` 一起打印出来。
 
 ## 三、两个案例的关系与"同一时刻只起一个实时可视化"
 

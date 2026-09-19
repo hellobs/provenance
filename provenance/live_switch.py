@@ -43,6 +43,8 @@ import sys
 import time
 import urllib.request
 
+from case01.run_naming import run_id_for
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 LIVE = {"case00": 5001, "case01": 5010}
@@ -203,13 +205,18 @@ def start(case, args):
         return 1
 
     os.makedirs(LOG_DIR, exist_ok=True)
+    run_id, out = "", ""
     if case == "case01":
+        # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
+        # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
+        # (名字写岔会让 5002 与 5004 两个面对同一条记录显示两个名字,实测踩过)。
+        run_id = args.run_id or run_id_for(args.branch)
+        out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
         cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
-               "--port", str(LIVE["case01"]), "--hold", str(args.hold)]
+               "--port", str(LIVE["case01"]), "--hold", str(args.hold),
+               "--run-id", run_id, "--out", out]
         if args.nodes:
             cmd += ["--nodes", str(args.nodes)]
-        if args.out:
-            cmd += ["--out", args.out]
     else:
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
                "--stride", str(args.stride), "--port", str(LIVE["case00"])]
@@ -223,6 +230,13 @@ def start(case, args):
                          creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
+    if run_id:
+        print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
+        print("  原始记录将落盘到: {}".format(out))
+        print("  跑完后映射成成品记录(名字保持一致,别改):")
+        print("    python -m case01.injector.pipeline --branch {} --run-id {}".format(args.branch, run_id))
+        print("        --from-record {} --reflect".format(out))
+        print("        --out case01{0}runs{0}{1}{0}run.json".format(os.sep, run_id))
 
     # 校验:进程活着 **且端口真绑上了**。只等端口不够——绑不上时进程还会继续跑模拟。
     bound = False
@@ -262,7 +276,8 @@ def main():
     ap.add_argument("--nodes", type=int, default=0, help="case01:只跑前 N 个节点(0=全部)")
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
     ap.add_argument("--branch", default="B", help="case01:分支 A/B/C")
-    ap.add_argument("--out", default="", help="case01:同时保存原始记录 JSON")
+    ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到 case01/runs_injector/<run_id>/raw.json)")
+    ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 live-<分支>-<真实日期-时刻>)")
     ap.add_argument("--name", default="demo", help="case00:模拟名")
     ap.add_argument("--sim-start", dest="sim_start", default="20250213-09:30",
                     help="case00:模拟起始时间(与 --start 的 case 选择不是一回事)")
