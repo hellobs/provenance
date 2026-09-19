@@ -27,6 +27,10 @@ class FakeLLM:
                 sys_txt += "\n" + str(m.get("content", ""))
         if "Reflection Router" in sys_txt:
             return "[]"
+        if "Branch 判定器" in sys_txt:
+            import json as _j
+            # 从 user 内容提取第一条回答(供一致性测试);固定返回 B
+            return _j.dumps({"branch": "B", "reason": "fake: cautious"})
         if "have just finished a conversation" in sys_txt:
             return ("本次经历中,我过度依赖了来源单一的市场测算,对二次转述的"
                     "独立性判断不足。我在判断 HCM 是否值得买入时,应当更明确地"
