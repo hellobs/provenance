@@ -74,6 +74,107 @@ def test_runs_list_reports_current_live_run():
     assert "260919-live-case01-mavis-B-9999" not in {x["run_id"] for x in d["runs"]}
 
 
+# ---------------------------------------------------------------------------
+# 实时同步:小镇在动,结果面板每 2 秒跟着长(用户要"同步看全程")
+# ---------------------------------------------------------------------------
+def _fake_raw(nodes_done=1, total=3):
+    """造一份"跑到第 N 个节点"的 injector 原始记录(形状照真实 raw.json 抄)。"""
+    nodes = []
+    for i in range(1, nodes_done + 1):
+        date = "2026-08-2{}".format(6 + i)
+        nodes.append({
+            "node_id": "node-{}".format(i), "date": date, "step": i,
+            "released_events": ["ev-{}".format(i)],
+            "events": [{"id": "ev-{}".format(i), "date": date,
+                        "time": "09:30", "event_type": "disclosure", "importance": 3,
+                        "targets": ["Ethan Lin"], "content": "事件 {}".format(i)}],
+            "context": {},
+            "interactions": [{"from": "Ethan Lin", "to": "Investment AI",
+                              "focus": "第 {} 轮问题".format(i)}],
+            "interaction_started": True, "retries": 0,
+            "world": {"price_usd": 45.8},
+            "world_state": {"date": date, "branch": "B", "cash_rmb": 200000.0,
+                            "hcm_shares": False, "held_fraction": 0.0,
+                            "entry_price_usd": None, "exit_price_usd": None, "exited": False},
+            # dialogue 的真实形状:list[dict],内层是 [说话人, 文本] 对(见 record._turns)
+            "dialogue": [{"Ethan Lin -> Investment AI": [
+                ["Ethan Lin", "第 {} 轮提问".format(i)],
+                ["Investment AI", "第 {} 轮回答".format(i)]]}],
+            "agents": {}, "elapsed_s": 12.5,
+        })
+    return {"schema_version": "injector-0.1", "run_id": "260919-live-case01-mavis-B-8888",
+            "mode": "mavis", "branch": "B", "roles": ["Investment AI", "Ethan Lin"],
+            "scenario_dir": "", "nodes": nodes, "world_audit": [],
+            "condition_monitor": [], "c_plan": {},
+            "summary": {"node_count": nodes_done, "interaction_started": nodes_done,
+                        "retries": 0, "elapsed_s": 12.5 * nodes_done}}
+
+
+def test_live_endpoint_reports_not_live_when_idle():
+    from case01 import review_app
+    review_app.clear_live()
+    d = _client().get("/api/review/live").json()
+    assert d["ok"] is True and d["live"] is False
+
+
+def test_live_endpoint_maps_partial_run_to_the_same_shape():
+    """实时记录必须与成品记录**同一套映射**,否则九块渲染会缺字段/报错。"""
+    from case01 import review_app
+    review_app.set_live_provider(lambda: _fake_raw(nodes_done=2), run_id="260919-live-case01-mavis-B-8888",
+                                total_nodes=7)
+    try:
+        d = _client().get("/api/review/live").json()
+        assert d["ok"] and d["live"] is True
+        assert d["done_nodes"] == 2 and d["total_nodes"] == 7
+        rec = d["record"]
+        assert rec["live"] is True and rec["run_id"] == "260919-live-case01-mavis-B-8888"
+        for key in ("turns", "retrievals", "events", "state_history", "audit", "injector",
+                    "reflection", "router"):
+            assert key in rec, "缺少 {}:面板九块靠它".format(key)
+        assert len(rec["injector"]["nodes"]) == 2, "跑到哪就长到哪"
+        assert rec["events"] and rec["turns"], "已有节点的对话/事件要能看到"
+        assert rec["reflection"] == {} and rec["router"] == {}, "反思/分流跑完才有"
+    finally:
+        review_app.clear_live()
+
+
+def test_live_endpoint_progress_grows_then_stops():
+    """节点走一个、实时记录长一个;clear 之后立刻回到 live=false。"""
+    from case01 import review_app
+    state = {"n": 0}
+    review_app.set_live_provider(lambda: _fake_raw(state["n"]), run_id="r1", total_nodes=3)
+    c = _client()
+    assert c.get("/api/review/live").json()["done_nodes"] == 0
+    state["n"] = 2
+    assert c.get("/api/review/live").json()["done_nodes"] == 2
+    review_app.clear_live()
+    assert c.get("/api/review/live").json()["live"] is False
+
+
+def test_live_provider_failure_is_reported_not_swallowed():
+    """provider 抛异常时要给出原因(面板要显示),不能静默变成空记录。"""
+    from case01 import review_app
+
+    def boom():
+        raise RuntimeError("bridge 挂了")
+
+    review_app.set_live_provider(boom, run_id="r2", total_nodes=3)
+    try:
+        d = _client().get("/api/review/live").json()
+        assert d["ok"] is False and d["live"] is True
+        assert "bridge 挂了" in d["errors"][0]
+    finally:
+        review_app.clear_live()
+
+
+def test_live_mode_is_wired_into_the_page():
+    """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
+    html = _client().get("/review").text
+    for piece in ("/api/review/live", "loadLive", "__live__", "● 实时",
+                  "反思/问题分流跑完才有"):
+        assert piece in html, piece
+
+
 def test_run_detail_has_the_six_sections():
     d = _client().get("/api/review/run/{}".format(MAVIS_RUN)).json()
     for key in ("turns", "retrievals", "events", "reflection", "router", "injector"):

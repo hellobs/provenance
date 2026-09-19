@@ -33,10 +33,14 @@ function makeSandbox() {
   const sandbox = {
     console,
     setInterval: () => 0,
+    clearInterval: () => {},
     setTimeout: (f) => { try { f(); } catch (e) { /* noop */ } return 0; },
     fetch: async (url) => ({
       ok: true, status: 200, text: async () => '',
-      json: async () => (String(url).includes('/api/review/runs') ? fakeRuns : {}),
+      // 实时那条也要给合法 JSON:页面 boot() 会同时取 /api/review/live。
+      json: async () => (String(url).includes('/api/review/live')
+        ? { ok: true, live: false }
+        : (String(url).includes('/api/review/runs') ? fakeRuns : {})),
     }),
     // 页面用 location 与 URLSearchParams 读嵌入/深链参数,用 document.body 挂 embed 类;
     // stub 缺了它们会在脚本初始化阶段就抛(那是探针自己的问题,不是被测 pane 的问题)。
@@ -47,6 +51,7 @@ function makeSandbox() {
       querySelectorAll: () => [],
       createElement: el,
       body: { classList: { add: () => {}, remove: () => {} } },
+      scrollingElement: { scrollTop: 0 },
     },
   };
   sandbox.globalThis = sandbox;

@@ -1,0 +1,9 @@
+{
+  "branch": "A",
+  "action": {
+    "timeline": "A",
+    "judge": "forced",
+    "c_plan": null,
+    "t0_rounds": 1
+  }
+}

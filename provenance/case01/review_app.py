@@ -51,6 +51,13 @@ RUNS_DIR = os.environ.get("CASE01_REVIEW_RUNS_DIR") or os.path.join(BASE_DIR, "r
 # 而不是让人对着旧记录猜(**不允许静默**)。
 _CURRENT = {"run_id": "", "note": ""}
 
+# 实跑期间的"实时记录"来源(2026-09-19 用户要求:小镇与结果要能同步看全程)。
+# 起服务的人注入一个 provider() -> injector 原始记录;面板每 2 秒拉一次
+# `/api/review/live`,用与成品记录**同一套映射**(to_case01_record)渲染九块,
+# 于是角色一边动、对话/检索/事件/状态/审计一边长出来。跑完映射出成品记录后
+# 面板自动切到成品那份(那时才有反思与问题分流)。
+_LIVE = {"provider": None, "run_id": "", "total_nodes": 0}
+
 router = APIRouter()
 
 
@@ -59,6 +66,28 @@ def set_current_run(run_id, note=""):
     _CURRENT["run_id"] = run_id or ""
     _CURRENT["note"] = note or ""
     return _CURRENT["run_id"]
+
+
+def set_live_provider(provider, run_id="", total_nodes=0):
+    """注入"实时记录"来源。provider 必须是无参可调用对象,返回 injector 原始记录。
+
+    为什么用 provider 而不是每步推一份:实跑与 HTTP 服务在**同一个进程**里
+    (uvicorn 跑在插件线程),面板每 2 秒来取一次就行,不需要在引擎线程里
+    维护推送节奏——少一处能出错的地方。
+    """
+    _LIVE["provider"] = provider
+    _LIVE["run_id"] = run_id or ""
+    _LIVE["total_nodes"] = int(total_nodes or 0)
+    if run_id:
+        set_current_run(run_id, "实跑跑完会自动映射成成品记录")
+    return _LIVE["run_id"]
+
+
+def clear_live():
+    """实跑结束/进程退出时收干净,别让面板一直显示一个已经不动的"实时"。"""
+    _LIVE["provider"] = None
+    _LIVE["run_id"] = ""
+    _LIVE["total_nodes"] = 0
 
 
 def _runs_dir():
@@ -119,6 +148,42 @@ def list_runs():
                          "current_run_id": _CURRENT["run_id"],
                          "current_note": _CURRENT["note"],
                          "runs": [_brief(r) for r in _discover_runs()]})
+
+
+@router.get("/api/review/live")
+def live_record():
+    """实跑期间的**实时记录**(与成品记录同一套映射,所以九块能直接渲染)。
+
+    面板每 2 秒来取一次;没有在实跑就返回 live=false,让面板切回成品记录。
+    跑完但还没映射出成品记录时,这里仍然给得出(provider 还活着),
+    面板会继续显示完整过程,并标注"反思/问题分流跑完才有"——不留空白。
+    """
+    provider = _LIVE["provider"]
+    if provider is None:
+        return JSONResponse({"ok": True, "live": False, "run_id": _LIVE["run_id"]})
+    try:
+        raw = provider()
+    except Exception as exc:  # noqa: BLE001 - 取不到也要让面板拿到原因,不能空着
+        return JSONResponse({"ok": False, "live": True, "run_id": _LIVE["run_id"],
+                             "errors": ["取实时记录失败: {}: {}".format(
+                                 type(exc).__name__, exc)]})
+    from .injector.record import to_case01_record
+    rec = to_case01_record(raw, branch=raw.get("branch", ""),
+                           run_id=raw.get("run_id", "") or _LIVE["run_id"])
+    rec["live"] = True
+    # 表头要显示"哪条剧情线(含义)"。branch_summary 不在记录里,是服务端推导的
+    # (与 5002 契约同源),成品记录那边由 _brief 补,实时这条在这里补。
+    try:
+        from . import full_context as fc
+        rec["branch_summary"] = fc._branch_summary(rec.get("branch", ""),
+                                                   rec.get("branch_action") or {})
+    except Exception:  # noqa: BLE001 - 推导失败不该让实时记录整体取不到
+        rec["branch_summary"] = ""
+    done_nodes = len(raw.get("nodes") or [])
+    total = _LIVE["total_nodes"] or done_nodes
+    return JSONResponse({"ok": True, "live": True, "run_id": rec.get("run_id", ""),
+                         "done_nodes": done_nodes, "total_nodes": total,
+                         "record": rec})
 
 
 @router.get("/api/review/run/{run_id}")
@@ -263,6 +328,11 @@ const TABS = [
 ];
 let DATA = null, TAB = "overview";
 let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见 boot())
+// 实时同步(用户要"小镇与结果同步看全程"):有实跑时下拉里多一条"● 正在跑",
+// 选中它就按 2 秒拉 /api/review/live 刷新九块;跑完映射出成品记录后自动切过去。
+const LIVE_ID = "__live__";
+let LIVE_META = null;   // {run_id, done_nodes, total_nodes}
+let liveTimer = null;
 
 // ---- 嵌入 / 深链参数 ----
 //   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
@@ -408,7 +478,11 @@ function paneStates(d) {
 
 function paneReflection(d) {
   const r = d.reflection || {};
-  if (!r.text) return '<div class="card"><div class="empty">无反思文本</div></div>';
+  if (!r.text) {
+    // 实时看全程时,反思本来就要等运行结束才有材料——说清楚,别让人以为坏了。
+    return '<div class="card"><div class="empty">' +
+      (d.live ? "反思在运行结束后生成:跑完会自动出现在这里" : "无反思文本") + '</div></div>';
+  }
   return `<div class="card"><div class="m">反思文本 · ${r.text.length} 字</div>
     <div class="t">${esc(r.text)}</div>
     <details><summary>展开交给模型的原始材料（${(r.material || "").length} 字）</summary>
@@ -424,6 +498,9 @@ function riskBadge(v) {
 function paneRouter(d) {
   const r = d.router || {}, iss = r.issues || [];
   let raw = r.raw; try { raw = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) {}
+  if (!iss.length && d.live) {
+    return '<div class="card"><div class="empty">问题分流在运行结束后生成:跑完会自动出现在这里</div></div>';
+  }
   return (iss.length ? iss.map(x => `<div class="card">
       <div class="m"><b>${esc(x.id)}</b> ${riskBadge(x.risk)} <span class="chip">${esc(x.field)}</span></div>
       <div class="t">${esc(x.summary)}</div>
@@ -462,15 +539,29 @@ const PANES = { overview: paneOverview, turns: paneTurns, retrievals: paneRetrie
 
 function render() {
   renderNav();
+  // 实时刷新时保住滚动位置(否则每 2 秒被拉回顶部,没法看长表格)。
+  const sc = document.scrollingElement || document.documentElement;
+  const y = sc ? sc.scrollTop : 0;
   document.getElementById("main").innerHTML = LIVE_HINT + (DATA
     ? PANES[TAB](DATA)
     : '<div class="card"><div class="empty">选择一次运行</div></div>');
+  if (sc) sc.scrollTop = y;
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA);
     const eng = isMavis ? "mavis 新架构" : "旧引擎对照（无注入器段）";
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
     const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
+    if (DATA.live) {
+      // 实时:把"跑到哪了"和"哪些块是跑完才有的"都写在头上(**不允许静默**)。
+      const prog = LIVE_META ? `${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点` : "";
+      document.getElementById("hmeta").innerHTML =
+        `<span style="color:#0f9d58;font-weight:600">● 实时</span> ${esc(DATA.run_id)} · ` +
+        `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${esc(prog)} · ` +
+        `反思/问题分流跑完才有　<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
+        `target="_blank">单独看这条 ↗</a>`;
+      return;
+    }
     document.getElementById("hmeta").innerHTML =
       `${esc(DATA.run_id)} · ${esc(eng)} · ${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${tail}　` +
       `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`;
@@ -478,18 +569,59 @@ function render() {
 }
 
 async function pick(id) {
+  if (id === LIVE_ID) { await loadLive(true); return; }
   const r = await fetch(`/api/review/run/${encodeURIComponent(id)}`);
   DATA = await r.json();
   render();
 }
 
+// ---- 实时记录:小镇在动,这里每 2 秒跟着长 ----
+function stopLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+
+async function loadLive(first) {
+  let d;
+  try {
+    d = await (await fetch("/api/review/live")).json();
+  } catch (e) {
+    document.getElementById("hmeta").innerHTML = `<span style="color:#d93025">实时记录取不到(${esc(e.message)})</span>`;
+    stopLive();
+    return;
+  }
+  if (!d.ok) {
+    document.getElementById("hmeta").innerHTML =
+      `<span style="color:#d93025">实时记录取不到:${esc((d.errors || []).join(";"))}</span>`;
+    return;
+  }
+  if (!d.live) {
+    // 实跑结束了:回到列表,优先落在刚跑完那条的成品记录上。
+    stopLive();
+    LIVE_META = null;
+    await boot();
+    return;
+  }
+  LIVE_META = { run_id: d.run_id, done_nodes: d.done_nodes, total_nodes: d.total_nodes };
+  const rec = d.record || {};
+  rec.branch_summary = rec.branch_summary || "";
+  DATA = rec;
+  render();
+  if (first) {
+    stopLive();
+    liveTimer = setInterval(() => loadLive(false), 2000);
+  }
+}
+
 async function boot() {
   const r = await fetch("/api/review/runs");
   const d = await r.json();
+  // 正在实跑时,下拉最上面先给一条"● 正在跑" —— 用户要的就是小镇与结果同步看全程。
+  let live = { live: false };
+  try { live = await (await fetch("/api/review/live")).json(); } catch (e) { live = { live: false }; }
   // 正在实跑、但还没有成品记录时,面板上明确写出来(**不允许静默**):
   // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
   const cur = String(d.current_run_id || "").trim();
-  if (cur && !(d.runs || []).some(x => x.run_id === cur)) {
+  const curInList = cur && (d.runs || []).some(x => x.run_id === cur);
+  LIVE_HINT = "";
+  if (cur && !curInList && !live.live) {
     LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
   const sel = document.getElementById("pick");
@@ -501,20 +633,32 @@ async function boot() {
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
   const optLabel = x => `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
   const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
-  sel.innerHTML = ["mavis", "legacy"].map(eng => {
+  const liveOpt = live.live
+    ? `<optgroup label="正在跑的这一次（实时）"><option value="${LIVE_ID}">● 实时 ｜ ` +
+      `${esc(live.run_id)}（${live.done_nodes}/${live.total_nodes} 节点）</option></optgroup>`
+    : "";
+  sel.innerHTML = liveOpt + ["mavis", "legacy"].map(eng => {
     const items = d.runs.filter(x => x.engine === eng)
                        .sort((a, b) => (BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9));
     if (!items.length) return "";
     return `<optgroup label="${esc(ENG_LABEL[eng] || eng)}">${items.map(optHtml).join("")}</optgroup>`;
   }).join("");
-  sel.onchange = () => pick(sel.value);
-  // 默认落在成品三线(mavis)上,不要落在旧引擎对照记录上——
-  // 否则一打开看到的就是"注入器:无注入器记录"那条,最容易让人以为面板坏了。
+  sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); pick(sel.value); };
+  // 有实跑就默认看实时(用户要"同步看全程");否则落在成品三线(mavis)上,
+  // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
-  const first = (WANT_RUN && d.runs.find(x => x.run_id === WANT_RUN))
-             || d.runs.find(x => x.engine === "mavis") || d.runs[0];
-  if (first) { await pick(first.run_id); }
-  else { document.getElementById("main").innerHTML = '<div class="card"><div class="empty">记录根下没有 run.json</div></div>'; }
+  if (WANT_RUN) {
+    const hit = d.runs.find(x => x.run_id === WANT_RUN);
+    if (hit) { sel.value = WANT_RUN; await pick(WANT_RUN); return; }
+    if (live.live && live.run_id === WANT_RUN) { sel.value = LIVE_ID; await loadLive(true); return; }
+  }
+  if (live.live) { sel.value = LIVE_ID; await loadLive(true); return; }
+  const first = d.runs.find(x => x.engine === "mavis") || d.runs[0];
+  if (first) { sel.value = first.run_id; await pick(first.run_id); }
+  else {
+    document.getElementById("main").innerHTML =
+      '<div class="card"><div class="empty">还没有成品记录;跑一次实跑就会实时长出来，跑完自动归档。</div></div>';
+  }
 }
 boot();
 </script>

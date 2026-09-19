@@ -123,6 +123,11 @@ def main(argv=None):
         dry_run=False, max_retries=args.max_retries, branch=args.branch,
         visualizers=[live],
     )
+    # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
+    # 于是小镇一边动、右栏的对话/检索/事件/状态/审计一边长出来(用户要的"同步看全程")。
+    # 跑完不立刻撤:成品记录还要等自动映射(~1-2 分钟),这期间面板继续显示完整过程。
+    from ..review_app import clear_live, set_live_provider
+    set_live_provider(lambda: bridge.run_record(), run_id=run_id, total_nodes=len(nodes))
     exit_code = 0
     try:
         record = bridge.run()
@@ -147,6 +152,7 @@ def main(argv=None):
         exit_code = 1
     finally:
         bridge.close()
+        clear_live()      # 进程要退出了,别让面板一直显示一个已经不动的"实时"
         print("服务已关闭")
     return exit_code
 
