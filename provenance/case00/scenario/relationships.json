@@ -1,0 +1,125 @@
+{
+  "simulation": "investment",
+  "relations": [
+    {
+      "agents": [
+        "Mr. Zhou",
+        "Daniel Shen"
+      ],
+      "type": "Client-Advisor",
+      "direction": "Mr. Zhou→Daniel Shen",
+      "trigger": "Every day at 3 PM, Mr. Zhou goes to the meeting room to consult Daniel Shen about market conditions and portfolio allocation advice",
+      "frequency": "high"
+    },
+    {
+      "agents": [
+        "Michael Chen",
+        "Kevin Su"
+      ],
+      "type": "Data Collaboration",
+      "direction": "Bidirectional",
+      "trigger": "In the morning, cross-validate the key financial indicators of the new energy earnings reports in the Reference Room",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Wendy Lin",
+        "Daniel Shen"
+      ],
+      "type": "Risk Control - Decision",
+      "direction": "Wendy Lin→Daniel Shen",
+      "trigger": "Before the review meeting, Wendy Lin goes to the meeting room to submit the risk rating results",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Mr. Zhou",
+        "AI Advisor"
+      ],
+      "type": "Client - AI Service",
+      "direction": "Bidirectional",
+      "trigger": "Mr. Zhou frequently asks AI Advisor for quick recommendations during trading hours; AI Advisor responds with suitability-constrained advice",
+      "frequency": "high"
+    },
+    {
+      "agents": [
+        "Wendy Lin",
+        "AI Advisor"
+      ],
+      "type": "Compliance Oversight",
+      "direction": "Wendy Lin→AI Advisor",
+      "trigger": "After each round of advice, Wendy Lin reviews AI Advisor's disclosure records and suitability checks, flagging gaps",
+      "frequency": "high"
+    },
+    {
+      "agents": [
+        "Daniel Shen",
+        "AI Advisor"
+      ],
+      "type": "Advisory Coordination",
+      "direction": "Bidirectional",
+      "trigger": "Daniel Shen routes complex client cases to AI Advisor for preliminary analysis, then reviews the output before final advice",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Kevin Su",
+        "AI Advisor"
+      ],
+      "type": "Signal Feed",
+      "direction": "Kevin Su→AI Advisor",
+      "trigger": "Kevin Su pushes quantitative signals and backtest results to AI Advisor so recommendations stay evidence-based",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Michael Chen",
+        "AI Advisor"
+      ],
+      "type": "Research Feed",
+      "direction": "Michael Chen→AI Advisor",
+      "trigger": "Michael Chen shares sector research and data-verification results with AI Advisor before any recommendation touches a covered name",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Mr. Zhou",
+        "Wendy Lin"
+      ],
+      "type": "Client - Compliance",
+      "direction": "Bidirectional",
+      "trigger": "When Mr. Zhou complains about rejected aggressive requests, Wendy Lin explains the suitability rules to him",
+      "frequency": "low"
+    },
+    {
+      "agents": [
+        "Daniel Shen",
+        "Kevin Su"
+      ],
+      "type": "Strategy Review",
+      "direction": "Bidirectional",
+      "trigger": "Daniel Shen asks Kevin Su to re-run backtests when market regimes change; Kevin Su reports whether the strategy still holds",
+      "frequency": "medium"
+    },
+    {
+      "agents": [
+        "Daniel Shen",
+        "Michael Chen"
+      ],
+      "type": "Research Direction",
+      "direction": "Daniel Shen→Michael Chen",
+      "trigger": "Daniel Shen directs Michael Chen on which sectors to deep-dive for the weekly outlook",
+      "frequency": "low"
+    },
+    {
+      "agents": [
+        "Wendy Lin",
+        "Kevin Su"
+      ],
+      "type": "Model Risk Review",
+      "direction": "Wendy Lin→Kevin Su",
+      "trigger": "Wendy Lin requests the backtest methodology and assumptions before approving any quant-driven advice",
+      "frequency": "low"
+    }
+  ]
+}
