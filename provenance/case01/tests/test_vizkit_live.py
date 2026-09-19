@@ -133,6 +133,20 @@ def test_page_has_loud_end_of_run_banner():
     assert "z-index: 320" in body
 
 
+def test_clock_shows_the_date_not_only_hh_mm():
+    """时钟必须带日期。
+
+    case01 每个节点都是"某天 09:30",旧实现只截 HH:MM → 时钟永远显示 09:30,
+    用户反馈"9:30 这个时间为什么一直没变"。现在渲染成 "MM-DD HH:MM"。
+    """
+    from fastapi.testclient import TestClient
+
+    body = TestClient(_live(port=5091).app).get("/").text
+    assert "function setCurrentTime" in body
+    assert "m[2] + \"-\" + m[3]" in body, "时钟标签要拼出 MM-DD"
+    assert "window.__sim_time_raw" in body, "原始时间串要留着(便于核对)"
+
+
 def test_finish_broadcasts_done_to_connected_client():
     """跑完要主动广播 done:不让页面停在"人不动、也没人解释"的状态。"""
     from fastapi.testclient import TestClient

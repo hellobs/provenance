@@ -205,6 +205,14 @@ def test_router_pane_shows_risk_note_and_question_flag():
     assert "仍是疑问句" in html
 
 
+def test_no_filler_phrases_in_the_panel():
+    """用户把"（那时才有反思与问题分流）""反思/问题分流跑完才有"点成废话,已删。"""
+    html = _client().get("/review").text
+    assert "反思/问题分流跑完才有" not in html
+    assert "那时才有反思与问题分流" not in html
+    assert "跑完后才有" in html, "空状态仍需一句极短说明(不许静默留白)"
+
+
 def test_end_of_run_notifications_are_wired():
     """用户明确要求"推演结束后要有提示":小镇页有结束横幅,面板有"已生成"绿条。"""
     page = _client().get("/review").text
@@ -217,8 +225,7 @@ def test_end_of_run_notifications_are_wired():
 def test_live_mode_is_wired_into_the_page():
     """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
     html = _client().get("/review").text
-    for piece in ("/api/review/live", "loadLive", "__live__", "● 实时",
-                  "反思/问题分流跑完才有"):
+    for piece in ("/api/review/live", "loadLive", "__live__", "● 实时"):
         assert piece in html, piece
 
 

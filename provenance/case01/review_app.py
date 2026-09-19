@@ -500,9 +500,9 @@ function paneStates(d) {
 function paneReflection(d) {
   const r = d.reflection || {};
   if (!r.text) {
-    // 实时看全程时,反思本来就要等运行结束才有材料——说清楚,别让人以为坏了。
+    // 实时看全程时,反思本来就要等运行结束才有材料——一句短的说明就够(用户嫌长句子是废话)。
     return '<div class="card"><div class="empty">' +
-      (d.live ? "反思在运行结束后生成:跑完会自动出现在这里" : "无反思文本") + '</div></div>';
+      (d.live ? "跑完后才有" : "无反思文本") + '</div></div>';
   }
   return `<div class="card"><div class="m">反思文本 · ${r.text.length} 字</div>
     <div class="t">${esc(r.text)}</div>
@@ -520,7 +520,7 @@ function paneRouter(d) {
   const r = d.router || {}, iss = r.issues || [];
   let raw = r.raw; try { raw = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) {}
   if (!iss.length && d.live) {
-    return '<div class="card"><div class="empty">问题分流在运行结束后生成:跑完会自动出现在这里</div></div>';
+    return '<div class="card"><div class="empty">跑完后才有</div></div>';
   }
   const styleTag = x => (x.style === "question")
     ? '<span class="chip" style="background:#fde68a;color:#92400e" title="模型写成了疑问句,不是行为/判断">仍是疑问句</span>'
@@ -579,12 +579,12 @@ function render() {
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
     const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
     if (DATA.live) {
-      // 实时:把"跑到哪了"和"哪些块是跑完才有的"都写在头上(**不允许静默**)。
+      // 实时:把"跑到哪了"写在头上(**不允许静默**)。
       const prog = LIVE_META ? `${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点` : "";
       document.getElementById("hmeta").innerHTML =
         `<span style="color:#0f9d58;font-weight:600">● 实时</span> ${esc(DATA.run_id)} · ` +
-        `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${esc(prog)} · ` +
-        `反思/问题分流跑完才有　<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
+        `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${esc(prog)}　` +
+        `<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
         `target="_blank">单独看这条 ↗</a>`;
       return;
     }

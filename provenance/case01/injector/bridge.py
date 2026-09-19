@@ -81,6 +81,12 @@ class MavisBridge:
 
         # 可插拔可视化:引擎只产生事件,插件自己决定怎么画(见 vizkit/)
         self._agent_trace: Dict[int, Dict[str, dict]] = {}
+        # 前端"上一次画到哪个格子"——用来给 pin 之类没有路径的移动补一条正交可视路径
+        # (见 _visual_path;不补的话前端会沿直线斜穿格子)。
+        # 初值 = 场景配置里的初始坐标 = 前端把角色摆在的位置,否则**第一段**仍是斜线。
+        self._last_visual_coord: Dict[str, list] = self._seed_visual_coords()
+        # 已经报过"这对格子不可达"的组合(避免每步刷同一行日志)
+        self._visual_path_warned: set = set()
         self._fanout = self._build_fanout(visualizers)
         # 插件面迁移状态(默认关闭,由 _build_mavis 决定):
         # _plugin_mode=True 时走 mavis 插件面且不再覆盖全局 chat_callback;
@@ -413,6 +419,56 @@ class MavisBridge:
         agent = (self.game.agents or {}).get(name) if self.game is not None else None
         return getattr(agent, "role_type", "user") or "user"
 
+    def _seed_visual_coords(self) -> Dict[str, list]:
+        """可视路径的起点 = 场景配置里的初始格子(与前端渲染的初始位置同源)。"""
+        try:
+            from mavis_vizkit.plugins.town import scenario_coords
+            return {k: list(v) for k, v in
+                    scenario_coords(self.scenario_dir, self.roles).items()}
+        except Exception as e:  # noqa: BLE001 - 拿不到就退化成"第一段走直线",但留痕
+            print("[case01] 初始坐标取不到,第一段移动可能仍是直线: {}".format(e), flush=True)
+            return {}
+
+    def _visual_path(self, name, dst):
+        """给前端的**可视路径**:从上一次画到的格子走到目标格子,走迷宫的正交路线。
+
+        为什么要单独算:mavis 侧 pin 之后 `agent.path` 被清空(同址且静止才可能触发交互),
+        前端拿不到路径就只能沿直线滑过去 —— 于是**斜着穿格**(2026-09-19 用户实测反馈
+        "有的AI走斜线,而不是横着竖着走的")。这里用迷宫 BFS 补一条正交路径,
+        只影响画面,不改 mavis 语义(交互仍按"同址 + 空路径"判定)。
+
+        寻不到路(不可达/同格)返回 None,由调用方回退成直线 —— 但会留一行日志,不静默。
+        """
+        src = self._last_visual_coord.get(name)
+        if dst:
+            self._last_visual_coord[name] = list(dst)
+        if not src or not dst or list(src) == list(dst):
+            return None
+        try:
+            agents = getattr(self.game, "agents", None) or {}
+            agent = agents.get(name)
+            if agent is None and hasattr(self.game, "get_agent"):
+                agent = self.game.get_agent(name)
+            maze = getattr(agent, "maze", None) if agent is not None else None
+            if maze is None:
+                return None
+            path = maze.find_path(list(src), list(dst))
+            if path:
+                return [[int(c[0]), int(c[1])] for c in path]
+            # 不可达:前端只能直线走过去(可能穿墙)——必须留痕,但不重复刷同一对格子
+            key = (name, tuple(src), tuple(dst))
+            if key not in self._visual_path_warned and self.game is not None:
+                self._visual_path_warned.add(key)
+                self.game.logger.warning(
+                    "visual path: {} 从 {} 到 {} 不可达,前端只能直线走过去".format(
+                        name, list(src), list(dst)))
+            return None
+        except Exception as e:  # noqa: BLE001 - 画不出来不该打断推演,但要说一声
+            if self.game is not None:
+                self.game.logger.warning(
+                    "visual path failed for {} {}->{}: {}".format(name, src, dst, e))
+            return None
+
     def _emit_agent(self, name, state, sim_time):
         """可视化侧:发一条 agent 事件给 fanout(适配器转发;不需要 step)。"""
         if self._fanout is None:
@@ -423,9 +479,18 @@ class MavisBridge:
         action = as_text(state.get("action"))
         location = as_text(state.get("location"))
         currently = as_text(state.get("currently"))
+        coord = state.get("coord")
+        # mavis 自带路径(pin 之外的自然行走)优先用;没有就用可视路径补一条正交的,
+        # 否则前端会沿直线斜穿格子。
+        path = state.get("path") or []
+        if not path:
+            path = self._visual_path(name, coord) or []
+        else:
+            if coord:
+                self._last_visual_coord[name] = list(coord)
         self._fanout.emit(agent_event(
-            name, state.get("coord"), action, location, currently,
-            state.get("path"), sim_time, self._role_type(name)))
+            name, coord, action, location, currently,
+            path, sim_time, self._role_type(name)))
 
     def _viz_on_agent(self, name, state, step, sim_time):
         """on_agent 回调:记录侧总走这里;_plugin_mode 下可视化事件由适配器转发。"""

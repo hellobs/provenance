@@ -203,8 +203,7 @@
 		} else {
 			text = "推演结束" + (extra || "") +
 				"<br><span style='font-weight:normal;font-size:12.5px'>" +
-				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它" +
-				"(那时才有反思与问题分流)</span>";
+				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它</span>";
 			color = "rgba(15,157,88,0.95)";
 		}
 		if (!b) { devLog("sys", "推演结束:" + reason); return; }
@@ -353,12 +352,23 @@
 	function setCurrentTime(t) {
 		if (!t || t.length < 12) return;
 		window.__time_count = (window.__time_count || 0) + 1;
-		// Extract the "12:42" part of "20250213-12:42" directly; no Date parsing (avoids parsing bugs)
-		let timeStr = String(t).slice(9);
+		// 时间字符串形如 "20260828-09:30"(case00 的 "20250213-12:42" 同格式)。
+		// 以前只截 HH:MM —— 但 case01 每个节点是"某天 09:30",于是时钟永远显示 09:30,
+		// 用户反馈"9:30 这个时间为什么一直没变"。现在把**日期**也带上:
+		// 节点之间的日期(08-27 → 08-28 → … → 09-15)一跳,时钟就跟着变。
+		// 直接按位置解析,不用 Date(避免时区/格式坑)。
+		let s = String(t).trim();
+		let m = s.match(/^(\d{4})-?(\d{2})-?(\d{2})[ T\-]?(\d{2}:\d{2})?/);
+		let label;
+		if (m) { label = m[4] ? (m[2] + "-" + m[3] + " " + m[4]) : (m[2] + "-" + m[3]); }
+		else { label = s.slice(-5); }
 		let clockEl = document.getElementById("sim-clock-time");
-		if (clockEl) clockEl.innerHTML = timeStr;
-		display_time = timeStr;
-		target_time = timeStr;
+		if (clockEl) clockEl.innerHTML = label;
+		if (clockEl) clockEl.title = s;      // 原始串留在 tooltip 里,便于核对
+		window.__sim_time_raw = s;
+		// display_time/target_time 仍是 HH:MM(回放逻辑按它比对,不动)
+		display_time = s.slice(9);
+		target_time = s.slice(9);
 	}
 
 	function applySnapshot(agents, time) {
