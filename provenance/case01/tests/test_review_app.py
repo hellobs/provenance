@@ -185,6 +185,26 @@ def test_live_endpoint_hands_over_once_the_record_is_mapped(monkeypatch, tmp_pat
         review_app.clear_live()
 
 
+def test_dropdown_has_no_group_titles():
+    """下拉里不要分组标题(用户原话:"奇怪的无用的话")。
+
+    曾经有 `正在跑的这一次（实时）` 与 `mavis 新架构（成品三线）` 两个 optgroup。
+    现在就是一条条记录;引擎归属靠 run_id 自带(`…-mavis-B-…` / `…-old-B`)。
+    """
+    html = _client().get("/review").text
+    assert "optgroup" not in html
+    assert "正在跑的这一次" not in html
+    assert "mavis 新架构（成品三线）" not in html
+    assert "● 实时 ｜" in html, "实时那条仍要在(运行时由 /api/review/live 决定显不显示)"
+
+
+def test_router_pane_shows_risk_note_and_question_flag():
+    """问题分流那一块:风险单独一段,"仍是疑问句"要显式标出来(不许静默)。"""
+    html = _client().get("/review").text
+    assert "风险 / 错在哪" in html
+    assert "仍是疑问句" in html
+
+
 def test_live_mode_is_wired_into_the_page():
     """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
     html = _client().get("/review").text

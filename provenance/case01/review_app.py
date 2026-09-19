@@ -396,8 +396,8 @@ function paneOverview(d) {
   const rows = [
     ["run_id", esc(d.run_id)],
     ["引擎记录", hasInj
-      ? '<span class="chip k">mavis 新架构（成品三线）</span>'
-      : '<span class="chip">旧引擎对照 · 无注入器段</span>'],
+      ? '<span class="chip k">mavis</span>'
+      : '<span class="chip">旧引擎</span>'],
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
     ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
@@ -571,7 +571,8 @@ function render() {
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA);
-    const eng = isMavis ? "mavis 新架构" : "旧引擎对照（无注入器段）";
+    // 引擎只用两个字,不写"（成品三线）""（无注入器段）"这种括注(用户嫌啰嗦)。
+    const eng = isMavis ? "mavis" : "旧引擎";
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
     const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
     if (DATA.live) {
@@ -647,9 +648,9 @@ async function boot() {
     LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
   const sel = document.getElementById("pick");
-  // 下拉就是一条条记录:**不要分组标题**。用户明确说过"正在跑的这一次（实时）""mavis 新架构
-  // （成品三线）"这种话是"奇怪的无用的话"——记录名里已经带了引擎(branch 前那段),
-  // 标签只保留"哪条线(含义) ｜ run_id"。
+  // 下拉就是一条条记录:**不要分组标题**(用户说过那种分组标题是"奇怪的无用的话";
+  // 测试 test_dropdown_has_no_group_titles 会盯住页面里不出现分组元素)。
+  // 记录名里已经带了引擎(branch 前那段),标签只保留"哪条线(含义) ｜ run_id"。
   const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
   const ENG_ORDER = { mavis: 0, legacy: 1 };
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
@@ -664,7 +665,7 @@ async function boot() {
     String(a.run_id).localeCompare(String(b.run_id)));
   sel.innerHTML = liveOpt + sorted.map(optHtml).join("");
   sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); pick(sel.value); };
-  // 有实跑就默认看实时(用户要"同步看全程");否则落在成品三线(mavis)上,
+  // 有实跑就默认看实时(用户要"同步看全程");否则落在 mavis 记录上,
   // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
   if (WANT_RUN) {
