@@ -196,3 +196,7 @@ build/
 # 目视验收截图(用 case01/tools/webshot.js 随时重新生成,不入库)
 .shots/
 provenance/.shots/
+
+# case01 运行记录/样本一律不入库(约定:只入约定与代码,不入记录)。
+# 2026-09-19:用新目录名 runs_archive_* 归档时漏了这条,把 11 条记录提交进了公开仓库。
+provenance/case01/runs_archive_*/
