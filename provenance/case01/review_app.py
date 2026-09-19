@@ -137,78 +137,103 @@ _PAGE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <title>GTC Case 01 · 成品记录审阅</title>
 <style>
-  :root { --ink:#223; --mut:#778; --line:#dde4e0; --bg:#f4f6f5; --card:#fff;
-          --accent:#2d6cdf; --green:#1d3a2f; --low:#2f9e44; --mid:#b26a00; --high:#c92a2a; }
+  /* 中性配色:深色页头(原来是墨绿 #1d3a2f)已去掉,改成浅色页头 + 单一蓝色强调色。
+     理由:这块面板要嵌进治理平台/小镇界面,深色大面积色块既不协调也难与别家风格共存;
+     中性底 + 一个强调色,别人接手时改 --accent 一处即可。绿色只保留在"风险低"徽标上。 */
+  :root { --ink:#1f2937; --mut:#6b7280; --line:#e5e7eb; --line-soft:#f1f3f5;
+          --bg:#f6f7f9; --card:#fff; --accent:#2563eb; --accent-soft:#eef4ff;
+          --low:#0f9d58; --mid:#c77700; --high:#d93025; }
   * { box-sizing: border-box; }
-  body { margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--green); color:#fff; padding:10px 18px; display:flex; gap:16px;
+  body { margin:0; background:var(--bg); color:var(--ink); font-size:13px; line-height:1.6;
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+         -webkit-font-smoothing:antialiased; }
+  header { position:sticky; top:0; z-index:5; background:var(--card); color:var(--ink);
+           border-bottom:1px solid var(--line); padding:10px 18px; display:flex; gap:14px;
            align-items:center; flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0; font-weight:600; }
-  header select { background:#26493b; color:#fff; border:1px solid #3c6353; border-radius:6px;
-                  padding:5px 8px; font-size:13px; max-width:560px; }
-  header .meta { font-size:12px; color:#cfe3d8; margin-left:auto; }
-  header a { color:#cfe3d8; font-size:12px; }
+  header h1 { font-size:15px; margin:0; font-weight:600; letter-spacing:.2px; }
+  header select { font:inherit; font-size:13px; color:var(--ink); background:var(--card);
+                  border:1px solid var(--line); border-radius:8px; padding:5px 8px; max-width:420px; }
+  header select:hover { border-color:#cfd6e0; }
+  header .meta { font-size:12px; color:var(--mut); margin-left:auto; min-width:0;
+                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  header .meta a { color:var(--accent); text-decoration:none; }
+  header .meta a:hover { text-decoration:underline; }
+  code { background:var(--line-soft); border-radius:4px; padding:1px 5px; font-size:12px;
+         font-family:ui-monospace,Consolas,monospace; }
+  .note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px;
+          padding:8px 12px; font-size:12px; margin-bottom:10px; }
   .wrap { max-width:1080px; margin:16px auto; padding:0 14px; display:flex; gap:16px; align-items:flex-start; }
-  nav { flex:0 0 148px; background:var(--card); border:1px solid var(--line); border-radius:10px;
-        padding:8px; position:sticky; top:12px; }
-  nav button { display:flex; justify-content:space-between; width:100%; text-align:left; border:0;
-               background:transparent; padding:7px 9px; border-radius:7px; cursor:pointer;
-               font-size:13px; color:var(--ink); font-family:inherit; }
-  nav button:hover { background:#eef2f0; }
-  nav button.on { background:#e7efff; color:var(--accent); font-weight:600; }
-  nav button span.n { color:var(--mut); font-weight:400; font-size:12px; }
+  nav { flex:0 0 152px; background:var(--card); border:1px solid var(--line); border-radius:12px;
+        padding:6px; position:sticky; top:64px; }
+  nav button { display:flex; justify-content:space-between; gap:8px; width:100%; text-align:left;
+               border:0; background:transparent; padding:7px 10px; border-radius:8px; cursor:pointer;
+               font:inherit; font-size:13px; color:var(--ink); }
+  nav button:hover { background:var(--line-soft); }
+  nav button.on { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  nav button span.n { color:var(--mut); font-weight:400; font-size:12px; font-variant-numeric:tabular-nums; }
+  nav button.on span.n { color:var(--accent); }
   main { flex:1; min-width:0; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
-          padding:12px 16px; margin-bottom:12px; }
-  .card .m { color:var(--mut); font-size:12px; margin-bottom:6px; }
-  .card .m b { color:var(--accent); }
-  .t { font-size:14px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
-  h2 { font-size:14px; color:#456; margin:6px 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:14px 16px; margin-bottom:12px; }
+  .card .m { color:var(--mut); font-size:12px; margin-bottom:8px; }
+  .card .m b { color:var(--ink); font-weight:600; }
+  .t { font-size:13.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+  h2 { font-size:13px; color:var(--mut); font-weight:600; margin:2px 0 12px; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .chip { font-size:12px; padding:2px 8px; border-radius:10px; background:#eef2f0; color:#456; }
-  .chip.k { background:#e7efff; color:var(--accent); }
-  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; color:#fff; }
+  .chip { font-size:12px; padding:2px 9px; border-radius:999px; background:var(--line-soft); color:#4b5563; }
+  .chip.k { background:var(--accent-soft); color:var(--accent); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px;
+           color:#fff; font-weight:500; }
   .badge.low { background:var(--low); } .badge.medium { background:var(--mid); }
-  .badge.high { background:var(--high); } .badge.other { background:#889; }
+  .badge.high { background:var(--high); } .badge.other { background:#9ca3af; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--mut); font-weight:500; font-size:12px; }
-  .kv { display:grid; grid-template-columns:150px 1fr; gap:6px 12px; font-size:13px; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+  th { color:var(--mut); font-weight:500; font-size:12px; border-bottom-color:var(--line); }
+  tbody tr:hover { background:#fafbfc; }
+  .kv { display:grid; grid-template-columns:170px 1fr; gap:7px 14px; font-size:13px; }
   .kv .k { color:var(--mut); }
   details { margin-top:8px; }
   summary { cursor:pointer; font-size:12px; color:var(--accent); }
-  pre { background:#f7f9f8; border:1px solid var(--line); border-radius:8px; padding:10px;
-        font-size:12px; line-height:1.5; overflow:auto; max-height:420px; white-space:pre-wrap; }
-  .empty { color:#99a; text-align:center; padding:26px; }
+  pre { background:#fafbfc; border:1px solid var(--line); border-radius:10px; padding:12px;
+        font-size:12px; line-height:1.6; overflow:auto; max-height:420px; white-space:pre-wrap;
+        font-family:ui-monospace,Consolas,monospace; }
+  .empty { color:#9ca3af; text-align:center; padding:28px; }
   .tl { border-left:2px solid var(--line); margin-left:6px; padding-left:14px; }
   .tl .row { position:relative; margin-bottom:10px; }
-  .tl .row::before { content:""; position:absolute; left:-21px; top:5px; width:8px; height:8px;
+  .tl .row::before { content:""; position:absolute; left:-21px; top:6px; width:7px; height:7px;
                      border-radius:50%; background:var(--accent); }
-  .bar { height:6px; border-radius:3px; background:#eef2f0; overflow:hidden; margin-top:4px; }
-  .bar i { display:block; height:100%; background:var(--accent); }
+  .bar { height:4px; border-radius:3px; background:var(--line-soft); overflow:hidden; margin-top:5px; }
+  .bar i { display:block; height:100%; background:var(--accent); border-radius:3px; opacity:.9; }
   .num { font-variant-numeric:tabular-nums; }
-  /* 嵌入模式(?embed=1 或 /embed/review):给仝牧平台用 iframe 引用时用。
-     去掉大标题与页边距、压缩表头,让面板贴合 iframe 尺寸,而不是自带一整套页面外框。 */
+  /* 嵌入模式(?embed=1 或 /embed/review),也是 5010 右栏卡片里那份:
+     去掉大标题与页边距、页头压成两行(下拉整行 + 说明一行),贴合 iframe 尺寸。 */
   body.embed { background:#fff; }
-  body.embed header { padding:6px 10px; gap:10px; }
+  body.embed header { padding:9px 12px; gap:8px; position:static; }
   body.embed header h1 { display:none; }
-  body.embed header select { max-width:240px; font-size:12px; }
-  body.embed header .meta { font-size:11px; }
-  body.embed .wrap { margin:0; padding:6px 8px 10px; gap:10px; max-width:none; }
+  body.embed header select { width:100%; max-width:none; font-size:12.5px; }
+  body.embed header .meta { margin-left:0; width:100%; font-size:11.5px; white-space:normal; }
+  body.embed .wrap { margin:0; padding:8px 10px 12px; gap:10px; max-width:none; }
   body.embed nav { position:static; flex:0 0 132px; }
-  body.embed .card { padding:9px 12px; margin-bottom:9px; }
+  body.embed .card { padding:11px 13px; margin-bottom:10px; }
   /* 窄容器:嵌在 5010 右栏那张卡片里时 iframe 只有 ~380px 宽。
-     媒体查询量的是 iframe 自己的视口宽度,所以这里能把九块的导航改成**横排**、
-     表格允许横向滚动——否则左边那条竖导航会吃掉三分之一宽度,表就挤没了。 */
+     媒体查询量的是 iframe 自己的视口宽度,所以这里能把九块的导航改成**横排**。
+     注意 min-width:0 —— flex/grid 项目的 min-width 默认是 auto(按最小内容宽),
+     里面只要有一个不换行的长元素(表格/长串),整页就会被撑宽、
+     文字被裁在卡片外面(实测踩过:截图里英文段落右边被切掉)。 */
   @media (max-width: 700px) {
-    .wrap { flex-direction:column; gap:6px; }
+    .wrap, nav, main, .card, .kv { min-width:0; }
+    /* align-items 必须重置:外层默认 flex-start,而窄版把 .wrap 改成了**竖排**——
+       竖排时 align-items 管的是宽度,flex-start 会让每块按内容宽(max-content)排,
+       于是长段落不换行、被裁在卡片外(实测:英文段落右边整段被切掉)。 */
+    .wrap { flex-direction:column; gap:6px; align-items:stretch; }
     nav { position:static; flex:0 0 auto; display:flex; flex-wrap:wrap; gap:4px; padding:6px; }
     nav button { width:auto; }
     .card { padding:8px 10px; }
     .kv { grid-template-columns:1fr; gap:2px 0; }
     .kv .k { font-size:12px; }
     pre { max-height:260px; }
-    .card > table, .card table { display:block; overflow-x:auto; white-space:nowrap; }
+    table { font-size:12.5px; }
+    th, td { padding:5px 6px; }
     .t { font-size:13px; }
   }
 </style>
@@ -465,9 +490,7 @@ async function boot() {
   // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
   const cur = String(d.current_run_id || "").trim();
   if (cur && !(d.runs || []).some(x => x.run_id === cur)) {
-    LIVE_HINT = `<div class="card" style="border-color:#e0b060;background:#fffaf0">` +
-      `本次实跑 <code>${esc(cur)}</code> 还没生成成品记录` +
-      `${d.current_note ? `（${esc(d.current_note)}）` : ""}——跑完后会自动出现在上面的下拉里。</div>`;
+    LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
   const sel = document.getElementById("pick");
   // 下拉按引擎**分组**,并先说人话:哪条剧情线(带含义) -> 记录 id。

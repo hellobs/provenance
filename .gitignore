@@ -192,3 +192,7 @@ build/
 *.egg-info/
 .venv/
 .uv/
+
+# 目视验收截图(用 case01/tools/webshot.js 随时重新生成,不入库)
+.shots/
+provenance/.shots/

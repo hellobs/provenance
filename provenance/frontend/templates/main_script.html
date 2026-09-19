@@ -261,6 +261,9 @@
 					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
 				} else if (reason === "interrupted") {
 					setSimStatus("finished", "推演被中断(服务保持中)");
+				} else if (reason === "review_only") {
+					// 5010 的 --review-only:只服务界面、根本没在推演。
+					setSimStatus("finished", "仅审阅模式:未在推演(右栏可翻结果记录)");
 				} else {
 					setSimStatus("finished", "推演已结束(服务保持中,可查看结果)");
 				}
