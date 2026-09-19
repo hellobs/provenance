@@ -8,6 +8,8 @@ roles / alias / scenario / 前端资源根 作为参数喂给它,不再含渲染
     python -m case01.vizkit.live_run --branch B --port 5010
 然后浏览器打开 http://127.0.0.1:5010/ —— 运行过程中角色移动/对话会实时出现。
 跑完后默认再保持 60 秒(--hold)方便观察,随后关闭服务。
+跑完会广播一条 `done`:此后(含保持期)打开页面的人会看到"已结束",
+不会被空小镇误导——**不允许静默**。
 """
 import argparse
 import json
@@ -78,12 +80,21 @@ def main(argv=None):
         if args.out:
             bridge.save(args.out)
             print("记录已保存 ->", args.out)
+        # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
+        # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
+        live.finish("run_finished")
         if args.hold > 0:
-            print("保持服务 {:.0f} 秒供观察…".format(args.hold))
+            print("推演已结束,服务保持 {:.0f} 秒供观察(此刻打开页面会显示“已结束”)…"
+                  .format(args.hold))
             time.sleep(args.hold)
     except KeyboardInterrupt:
         print("已中断")
+        live.finish("interrupted")
         exit_code = 130
+    except Exception as exc:  # noqa: BLE001 - 必须让页面也看到失败,不能只写在自己日志里
+        print("运行失败: {}: {}".format(type(exc).__name__, exc))
+        live.finish("error:{}".format(type(exc).__name__))
+        exit_code = 1
     finally:
         bridge.close()
         print("服务已关闭")

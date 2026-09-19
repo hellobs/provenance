@@ -955,6 +955,12 @@ async def ws_endpoint(ws: WebSocket):
     await ws.send_json({"type": "init"})
     if state.compressor is not None and state.compressor.started:
         await ws.send_json(state.compressor.snapshot())
+    # 已经结束/报错时才连进来的人:必须立刻告知,否则页面只显示一个不动的小镇,
+    # 用户会判断"可视化里根本没反应"(2026-09-19 实测反馈)。**不允许静默**。
+    if state.sim_state.get("status") == "done":
+        await ws.send_json({"type": "done", "reason": "run_finished"})
+    elif state.sim_state.get("status") == "error":
+        await ws.send_json({"type": "error", "message": state.sim_state.get("error", "")})
 
     # 独立心跳任务:每 5 秒无条件发 ping,不依赖队列是否为空。
     # 旧实现只在 q 超时才发 ping——模拟突发式推送(每步 6 角色批量)的
@@ -968,6 +974,7 @@ async def ws_endpoint(ws: WebSocket):
                 try:
                     await ws.send_json({"type": "ping"})
                 except Exception:
+                    log.debug("心跳终止(连接已关闭)", exc_info=True)
                     return
         except _asyncio.CancelledError:
             pass
@@ -980,7 +987,8 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     except Exception:
-        pass
+        # 断线是常态;但非断线的异常必须留痕,否则前端黑屏时无从排查。
+        log.warning("websocket 连接异常关闭", exc_info=True)
     finally:
         stop_hb.set()
         hb_task.cancel()

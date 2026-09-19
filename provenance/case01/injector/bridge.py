@@ -371,15 +371,28 @@ class MavisBridge:
     # ------------------------------------------------------------------
     # 可插拔可视化接线(引擎只产生事件,插件自己画)
     # ------------------------------------------------------------------
-    @staticmethod
-    def _build_fanout(visualizers):
-        """visualizers:[插件实例] / ["town","report","console"] / None(不接)。"""
+    def _build_fanout(self, visualizers):
+        """visualizers:[插件实例] / ["town","report","console"] / None(不接)。
+
+        插件故障**不允许静默**:某个插件抛异常时记一行警告(带 traceback),
+        否则表现就是"页面/文件里什么都没有,日志里也什么都没有"。
+        """
         if not visualizers:
             return None
         from mavis_vizkit import Fanout, create
 
         instances = [create(v) if isinstance(v, str) else v for v in visualizers]
-        return Fanout(instances, on_error=lambda name, exc: None)
+
+        def _on_error(name, exc):
+            msg = "可视化插件 {} 出错(已隔离): {}: {}".format(
+                name, type(exc).__name__, exc)
+            game = getattr(self, "game", None)
+            if game is not None and getattr(game, "logger", None) is not None:
+                game.logger.warning(msg)
+            else:
+                print("[vizkit] " + msg, flush=True)
+
+        return Fanout(instances, on_error=_on_error)
 
     def _trace_agent(self, name, state, step, sim_time):
         """记录侧:把本步节点的 agent 状态落进 _agent_trace(两种模式都必须)。"""

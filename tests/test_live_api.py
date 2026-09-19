@@ -300,6 +300,38 @@ class TestUndo:
 
 
 # ---------------------------------------------------------------------------
+# WebSocket:跑完之后才连进来的人必须被告知
+# ---------------------------------------------------------------------------
+class TestWsLateJoiner:
+    """**不允许静默**:推演已结束/已出错后才打开页面的人,必须立刻收到 done/error。
+
+    起因:服务跑完仍保持(--hold),此时打开页面只看到一个不动的小镇、
+    也没有任何说明,用户据此判断"可视化里的人根本没反应"。
+    """
+
+    def _set_status(self, monkeypatch, status, error=""):
+        monkeypatch.setattr(state, "sim_state", {
+            "name": "test-sim", "status": status, "error": error,
+            "start_time": "20250213-09:30", "stride": 2,
+        })
+
+    def test_done_sent_to_late_joiner(self, client, monkeypatch):
+        self._set_status(monkeypatch, "done")
+        with client.websocket_connect("/ws") as ws:
+            assert ws.receive_json()["type"] == "init"
+            msg = ws.receive_json()
+            assert msg["type"] == "done"
+            assert msg.get("reason")
+
+    def test_error_sent_to_late_joiner(self, client, monkeypatch):
+        self._set_status(monkeypatch, "error", error="boom")
+        with client.websocket_connect("/ws") as ws:
+            assert ws.receive_json()["type"] == "init"
+            msg = ws.receive_json()
+            assert msg["type"] == "error" and msg["message"] == "boom"
+
+
+# ---------------------------------------------------------------------------
 # 页面渲染冒烟(HTML + JS 语法)
 # ---------------------------------------------------------------------------
 class TestPageRender:
@@ -349,6 +381,8 @@ class TestPageRender:
             assert "goals-panel" in r.text
         if path == "/":
             assert "game-container" in r.text
+            # 实时页必须有可见的运行状态指示(连接中/进行中/已结束/出错)
+            assert 'id="sim-status"' in r.text and "setSimStatus" in r.text
 
 
 # ---------------------------------------------------------------------------

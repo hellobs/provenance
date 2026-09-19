@@ -11,10 +11,13 @@
    否则不落任何本仓路径。
 """
 import json
+import logging
 import os
 from typing import Dict, List, Optional
 
 from .. import Visualizer, register
+
+log = logging.getLogger("mavis_vizkit.town")
 
 
 def scenario_coords(scenario_dir: str, roles) -> Dict[str, list]:
@@ -23,6 +26,9 @@ def scenario_coords(scenario_dir: str, roles) -> Dict[str, list]:
     for role in (roles or []):
         p = os.path.join(scenario_dir, "agents", role, "agent.json")
         if not os.path.exists(p):
+            # 角色没有场景配置 → 前端就没有初始坐标(会停在原点)。
+            # 不打断,但必须留痕:**不允许静默**。
+            log.warning("角色 %s 缺少场景配置,无初始坐标: %s", role, p)
             continue
         try:
             with open(p, encoding="utf-8") as f:
@@ -30,7 +36,10 @@ def scenario_coords(scenario_dir: str, roles) -> Dict[str, list]:
             coord = cfg.get("coord")
             if coord:
                 out[role] = list(coord)
+            else:
+                log.warning("角色 %s 的场景配置里没有 coord: %s", role, p)
         except Exception:
+            log.warning("读取角色 %s 的场景配置失败: %s", role, p, exc_info=True)
             continue
     return out
 

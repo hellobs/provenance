@@ -21,6 +21,20 @@ body { margin: 0; }
     padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><span id="sim-clock-time">--:--</span></div>
 
+<!-- 运行状态指示(仅实时模式):连接中 / 推演进行中 / 已结束 / 出错。
+     加这一行的原因:推演跑完后服务会继续保持(--hold),此时打开页面看到的是
+     一个不动的小镇、且没有任何说明,容易被当成"可视化坏了"。**不允许静默**:
+     页面上必须一眼看出当前到底在不在跑。 -->
+{% if live_mode %}
+<div id="sim-status" style="position: fixed; left: 16px; top: 100px; z-index: 100;
+    background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; color: #555; max-width: 260px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <span id="sim-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%;
+        background:#f0ad4e; margin-right:6px; vertical-align:middle;"></span><span
+        id="sim-status-text">连接中…</span></div>
+{% endif %}
+
 <!-- Story event banner (shown when an event is injected) -->
 <div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
     z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;

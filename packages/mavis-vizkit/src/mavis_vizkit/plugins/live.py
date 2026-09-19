@@ -6,20 +6,29 @@
 - 页面:由调用方传入 `static_root` / `template_dir`(前端资源根);
   角色的贴图别名经 alias 挂载到既有目录(只影响贴图);
 - 快照:新连入的客户端先收 `init` + 当前 `snapshot`,随后接收实时事件。
+  若调用方从不发 `snapshot` 事件,则用"每个角色最近一条状态"**合成**一份
+  (见 `catch_up`),否则中途/事后打开页面的人会看到空小镇而不知道原因。
+- 结束:调用方跑完后应调 `finish()` 发一条 `done`;新连入者也会立刻收到
+  `done`,从而知道"推演已结束、服务只是在保持"。
 
 实现要点
 --------
 - uvicorn 跑在守护线程里,插件本身在引擎线程被调用 → 事件通过
   `asyncio.run_coroutine_threadsafe` 投递到 uvicorn 的事件循环;
-- 服务器未启动时事件进 pending 缓冲(便于单测与无头运行,不丢语义)。
+- 服务器未启动时事件进 pending 缓冲(便于单测与无头运行,不丢语义);
+- **不静默**:推送失败、连接异常、心跳异常都记日志(不打断引擎,但必须留痕)。
+  宁可日志吵,也不要"页面上什么都没有、日志里也什么都没有"。
 """
 import asyncio
+import logging
 import os
 import threading
 from typing import Dict, List, Optional
 
 from .. import Visualizer, register
 from .town import scenario_coords
+
+log = logging.getLogger("mavis_vizkit.live")
 
 
 class LiveVisualizer(Visualizer):
@@ -60,6 +69,10 @@ class LiveVisualizer(Visualizer):
         self._clients: List[asyncio.Queue] = []
         self._pending: List[dict] = []
         self._last_snapshot: Optional[dict] = None
+        self._last_agents: dict = {}      # 角色名 -> 最近一条 agent 前端消息(用于合成追赶快照)
+        self._last_time: str = ""         # 最近一次模拟时间(同上)
+        self._finished: bool = False      # 运行是否已结束(由 finish() 或 done 事件置位)
+        self._finish_reason: str = ""     # 结束原因(随 done 一起告诉客户端)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
         self._server = None
@@ -109,9 +122,72 @@ class LiveVisualizer(Visualizer):
         msg = self._town.to_frontend(event)
         if not msg:
             return
-        if msg.get("type") == "snapshot":
+        kind = msg.get("type")
+        # 模拟时间:任何带 time 的消息都算(agent/chat_line 也带),
+        # 否则"只收到过 agent 就被中断的运行"合成快照时时间是空的。
+        if msg.get("time"):
+            self._last_time = msg["time"]
+        if kind == "agent":
+            # 记下每个角色的最近状态:新连接要靠它合成"当前状态"快照。
+            name = msg.get("name")
+            if name:
+                self._last_agents[name] = dict(msg)
+        elif kind == "snapshot":
             self._last_snapshot = msg
+        elif kind == "done":
+            self._finished = True
+            self._finish_reason = msg.get("reason", "") or self._finish_reason
         self.broadcast(msg)
+
+    @property
+    def finished(self) -> bool:
+        """运行是否已结束(前端"已结束"指示与服务端 done 的依据)。"""
+        return self._finished
+
+    @property
+    def finish_reason(self) -> str:
+        return self._finish_reason
+
+    def finish(self, reason: str = "run_finished") -> None:
+        """运行结束:广播一条 `done`,并记住状态以便后到的人也知道。
+
+        为什么必须发:前端有 `done` 的处理分支,但如果没人发,页面就只是"人不动、
+        也没人告诉你为什么"——用户实测反馈过。`--hold` 只保持服务,不代表还在跑。
+        """
+        if self._finished and reason == self._finish_reason:
+            return
+        self._finished = True
+        self._finish_reason = reason
+        self.broadcast({"type": "done", "reason": reason})
+
+    def catch_up(self) -> Optional[dict]:
+        """新连接的"当前状态"追赶:优先给真实 snapshot,否则用各角色最近一条状态合成。
+
+        为什么必须有它:前端只在收到 `snapshot` 时才会立刻把角色**归位**
+        (`applySnapshot`),否则要等后续逐条 `agent` 消息才知道角色在哪。
+        而在"跑完之后服务保持(--hold)"或"中途才打开页面"这两种常见情形下,
+        已经没有后续消息了——于是页面是一个**空小镇**,看起来像坏了。
+        2026-09-19 用户实测反馈:"左边那个可视化里面的人根本没反应"。
+
+        合成快照只带前端归位与名牌需要的字段(coord / action / location),
+        形状与 `applySnapshot` 的读法一致;拿到真实 snapshot 时仍以真实那份为准。
+        """
+        if self._last_snapshot:
+            return self._last_snapshot
+        if not self._last_agents:
+            return None
+        agents = {}
+        for name, msg in self._last_agents.items():
+            agents[name] = {
+                "coord": msg.get("coord"),
+                "texture": msg.get("texture"),
+                "action": msg.get("action", ""),
+                "location": msg.get("location", ""),
+                "currently": msg.get("currently", ""),
+                "role_type": msg.get("role_type", "user"),
+            }
+        return {"type": "snapshot", "agents": agents, "time": self._last_time,
+                "synthesized": True}
 
     def broadcast(self, msg: dict) -> None:
         """线程安全广播:投递到 uvicorn 事件循环;未启动则进 pending。"""
@@ -125,7 +201,9 @@ class LiveVisualizer(Visualizer):
             try:
                 asyncio.run_coroutine_threadsafe(q.put(dict(msg)), loop)
             except Exception:
-                continue
+                # 单个客户端推送失败不影响其它客户端,但**必须留痕**——
+                # 否则表现就是"某个人页面上什么都没有",而日志里也什么都没有。
+                log.warning("向一个客户端推送失败(type=%s)", msg.get("type"), exc_info=True)
 
     def pending(self) -> List[dict]:
         return list(self._pending)
@@ -214,15 +292,26 @@ class LiveVisualizer(Visualizer):
             try:
                 await ws.send_json({"type": "init", "agents": self.roles,
                                     "textures": {r: self.alias.get(r, r) for r in self.roles}})
-                for msg in ([self._last_snapshot] if self._last_snapshot else []) + self.drain_pending():
+                # 先给"当前状态"追赶,再补没送到过的事件。
+                catch = self.catch_up()
+                if catch:
+                    await ws.send_json(catch)
+                for msg in self.drain_pending():
                     if msg:
                         await ws.send_json(msg)
+                # 已经跑完才连进来的人:立刻告诉他"结束了",否则页面只是静悄悄的。
+                if self._finished:
+                    await ws.send_json({"type": "done",
+                                        "reason": self._finish_reason or "run_finished"})
+                log.info("客户端接入(当前 %d 个,追赶快照=%s,已结束=%s)",
+                         len(self._clients), bool(catch), self._finished)
                 while True:
                     await ws.send_json(await q.get())
             except WebSocketDisconnect:
                 pass
             except Exception:
-                pass
+                # 断线是常态,但"不是断线"的异常必须留痕,否则前端黑屏无从排查。
+                log.warning("websocket 连接异常关闭", exc_info=True)
             finally:
                 hb.cancel()
                 if q in self._clients:
@@ -238,7 +327,8 @@ class LiveVisualizer(Visualizer):
         except asyncio.CancelledError:
             pass
         except Exception:
-            pass
+            # 心跳失败基本等于这条连接死了;记一行日志,便于对照"页面为什么停住"。
+            log.debug("心跳终止(连接已关闭)", exc_info=True)
 
 
 register("live", LiveVisualizer)

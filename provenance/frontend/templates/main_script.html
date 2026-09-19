@@ -159,6 +159,22 @@
 			t.innerHTML = "Expand ▸";
 		}
 	}
+	// ================= 运行状态指示(live 模式) =================
+	// **不允许静默**:页面必须能一眼看出"连接中 / 推演进行中 / 已结束 / 出错"。
+	// 起因:推演跑完后服务继续保持(--hold),新打开页面的人只看到一个不动的小镇、
+	// 没有任何说明,于是判断"可视化里的人根本没反应"。
+	function setSimStatus(state, text) {
+		var dot = document.getElementById("sim-status-dot");
+		var el = document.getElementById("sim-status-text");
+		var box = document.getElementById("sim-status");
+		if (!dot || !el) return;  // 旧模板 / 非实时页面没有这个元素,不报错
+		var colors = { connecting: "#f0ad4e", running: "#4caf50", finished: "#9e9e9e", error: "#f44336" };
+		dot.style.background = colors[state] || "#f0ad4e";
+		el.textContent = text || state;
+		if (box) box.title = text || state;
+		window.__sim_status = state;
+		devLog("sys", "状态 → " + (text || state));
+	}
 	// ================= Global error capture (into console) =================
 	// 1) JS runtime errors
 	window.onerror = function(msg, src, line, col, err) {
@@ -181,16 +197,19 @@
 	if (live_mode) {
 		let sse_state = "connecting";
 		let lastMsgTs = Date.now();  // 最后收到消息的时间(服务端每 5 秒发心跳)
+		let sim_running = false;     // 是否已经收到过推演数据(区别于"连上了但还没开始")
+		setSimStatus("connecting", "连接中…");
 		let ws = new WebSocket("ws://" + location.host + "/ws");
-		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); };
-		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setTimeout(function() { location.reload(); }, 3000); };
-		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); };
+		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); setSimStatus("connecting", "已连接,等待推演数据…"); };
+		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setSimStatus("error", "连接已断开,3 秒后重连…"); setTimeout(function() { location.reload(); }, 3000); };
+		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); setSimStatus("error", "连接出错"); };
 		// (WebSocket disconnect is handled by onclose: reload page after 3s to reconnect)
 		ws.onmessage = function(e) {
 			lastMsgTs = Date.now();  // 任意消息(含心跳)都视为连接健康
 			const msg = JSON.parse(e.data);
 			if (msg.type === "agent") {
 				var isAI = msg.role_type === "ai_tool";
+				if (!sim_running) { sim_running = true; setSimStatus("running", "推演进行中"); }
 				// 场景驱动仅在 scene/独立页执行;面板模式只消费倾向数据
 				if (wantScene) {
 					devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
@@ -220,15 +239,26 @@
 				devLog("time", "Game time → " + msg.time);
 				setCurrentTime(msg.time);
 			} else if (msg.type === "snapshot") {
-				devLog("sys", "Snapshot: " + Object.keys(msg.agents || {}).length + " agents, time " + msg.time);
+				devLog("sys", "Snapshot: " + Object.keys(msg.agents || {}).length + " agents, time " + msg.time
+					+ (msg.synthesized ? "(按最近状态合成)" : ""));
+				if (!sim_running) { sim_running = true; setSimStatus("running", "推演进行中"); }
 				if (wantScene) applySnapshot(msg.agents, msg.time);
 				else if (msg.time) setCurrentTime(msg.time);
 			} else if (msg.type === "done") {
-				devLog("sys", "Simulation finished");
+				var reason = msg.reason || "";
+				devLog("sys", "Simulation finished" + (reason ? " (" + reason + ")" : ""));
 				sim_finished = true;
+				if (reason.indexOf("error") === 0) {
+					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
+				} else if (reason === "interrupted") {
+					setSimStatus("finished", "推演被中断(服务保持中)");
+				} else {
+					setSimStatus("finished", "推演已结束(服务保持中,可查看结果)");
+				}
 			} else if (msg.type === "error") {
 				devLog("event", "Error: " + (msg.message || ""));
 				sim_error = msg.message || "Simulation error";
+				setSimStatus("error", "推演出错:" + (msg.message || ""));
 			} else if (msg.type === "story") {
 				// Story event injection: highlight in console + red banner flash
 				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));

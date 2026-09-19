@@ -81,6 +81,22 @@ class TestFanout:
         fanout.emit({"type": "nonsense"})
         assert errors and "未知事件类型" in errors[0]
 
+    def test_default_on_error_logs_instead_of_silence(self, caplog):
+        """默认(不传 on_error)必须留痕:插件炸了不能既没输出也没日志。"""
+        import logging
+
+        class Boom(vizkit.Visualizer):
+            name = "boom2"
+
+            def on_event(self, event):
+                raise RuntimeError("plugin down")
+
+        fanout = Fanout([Boom()])
+        with caplog.at_level(logging.WARNING, logger="mavis_vizkit"):
+            fanout.emit({"type": "time", "time": "2026-08-27"})
+        assert any("boom2" in r.message for r in caplog.records), "插件异常必须记日志"
+        assert any(r.levelno >= logging.WARNING for r in caplog.records)
+
 
 class TestTownPlugin:
     def test_alias_and_fallback_coords(self, tmp_path, scenario_dir):

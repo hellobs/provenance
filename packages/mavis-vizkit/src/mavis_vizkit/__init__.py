@@ -6,11 +6,20 @@
 
 - 统一事件流:init / time / agent / chat_line / story / snapshot(键名固定)。
 - 插件可消费"实时事件流"(on_event)或"整份 run 记录"(on_record)。
-- 故障隔离:Fanout 把事件推给多个插件,单个插件异常不打断其它插件。
+- 故障隔离:Fanout 把事件推给多个插件,单个插件异常不打断其它插件
+  (但**默认会打日志**,不允许静默吞掉)。
 """
+import logging
 from typing import Callable, Dict, List
 
+log = logging.getLogger("mavis_vizkit")
+
 EVENT_TYPES = ("init", "time", "agent", "chat_line", "story", "snapshot")
+
+
+def _default_on_error(name: str, exc: BaseException) -> None:
+    """插件级故障的默认去处:记一行警告。**不允许静默**。"""
+    log.warning("可视化插件 %s 出错(已隔离,不影响引擎):%s", name, exc, exc_info=True)
 
 
 class Visualizer:
@@ -46,11 +55,13 @@ def create(name: str, **kwargs) -> Visualizer:
 
 
 class Fanout:
-    """把事件同时推给多个插件;单个插件异常不打断其它插件。"""
+    """把事件同时推给多个插件;单个插件异常不打断其它插件(但**必须报出来**)。"""
 
     def __init__(self, visualizers: List[Visualizer], on_error=None):
         self.visualizers = list(visualizers)
-        self.on_error = on_error or (lambda name, exc: None)
+        # 默认**不静默**:插件炸了要留一行警告。此前默认是空 lambda,
+        # 结果是"页面上什么都没有、日志里也什么都没有"。
+        self.on_error = on_error or _default_on_error
 
     def emit(self, event: dict) -> None:
         etype = event.get("type")

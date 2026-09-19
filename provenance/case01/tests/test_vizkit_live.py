@@ -77,6 +77,15 @@ def test_snapshot_is_sent_to_late_joiner():
         assert snap["type"] == "snapshot" and "Ethan Lin" in snap["agents"]
 
 
+def _recv_until(ws, kind, limit=10):
+    """收消息直到出现指定类型(容忍追赶快照/积压事件夹在中间)。"""
+    for _ in range(limit):
+        msg = ws.receive_json()
+        if msg.get("type") == kind:
+            return msg
+    raise AssertionError("在 {} 条消息内没有收到 {}".format(limit, kind))
+
+
 def test_index_page_renders_with_alias_assets():
     from fastapi.testclient import TestClient
 
@@ -90,3 +99,58 @@ def test_index_page_renders_with_alias_assets():
     assert client.get("/static/assets/village/agents/Ethan Lin/portrait.png").status_code == 200
     health = client.get("/health").json()
     assert health["status"] == "ok" and health["roles"] == ROLES
+
+
+def test_page_shows_visible_run_status():
+    """页面必须有可见的运行状态指示(**不允许静默**)。
+
+    起因:推演跑完后服务继续保持(--hold),新开页面的人只看到不动的小镇、
+    没有任何说明,于是反馈"可视化里的人根本没反应"。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5093)
+    body = TestClient(live.app).get("/").text
+    assert 'id="sim-status"' in body and 'id="sim-status-text"' in body
+    assert "setSimStatus" in body
+    for state in ("connecting", "running", "finished", "error"):
+        assert state in body, "状态机缺少 {} 分支".format(state)
+
+
+def test_finish_broadcasts_done_to_connected_client():
+    """跑完要主动广播 done:不让页面停在"人不动、也没人解释"的状态。"""
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5092)
+    client = TestClient(live.app)
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "init"
+        live.finish("run_finished")
+        msg = _recv_until(ws, "done")
+        assert msg["reason"] == "run_finished"
+    assert live.finished is True
+
+
+def test_late_joiner_after_finish_gets_synthesized_snapshot_and_done():
+    """跑完之后才打开页面的人:先拿到合成快照(角色归位),再被告知已结束。"""
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5091)
+    live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [9, 7],
+                   "action": "asking", "location": "office", "time": "2026-09-15"})
+    live.finish("run_finished")
+    client = TestClient(live.app)
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "init"
+        snap = _recv_until(ws, "snapshot")
+        assert snap.get("synthesized") is True
+        assert snap["agents"]["Ethan Lin"]["coord"] == [9, 7]
+        assert snap["time"] == "2026-09-15"
+        assert _recv_until(ws, "done")["type"] == "done"
+
+
+def test_finish_is_idempotent():
+    live = _live(port=5090)
+    live.finish("run_finished")
+    live.finish("run_finished")
+    assert [m["type"] for m in live.pending()] == ["done"]
