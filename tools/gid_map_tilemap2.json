@@ -1,0 +1,19 @@
+{
+ "world": "the Ville",
+ "sector": {
+  "32164": {"name": "Trading Center"},
+  "32174": {"name": "SECTOR_32174"}
+ },
+ "arena": {
+  "32140": {"name": "Trading Floor"},
+  "32141": {"name": "ARENA_32141"}
+ },
+ "object": {
+  "32222": {"name": "宿舍Lounge"},
+  "32250": {"name": "File Cabinet"},
+  "32260": {"name": "Trading Terminal"},
+  "32270": {"name": "Seat"},
+  "32279": {"name": "Market Screen"},
+  "32280": {"name": "Podium"}
+ }
+}
