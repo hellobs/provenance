@@ -21,18 +21,26 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUNS_DIR = os.path.join(BASE_DIR, "runs")
+# 记录根:默认 case01/runs。可用 CASE01_REVIEW_RUNS_DIR 覆盖——测试指向入库的
+# tests/fixtures/records,因为 case01/runs/ 是 gitignored、CI 的全新 checkout 里没有它。
+# 这与 case01/viz.py 的 load_run(run_id, runs_dir=...) 是同一个道理。
+RUNS_DIR = os.environ.get("CASE01_REVIEW_RUNS_DIR") or os.path.join(BASE_DIR, "runs")
 
 app = FastAPI(title="GTC Case 01 · 成品记录审阅")
 
 
+def _runs_dir():
+    """每次调用都读模块级 RUNS_DIR,便于测试 monkeypatch。"""
+    return RUNS_DIR
+
+
 def _discover_runs():
-    """列出 case01/runs 下所有带 run.json 的 run。"""
-    if not os.path.isdir(RUNS_DIR):
+    """列出记录根下所有带 run.json 的 run。"""
+    if not os.path.isdir(_runs_dir()):
         return []
     out = []
-    for name in sorted(os.listdir(RUNS_DIR)):
-        path = os.path.join(RUNS_DIR, name, "run.json")
+    for name in sorted(os.listdir(_runs_dir())):
+        path = os.path.join(_runs_dir(), name, "run.json")
         if os.path.isfile(path):
             out.append(name)
     return out
@@ -40,7 +48,7 @@ def _discover_runs():
 
 def _brief(run_id):
     """列表用的轻量摘要(只读该 run.json,不做全量返回)。"""
-    path = os.path.join(RUNS_DIR, run_id, "run.json")
+    path = os.path.join(_runs_dir(), run_id, "run.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -78,7 +86,7 @@ def get_run(run_id: str):
     if run_id not in _discover_runs():
         return JSONResponse({"ok": False, "errors": ["没有这个 run: {}".format(run_id)]},
                             status_code=404)
-    with open(os.path.join(RUNS_DIR, run_id, "run.json"), "r", encoding="utf-8") as f:
+    with open(os.path.join(_runs_dir(), run_id, "run.json"), "r", encoding="utf-8") as f:
         return JSONResponse(json.load(f))
 
 
