@@ -28,10 +28,15 @@ body { margin: 0; }
 </style>
 <div id="game-container" style="text-align: center"></div>
 
-<!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
+<!-- 左栏(时钟 / 运行状态 / Developer Console):三块放在**同一个竖排容器**里,
+     而不是各自写死 fixed top —— 状态块会随"重开一局"按钮出现而变高,写死 top 就会压住
+     console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。 -->
 {% if embed != "goals" and embed != "explain" and embed != "timeline" %}
-<div id="sim-clock" style="position: fixed; left: 16px; top: 60px; z-index: 100;
-    background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
+<div id="left-col" style="position: fixed; left: 16px; top: 60px; z-index: 150; width: 320px;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+
+<!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
+<div id="sim-clock" style="background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
     padding: 6px 12px; font-size: 14px; font-weight: bold; color: #333;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><span id="sim-clock-time">--:--</span></div>
 
@@ -40,8 +45,7 @@ body { margin: 0; }
      一个不动的小镇、且没有任何说明,容易被当成"可视化坏了"。**不允许静默**:
      页面上必须一眼看出当前到底在不在跑。 -->
 {% if live_mode %}
-<div id="sim-status" style="position: fixed; left: 16px; top: 100px; z-index: 100;
-    background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
+<div id="sim-status" style="background: rgba(255,255,255,0.92); border: 1px solid #d8d8d8; border-radius: 8px;
     padding: 5px 12px; font-size: 12px; color: #555; max-width: 260px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
     <span id="sim-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%;
@@ -49,15 +53,56 @@ body { margin: 0; }
         id="sim-status-text">连接中…</span>
     {% if can_restart %}
     <!-- 推演结束后才出现的小按钮:决定要不要重开一局(用户要求)。
-         只有调用方注册了 on_restart 才渲染,否则这个服务不支持重开。 -->
-    <button id="restart-btn" onclick="restartRun()" title="用同样的设置再跑一局"
-        style="display:none; margin-top:6px; width:100%; padding:4px 8px; font:inherit;
-        font-size:12px; cursor:pointer; border:1px solid #cfd6e0; border-radius:7px;
-        background:#2563eb; color:#fff;">重开一局</button>
+         只有调用方注册了 on_restart 才渲染,否则这个服务不支持重开。
+         旁边的下拉是**通用**的 restart_choices(本页不知道 A/B/C 是什么):
+         选中的值随 POST body 一起交给服务端。"为什么跑的全是 B" —— 现在能在这选。 -->
+    <div id="restart-box" style="display:none; margin-top:6px; display:flex; gap:6px; align-items:center;">
+        {% for c in restart_choices or [] %}
+        <select id="restart-choice-{{ c.id }}" title="{{ c.label }}"
+            style="font:inherit; font-size:12px; padding:3px 4px; border:1px solid #cfd6e0;
+            border-radius:7px; background:#fff; color:#333;">
+            {% for opt in c.options or [] %}
+            <option value="{{ opt }}"{% if opt == c.value %} selected{% endif %}>{{ c.label }}{{ opt }}</option>
+            {% endfor %}
+        </select>
+        {% endfor %}
+        <button id="restart-btn" onclick="restartRun()" title="按上面的选择再跑一局"
+            style="flex:1; padding:4px 8px; font:inherit; font-size:12px; cursor:pointer;
+            border:1px solid #cfd6e0; border-radius:7px; background:#2563eb; color:#fff;">重开一局</button>
+    </div>
     <span id="restart-note" style="display:none; margin-top:4px; font-size:11px; color:#888;"></span>
     {% endif %}
 </div>
 {% endif %}
+
+<!-- Developer Console:左栏的第三块(必须**放在容器里面** —— 一开始我把它留在文件末尾,
+     结果整页(横幅/右栏/时间轴)全被卷进这个竖排容器,布局当场塌了)。 -->
+{% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
+<div style="width: 320px;">
+    <div id="dev-console" style="background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
+        font-size: 11px; color: #ccc; font-family: Consolas, monospace;
+        display: flex; flex-direction: column; overflow: hidden; max-height: 40vh;">
+        <div id="dev-console-header" style="display:flex; justify-content:space-between; align-items:center;
+            padding: 6px 10px; background: #222; cursor: pointer; user-select: none; flex-shrink: 0;">
+            <span style="font-weight:bold; color:#4af;">Developer Console</span>
+            <span id="dev-console-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
+        </div>
+        <div id="dev-console-body" style="padding: 6px 10px; overflow-y: scroll; flex: 1; line-height: 1.5;
+            max-height: calc(40vh - 34px); scrollbar-width: thin; scrollbar-color: #666 #222;">
+            <div style="color:#888;">Console ready, waiting for messages...</div>
+        </div>
+    </div>
+</div>
+<style>
+/* Developer console scrollbar (WebKit browsers) */
+#dev-console-body::-webkit-scrollbar { width: 8px; }
+#dev-console-body::-webkit-scrollbar-track { background: #222; border-radius: 4px; }
+#dev-console-body::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
+#dev-console-body::-webkit-scrollbar-thumb:hover { background: #888; }
+</style>
+{% endif %}
+
+</div><!-- /#left-col -->
 
 <!-- Story event banner (shown when an event is injected) -->
 <div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -205,34 +250,10 @@ body { margin: 0; }
         padding:10px 12px; font-size:11px; max-width:420px; max-height:60vh; overflow-y:auto;"></div>
 {% endif %}
 
-<!-- Left column: developer console。top 要让开左上角那两块(时钟 top:60 与
-     运行状态 top:100,状态块底边约 130)——原来写 120 会被状态块压住一部分。 -->
-{% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}
-<div style="position: fixed; left: 16px; top: 146px; width: 320px; z-index: 150;">
+<!-- (Developer Console 已上移到 #left-col 容器内;这里不再重复一份。) -->
 
-    <!-- Developer console (live message stream, collapsible, scrollable) -->
-    <div id="dev-console" style="background: rgba(17,17,17,0.92); border: 1px solid #444; border-radius: 8px;
-        font-size: 11px; color: #ccc; font-family: Consolas, monospace;
-        display: flex; flex-direction: column; overflow: hidden; max-height: 40vh;">
-        <div id="dev-console-header" style="display:flex; justify-content:space-between; align-items:center;
-            padding: 6px 10px; background: #222; cursor: pointer; user-select: none; flex-shrink: 0;">
-            <span style="font-weight:bold; color:#4af;">Developer Console</span>
-            <span id="dev-console-toggle" style="color:#888; font-size:12px;">Collapse ▾</span>
-        </div>
-        <div id="dev-console-body" style="padding: 6px 10px; overflow-y: scroll; flex: 1; line-height: 1.5;
-            max-height: calc(40vh - 34px); scrollbar-width: thin; scrollbar-color: #666 #222;">
-            <div style="color:#888;">Console ready, waiting for messages...</div>
-        </div>
-    </div>
+{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
 </div>
-
-<style>
-/* Developer console scrollbar (WebKit browsers) */
-#dev-console-body::-webkit-scrollbar { width: 8px; }
-#dev-console-body::-webkit-scrollbar-track { background: #222; border-radius: 4px; }
-#dev-console-body::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
-#dev-console-body::-webkit-scrollbar-thumb:hover { background: #888; }
-</style>
 {% endif %}
 
 {% if embed != "scene" and embed != "goals" and embed != "explain" and embed != "timeline" %}

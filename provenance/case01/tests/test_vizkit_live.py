@@ -16,12 +16,12 @@ ROLES = ["Investment AI", "Ethan Lin"]
 ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
 
 
-def _live(port=5099, extra_panels=None, on_restart=None):
+def _live(port=5099, extra_panels=None, on_restart=None, restart_choices=None):
     return create("live", port=port, roles=ROLES, alias=ALIAS, scenario_dir=SCENARIO,
                   static_root=os.path.join(FRONTEND, "static"),
                   template_dir=os.path.join(FRONTEND, "templates"),
                   ping_interval=30.0, extra_panels=extra_panels,
-                  on_restart=on_restart)
+                  on_restart=on_restart, restart_choices=restart_choices)
 
 
 def test_registered_and_config():
@@ -135,30 +135,40 @@ def test_page_has_loud_end_of_run_banner():
 
 
 def test_restart_button_only_when_caller_registers_it():
-    """推演结束后的小按钮"重开一局"(用户要求):注册了 on_restart 才有,没注册就不出现。"""
+    """推演结束后的小按钮"重开一局"(用户要求):注册了 on_restart 才有,没注册就不出现。
+
+    同时验:页面上那个下拉来自通用的 restart_choices,选中的值会随 POST body
+    交给回调(用户问"为什么跑的全是 B" —— 现在能在页面上选 A/B/C)。
+    """
     from fastapi.testclient import TestClient
 
     plain = TestClient(_live(port=5083).app).get("/").text
     assert 'id="restart-btn"' not in plain, "没注册回调时不该有按钮"
     assert TestClient(_live(port=5082).app).post("/control/restart").status_code == 404
 
-    calls = []
+    seen = []
 
-    def on_restart():
-        calls.append(1)
+    def on_restart(payload):
+        seen.append(payload)
         return {"ok": True, "detail": "已受理"}
 
-    live = _live(port=5081, on_restart=on_restart)
+    live = _live(port=5081, on_restart=on_restart,
+                 restart_choices=[{"id": "branch", "label": "分支",
+                                   "options": ["A", "B", "C"], "value": "B"}])
     c = TestClient(live.app)
     page = c.get("/").text
     assert 'id="restart-btn"' in page and "restartRun" in page
-    assert 'id="restart-note"' in page, "失败/受理都要有地方写出来"
+    assert 'id="restart-box"' in page and 'id="restart-choice-branch"' in page
+    assert ">分支A</option>" in page and ">分支C</option>" in page
     # 按钮默认隐藏:只有状态变成已结束/出错才显示
-    assert "state === \"finished\"" in page or 'state === "finished"' in page
-    r = c.post("/control/restart")
+    assert 'state === "finished"' in page
+    r = c.post("/control/restart", json={"branch": "A"})
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["detail"] == "已受理"
-    assert calls == [1]
+    assert seen == [{"branch": "A"}], "页面选的分支要原样交给回调"
+    # 不带 body 也要能打(老页面/curl)
+    assert c.post("/control/restart").json()["ok"] is True
+    assert seen[-1] == {}
     assert c.get("/health").json()["can_restart"] is True
 
 
@@ -166,7 +176,7 @@ def test_restart_callback_failure_is_reported_to_the_page():
     """重开失败不能让页面以为成功了(不许静默)。"""
     from fastapi.testclient import TestClient
 
-    def boom():
+    def boom(payload):
         raise RuntimeError("桥接挂了")
 
     live = _live(port=5080, on_restart=boom)
@@ -177,19 +187,27 @@ def test_restart_callback_failure_is_reported_to_the_page():
 
 
 def test_begin_run_clears_finished_state_for_the_next_round():
-    """重开一局时插件必须被"重置":否则第二局从第一秒起就告诉页面"已结束"。"""
+    """重开一局时插件必须被"重置":否则第二局从第一秒起就告诉页面"已结束",
+    或者把上一局积压的 done 补发给刚刷新连上来的页面(实测:重开后又突然说推演结束)。"""
     from fastapi.testclient import TestClient
 
     live = _live(port=5079)
     c = TestClient(live.app)
+    # 造上一局的残留:一条没发出去的 done + 追赶快照
+    live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [9, 7], "time": "t1"})
     live.finish("run_finished")
     assert c.get("/health").json()["finished"] is True
+    assert live.pending(), "上一局的 done 还在积压里"
+
     live.begin_run()
     h = c.get("/health").json()
     assert h["finished"] is False and h["finish_reason"] == ""
-    # 晚连进来的人这时不该再收到 done
+    assert live.pending() == [], "上一局积压的事件必须清掉"
     with c.websocket_connect("/ws") as ws:
         assert ws.receive_json()["type"] == "init"
+        # 清干净了:既没有 done,也没有上一局的追赶快照
+        live.on_event({"type": "time", "time": "2026-08-27-09:30"})
+        assert ws.receive_json()["type"] == "time"
 
 
 def test_bridge_close_can_keep_the_shared_visualizer():

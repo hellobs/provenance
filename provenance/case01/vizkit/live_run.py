@@ -43,7 +43,7 @@ SCENARIO = os.path.join(
 
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
-                  scenario_dir="", with_review=True, on_restart=None):
+                  scenario_dir="", with_review=True, on_restart=None, branch="B"):
     """建**一个**服务:实时小镇 + case01 结果面板(九块)。
 
     为什么要挂在一起(2026-09-19 用户拍板"只维护一个界面"):
@@ -63,7 +63,10 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         # ?embed=1:卡片里的 iframe 用压缩版式(去掉大标题与页边距),贴合 380px 宽的卡片
         extra_panels=[{"id": "review", "label": "结果记录",
                        "url": "/review?embed=1"}],
-        on_restart=on_restart)
+        on_restart=on_restart,
+        # 重开时可以在页面上选分支(A/B/C 是业务标签,所以由 case01 侧传进来)
+        restart_choices=[{"id": "branch", "label": "分支", "options": ["A", "B", "C"],
+                          "value": branch}])
     if with_review:
         from ..review_app import attach_to
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。
@@ -129,17 +132,26 @@ def main(argv=None):
 
     scenario = args.scenario_dir or SCENARIO
     # 页面上的"重开一局"按钮(用户要求:推演结束后决定要不要重开)。
-    # 回调只做一件事:把重开请求记下来;真正的重开由下面的主循环执行
+    # 回调只做一件事:把重开请求(含页面上选的分支)记下来;真正的重开由下面的主循环执行
     # (不能在回调里直接跑推演,那是 HTTP 线程池的活)。
     restart_flag = threading.Event()
+    restart_req = {"branch": ""}
 
-    def request_restart():
+    def request_restart(payload=None):
+        branch = str((payload or {}).get("branch") or "").strip().upper()
+        if branch not in ("A", "B", "C"):
+            branch = args.branch          # 没选/选了怪值 → 沿用当前分支
+        restart_req["branch"] = branch
         restart_flag.set()
-        print("收到重开请求:当前这一局跑完(或保持期结束)后立刻开新的一局")
-        return {"ok": True, "detail": "已受理:这一局结束后自动开新的一局"}
+        # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
+        # pending 里那条上一局的 done,变成"重开后又突然说推演结束"(用户实测反馈)。
+        live.begin_run()
+        print("收到重开请求:下一局分支 {};当前这一局跑完(或保持期结束)后立刻开".format(branch))
+        return {"ok": True, "detail": "已受理:下一局走 {} 线".format(branch), "branch": branch}
 
     live = build_service(host=args.host, port=args.port, roles=roles,
                          run_id=args.run_id, scenario_dir=scenario,
+                         branch=args.branch,
                          on_restart=None if args.no_restart else request_restart)
     live.start()
     print("界面已启动: {}  (小镇 + 右栏“结果记录”卡片;Ctrl+C 结束)".format(live.url()))
@@ -161,21 +173,26 @@ def main(argv=None):
 
     exit_code = 0
     ran_once = False
+    branch = args.branch
     try:
         while True:
             restart_flag.clear()
-            nodes = default_nodes(args.branch, roles=list(roles))
+            # 分支由页面上的下拉决定(重开时可以换线);没选就沿用启动时的 --branch
+            if restart_req["branch"]:
+                branch = restart_req["branch"]
+                restart_req["branch"] = ""
+            nodes = default_nodes(branch, roles=list(roles))
             if args.nodes > 0:
                 nodes = nodes[:args.nodes]
             # 每跑一次就该有一个能唯一定位的名字:**日期在最前**(便于按时间排序)、
             # 带 case 与引擎、实跑再带 HHMM(同一天跑多次也不撞)。名字里的日期是
             # **真实运行时间**;记录里的 start_date/end_date 是模拟剧情日期,不是一回事。
-            run_id = args.run_id if (args.run_id and not ran_once) else live_run_id(args.branch)
+            run_id = args.run_id if (args.run_id and not ran_once) else live_run_id(branch)
             ran_once = True
-            out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
-            print("本次 run_id: {}".format(run_id))
-            # 新的一局开始:先清掉插件上"已结束"的状态,否则第二局从第一秒起
-            # 就告诉页面"已结束"(状态点灰着),看着像没在跑。
+            out = os.path.join("case01", "runs_injector", run_id, "raw.json")
+            print("本次 run_id: {} (分支 {})".format(run_id, branch))
+            # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
+            # 否则刷新后的页面会收到上一局的 done / 旧位置。
             live.begin_run()
             # 面板是建服务时挂上去的,那时 run_id 还没生成;这里补告一次,
             # 好让面板能写出"本次实跑 <run_id> 还没成品记录(跑完自动生成)"。
@@ -183,7 +200,7 @@ def main(argv=None):
             bridge = MavisBridge(
                 nodes=nodes, roles=roles, scenario_dir=scenario,
                 run_id=run_id,
-                dry_run=False, max_retries=args.max_retries, branch=args.branch,
+                dry_run=False, max_retries=args.max_retries, branch=branch,
                 visualizers=[live],
             )
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
@@ -200,7 +217,7 @@ def main(argv=None):
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
                 live.finish("run_finished")
                 if not args.no_map:
-                    _map_run(run_id, args.branch, out)
+                    _map_run(run_id, branch, out)
                 else:
                     print("  (--no-map:跳过映射;手工命令见 docs)")
                 if args.hold > 0:
@@ -226,7 +243,7 @@ def main(argv=None):
                 bridge.close(keep_visualizers=True)
             if not restart_flag.is_set():
                 break
-            print("重开:开始新的一局(分支 {} 不变)".format(args.branch))
+            print("重开:开始新的一局(分支 {})".format(branch))
     finally:
         live.close()      # 进程要退出了:现在才关服务本身
         clear_live()      # 别让面板一直显示一个已经不动的"实时"

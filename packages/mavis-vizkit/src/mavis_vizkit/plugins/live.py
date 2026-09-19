@@ -46,7 +46,7 @@ class LiveVisualizer(Visualizer):
                  start_datetime: str = "",
                  nodes_key: str = "nodes", meta_key: Optional[str] = None,
                  extra_panels: Optional[List[dict]] = None,
-                 on_restart=None):
+                 on_restart=None, restart_choices: Optional[List[dict]] = None):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -73,7 +73,10 @@ class LiveVisualizer(Visualizer):
         self.extra_panels = [dict(t) for t in (extra_panels or []) if t.get("url")]
         # 可选的"重开"回调(默认 None = 页面不显示按钮、也不挂控制路由)。
         # 页面推演结束后给一个小按钮,由调用方决定"重开"到底做什么。
+        # restart_choices 是**通用**的下拉项:[{id,label,options,value}] ——
+        # 本包不知道 A/B/C 是什么,只知道"重开时可以带一组选择给回调"。
         self.on_restart = on_restart
+        self.restart_choices = [dict(c) for c in (restart_choices or []) if c.get("id")]
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -159,15 +162,24 @@ class LiveVisualizer(Visualizer):
         return self._finish_reason
 
     def begin_run(self) -> None:
-        """新的一局开始:清掉"已结束"状态。
+        """新的一局开始:把**上一局留下的状态全部清掉**。
 
-        为什么要它:插件是**跨局共享**的(HTTP 服务只有一份)。第一局 `finish()` 之后
-        `_finished` 一直是 True —— 不清的话,重开的第二局从第一秒起就告诉页面"已结束"
-        (状态点灰着、done 立刻发出去),页面看着像没在跑。
-        只清状态,不广播:新一局的"在跑"由页面上的 init/快照/agent 消息自然体现。
+        为什么要它(2026-09-19 真机踩到):插件是跨局共享的(HTTP 服务只有一份),
+        第一局 `finish()` 之后 `_finished` 一直是 True —— 用户点了"重开"、页面刷新后
+        连上来,先收到握手,再把 **pending 里那条上一局的 `done`** 补发给他,
+        于是"重开后又突然说推演结束"。同类残留还有:上一局的追赶快照/角色位置
+        (新一局会很早看到旧位置)、上一局的模拟时间。
+
+        所以这里一次性清空:`_finished` / `_finish_reason` / `_pending` /
+        `_last_snapshot` / `_last_agents` / `_last_time`。
+        只清状态,不广播:新一局的"在跑"由 init/快照/agent 消息自然体现。
         """
         self._finished = False
         self._finish_reason = ""
+        self._pending = []
+        self._last_snapshot = None
+        self._last_agents = {}
+        self._last_time = ""
 
     def finish(self, reason: str = "run_finished") -> None:
         """运行结束:广播一条 `done`,并记住状态以便后到的人也知道。
@@ -283,6 +295,7 @@ class LiveVisualizer(Visualizer):
                 },
                 "extra_panels": self.extra_panels,
                 "can_restart": self.on_restart is not None,
+                "restart_choices": self.restart_choices,
             }
 
         @app.get("/", response_class=HTMLResponse)
@@ -312,15 +325,24 @@ class LiveVisualizer(Visualizer):
 
         if self.on_restart is not None:
             @app.post("/control/restart")
-            async def control_restart():
+            async def control_restart(request: Request):
                 """页面上的"重开一局"按钮打这里(通用控制口子,默认关闭)。
 
-                回调由调用方给(本包不认识它做什么);跑在**线程池**里,
-                免得重开这种重活把事件循环堵住。回调返回可 JSON 化的 dict 原样回给页面。
+                回调由调用方给(本包不认识它做什么);请求体是可选的 JSON
+                (形如 {"branch": "A"},来自 restart_choices 里的下拉),
+                原样作为参数交给回调。回调跑在**线程池**里,免得重开这种重活堵住事件循环;
+                它返回的 dict 原样回给页面。
                 """
+                payload = {}
+                try:
+                    payload = await request.json()
+                    if not isinstance(payload, dict):
+                        payload = {}
+                except Exception:      # noqa: BLE001 - 没带 body 是正常的
+                    payload = {}
                 try:
                     res = await asyncio.get_running_loop().run_in_executor(
-                        None, self.on_restart)
+                        None, lambda: self.on_restart(payload))
                 except Exception as exc:  # noqa: BLE001 - 失败要如实回给页面
                     log.warning("重开回调失败", exc_info=True)
                     return {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}

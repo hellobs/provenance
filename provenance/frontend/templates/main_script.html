@@ -183,8 +183,8 @@
 		if (box) box.title = text || state;
 		window.__sim_status = state;
 		// 只有"跑完了"才给重开按钮:跑的时候按它没有意义(要等这一局结束)。
-		var rb = document.getElementById("restart-btn");
-		if (rb) { rb.style.display = (state === "finished" || state === "error") ? "block" : "none"; }
+		var rb = document.getElementById("restart-box");
+		if (rb) { rb.style.display = (state === "finished" || state === "error") ? "flex" : "none"; }
 		devLog("sys", "状态 → " + (text || state));
 	}
 	// ================= 推演结束的醒目提示 =================
@@ -225,10 +225,23 @@
 	// 请求成功后**刷新页面**——新一局要从零开始(空小镇、清空的对话、新的实时记录),
 	// 原地复用旧页面会把上一局的对话/位置留在屏幕上。
 	function restartRun() {
+		var box = document.getElementById("restart-box");
 		var btn = document.getElementById("restart-btn");
 		var note = document.getElementById("restart-note");
+		// 把 restart_choices 里选中的值(现在只有分支)一起交给服务端
+		var payload = {};
+		var sels = document.querySelectorAll("#restart-box select");
+		for (var i = 0; i < sels.length; i++) {
+			var id = sels[i].id.replace("restart-choice-", "");
+			payload[id] = sels[i].value;
+		}
+		if (box) box.style.pointerEvents = "none";
 		if (btn) { btn.disabled = true; btn.textContent = "正在重开…"; }
-		fetch("/control/restart", { method: "POST" })
+		fetch("/control/restart", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload)
+		})
 			.then(function(r) { return r.json(); })
 			.then(function(d) {
 				if (d && d.ok) {
@@ -239,12 +252,14 @@
 					var msg = (d && (d.error || d.detail)) || "未知原因";
 					if (note) { note.style.display = "block"; note.textContent = "重开失败:" + msg; }
 					devLog("error", "重开失败:" + msg);
+					if (box) box.style.pointerEvents = "";
 					if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
 				}
 			})
 			.catch(function(e) {
 				if (note) { note.style.display = "block"; note.textContent = "重开请求失败:" + e.message; }
 				devLog("error", "重开请求失败:" + e.message);
+				if (box) box.style.pointerEvents = "";
 				if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
 			});
 	}
