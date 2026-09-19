@@ -43,7 +43,8 @@ SCENARIO = os.path.join(
 
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
-                  scenario_dir="", with_review=True, on_restart=None, branch="B"):
+                  scenario_dir="", with_review=True, on_restart=None, branch="B",
+                  branch_mode="judge"):
     """建**一个**服务:实时小镇 + case01 结果面板(九块)。
 
     为什么要挂在一起(2026-09-19 用户拍板"只维护一个界面"):
@@ -64,9 +65,12 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         extra_panels=[{"id": "review", "label": "结果记录",
                        "url": "/review?embed=1"}],
         on_restart=on_restart,
-        # 重开时可以在页面上选分支(A/B/C 是业务标签,所以由 case01 侧传进来)
-        restart_choices=[{"id": "branch", "label": "分支", "options": ["A", "B", "C"],
-                          "value": branch}])
+        # 重开时可以在页面上选:自动(由 AI 的 T0 回答判定,01 §六 的设计原意)或指定分支
+        # ("auto" 是默认 —— 保留设计原意;选 A/B/C 则退回 preset 对照)
+        restart_choices=[{"id": "branch",
+                          "label": "分支",
+                          "options": ["auto", "A", "B", "C"],
+                          "value": "auto" if branch_mode == "judge" else branch}])
     if with_review:
         from ..review_app import attach_to
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。
@@ -107,7 +111,12 @@ def _map_run(run_id, branch, raw_out):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="case01 单一界面:实时小镇 + 结果记录")
-    ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
+    ap.add_argument("--branch", default="B", choices=["A", "B", "C"],
+                    help="兜底分支:judge 模式下只有在判不出来时才用它")
+    ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
+                    choices=["judge", "preset"],
+                    help="judge=先跑 T0 再由 AI 的回答判定分支(0904doc 01 §六 的设计原意,默认);"
+                         "preset=分支由 --branch 指定(可控对照)")
     ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
@@ -140,10 +149,15 @@ def main(argv=None):
     branch_now = [args.branch]
 
     def request_restart(payload=None):
-        branch = str((payload or {}).get("branch") or "").strip().upper()
-        if branch not in ("A", "B", "C"):
-            branch = branch_now[0]        # 没选/选了怪值 → 沿用当前分支
+        choice = str((payload or {}).get("branch") or "").strip().upper()
+        if choice in ("A", "B", "C"):
+            branch = choice
+            mode = "preset"
+        else:
+            branch = branch_now[0]      # auto:分支交给 T0 判定,分支参数只作兜底
+            mode = "judge"
         restart_req["branch"] = branch
+        restart_req["mode"] = mode
         restart_flag.set()
         # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
         # pending 里那条上一局的 done,变成"重开后又突然说推演结束"(用户实测反馈)。
@@ -154,12 +168,16 @@ def main(argv=None):
         from ..review_app import clear_live, set_current_run
         clear_live()
         set_current_run("", "")
-        print("收到重开请求:下一局分支 {};当前这一局跑完(或保持期结束)后立刻开".format(branch))
-        return {"ok": True, "detail": "已受理:下一局走 {} 线".format(branch), "branch": branch}
+        print("收到重开请求:下一局 {};当前这一局跑完(或保持期结束)后立刻开".format(
+            "由 AI 的 T0 回答判定分支" if mode == "judge" else "预设 {} 线".format(branch)))
+        return {"ok": True,
+                "detail": ("已受理:下一局由 AI 的 T0 回答判定分支" if mode == "judge"
+                           else "已受理:下一局走 {} 线".format(branch)),
+                "branch": branch, "mode": mode}
 
     live = build_service(host=args.host, port=args.port, roles=roles,
                          run_id=args.run_id, scenario_dir=scenario,
-                         branch=args.branch,
+                         branch=args.branch, branch_mode=args.branch_mode,
                          on_restart=None if args.no_restart else request_restart)
     live.start()
     print("界面已启动: {}  (小镇 + 右栏“结果记录”卡片;Ctrl+C 结束)".format(live.url()))
@@ -182,13 +200,17 @@ def main(argv=None):
     exit_code = 0
     ran_once = False
     branch = args.branch
+    branch_mode = args.branch_mode
     try:
         while True:
             restart_flag.clear()
-            # 分支由页面上的下拉决定(重开时可以换线);没选就沿用启动时的 --branch
-            if restart_req["branch"]:
+            # 分支方式由页面上的下拉决定(重开时可以换):auto=由 AI 的 T0 回答判定(默认),
+            # A/B/C=预设(可控对照)。没选就沿用启动时的 --branch/--branch-mode。
+            if restart_req.get("branch"):
                 branch = restart_req["branch"]
+                branch_mode = restart_req.get("mode") or branch_mode
                 restart_req["branch"] = ""
+                restart_req["mode"] = ""
             branch_now[0] = branch        # 回调里读"当前分支"用
             nodes = default_nodes(branch, roles=list(roles))
             if args.nodes > 0:
@@ -196,10 +218,12 @@ def main(argv=None):
             # 每跑一次就该有一个能唯一定位的名字:**日期在最前**(便于按时间排序)、
             # 带 case 与引擎、实跑再带 HHMM(同一天跑多次也不撞)。名字里的日期是
             # **真实运行时间**;记录里的 start_date/end_date 是模拟剧情日期,不是一回事。
+            # judge 模式下真正的分支要等 T0 跑完才知道,所以名字里的分支先按兜底值,
+            # 记录写完(raw 落盘)后由 pipeline 的 branch 覆盖 —— 提示会打出来。
             run_id = args.run_id if (args.run_id and not ran_once) else live_run_id(branch)
             ran_once = True
             out = os.path.join("case01", "runs_injector", run_id, "raw.json")
-            print("本次 run_id: {} (分支 {})".format(run_id, branch))
+            print("本次 run_id: {} (分支方式={} 兜底分支={})".format(run_id, branch_mode, branch))
             # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
             # 否则刷新后的页面会收到上一局的 done / 旧位置。
             live.begin_run()
@@ -210,6 +234,7 @@ def main(argv=None):
                 nodes=nodes, roles=roles, scenario_dir=scenario,
                 run_id=run_id,
                 dry_run=False, max_retries=args.max_retries, branch=branch,
+                branch_mode=branch_mode,
                 visualizers=[live],
             )
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
@@ -219,7 +244,11 @@ def main(argv=None):
                               total_nodes=len(nodes))
             try:
                 record = bridge.run()
+                # judge 模式:分支是 T0 跑完才定的;run_id 里那段分支名先按兜底值起,
+                # 这里把**真实分支**打出来(记录里的 branch 以判定结果为准)。
                 print("运行完成:", json.dumps(record.get("summary") or {}, ensure_ascii=False))
+                print("  分支:{} (source={}) run_id={}".format(
+                    record.get("branch"), record.get("branch_source"), run_id))
                 bridge.save(out)
                 print("记录已保存 ->", out)
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
@@ -230,7 +259,8 @@ def main(argv=None):
                 # 但失败原因会在 stdout 与页面提示里写明。
                 try:
                     if not args.no_map:
-                        _map_run(run_id, branch, out)
+                        # 用**判定后的**真实分支做映射(judge 模式下 branch 参数只是兜底)
+                        _map_run(run_id, record.get("branch") or branch, out)
                     else:
                         print("  (--no-map:跳过映射;手工命令见 docs)")
                 finally:

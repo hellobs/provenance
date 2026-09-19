@@ -64,6 +64,7 @@ class MavisBridge:
         meeting_coord: Optional[List[int]] = None,
         c_plan_llm: Optional[object] = None,
         visualizers: Optional[List[object]] = None,
+        branch_mode: str = "preset",
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -73,6 +74,12 @@ class MavisBridge:
         self.dry_run = bool(dry_run)
         self.anchor_coord = list(anchor_coord) if anchor_coord else None
         self.branch = branch
+        # 分支来源:preset(运行参数) / judge(由 T0 回答判定,01 §六 的设计原意)
+        if branch_mode not in ("preset", "judge"):
+            raise ValueError("branch_mode 只能是 preset 或 judge,收到 {!r}".format(branch_mode))
+        self.branch_mode = branch_mode
+        self.branch_source = "preset"
+        self.judge_info: Dict[str, str] = {}
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
@@ -148,27 +155,38 @@ class MavisBridge:
                 self._current_context[dst].setdefault("user request", focus)
 
     def run(self) -> dict:
-        """按节点推进,返回本次运行的记录。"""
+        """按节点推进,返回本次运行的记录。
+
+        `branch_mode="judge"` 时**保留 0904doc 01 §六 的设计原意**:先跑 T0(咨询当天),
+        用 Investment AI 在 T0 的实际回答判定本次进入 A/B/C,再按该分支的预设时间线跑完
+        其余节点(市场世界仍不由模型临时生成)。`branch_mode="preset"` 则是可控对照:
+        分支由运行参数指定,T0 不参与判定。
+        """
         if not self.dry_run:
             self._build_mavis()
-        for idx, node in enumerate(self.nodes, start=1):
+        nodes = list(self.nodes)
+        idx = 0
+        while idx < len(nodes):
+            node = nodes[idx]
+            step_index = idx          # 0-based,与原来 enumerate(start=1) 的 idx-1 等价
+            idx += 1
             self.activate(node)
             self._apply_world(node)
             dialogue_before = self._dialogue_count()
             node_t0 = time.time()
 
             retries = 0
-            started = self._step_once(node, step_index=idx - 1,
-                                      stride=self._stride_to_next(idx - 1))
+            started = self._step_once(node, step_index=step_index,
+                                      stride=self._stride_to_next(step_index))
             if node.require_interaction and not started:
                 while retries < self.max_retries and not started:
                     retries += 1
-                    started = self._step_once(node, step_index=idx - 1, stride=0)
+                    started = self._step_once(node, step_index=step_index, stride=0)
 
             self.records.append({
                 "node_id": node.node_id,
                 "date": node.date,
-                "step": idx,
+                "step": step_index + 1,
                 "released_events": [e.get("id") for e in node.events],
                 "events": [dict(e, date=node.date) for e in node.events],
                 "context": {k: dict(v) for k, v in self._current_context.items()},
@@ -178,15 +196,77 @@ class MavisBridge:
                 "world": dict(node.world),
                 "world_state": (self._node_facts.get(node.node_id) or {}).get("state"),
                 "dialogue": self._dialogue_tail(dialogue_before),
-                "agents": dict(self._agent_trace.get(idx, {})),
+                "agents": dict(self._agent_trace.get(step_index + 1, {})),
                 "elapsed_s": round(time.time() - node_t0, 1),
             })
-            # Branch C:首个节点(T0)落地后,用 Investment AI 的答案解析条件化方案并
-            # 注入事实层(buy_now 立即建仓 / wait 留待后续节点监测触发)。
+
+            # judge 模式:第一个节点(T0)落地后立刻判定分支,然后换成该分支的后续节点重排。
+            if (self.branch_mode == "judge" and step_index == 0 and not self.dry_run):
+                self._decide_branch_from_t0(self.records[-1], t0_node=node)
+                nodes = list(self.nodes)
+            # Branch C:分支确定后,用 Investment AI 的 T0 答案解析条件化方案并注入事实层
+            # (buy_now 立即建仓 / wait 留待后续节点监测触发)。
             if self.branch == "C" and not self.dry_run \
-                    and self.facts is not None and node is self.nodes[0]:
+                    and self.facts is not None and step_index == 0:
                 self._install_c_plan(self.records[-1], node)
         return self.run_record()
+
+    def _decide_branch_from_t0(self, rec: dict, t0_node: NodeSpec) -> str:
+        """用 Investment AI 在 T0 的实际回答判定分支(01 §六),并据此重排后续节点与事实层。
+
+        判不出来(没有 T0 对话)时**不静默**:记一条警告、保留原分支,并把
+        `branch_source` 标成 `preset-fallback` —— 记录里能看出来这次没判成。
+        """
+        answer = self._extract_role_answer(rec, self.roles[0])
+        if not answer:
+            self.branch_source = "preset-fallback"
+            self.judge_info = {"detected": "", "reason": "T0 没有 AI 回答,无法判定"}
+            self._warn("judge: T0 没有 Investment AI 的回答,分支退回预设 {}".format(self.branch))
+            return self.branch
+        from ..world.branch import LLMBranchJudge
+        from ..agents.llm import OllamaClient
+
+        llm = self.c_plan_llm or OllamaClient()
+        try:
+            detected, info = LLMBranchJudge(llm).judge(answer)
+        except Exception as e:  # noqa: BLE001 - 判定失败也要留痕,不静默
+            self.branch_source = "preset-fallback"
+            self.judge_info = {"detected": "", "reason": "judge 失败: {}".format(e)}
+            self._warn("judge 调用失败({}),分支退回预设 {}".format(e, self.branch))
+            return self.branch
+        self.branch = detected
+        self.branch_source = "judge"
+        self.judge_info = {"detected": detected, "reason": info.get("reason", ""),
+                           "judge": info.get("judge", "llm"),
+                           "answer_head": answer[:200]}
+        # 后续节点换成该分支的时间线(T0 已经跑过,从第 2 个节点接着跑)
+        self.nodes = [t0_node] + self._nodes_for(detected)[1:]
+        # 事实层也得换成该分支的市场世界,并把它推进到 T0(与刚跑完的那一步对齐)
+        if self.use_case01_facts:
+            from .worldfacts import Case01Facts
+
+            facts = Case01Facts(detected, run_id=self.run_id)
+            facts.apply_node(t0_node)
+            self.facts = facts
+            self._node_facts[t0_node.node_id] = {"state": facts.state_snapshot()}
+            self._world_audit = facts.audit()
+            rec["world_state"] = facts.state_snapshot()
+        self._warn("judge: T0 判定为 {} 线({});后续按 Timeline {} 跑".format(
+            detected, self.judge_info["reason"], "B" if detected == "B" else "A"))
+        return detected
+
+    def _nodes_for(self, branch: str) -> List[NodeSpec]:
+        """某个分支的完整节点序列(judge 模式判定后重排用)。"""
+        from .nodes import default_nodes
+
+        return default_nodes(branch, roles=list(self.roles))
+
+    def _warn(self, msg: str) -> None:
+        """警告:优先走 mavis 日志,没有 game 时打 stdout(**不许静默**)。"""
+        if self.game is not None and getattr(self.game, "logger", None) is not None:
+            self.game.logger.warning(msg)
+        else:
+            print("[bridge] " + msg, flush=True)
 
     def run_record(self) -> dict:
         """本次运行的记录（schema 版本化,便于与 case01 run.json 对齐）。"""
@@ -195,6 +275,11 @@ class MavisBridge:
             "run_id": self.run_id,
             "mode": "dry-run" if self.dry_run else "mavis",
             "branch": self.branch,
+            # 分支从哪来:preset=运行参数指定;judge=由 T0 回答判定(01 §六 的设计原意);
+            # preset-fallback=判定失败退回预设(记录里必须看得出来)
+            "branch_mode": self.branch_mode,
+            "branch_source": self.branch_source,
+            "judge_info": dict(self.judge_info),
             "roles": list(self.roles),
             "scenario_dir": self.scenario_dir,
             "nodes": list(self.records),

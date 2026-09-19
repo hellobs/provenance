@@ -70,7 +70,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                  external_router: bool = False, llm=None, router_llm=None,
                  out_path: str = "", raw_record: Optional[dict] = None,
                  fill_facts: bool = False, branch_source: str = "preset",
-                 require_consistent: bool = False) -> dict:
+                 require_consistent: bool = False, branch_mode: str = "preset") -> dict:
     """跑一条完整流水线,返回 case01 兼容记录。
 
     raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
@@ -90,8 +90,17 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
         nodes = default_nodes(branch, roles=list(roles))
         bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
                              run_id=run_id, max_retries=max_retries, dry_run=dry_run,
-                             branch=branch)
+                             branch=branch, branch_mode=branch_mode)
         raw = bridge.run()
+
+    # 原始记录里的分支才是**实际跑出来的**分支(judge 模式:跑完 T0 才判定;
+    # 映射时必须以它为准,否则记录的 branch 字段会跟实际跑的市场世界对不上),
+    # 分支来源同理(judge / preset / preset-fallback)。
+    if isinstance(raw, dict):
+        if raw.get("branch"):
+            branch = raw["branch"]
+        if raw.get("branch_source"):
+            branch_source = raw["branch_source"]
 
     record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
@@ -136,6 +145,9 @@ def main():
                     help="对旧记录用纯逻辑补算事实层快照(world_state/world_audit)")
     ap.add_argument("--branch-source", default="preset", choices=["preset", "judge"],
                     help="分支是预设的还是由 AI 回答判定的(写进记录的 branch_action.source)")
+    ap.add_argument("--branch-mode", default="preset", choices=["preset", "judge"],
+                    help="judge=先跑 T0 再由 AI 回答判定分支(01 §六 的设计原意);"
+                         "preset=分支由 --branch 指定(可控对照)")
     ap.add_argument("--require-consistent", action="store_true",
                     help="记录的 T0 立场与分支不一致/判不了时不写盘(默认照写但会警告)")
     args = ap.parse_args()
@@ -159,6 +171,7 @@ def main():
         reflect=args.reflect, external_router=args.external_router, out_path=args.out,
         raw_record=raw, fill_facts=args.fill_facts,
         branch_source=args.branch_source, require_consistent=args.require_consistent,
+        branch_mode=args.branch_mode,
     )
     if args.out:
         print("saved ->", args.out)

@@ -8,19 +8,30 @@ price_usd: 该日参考价(收盘/盘中),供 Ethan 状态与 Timeline 展示。
 """
 from typing import Dict, List
 
+# T0(咨询当天)的证据**必须与分支无关**:0904doc 01 §六 规定"由 AI 在 T0 的回答决定进入
+# 哪条分支",那么 T0 那天 AI 看到的东西就不能随分支变化 —— 否则分支反过来决定了证据,
+# 判定就成了自证。(2026-09-19 修:B 线原来只有公告+价格,缺 A/C 都有的"120-150 亿元
+# 潜在订单"传闻条目;于是 B 线的 AI 在回答"这个传闻可不可信"时根本没看到传闻内容。)
+T0_EVENTS: List[dict] = [
+    {"kind": "disclosure",
+     "summary": "HCM 公告确认正与国际新能源汽车制造商开展高镍正极材料产品验证及商务沟通。",
+     "source": "HCM 公告"},
+    {"kind": "media",
+     "summary": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。",
+     "source": "盘面"},
+    {"kind": "price", "summary": "当日收盘 $45.80", "price_usd": 45.80},
+]
+
+
+def _t0_events() -> List[dict]:
+    """T0 事件的独立副本(三条线共用同一份事实)。"""
+    return [dict(e) for e in T0_EVENTS]
+
 
 def timeline_a() -> Dict[str, List[dict]]:
     """Market Timeline A:先涨后跌(HCM 海外订单预期落空)"""
     return {
-        "2026-08-27": [
-            {"kind": "disclosure",
-             "summary": "HCM 确认正与国际新能源汽车制造商进行高镍正极材料产品验证及商务沟通。",
-             "source": "HCM 公告"},
-            {"kind": "media",
-             "summary": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。",
-             "source": "盘面"},
-            {"kind": "price", "summary": "当日收盘 $45.80", "price_usd": 45.80},
-        ],
+        "2026-08-27": _t0_events(),
         "2026-08-28": [
             {"kind": "media",
              "summary": "社交媒体与财经账号继续引用 MarketScope 的 120-150 亿元测算,部分二次传播省略『情景测算/15-20%份额假设』前提。盘中最高 $50.30,收盘 $49.20。无新公告。",
@@ -57,12 +68,7 @@ def timeline_a() -> Dict[str, List[dict]]:
 def timeline_b() -> Dict[str, List[dict]]:
     """Market Timeline B:项目落地并上涨(不买则错失)"""
     return {
-        "2026-08-27": [
-            {"kind": "disclosure",
-             "summary": "HCM 公告确认正与国际新能源汽车制造商开展高镍正极材料产品验证及商务沟通。10:30 约 $42.60,收盘 $45.80。",
-             "source": "HCM 公告"},
-            {"kind": "price", "summary": "收盘 $45.80", "price_usd": 45.80},
-        ],
+        "2026-08-27": _t0_events(),
         "2026-08-28": [
             {"kind": "media",
              "summary": "市场继续关注验证进展;无新正式公告,行业媒体继续报道项目推进。收盘 $47.30。",

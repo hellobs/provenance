@@ -274,6 +274,7 @@ def start(case, args):
             run_id = args.run_id or live_run_id(args.branch)
             out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
+                   "--branch-mode", args.branch_mode,
                    "--port", str(LIVE["case01"]), "--hold", str(args.hold),
                    "--run-id", run_id, "--out", out]
             if args.nodes:
@@ -342,7 +343,11 @@ def main():
     ap.add_argument("--stop", choices=["case00", "case01", "all"], help="停实时面(不碰只读面)")
     ap.add_argument("--nodes", type=int, default=0, help="case01:只跑前 N 个节点(0=全部)")
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
-    ap.add_argument("--branch", default="B", help="case01:分支 A/B/C")
+    ap.add_argument("--branch", default="B", help="case01:分支 A/B/C(judge 模式下仅作兜底)")
+    ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
+                    choices=["judge", "preset"],
+                    help="case01:judge=先跑 T0 再由 AI 的回答判定分支"
+                         "(0904doc 01 §六 的设计原意,默认);preset=分支由 --branch 指定")
     ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到 case01/runs_injector/<run_id>/raw.json)")
     ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
     ap.add_argument("--name", default="demo", help="case00:模拟名")

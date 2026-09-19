@@ -165,7 +165,11 @@ def to_case01_record(record: dict, branch: str = "",
             # (case01.world.timelines.BRANCH_TO_TIMELINE = {A:A, B:B, C:A})。
             # 与已冻结的旧引擎记录(demo-2/demo-3 的 branch_action.timeline 均为 A)一致。
             "timeline": _timeline_of(branch),
-            "judge": "preset(mavis 路径不调 LLM judge)",
+            # 分支从哪来:preset(运行参数) / judge(由 T0 回答判定,01 §六 的设计原意)
+            "source": record.get("branch_source") or "preset",
+            "judge_info": dict(record.get("judge_info") or {}),
+            "judge": ("llm(T0 回答判定)" if (record.get("branch_source") == "judge")
+                      else "preset(mavis 路径不调 LLM judge)"),
             "c_plan": dict(c_plan or {}),
             "t0_rounds": int(t0_rounds or 0),
         },
