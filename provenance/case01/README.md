@@ -9,6 +9,11 @@
 > case01 `world/` 决定,mavis 只负责角色表达与交互。
 > 迁移依据与验收见 `case01/docs/case01_over_mavis_*.md`。
 > 下方旧引擎介绍保留供回溯。
+>
+> **与 case00 的关系**：case00 = 仓库原有的 6 角色投资咨询场景（Provenance 原生,
+> 由 `live_fastapi.py` 在 5001 驱动），与 case01 并存且互不依赖；同一时刻只让一个案例
+> 跑模拟线程。两个案例的构成、启动命令、产物位置与组件化现状见
+> `../docs/case00_case01_并列说明.md`。
 
 <旧引擎>GTC Case 01(0904doc)的运行引擎:节点驱动的受控实验,
 非 MAVIS 连续仿真。Ethan Lin(普通投资者)× Investment AI(本地 Ollama
