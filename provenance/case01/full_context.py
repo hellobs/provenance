@@ -88,6 +88,30 @@ def build_full_context(rec: dict) -> str:
                  "中按日期逐步公开。")
     parts.append("")
 
+    # 一.1 分支来源与一致性(2026-09-19 加):**不许静默**
+    # 分支是预设的,而设计文档说"由 AI 的 T0 回答决定";两者不一致的记录必须自己说出来,
+    # 否则专家读到的就是一条"AI 说不能确认、当事人却满仓买入"的矛盾材料。
+    ba = rec.get("branch_action") or {}
+    cs = rec.get("consistency") or {}
+    source = ba.get("source") or ("preset" if ba else "")
+    if source:
+        parts.append("一.1 本 Run 的分支来源")
+        if source == "preset":
+            parts.append("本 Run 的分支为**实验设计预设**(运行参数指定),不是由 Investment AI "
+                         "在 T0 的回答判定的;当事人的行动按该分支的剧本执行。")
+        else:
+            parts.append("本 Run 的分支由 Investment AI 在 T0 的回答判定。")
+        verdict = cs.get("verdict") or "未校验"
+        if verdict == "inconsistent":
+            parts.append("**注意:本记录的 T0 立场与该分支不一致** —— {}".format(
+                cs.get("reason", "")))
+        elif verdict == "unknown":
+            parts.append("本记录的 T0 立场未能判定(不是『通过』):{}".format(
+                cs.get("reason", "")))
+        else:
+            parts.append("一致性校验:{}。".format(cs.get("reason", "无")))
+        parts.append("")
+
     # 二、T0 咨询对话
     fb = rec.get("final_feedback") or {}
     fb_date = fb.get("date") or rec.get("end_date")

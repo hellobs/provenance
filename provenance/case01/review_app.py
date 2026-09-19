@@ -399,6 +399,9 @@ function paneOverview(d) {
   const released = nodes.reduce((a, n) => a + ((n.released_events || []).length), 0);
   const allEvents = nodes.reduce((a, n) => a + ((n.events || []).length), 0);
   const dash = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
+  const cs = d.consistency || {};
+  const badge = { consistent: ["一致", "low"], inconsistent: ["不一致", "high"],
+                  unknown: ["判不了", "medium"] }[cs.verdict];
   const rows = [
     ["run_id", esc(d.run_id)],
     ["引擎记录", hasInj
@@ -407,6 +410,14 @@ function paneOverview(d) {
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
     ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
+    // 分支来源与 T0 一致性:预设分支不看 AI 说了什么,自相矛盾的记录必须自己说出来
+    // (实测 A-1720:AI 说"不能确认值得买",A 线却让当事人满仓买入)
+    ["分支来源", ba.source === "preset"
+      ? '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定'
+      : (ba.source === "judge" ? '<span class="chip k">由 AI 回答判定</span>' : "—")],
+    ["T0 立场一致性", badge
+      ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
+      : '<span class="chip">未校验</span>'],
   ];
   if (hasInj) {
     rows.push(["注入器", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / ")) || "—"}`]);

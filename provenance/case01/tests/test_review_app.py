@@ -205,6 +205,15 @@ def test_router_pane_shows_risk_note_and_question_flag():
     assert "仍是疑问句" in html
 
 
+def test_overview_shows_branch_source_and_consistency():
+    """概览必须显示"分支来源"与"T0 立场一致性"(预设分支的坑,不能让看的人自己发现)。"""
+    html = _client().get("/review").text
+    assert "分支来源" in html and "实验设计预设" in html
+    assert "T0 立场一致性" in html
+    # 旧记录没有这两个字段时显示"未校验"/"—",不能报错
+    assert "未校验" in html
+
+
 def test_no_filler_phrases_in_the_panel():
     """用户把"（那时才有反思与问题分流）""反思/问题分流跑完才有"点成废话,已删。"""
     html = _client().get("/review").text

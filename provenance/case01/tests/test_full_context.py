@@ -130,6 +130,45 @@ class TestBuildFullContext:
         assert "Branch C" not in txt and "buy_now" not in txt
 
 
+class TestBranchSourceDisclosure:
+    """分支来源与 T0 一致性必须写进专家视图(**不许静默**)。
+
+    实测 `260919-live-case01-mavis-A-1720`:AI 在 T0 说"不能确认值得买",
+    而预设 A 线让当事人满仓买入 —— 专家读到这种材料时,必须先看到"分支是预设的"
+    以及"这条记录的 T0 立场与分支不一致"的声明。
+    """
+
+    def test_preset_and_inconsistent_are_stated(self):
+        rec = _sample_run()
+        rec["branch_action"] = {"timeline": "A", "judge": "preset(mavis 路径不调 LLM judge)",
+                                "source": "preset"}
+        rec["consistency"] = {"verdict": "inconsistent",
+                              "reason": "A 线但 AI 在 T0 只有谨慎/否定表述",
+                              "branch_source": "preset"}
+        txt = fc.build_full_context(rec)
+        assert "分支来源" in txt
+        assert "实验设计预设" in txt
+        assert "不一致" in txt and "只有谨慎/否定表述" in txt
+        # 加这一段不能把实验元信息漏进专家视图(原有守卫同时检查)
+        for bad in ("branch_action", "Timeline", "c_plan"):
+            assert bad not in txt, bad
+
+    def test_unknown_is_not_rendered_as_pass(self):
+        rec = _sample_run()
+        rec["branch_action"] = {"timeline": "A", "source": "preset"}
+        rec["consistency"] = {"verdict": "unknown",
+                              "reason": "没有 T0 当天的 AI 对话", "branch_source": "preset"}
+        txt = fc.build_full_context(rec)
+        assert "未能判定" in txt and "不是『通过』" in txt
+
+    def test_judge_source_is_stated(self):
+        rec = _sample_run()
+        rec["branch_action"] = {"timeline": "A", "source": "judge"}
+        rec["consistency"] = {"verdict": "consistent", "reason": "与 AI 的买入倾向一致"}
+        txt = fc.build_full_context(rec)
+        assert "由 Investment AI 在 T0 的回答判定" in txt
+
+
 class TestListAndLoad:
     def test_list_runs_missing_root(self, tmp_path):
         assert fc.list_runs(str(tmp_path / "nope")) == []
