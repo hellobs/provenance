@@ -90,17 +90,28 @@ def index() -> dict:
 
 
 @app.get("/api/runs", tags=["runs"])
-def list_runs(exclude_questionable: bool = False) -> dict:
+def list_runs(include_questionable: bool = False) -> dict:
     """全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
 
-    每条记录带 `quality` / `consistency` / `branch_source`(2026-09-19 加,加法字段):
-    `preset` 分支不看 AI 说了什么,可能出现"AI 说不能确认值得买、当事人却满仓"的记录 ——
-    平台可以据此**自己决定**是否给专家看,或提示专家。
-    `?exclude_questionable=1` 只返回 quality="ok" 的记录(平台可选;默认不跳,免得静默少给数据)。
+    每条记录带 `quality` / `consistency` / `branch_source`(加法字段)。默认**不返回**
+    `quality="questionable"` 的记录 —— 那是"预设分支且与 AI 的 T0 立场矛盾"的记录
+    (例:`A-1720` 里 AI 说"不能确认值得买"、当事人却满仓),给专家看会直接暴露矛盾内容。
+    这个"不返回"**不静默**:响应里给 `excluded` 计数与原因,平台也可以
+    `?include_questionable=1` 全量取。
+    `quality="unverified"`(旧记录没有一致性戳)**照常返回** —— 判不了 ≠ 有问题。
     """
-    runs = fc.list_runs(RUNS_ROOT, exclude_questionable=exclude_questionable)
-    return {"runs": runs, "count": len(runs),
-            "filter": {"exclude_questionable": bool(exclude_questionable)}}
+    all_runs = fc.list_runs(RUNS_ROOT)
+    runs = all_runs if include_questionable else [r for r in all_runs if r["quality"] != "questionable"]
+    dropped = [r["run_id"] for r in all_runs if r["quality"] == "questionable"]
+    out = {"runs": runs, "count": len(runs),
+           "filter": {"include_questionable": bool(include_questionable)}}
+    if dropped and not include_questionable:
+        out["excluded"] = {
+            "questionable": len(dropped), "run_ids": dropped,
+            "reason": "预设分支与 AI 的 T0 立场不一致(quality=questionable);"
+                      "加 ?include_questionable=1 可取全量",
+        }
+    return out
 
 
 @app.get("/api/runs/{run_id}", tags=["runs"])

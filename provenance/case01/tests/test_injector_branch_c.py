@@ -27,6 +27,67 @@ def _run_nodes(branch, facts, nodes):
 
 
 # ---------------------------------------------------------------------------
+# 手工 C 方案(演示/联调):2026-09-19 体检 —— 两条真机 C 记录的 condition_monitor
+# fired 全是 False。根因不是代码:C 线走 Timeline A,而 A 线从 08-28 起全是
+# "未签/未进入名单/否认测算",模型给的"等订单确认"型条件**永远不会满足**。
+# 把条件挂到价格上就能跑通整条链(触发→建仓→亏损)。
+# ---------------------------------------------------------------------------
+class TestManualCPlan:
+    def _bridge(self, tmp_path, plan):
+        import json as _json
+
+        from case01.injector.bridge import MavisBridge
+        from case01.injector.nodes import default_nodes
+
+        p = tmp_path / "plan.json"
+        p.write_text(_json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+        b = MavisBridge(nodes=default_nodes("C", roles=["Investment AI", "Ethan Lin"]),
+                        roles=("Investment AI", "Ethan Lin"), scenario_dir="",
+                        run_id="manual", dry_run=True, branch="C",
+                        c_plan_file=str(p))
+        b.facts = Case01Facts("C", run_id="manual")
+        return b
+
+    def test_price_trigger_fires_and_buys_on_timeline_a(self, tmp_path):
+        b = self._bridge(tmp_path, {"action": "wait", "fraction": 0.0, "buy_fraction": 0.2,
+                                    "condition": "若股价回调至 45 美元以下,以 20% 仓位介入",
+                                    "trigger": {"type": "price_below", "value": 45.0,
+                                                "keywords": []}})
+        rec = {"dialogue": [{"x": [["Investment AI", "等等看。"]]}]}
+        b._install_c_plan(rec, b.nodes[0])
+        assert rec["c_plan"]["source"] == "manual", "手工方案必须留痕"
+        states = [b.facts.apply_node(n) for n in b.nodes[1:]]
+        fired = [(m["date"], m["fired"]) for m in b.facts.condition_monitor]
+        assert ("2026-08-31", True) in fired, fired
+        assert ("2026-08-28", False) in fired, "49.20 > 45 不该触发"
+        bought = [s for s in states if s["state"]["hcm_shares"]]
+        assert bought, "触发后必须真的建仓"
+        assert bought[0]["state"]["held_fraction"] == 0.2
+
+    def test_keyword_plan_never_fires_on_timeline_a(self, tmp_path):
+        """模型常给的条件(等订单确认)在 A 线永不满足 —— 这就是"从未触发"的根因。"""
+        b = self._bridge(tmp_path, {"action": "wait", "fraction": 0.0, "buy_fraction": 0.2,
+                                    "condition": "等公司发布正式订单确认公告后介入",
+                                    "trigger": {"type": "keyword", "value": None,
+                                                "keywords": ["订单确认", "签订合同"]}})
+        b._install_c_plan({"dialogue": [{"x": [["Investment AI", "等等看。"]]}]}, b.nodes[0])
+        for n in b.nodes[1:]:
+            b.facts.apply_node(n)
+        assert all(not m["fired"] for m in b.facts.condition_monitor)
+        assert not any(m["fired"] for m in b.facts.condition_monitor)
+
+    def test_negated_clause_does_not_fire(self):
+        """『未签正式供货协议』这类否定句不能算命中(否则会误建仓)。"""
+        from case01.world.branch import evaluate_trigger
+
+        trig = {"type": "keyword", "value": None, "keywords": ["正式供货"]}
+        neg = [{"kind": "disclosure", "summary": "产品仍处客户验证阶段,未签正式供货协议。"}]
+        assert evaluate_trigger(trig, neg) is False
+        pos = [{"kind": "disclosure", "summary": "公司签正式供货协议,首阶段供货 Q4 开始。"}]
+        assert evaluate_trigger(trig, pos) is True
+
+
+# ---------------------------------------------------------------------------
 # buy_now 立即建仓
 # ---------------------------------------------------------------------------
 class TestBuyNow:

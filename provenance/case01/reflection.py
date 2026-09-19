@@ -47,6 +47,12 @@ REFLECTION_PROMPT_CN = (
     "**直接开始反思正文**:第一句就写实质内容(可以是一个小节标题)。"
     "不要以『当然可以』『好的』『以下是』『下面是我』等客套语开头,"
     "不要复述任务要求,不要自我介绍,不要写『我将从八个维度展开』这类过渡句。"
+    # 2026-09-19 体检:B-1654 的反思末尾是"…是否需要?" —— 反思是自省文件,
+    # 不该在末尾反问用户要不要继续服务。
+    "**写完就自然结束**:不要在末尾向用户提问、不要提供后续服务(『我可以继续帮你…』)、"
+    "不要请求反馈或确认,不要用问号收尾。"
+    # 正式文档里不要 emoji、不要以 Markdown 分隔线开局
+    "正文不要使用 emoji,不要以分隔线(---)开头。"
 )
 
 # 06 第七节·Router(中文逻辑稿,研究设计基准)
@@ -153,6 +159,63 @@ _META_MARKERS = (
 )
 _BOILERPLATE_END = ("：", ":", "。", "！", "!", "\n")
 _META_END = re.compile(r"[。！？：\n]")
+# 结尾的"服务兜售/反问"句(反思是自省文件,不该出现这些);按段/按句从尾部剥
+_TAIL_OFFER_MARKERS = (
+    "如你愿意", "如您愿意", "如果你愿意", "如果您愿意", "是否需要", "需要我",
+    "我可以继续", "我可以帮", "我可以为你", "我可以为您", "我可以进一步",
+    "要不要我", "随时告诉我", "请告诉我", "欢迎告诉我", "如果你希望", "如果您希望",
+    "如果还有其他", "还需要我", "我可以协助",
+)
+_EMOJI = re.compile(
+    "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF"
+    "\U00002190-\U000021FF\U00002B00-\U00002BFF\uFE0F\u200D]")
+
+
+def _strip_tail_offer(text: str) -> str:
+    """剥掉结尾的"要不要我继续帮你…"这类句子(以及孤零零的问句收尾)。
+
+    B-1654 实测结尾:"…以提升未来类似场景下的判断质量。是否需要?" —— 反思里
+    不该反问用户。剥到最后一个"完整句"为止;找不到就原样返回(不硬截)。
+    """
+    t = (text or "").rstrip()
+    for _ in range(3):
+        if not t:
+            return t
+        # 取最后一段(空行分隔)
+        parts = re.split(r"\n\s*\n", t)
+        last = parts[-1].strip()
+        keep = "\n\n".join(parts[:-1]).rstrip()
+        if not last:
+            return keep
+        # 末段含兜售标记,或末段就是个问句 → 丢掉末段
+        if any(m in last for m in _TAIL_OFFER_MARKERS) or last.endswith(("？", "?")):
+            if keep:
+                t = keep
+                continue
+        # 末段没标记但以问号结尾:只削掉最后那个问句
+        if last.endswith(("？", "?")):
+            idx = max(last.rfind("。"), last.rfind("！"), last.rfind("!"))
+            if idx > 0:
+                t = (keep + "\n\n" + last[:idx + 1]).strip() if keep else last[:idx + 1].strip()
+                continue
+        return t
+    return t
+
+
+def _strip_emoji(text: str) -> str:
+    """去掉 emoji(正式文档里不体面;2026-09-19 体检发现 8 条反思里带 📌🔍👉🚩)。"""
+    return _EMOJI.sub("", text or "")
+
+
+def _strip_tail_rules(text: str) -> str:
+    """去掉结尾孤零零的 markdown 分隔线(剥掉结尾段落后常留下一条 `---`)。"""
+    t = (text or "").rstrip()
+    for _ in range(3):
+        t2 = re.sub(r"(?:\n\s*)*[-*_]{3,}[ \t]*$", "", t).rstrip()
+        if t2 == t:
+            break
+        t = t2
+    return t
 
 
 def _looks_like_meta(seg: str) -> bool:
@@ -189,9 +252,10 @@ def _strip_boilerplate(text: str) -> str:
             t = t[len(seg):].lstrip()
             continue
         break
-    # 剥掉正文前的 markdown 分隔线(剥完客套常剩一条 "---")
-    t = re.sub(r"^(?:[-*_]{3,}\s*\n+)+", "", t.lstrip())
-    return t.lstrip()
+    # 剥掉正文前的 markdown 分隔线(剥完客套常剩一条 "---";也可能和正文同一行)
+    t = re.sub(r"^(?:[-*_]{3,}[ \t]*(?:\n+|$))+", "", t.lstrip())
+    t = _strip_emoji(t)
+    return _strip_tail_rules(_strip_tail_offer(t)).lstrip()
 
 
 
@@ -299,13 +363,19 @@ def _parse_router_json(text: str) -> list:
     for i, it in enumerate(arr):
         if not isinstance(it, dict):
             continue
-        risk = str(it.get("risk", "")).strip().lower()
+        risk = str(it.get("risk", it.get("risk_level", ""))).strip().lower()
         if risk not in _ROUTER_RISKS:
             risk = "medium"
         summary = str(it.get("summary", "")).strip()
-        field = str(it.get("field", "")).strip()
-        reason = str(it.get("routing_reason", "")).strip()
-        risk_note = str(it.get("risk_note", "")).strip()
+        # 字段名容忍:实测本地模型爱用 required_expert/risk_level 而不是 field/risk,
+        # 只认 field 会让"专业领域"整列空着(2026-09-19 体检:B-1613 五条全空、
+        # B-1710 有四条 risk_note 却 field 全空 —— 不是模型没答,是解析没认)。
+        field = str(it.get("field", "")
+                    or it.get("required_expert", "")
+                    or it.get("expert", "")
+                    or it.get("professional_field", "")).strip()
+        reason = str(it.get("routing_reason", "") or it.get("reason", "")).strip()
+        risk_note = str(it.get("risk_note", "") or it.get("note", "")).strip()
         if not summary and not field:
             continue
         issues.append({

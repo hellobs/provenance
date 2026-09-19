@@ -46,6 +46,15 @@ def client(tmp_path, monkeypatch):
                branch_action={"timeline": "A", "judge": "llm",
                               "c_plan": {"action": "wait"}},
                reflection={}, router={})
+    # run-03:预设分支但 T0 立场矛盾(quality=questionable)→ 默认不该出现在 /api/runs
+    _write_run(tmp_path, "run-03", branch="A",
+               branch_action={"timeline": "A", "judge": "preset",
+                              "source": "preset", "c_plan": None},
+               consistency={"verdict": "inconsistent", "reason": "A 线但 AI 只有谨慎表述",
+                            "branch_source": "preset"},
+               turns=[{"speaker": "ethan", "date": "2026-08-27", "text": "值得买吗?"},
+                      {"speaker": "ai", "date": "2026-08-27",
+                       "text": "I cannot say the stock is worth buying."}])
     monkeypatch.setattr(serve, "RUNS_ROOT", str(tmp_path))
     return DirectClient()
 
@@ -82,8 +91,7 @@ class DirectClient:
             return serve.index()
         if path == "/api/runs":
             # 把 query 交给真处理器(直接传参,免得为测试引入 urlparse 依赖)
-            excl = "exclude_questionable=1" in query
-            return serve.list_runs(exclude_questionable=excl)
+            return serve.list_runs(include_questionable="include_questionable=1" in query)
         if path == "/openapi.json":
             return serve.app.openapi()
         prefix = "/api/runs/"
@@ -105,21 +113,27 @@ class TestListAndDetail:
         r = client.get("/api/runs")
         assert r.status_code == 200
         body = r.json()
+        # run-03 是 quality=questionable,默认不返回(但不静默:excluded 里报出来)
         assert body["count"] == 2
         ids = [x["run_id"] for x in body["runs"]]
         assert ids == ["run-02", "run-01"]  # 倒序
+        assert body["excluded"]["questionable"] == 1
+        assert body["excluded"]["run_ids"] == ["run-03"]
+        assert "include_questionable" in body["excluded"]["reason"]
         # 质检标记(2026-09-19 加法字段):平台据此决定要不要给专家看
         for item in body["runs"]:
             assert item["quality"] in ("ok", "questionable", "unverified")
             assert "consistency" in item and "branch_source" in item
-        assert body["filter"] == {"exclude_questionable": False}
+        assert body["filter"] == {"include_questionable": False}
 
-    def test_list_runs_can_exclude_questionable(self, client):
-        """`?exclude_questionable=1` 只给 quality=ok 的记录(平台可选;默认不跳)。"""
-        r = client.get("/api/runs?exclude_questionable=1")
+    def test_list_runs_can_include_questionable(self, client):
+        """`?include_questionable=1` 取全量(平台可选;默认不给矛盾记录)。"""
+        r = client.get("/api/runs?include_questionable=1")
         body = r.json()
-        assert body["filter"]["exclude_questionable"] is True
-        assert all(x["quality"] == "ok" for x in body["runs"])
+        assert body["filter"]["include_questionable"] is True
+        assert body["count"] == 3
+        assert any(x["quality"] == "questionable" for x in body["runs"])
+        assert "excluded" not in body
 
     def test_detail_carries_quality(self, client):
         m = client.get("/api/runs/run-01").json()

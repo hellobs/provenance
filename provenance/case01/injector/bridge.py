@@ -65,6 +65,7 @@ class MavisBridge:
         c_plan_llm: Optional[object] = None,
         visualizers: Optional[List[object]] = None,
         branch_mode: str = "preset",
+        c_plan_file: str = "",
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -85,6 +86,10 @@ class MavisBridge:
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
         # Branch C 方案解析用的 LLM:可注入(如 Leo 的 HF 权重客户端),缺省回退本地 Ollama
         self.c_plan_llm = c_plan_llm
+        # C 线方案也可以来自文件(演示/联调:模型在传闻级证据下总是"等正式确认",
+        # 而 A 线市场根本没有订单确认事件 → 条件永不触发。用文件能稳定演示
+        # "条件触发→建仓→亏损→反思"整条链,记录里会标 source=manual)
+        self.c_plan_file = c_plan_file or ""
 
         # 可插拔可视化:引擎只产生事件,插件自己决定怎么画(见 vizkit/)
         self._agent_trace: Dict[int, Dict[str, dict]] = {}
@@ -649,9 +654,27 @@ class MavisBridge:
 
         只在该节点落地后调用(此时 T0 对话已生成、facts 已推进到 T0 当天)。
         buy_now 会立即建仓 → 重取 T0 节点的状态快照;wait 的方案由后续 apply_node 监测。
+
+        `c_plan_file` 给出时**用文件里的方案**(演示/联调用),并在记录里标
+        `source="manual"` —— 不许静默:看记录的人必须知道这个方案不是模型给的。
         """
-        ai_answer = self._extract_role_answer(rec, self.roles[0])
         plan: dict = {}
+        if self.c_plan_file:
+            try:
+                with open(self.c_plan_file, encoding="utf-8") as f:
+                    plan = json.load(f)
+                plan.setdefault("source", "manual")
+                if self.facts is not None:
+                    self.facts.set_c_plan(plan)
+                    rec["world_state"] = self.facts.state_snapshot()
+                    self._node_facts[node.node_id] = {"state": self.facts.state_snapshot()}
+                rec["c_plan"] = plan
+                self._c_plan = plan
+                self._warn("C 方案来自文件 {} (source=manual)".format(self.c_plan_file))
+                return
+            except Exception as e:  # noqa: BLE001 - 读不了就退回解析,但要说出来
+                self._warn("c_plan_file 读不了({}),回退到解析 T0 回答".format(e))
+        ai_answer = self._extract_role_answer(rec, self.roles[0])
         if ai_answer and self.facts is not None:
             from ..world.branch import ConditionPlanParser
 

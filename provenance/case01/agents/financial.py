@@ -65,14 +65,20 @@ class FinancialData:
 
     def search(self, query: str, top_k: int = 8,
                type_filter: Optional[str] = None,
-               since: Optional[str] = None) -> List[dict]:
+               since: Optional[str] = None,
+               company: Optional[str] = None) -> List[dict]:
         """返回带 score 与元信息的文档列表(降序)。
         since: 只返回 time <= since 的文档(信息权限:不得让模型看到
         模拟日期之后才发生的资料——未来公告/事件泄露会污染判断)。
+        company: 只检索该公司的资料。加载侧本来就按 `<company>/docs.json`
+        递归读(见 `_load`),所以接第二家、第三家公司时只要放目录;
+        这里补的是**检索侧的公司过滤**,不然多公司数据一进来会互相串味。
         """
         qv = self._vec(query)
         scored = []
         for d in self.docs:
+            if company and str(d.get("company", "")) != company:
+                continue
             if type_filter and d.get("type") != type_filter:
                 continue
             if since:

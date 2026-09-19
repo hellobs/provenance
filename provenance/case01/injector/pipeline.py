@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from typing import Optional, Tuple
 
 from .bridge import DEFAULT_ROLES, MavisBridge
@@ -127,6 +128,48 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
     return record
 
 
+def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
+                      write: bool = False) -> dict:
+    """对**已有成品记录**只重跑 Router(保留反思原文),用于补字段/换 prompt 口径。
+
+    2026-09-19 体检:`B-1613` 的 5 条 issue 的 `risk_note`/`field` 全空 —— 那条是
+    Router prompt 加 risk_note 要求之前跑的。重跑整条流水线会连反思一起重生成(浪费且改了原文),
+    所以这里只重跑 Router;写回时留 `.bak`,并打印旧→新的字段完整度。
+    """
+    from ..agents.llm import OllamaClient, OpenRouterClient
+    from ..reflection import run_router
+
+    with open(path, encoding="utf-8") as f:
+        rec = json.load(f)
+    text = (rec.get("reflection") or {}).get("text") or ""
+    if not text:
+        print("这条记录没有反思正文,不重跑 Router:", path)
+        return rec
+    router = router_llm or (OpenRouterClient() if external_router else OllamaClient())
+    old = ((rec.get("router") or {}).get("issues")) or []
+    rout = run_router(router, text)
+    rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or []}
+
+    def complete(issues):
+        return sum(1 for i in issues
+                   if (i.get("risk_note") or "").strip() and (i.get("field") or "").strip())
+
+    new = rec["router"]["issues"]
+    print("Router 重跑: {} 条 → {} 条;字段齐全的 issue: {} → {}".format(
+        len(old), len(new), complete(old), complete(new)))
+    for i in new:
+        print("   [{}] field={!r} risk={!r} style={} summary={}".format(
+            i.get("id"), i.get("field", ""), i.get("risk", ""), i.get("style", ""),
+            str(i.get("summary"))[:44]))
+    if write:
+        import shutil
+        shutil.copy2(path, path + "." + time.strftime("%Y%m%d-%H%M") + ".bak")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(rec, f, ensure_ascii=False, indent=2)
+        print("已写回:", path)
+    return rec
+
+
 def main():
     ap = argparse.ArgumentParser(description="case01 injector 完整流水线")
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
@@ -151,7 +194,16 @@ def main():
                          "preset=分支由 --branch 指定(可控对照)")
     ap.add_argument("--require-consistent", action="store_true",
                     help="记录的 T0 立场与分支不一致/判不了时不写盘(默认照写但会警告)")
+    ap.add_argument("--router-only", default="",
+                    help="对已有成品记录只重跑 Router(保留反思原文),升级字段口径用")
+    ap.add_argument("--router-write", action="store_true",
+                    help="配合 --router-only:真写回(默认只打印,留 .bak)")
     args = ap.parse_args()
+
+    if args.router_only:
+        rerun_router_only(args.router_only, external_router=args.external_router,
+                          write=args.router_write)
+        return 0
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
     if len(roles) != 2:
