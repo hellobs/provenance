@@ -107,5 +107,11 @@ process.on('unhandledRejection', (e) => {
     }
   }
   console.log(bad ? `\n自查未过:${bad} 处可疑` : '\n自查通过:所有 pane 都能渲染且无 undefined/[object Object]/NaN');
-  process.exit(bad ? 1 : 0);
+  // 退出码要可信:Node 在某些 Windows 版本上,`process.exit()` 撞上还没关干净的
+  // fetch 连接会触发 libuv 断言(win/async.c),进程以 0xC0000409 结束——
+  // 明明自查通过,退出码却像崩了(实测踩过)。所以先设 exitCode 让事件循环自然排空,
+  // 只在真的卡住时才强制退。
+  process.exitCode = bad ? 1 : 0;
+  const hard = setTimeout(() => process.exit(bad ? 1 : 0), 4000);
+  hard.unref();
 })();
