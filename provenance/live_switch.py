@@ -11,7 +11,9 @@
 两个 case 各自需要实时面,但**任何时刻只允许起一个**:两者共用同一个本地 Ollama,
 同时跑会把双方都拖慢,演示时屏幕上也不该有两套在动。
 
-只读面(5002 契约 / 5003 case00 存档 / 5004 审阅面板)**不跑模拟,不受此限**,本脚本不碰。
+只读面(5002 契约 / 5003 case00 存档)**不跑模拟,不受此限**,本脚本不碰。
+**case01 的 5010 现在同时是"单一界面"**(小镇 + 结果记录九块,`--review-only`
+就是只翻结果不推演)——2026-09-19 起独立的 5004 面板服务已退役。
 
 本脚本要防的两件事(都是实测踩过的)
 ---------------------------------
@@ -23,14 +25,19 @@
 
 因此进程发现**不能只看端口**:游离实例不监听任何端口,只能按命令行认。
 `--status` 会顺带报出匹配到的进程数,数量 >1 就是有游离实例。
+状态还区分"在推演 / 已跑完在保持 / 仅审阅(`--review-only`)"——靠 5010 的
+`/health` 里的 `finished`/`finish_reason`,不再靠猜。
 
-给平台侧的口径:平台**只需要一个地址**——`http://<host>:5004/combined`
-(实时小镇 + 结果 两窗一页)。它不必知道 5001 / 5010,也不必知道当前在跑哪个 case。
+给平台侧的口径:平台**只需要一个地址**——`http://<host>:5010/`
+(case01 单一界面:实时小镇 + 结果记录两个页签)。只看结果就引
+`http://<host>:5010/embed/review`,只看小镇 `http://<host>:5010/embed/scene`。
+平台不必知道 case00 的 5001,也不必知道当前在跑哪个 case。
 
 用法(在 `provenance/provenance` 下执行)
 --------------------------------------
     python live_switch.py --status
     python live_switch.py --start case01 [--nodes 2] [--hold 1800] [--branch B] [--no-map]
+    python live_switch.py --start case01 --review-only     # 不推演,只翻成品记录
     python live_switch.py --start case00 [--stride 2]
     python live_switch.py --stop case01 | case00 | all
 
@@ -56,7 +63,7 @@ LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
              "case01": "注入器推演(vizkit town)"}
 # 命令行特征:按它认进程(端口判断不到游离实例)
 CMD_NEEDLE = {"case00": "live_fastapi.py", "case01": "vizkit.live_run"}
-READONLY = {5002: "case01 只读契约", 5003: "case00 存档只读", 5004: "case01 审阅面板(含两窗一页)"}
+READONLY = {5002: "case01 只读契约", 5003: "case00 存档只读"}
 LOG_DIR = os.path.join(os.environ.get("TEMP", HERE), "dsh_srv")
 
 
@@ -132,9 +139,14 @@ def probe(case):
     if case == "case01":
         h = _http_json("http://127.0.0.1:%d/health" % port)
         if h:
-            info["simulating"] = h.get("pending", 0) > 0
-            info["detail"] = "roles={} pending={} clients={}".format(
-                h.get("roles"), h.get("pending"), h.get("clients"))
+            # finished / finish_reason 由实时插件报出,于是能分清三种状态:
+            # 在推演 / 已跑完在保持 / 仅审阅(--review-only,只服务界面不推演)。
+            reason = h.get("finish_reason", "")
+            info["finish_reason"] = reason
+            info["simulating"] = not h.get("finished", False)
+            info["detail"] = "roles={} pending={} clients={} finished={}{}".format(
+                h.get("roles"), h.get("pending"), h.get("clients"),
+                h.get("finished"), ("(%s)" % reason) if reason else "")
         else:
             info["detail"] = "端口在听,但 /health 取不到"
     else:
@@ -152,28 +164,35 @@ def _state(i):
     """一行状态。只报能从外部确证的东西:
 
     - case00(5001):用 /api/goals 的倾向角色数判断,可靠(--no-sim 时为 0);
-    - case01(5010):/health 只给 pending/clients,**分不清"还在推演"与"已跑完在保持"**
-      (后者由 --hold 决定),所以只报"在听",数字自己看。
+    - case01(5010):用 /health 的 finished/finish_reason 分清
+      "在推演" / "已跑完在保持" / "仅审阅(--review-only,不推演)"。
+      (2026-09-19 加了 finished 字段;在那之前分不清"还在跑"和"跑完在保持"。)
     """
     if not i["listening"]:
         return "未启动"
     if i["case"] == "case00":
         return "在推演" if i["simulating"] else "在听(未在推演:--no-sim)"
-    return "在听"
+    reason = i.get("finish_reason", "")
+    if i["simulating"]:
+        return "在推演"
+    if reason == "review_only":
+        return "仅审阅(未在推演)"
+    return "在听(已跑完)"
 
 
 def status():
     print("实时面(同时只允许一个在跑):")
     for case in ("case00", "case01"):
         i = probe(case)
-        warn = "  ⚠ 有 {} 个实例(含游离)".format(i["n_inst"]) if i["n_inst"] > 1 else ""
+        warn = "  [!] 有 {} 个实例(含游离)".format(i["n_inst"]) if i["n_inst"] > 1 else ""
         print("  {:<6} :{:<5} {:<22} {}{}".format(case, i["port"], _state(i), i["detail"], warn))
     print("只读面(不跑模拟,可随时全开):")
     for port, what in sorted(READONLY.items()):
         pids = sorted(_pids_by_port(port))
         print("  :{:<5} {:<24} {}".format(port, what,
               "listening pid={}".format(pids[0]) if pids else "down"))
-    print("\n平台侧只需要一个地址: http://<host>:5004/combined (小镇 + 结果 两窗一页)")
+    print("\n平台侧只需要一个地址: http://<host>:5010/ (case01 单一界面:小镇 + 结果记录)")
+    print("  只看结果 http://<host>:5010/embed/review ｜ 只看小镇 http://<host>:5010/embed/scene")
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +216,16 @@ def stop(case, quiet=False):
     return len(pids)
 
 
+def _is_review_only(case):
+    """该 case 当前在听的那个实例是不是"仅审阅"(不推演)。
+
+    靠 5010 的 /health(实时插件报 finished/finish_reason)判断,不靠猜命令行。
+    """
+    i = probe(case)
+    return bool(i["listening"]) and not i["simulating"] \
+        and i.get("finish_reason") == "review_only"
+
+
 def _start_mapper(run_id, args, raw_out):
     """起一个脱离的看护进程:等原始记录写好,自动映射成成品记录。
 
@@ -212,7 +241,7 @@ def _start_mapper(run_id, args, raw_out):
             subprocess.Popen(cmd, cwd=HERE, stdout=f, stderr=f,
                              creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     except Exception as e:  # noqa: BLE001 - 起不来也要说清楚,不能静默
-        print("  ⚠ 看护进程没起来({}: {}),跑完请手工跑上面那条映射命令"
+        print("  [!] 看护进程没起来({}: {}),跑完请手工跑上面那条映射命令"
               .format(type(e).__name__, e))
         return ""
     return mapper_log
@@ -220,11 +249,23 @@ def _start_mapper(run_id, args, raw_out):
 
 def start(case, args):
     other = "case01" if case == "case00" else "case00"
-    print("按「同时只允许一个实时面」的规则——先停另一个,再停本 case 的旧实例(防游离):")
-    stop(other)
-    stop(case)
-    if live_pids(case) or live_pids(other):
-        print("  ⚠ 仍有实时进程没清干净,继续起会得到两个实例;先手工处理:")
+    review_only = bool(getattr(args, "review_only", False))
+    if case == "case01" and review_only:
+        # 仅审阅:不推演、不占 Ollama,所以**不必**停另一个 case 的实时面
+        # (它俩不会互相拖慢)。只清本端口上的旧实例。
+        print("仅审阅模式(--review-only):不跑推演,只服务界面;不会停 case00 的实时面。")
+        stop(case)
+    else:
+        print("按「同时只允许一个实时面」的规则——先停另一个,再停本 case 的旧实例(防游离):")
+        if case == "case00" and _is_review_only("case01"):
+            # case01 只是"仅审阅"(不推演),不该被停掉:它不抢 Ollama,
+            # 而且那是看结果记录的唯一界面。
+            print("  case01 :5010 只是「仅审阅」(未在推演),保留不动。")
+        else:
+            stop(other)
+        stop(case)
+    if live_pids(case) or (not (case == "case01" and review_only) and live_pids(other)):
+        print("  [!] 仍有实时进程没清干净,继续起会得到两个实例;先手工处理:")
         for c in ("case00", "case01"):
             print("    {}: {}".format(c, sorted(live_pids(c))))
         return 1
@@ -232,16 +273,21 @@ def start(case, args):
     os.makedirs(LOG_DIR, exist_ok=True)
     run_id, out = "", ""
     if case == "case01":
-        # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
-        # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
-        # (名字写岔会让 5002 与 5004 两个面对同一条记录显示两个名字,实测踩过)。
-        run_id = args.run_id or live_run_id(args.branch)
-        out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
-        cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
-               "--port", str(LIVE["case01"]), "--hold", str(args.hold),
-               "--run-id", run_id, "--out", out]
-        if args.nodes:
-            cmd += ["--nodes", str(args.nodes)]
+        if review_only:
+            cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--review-only",
+                   "--port", str(LIVE["case01"])]
+            run_id = ""
+        else:
+            # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
+            # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
+            # (名字写岔会让 5002 与结果面板对同一条记录显示两个名字,实测踩过)。
+            run_id = args.run_id or live_run_id(args.branch)
+            out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
+            cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
+                   "--port", str(LIVE["case01"]), "--hold", str(args.hold),
+                   "--run-id", run_id, "--out", out]
+            if args.nodes:
+                cmd += ["--nodes", str(args.nodes)]
     else:
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
                "--stride", str(args.stride), "--port", str(LIVE["case00"])]
@@ -272,7 +318,7 @@ def start(case, args):
             bound = True
             break
     if not bound:
-        print("\n  ✗ 起来后端口没绑上(常见原因:端口被别的进程占着)。")
+        print("\n  [失败] 起来后端口没绑上(常见原因:端口被别的进程占着)。")
         print("    正在收掉这个游离实例,避免留下'看不见的第二个推演'……")
         stop(case, quiet=True)
         tail = ""
@@ -295,7 +341,7 @@ def start(case, args):
         j = probe(c)
         extra = "  实例数={}".format(j["n_inst"]) if j["n_inst"] else ""
         print("  {:<6} :{:<5} {}{}".format(c, j["port"], _state(j), extra))
-    print("\n平台入口(一个): http://<host>:5004/combined")
+    print("\n平台入口(一个): http://<host>:5010/  ｜ 只看结果 .../embed/review ｜ 只看小镇 .../embed/scene")
     return 0
 
 
@@ -317,6 +363,8 @@ def main():
                     help="case00:只服务 Web 层不跑模拟(不算实时面,但仍占端口)")
     ap.add_argument("--no-map", dest="no_map", action="store_true",
                     help="case01:跑完不自动映射成成品记录(默认自动映射)")
+    ap.add_argument("--review-only", dest="review_only", action="store_true",
+                    help="case01:不推演,只把界面(小镇 + 结果记录)起来;可随时开着翻记录")
     args = ap.parse_args()
 
     if args.start:

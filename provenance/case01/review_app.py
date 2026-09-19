@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""case01 成品记录的交互式审阅面板(FastAPI,端口 5004)。
+"""case01 成品记录的交互式审阅面板(自包含 HTML + 原生 JS + JSON API)。
 
 做法对齐仓库里既有的嵌入面板(`live/routes.py` 的 `_render_reflections_page`):
 **自包含 HTML + 原生 JS + fetch 打自己的 JSON API**,不依赖 Phaser、不需要构建步骤。
@@ -8,25 +8,35 @@
 概览 / 对话(turns) / 检索(retrievals) / 事件(events) / 状态(state_history) /
 反思(reflection) / 问题分流(router) / 注入器(injector) / 审计(audit)。
 
-本服务**只读**、不跑模拟,所以不受"同一时刻只允许一个实时可视化"的限制,可随时开着。
+**它现在是"挂件",不是独立服务(2026-09-19 用户拍板:只维护一个界面)**
+--------------------------------------------------------------------
+面板的路由放在一个 `APIRouter` 里,由 case01 的实时面(5010,
+`case01/vizkit/live_run.py`)**include 进同一个 FastAPI 应用**,于是:
 
-对外面(给仝牧平台 iframe 用):
+- 5010 页面上多一个"结果记录"页签 —— 小镇(过程)与九块(结果)在**一个界面**里;
+- 不再需要单独占一个端口的 5004 面板服务(已退役,`--port` 仍可单独跑,仅供排障)。
 
-- `/`              完整页(带大标题)
-- `/embed/review`  嵌入面:同一页,压缩版式(去掉大标题与页边距),贴合 iframe 尺寸
-- `/combined`      **两窗一页**:左=实时小镇(Phaser),右=本面板;整体可再被 iframe 引用,
-                   所以平台插一个 iframe 就能同时拿到"过程"与"结果"
-- 深链参数:`?run=<run_id>` 指定默认记录、`?tab=<页签 id>` 指定默认页签、`?embed=1` 压缩版式、
-  `/combined?live=<小镇地址>` 指定小镇源(默认 case01 的实时面 5010;case00 那个小镇传 5001)
+为什么不是把九块写进 mavis-vizkit:那个包**不认识 case01 的字段**
+(反思/问题分流/注入器/审计都是业务词),它只提供"调用方可以挂自己的只读面板"
+这个通用口子(`extra_tabs`)。所以九块留在这里,由 case01 侧挂上去。
+
+路由清单(相对路径,挂进哪个 app 都一样,不依赖前缀):
+
+- `/review`            面板页(带大标题)
+- `/embed/review`      嵌入面:同一页,压缩版式,贴合 iframe
+- `/api/review/health` 本面板自己的健康检查(避开实时面的 `/health`)
+- `/api/review/runs`   记录列表(+ 当前实跑 run_id,用于提示"这条还没成品记录")
+- `/api/review/run/<id>`  单条记录全文(白名单校验,杜绝路径穿越)
+- 深链参数:`?run=<run_id>` 指定默认记录、`?tab=<页签 id>` 指定默认页签、`?embed=1` 压缩版式
 
 注意与 5002 的关系:5002(`case01/serve.py`)是**冻结合同面**(`/api/runs` 等,平台对接用),
-不要往它上面加 UI;审阅面独立成本服务,免得污染契约。
+不要往它上面加 UI;本面板是给人看的,挂在实时面上。
 """
 import argparse
 import json
 import os
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +45,19 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 这与 case01/viz.py 的 load_run(run_id, runs_dir=...) 是同一个道理。
 RUNS_DIR = os.environ.get("CASE01_REVIEW_RUNS_DIR") or os.path.join(BASE_DIR, "runs")
 
-app = FastAPI(title="GTC Case 01 · 成品记录审阅")
+# 当前正在实跑的 run_id(由起服务的人告知,如 case01/vizkit/live_run.py)。
+# 用途只有一个:实跑还没跑完时,面板上明确写"这次还在跑/还没生成成品记录",
+# 而不是让人对着旧记录猜(**不允许静默**)。
+_CURRENT = {"run_id": "", "note": ""}
+
+router = APIRouter()
+
+
+def set_current_run(run_id, note=""):
+    """告知面板"当前正在实跑的 run_id"(没有就传空)。"""
+    _CURRENT["run_id"] = run_id or ""
+    _CURRENT["note"] = note or ""
+    return _CURRENT["run_id"]
 
 
 def _runs_dir():
@@ -85,18 +107,20 @@ def _brief(run_id):
     }
 
 
-@app.get("/health")
+@router.get("/api/review/health")
 def health():
     return {"status": "ok", "service": "case01 review", "runs": len(_discover_runs())}
 
 
-@app.get("/api/review/runs")
+@router.get("/api/review/runs")
 def list_runs():
     return JSONResponse({"count": len(_discover_runs()),
+                         "current_run_id": _CURRENT["run_id"],
+                         "current_note": _CURRENT["note"],
                          "runs": [_brief(r) for r in _discover_runs()]})
 
 
-@app.get("/api/review/run/{run_id}")
+@router.get("/api/review/run/{run_id}")
 def get_run(run_id: str):
     # 白名单校验:run_id 只能来自已发现的 run,杜绝路径穿越
     if run_id not in _discover_runs():
@@ -198,6 +222,7 @@ const TABS = [
   ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
 ];
 let DATA = null, TAB = "overview";
+let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见 boot())
 
 // ---- 嵌入 / 深链参数 ----
 //   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
@@ -397,9 +422,9 @@ const PANES = { overview: paneOverview, turns: paneTurns, retrievals: paneRetrie
 
 function render() {
   renderNav();
-  document.getElementById("main").innerHTML = DATA
+  document.getElementById("main").innerHTML = LIVE_HINT + (DATA
     ? PANES[TAB](DATA)
-    : '<div class="card"><div class="empty">选择一次运行</div></div>';
+    : '<div class="card"><div class="empty">选择一次运行</div></div>');
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA);
@@ -421,6 +446,14 @@ async function pick(id) {
 async function boot() {
   const r = await fetch("/api/review/runs");
   const d = await r.json();
+  // 正在实跑、但还没有成品记录时,面板上明确写出来(**不允许静默**):
+  // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
+  const cur = String(d.current_run_id || "").trim();
+  if (cur && !(d.runs || []).some(x => x.run_id === cur)) {
+    LIVE_HINT = `<div class="card" style="border-color:#e0b060;background:#fffaf0">` +
+      `本次实跑 <code>${esc(cur)}</code> 还没生成成品记录` +
+      `${d.current_note ? `（${esc(d.current_note)}）` : ""}——跑完后会自动出现在上面的下拉里。</div>`;
+  }
   const sel = document.getElementById("pick");
   // 下拉按引擎**分组**,并先说人话:哪条剧情线(带含义) -> 记录 id。
   // 旧写法 "mavis · demo-A-mavis — A 建议买入…" 前缀是黑话、又被 select 宽度截掉,
@@ -451,82 +484,56 @@ boot();
 </html>"""
 
 
-# 两窗一页:左=实时小镇(Phaser),右=成品记录审阅。整体再被 iframe 引用也成立,
-# 所以仝牧平台插**一个** iframe 就能同时拿到"过程"与"结果"两个窗口。
-_DEFAULT_LIVE_TOWN = (os.environ.get("CASE01_LIVE_TOWN_URL")
-                      or "http://127.0.0.1:5010/embed/scene")
-
-_COMBINED = r"""<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="utf-8">
-<title>case01 · 实时小镇 + 成品记录</title>
-<style>
-  html, body { height:100%; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
-  body { background:#0f1a16; }
-  .bar { height:32px; display:flex; align-items:center; gap:10px; padding:0 12px;
-         background:#1d3a2f; color:#cfe3d8; font-size:12px; }
-  .bar b { color:#fff; }
-  .bar .sp { margin-left:auto; }
-  .bar a { color:#cfe3d8; }
-  .split { display:flex; height:calc(100% - 32px); gap:6px; padding:6px; box-sizing:border-box; }
-  .pane { flex:1 1 50%; min-width:0; background:#fff; border:1px solid #2a4a3c;
-          border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
-  .pane h2 { margin:0; padding:6px 10px; font-size:12px; font-weight:500; color:#456;
-             background:#f4f6f5; border-bottom:1px solid #dde4e0; }
-  .pane iframe { flex:1; width:100%; border:0; }
-</style>
-</head>
-<body>
-<div class="bar"><b>GTC Case 01</b> · 实时小镇 ＋ 成品记录审阅
-  <span class="sp"><a href="/embed/review" target="_blank" rel="noreferrer">单独打开结果窗 ↗</a></span></div>
-<div class="split">
-  <div class="pane">
-    <h2>① 实时小镇（Phaser，mavis 推演）</h2>
-    <iframe src="__LIVE__" title="实时小镇"></iframe>
-  </div>
-  <div class="pane">
-    <h2>② 成品记录（Reflection / Router / 注入器）</h2>
-    <iframe src="/embed/review" title="成品记录审阅"></iframe>
-  </div>
-</div>
-</body>
-</html>"""
+# 两窗一页(`/combined`)已随"只维护一个界面"退役:5010 页面自带"实时小镇 / 结果记录"
+# 页签,平台要结果只引 `/embed/review`,要看过程+结果就引 5010 首页本身。
 
 
-@app.get("/", response_class=HTMLResponse)
+@router.get("/review", response_class=HTMLResponse)
 def index():
     return HTMLResponse(_PAGE)
 
 
-@app.get("/embed/review", response_class=HTMLResponse)
+@router.get("/embed/review", response_class=HTMLResponse)
 def embed_review():
-    """嵌入面:与 / 同一页,靠前端识别 /embed/ 路径切到压缩版式。
+    """嵌入面:与面板页同一份 HTML,靠前端识别 /embed/ 路径切到压缩版式。
 
-    单独做这一个路由(而不是把面板塞进 5002)是为了不污染冻结的对接契约;
-    本服务只读、不跑模拟,所以随时可以开着。
+    给仝牧平台 iframe 用:只要结果、不要小镇时引这一个地址即可。
     """
     return HTMLResponse(_PAGE)
 
 
-@app.get("/combined", response_class=HTMLResponse)
-def combined(live: str = ""):
-    """实时小镇 + 成品记录,两窗一页;整体可再被 iframe 引用(给仝牧平台用)。
+def attach_to(target, current_run_id="", note=""):
+    """把本面板挂到调用方的 FastAPI 应用上,返回该应用(链式)。
 
-    ?live= 指定小镇地址(默认 case01 的实时面 5010/embed/scene;
-    要看 case00 那个小镇就传 http://127.0.0.1:5001/embed/scene)。
-    本页只负责把给定地址嵌进来,**不负责起服务**——"任何时刻只允许一个实时面在跑"
-    这条规则由起服务的人守(见 docs/case00_case01_并列说明.md 第三节)。
+    case01 的实时面这样用:小镇(实时)+ 结果(九块)在**同一个服务、同一个界面**,
+    不再需要单独占端口的 5004 面板服务。
     """
-    url = (live or "").strip() or _DEFAULT_LIVE_TOWN
-    if not (url.startswith("http://") or url.startswith("https://")):
-        url = _DEFAULT_LIVE_TOWN          # 只接受 http(s),别的一律回落到默认
-    return HTMLResponse(_COMBINED.replace("__LIVE__", url))
+    if current_run_id or note:
+        set_current_run(current_run_id, note)
+    target.include_router(router)
+    return target
+
+
+def build_app():
+    """独立跑法(排障/单测用):`python -m case01.review_app --port 5004`。"""
+    a = FastAPI(title="GTC Case 01 · 成品记录审阅")
+    a.include_router(router)
+
+    @a.get("/health")
+    def _standalone_health():
+        return health()
+
+    return a
+
+
+# 模块级 app:保持既有测试与排障脚本能直接 `from case01.review_app import app`。
+app = build_app()
 
 
 def main():
-    ap = argparse.ArgumentParser(description="case01 成品记录审阅面板")
-    ap.add_argument("--port", type=int, default=5004)
+    ap = argparse.ArgumentParser(description="case01 成品记录审阅面板(独立跑法)")
+    ap.add_argument("--port", type=int, default=5004,
+                    help="默认 5004;现在正常用法是挂在实时面 5010 上(见模块 docstring)")
     ap.add_argument("--host", default="127.0.0.1")
     args = ap.parse_args()
     import uvicorn

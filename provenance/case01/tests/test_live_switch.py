@@ -6,7 +6,7 @@
 - `n_instances`:按 ppid 折算"逻辑实例数"。uv 建的 venv 里 `python.exe` 是 trampoline,
   会再拉起真正的解释器,所以一个逻辑实例对应父子两个 PID——不折算就会把 1 报成 2。
 - `_state`:状态文案。只报能从外部确证的东西(case00 用倾向角色数可靠;
-  case01 的 /health 分不清"还在推演"与"已跑完在保持",所以只报"在听")。
+  case01 用 /health 的 finished/finish_reason 分清"在推演/已跑完/仅审阅")。
 - 端口映射。
 
 真正起停进程的部分**不做自动化测试**:它要杀进程、依赖 netstat/PowerShell,
@@ -29,8 +29,13 @@ def test_n_instances_folds_trampoline_pair():
 
 def test_state_only_claims_what_it_can_prove():
     assert _state({"case": "case01", "listening": False, "simulating": None}) == "未启动"
-    # case01:端口在听就够了,不猜它是否还在推演
-    assert _state({"case": "case01", "listening": True, "simulating": None}) == "在听"
+    # case01:靠 /health 的 finished 分清"还在推演"与"跑完在保持"(2026-09-19 起)
+    assert _state({"case": "case01", "listening": True, "simulating": True}) == "在推演"
+    assert _state({"case": "case01", "listening": True, "simulating": False,
+                   "finish_reason": "run_finished"}) == "在听(已跑完)"
+    # 仅审阅(--review-only):服务在,但没有在推演
+    assert _state({"case": "case01", "listening": True, "simulating": False,
+                   "finish_reason": "review_only"}) == "仅审阅(未在推演)"
     # case00:倾向角色数是可靠信号
     assert _state({"case": "case00", "listening": True, "simulating": True}) == "在推演"
     assert _state({"case": "case00", "listening": True,

@@ -3,8 +3,8 @@
 
 为什么要有它
 -----------
-`--start case01` 只负责起实时推演并落一份 `raw.json`;要在审阅面板(5004)/
-只读契约(5002)里看到这条记录,还得再跑一次
+`--start case01` 只负责起实时推演并落一份 `raw.json`;要在结果面板(现在挂在 5010
+的 `/review` 页签上)/只读契约(5002)里看到这条记录,还得再跑一次
 `python -m case01.injector.pipeline ... --from-record <raw> --reflect --out <run.json>`。
 这一步以前是**手工**的,忘了跑的结果就是:实跑明明成功了,但两个面上什么都没有——
 属于"静默后果",按本工作区的铁律不允许。
@@ -42,6 +42,16 @@ from datetime import datetime
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.dirname(os.path.dirname(HERE))          # provenance/provenance
 RUNS_DIR = os.path.join(PKG_ROOT, "case01", "runs")
+
+# 看护进程的输出被重定向到日志文件,此时 stdout 用的是**本地编码**(中文 Windows 是 GBK);
+# 打不出对勾/叉号那类符号时会直接抛 UnicodeEncodeError —— 而它发生在映射**成功之后**,
+# 于是"成功"被写成"崩了"(实测踩过)。所以:保留本地编码(别把中文变乱码),
+# 只把打不出的字符替换掉;日志里的状态标记也一律用 ASCII 的 [ok] / [失败]。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(errors="replace")
+    except Exception:  # noqa: BLE001 - 老 Python / 非常规流:能跑就跑
+        pass
 
 
 def log(msg: str) -> None:
@@ -120,16 +130,16 @@ def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> 
     if (proc.stderr or "").strip():
         log("映射 stderr(尾部 1500 字符):\n" + proc.stderr.strip()[-1500:])
     if proc.returncode != 0:
-        log("✗ 映射失败(exit={}, 耗时 {:.0f}s)。原始记录仍在:{}\n"
+        log("[失败] 映射失败(exit={}, 耗时 {:.0f}s)。原始记录仍在:{}\n"
             "  可手工重跑: python -m case01.injector.pipeline --branch {} --run-id {} "
             "--from-record {} --reflect --out {}".format(
                 proc.returncode, dt, raw, branch, run_id, raw, out))
         return proc.returncode
     if not os.path.exists(out):
-        log("✗ 映射命令返回 0,但成品文件不存在:{}".format(out))
+        log("[失败] 映射命令返回 0,但成品文件不存在:{}".format(out))
         return 1
-    log("✓ 成品记录已生成({:.0f}s):{}".format(dt, out))
-    log("  审阅面板: http://127.0.0.1:5004/   (刷新后在下拉里选 {})".format(run_id))
+    log("[ok] 成品记录已生成({:.0f}s):{}".format(dt, out))
+    log("  看结果: http://127.0.0.1:5010/review   (或 5010 首页的“结果记录”页签;选 {})".format(run_id))
     return 0
 
 
@@ -155,12 +165,12 @@ def main(argv=None) -> int:
 
     state = wait_for_raw(raw, args.port, args.poll, args.stable, args.timeout)
     if state == "no-record":
-        log("✗ 实时面已经退出,但原始记录一直没出现:{}".format(raw))
+        log("[失败] 实时面已经退出,但原始记录一直没出现:{}".format(raw))
         log("  说明那次实跑**没写成记录**(崩了或被中断)。请看实时面日志:{}".format(
             os.path.join(os.environ.get("TEMP", ""), "dsh_srv", "live_case01.out")))
         return 2
     if state == "timeout":
-        log("✗ 等了 {:.0f} 秒仍没等到写好的原始记录:{}".format(args.timeout, raw))
+        log("[失败] 等了 {:.0f} 秒仍没等到写好的原始记录:{}".format(args.timeout, raw))
         return 3
 
     log("原始记录已就绪({} 字节),开始映射".format(_size(raw)))

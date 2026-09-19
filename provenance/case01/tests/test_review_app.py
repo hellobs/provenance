@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""case01 成品记录审阅面板(case01/review_app.py, 只读服务 5004)的测试。
+"""case01 成品记录审阅面板(case01/review_app.py)的测试。
+
+面板现在是**挂在 5010 实时面上的挂件**(2026-09-19 起独立 5004 服务退役,
+"只维护一个界面"),所以这里既验独立跑法(排障用),也验"挂上去之后路径不变"。
 
 **数据源必须是入库的 fixtures,不能是 case01/runs/**:`case01/runs/` 在
 `case01/.gitignore` 里(第 2 行 `runs/`),CI 的全新 checkout 里一条记录都没有——
@@ -8,7 +11,8 @@
 `load_run(run_id, runs_dir=...)` 同一做法)。
 
 只验接口形状与安全边界,不验前端渲染:前端是自包含 HTML + 原生 JS,
-JS 语法另用 `node --check` 对提取出的 <script> 块查过。
+JS 语法另用 `node --check` 对提取出的 <script> 块查过;运行期渲染用
+`node case01/tools/review_panel_probe.js`(打真实服务)查。
 """
 import os
 
@@ -26,6 +30,7 @@ OLD_RUN = "260905-demo-case01-old-C"       # 旧引擎:无 injector 段
 def _use_fixtures(monkeypatch):
     from case01 import review_app
     monkeypatch.setattr(review_app, "RUNS_DIR", FIXTURES)
+    monkeypatch.setattr(review_app, "_CURRENT", {"run_id": "", "note": ""})
 
 
 def _client():
@@ -34,11 +39,16 @@ def _client():
 
 
 def test_health_counts_runs_from_configured_root():
-    body = _client().get("/health").json()
+    body = _client().get("/api/review/health").json()
     assert body["status"] == "ok"
     assert body["service"] == "case01 review"
     # fixtures 里至少要有 mavis 与旧引擎各一条,面板才谈得上"两个引擎都能看"
     assert body["runs"] >= 2
+
+
+def test_standalone_app_still_serves_health_at_root():
+    """独立跑法(排障用)保留 /health;挂到实时面上时用 /api/review/health,避开它的 /health。"""
+    assert _client().get("/health").json()["service"] == "case01 review"
 
 
 def test_runs_list_covers_both_engines():
@@ -49,6 +59,19 @@ def test_runs_list_covers_both_engines():
     for key in ("branch", "n_turns", "n_retrievals", "n_events", "n_issues", "has_reflection"):
         assert key in one, key
     assert one["has_reflection"] is True
+
+
+def test_runs_list_reports_current_live_run():
+    """正在实跑、但还没有成品记录时,列表要带出 run_id,面板才好写出"还没记录"。
+
+    否则人对着旧记录看,会以为这次实跑的结果丢了(**不允许静默**)。
+    """
+    from case01 import review_app
+    review_app.set_current_run("260919-live-case01-mavis-B-9999", "跑完自动映射")
+    d = _client().get("/api/review/runs").json()
+    assert d["current_run_id"] == "260919-live-case01-mavis-B-9999"
+    assert d["current_note"] == "跑完自动映射"
+    assert "260919-live-case01-mavis-B-9999" not in {x["run_id"] for x in d["runs"]}
 
 
 def test_run_detail_has_the_six_sections():
@@ -144,7 +167,8 @@ def test_brief_carries_derived_branch_summary():
 def test_embed_surface_is_served_and_iframe_allowed():
     """嵌入面:仝牧平台用 iframe 引它。同一页,靠前端识别 /embed/ 路径切压缩版式。"""
     c = _client()
-    for path in ("/embed/review", "/?embed=1", "/?run={}&tab=router".format(MAVIS_RUN)):
+    for path in ("/review", "/embed/review", "/review?embed=1",
+                 "/review?run={}&tab=router".format(MAVIS_RUN)):
         r = c.get(path)
         assert r.status_code == 200, path
         assert "/api/review/runs" in r.text, path
@@ -154,26 +178,30 @@ def test_embed_surface_is_served_and_iframe_allowed():
     assert "content-security-policy" not in headers
 
 
-def test_combined_page_hosts_both_windows():
-    """两窗一页:实时小镇 iframe + 结果 iframe,整页本身也可再被 iframe。"""
-    c = _client()
-    body = c.get("/combined").text
-    assert "/embed/review" in body, "结果窗应 iframe 本服务的嵌入面"
-    assert "http://127.0.0.1:5010/embed/scene" in body, "默认小镇源 = case01 实时面"
-    # ?live= 可换成别的小镇(case00 的 5001 也是 Phaser 小镇)
-    r2 = c.get("/combined", params={"live": "http://127.0.0.1:5001/embed/scene"})
-    assert "http://127.0.0.1:5001/embed/scene" in r2.text
-    # 非 http(s) 一律回落默认:不把任意串塞进 iframe
-    r3 = c.get("/combined", params={"live": "javascript:alert(1)"})
-    assert "javascript:" not in r3.text
-    assert "http://127.0.0.1:5010/embed/scene" in r3.text
+def test_combined_page_is_retired():
+    """/combined(两窗一页)已随"只维护一个界面"退役:那个界面现在是 5010 首页本身。"""
+    assert _client().get("/combined").status_code == 404
 
 
 def test_index_page_is_self_contained():
-    html = _client().get("/").text
+    html = _client().get("/review").text
     assert "<script>" in html
     assert "/api/review/runs" in html, "页面应自连自己的 JSON API"
     assert "phaser" not in html.lower(), "本面板不依赖 Phaser(照 reflections 面板的做法)"
+
+
+def test_router_can_be_attached_to_a_host_app():
+    """挂到别的 FastAPI 应用上,路径不变(5010 就是这么挂的)。"""
+    from fastapi import FastAPI
+    from case01 import review_app
+
+    host = FastAPI()
+    review_app.attach_to(host, current_run_id=MAVIS_RUN, note="正在跑")
+    c = TestClient(host)
+    assert c.get("/review").status_code == 200
+    assert c.get("/api/review/runs").status_code == 200
+    assert c.get("/api/review/runs").json()["current_run_id"] == MAVIS_RUN
+    assert c.get("/api/review/run/{}".format(MAVIS_RUN)).status_code == 200
 
 
 def test_empty_root_reports_zero_runs_instead_of_crashing(monkeypatch, tmp_path):
@@ -181,7 +209,7 @@ def test_empty_root_reports_zero_runs_instead_of_crashing(monkeypatch, tmp_path)
     from case01 import review_app
     monkeypatch.setattr(review_app, "RUNS_DIR", str(tmp_path / "nope"))
     c = _client()
-    assert c.get("/health").json()["runs"] == 0
+    assert c.get("/api/review/health").json()["runs"] == 0
     assert c.get("/api/review/runs").json()["count"] == 0
-    assert c.get("/").status_code == 200
+    assert c.get("/review").status_code == 200
     assert c.get("/api/review/run/{}".format(MAVIS_RUN)).status_code == 404

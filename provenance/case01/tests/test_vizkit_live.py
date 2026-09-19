@@ -16,11 +16,11 @@ ROLES = ["Investment AI", "Ethan Lin"]
 ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
 
 
-def _live(port=5099):
+def _live(port=5099, extra_tabs=None):
     return create("live", port=port, roles=ROLES, alias=ALIAS, scenario_dir=SCENARIO,
                   static_root=os.path.join(FRONTEND, "static"),
                   template_dir=os.path.join(FRONTEND, "templates"),
-                  ping_interval=30.0)
+                  ping_interval=30.0, extra_tabs=extra_tabs)
 
 
 def test_registered_and_config():
@@ -187,3 +187,60 @@ def test_duplicate_init_in_backlog_is_dropped():
         assert ws.receive_json()["type"] == "init"          # 握手那条
         msg = ws.receive_json()
         assert msg["type"] == "chat_line", "积压照发,但不应再出现第二条 init"
+
+
+def test_extra_tabs_render_only_when_caller_provides_them():
+    """调用方挂了额外面板才出页签;没挂的 face(比如 case00)一行都不多。
+
+    这是"单一界面"的通用口子:本包不认识那些面板是什么,只按给定 URL 嵌进 iframe。
+    """
+    from fastapi.testclient import TestClient
+
+    plain = TestClient(_live(port=5087).app).get("/").text
+    assert 'id="face-tabs"' not in plain, "没给 extra_tabs 时不该出现页签"
+
+    live = _live(port=5086, extra_tabs=[{"id": "review", "label": "结果记录",
+                                         "url": "/review"}])
+    c = TestClient(live.app)
+    page = c.get("/").text
+    assert 'id="face-tabs"' in page and "结果记录" in page
+    assert 'data-url="/review"' in page, "页签要指向调用方给的地址"
+    # 嵌入面(case00/平台只要场景)不带页签,免得把别人的界面塞进 iframe
+    assert 'id="face-tabs"' not in c.get("/embed/scene").text
+
+
+def test_health_reports_finished_state():
+    """/health 报 finished/finish_reason:运维靠它分清"在推演/已跑完/仅审阅"。"""
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5085)
+    h = TestClient(live.app).get("/health").json()
+    assert h["finished"] is False and h["finish_reason"] == ""
+    live.finish("review_only")
+    h2 = TestClient(live.app).get("/health").json()
+    assert h2["finished"] is True and h2["finish_reason"] == "review_only"
+
+
+def test_single_interface_service_hosts_town_and_review_panel():
+    """**只维护一个界面**:5010 的服务同时给出小镇页与结果面板(九块)。
+
+    2026-09-19 用户拍板:小镇(过程)与结果(九块)合并到一个界面,
+    独立的 5004 面板服务退役。做法 = 实时面 include case01 的结果面板路由。
+    """
+    from fastapi.testclient import TestClient
+
+    from case01.vizkit.live_run import build_service
+
+    live = build_service(host="127.0.0.1", port=5084, roles=ROLES,
+                         run_id="260919-live-case01-mavis-B-0001")
+    c = TestClient(live.app)
+    page = c.get("/").text
+    assert 'id="face-tabs"' in page, "首页要有页签"
+    assert "结果记录" in page and 'data-url="/review"' in page
+    # 同一个服务上确实挂着结果面板(页面 + 数据)
+    assert c.get("/review").status_code == 200
+    runs = c.get("/api/review/runs")
+    assert runs.status_code == 200
+    # 正在实跑的那条还没成品记录时,面板要能说清楚
+    assert runs.json()["current_run_id"] == "260919-live-case01-mavis-B-0001"
+    live.close()

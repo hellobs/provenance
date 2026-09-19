@@ -74,7 +74,7 @@ def test_pipeline_run_id_override_applies_in_mapping_path(tmp_path):
     2026-09-19 实测踩到:传了 `--run-id live-B-mavis`,run_pipeline 把它算出来了,
     却没传给 to_case01_record,于是输出记录的 run_id 沿用了原始记录的 `live-B`。
     后果是两个面不一致——5002 契约按记录里的 run_id 列(显示 live-B),
-    5004 审阅面板按目录名列(显示 live-B-mavis),同一条记录出现两个名字。
+    结果面板按目录名列(显示 live-B-mavis),同一条记录出现两个名字。
     """
     raw = {
         "schema_version": "injector-0.1", "run_id": "raw-1", "mode": "mavis",

@@ -60,8 +60,8 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 - 运行架构：`case01/injector/`（bridge / 节点 / 条件 / 记录映射）+ `case01/world/`
   （事实层、市场时间线、分支判定；纯净，只 import 标准库）
 - 服务：只读契约 `case01/serve.py`（**5002**：`/api/runs`、`/api/runs/{run_id}`、
-  `/api/runs/{run_id}/full-context`，另挂 `/viewer`）；实时可视化 `case01/vizkit/live_run.py`（**5010**）；
-  成品记录的交互式审阅面板 `case01/review_app.py`（**5004**，见第四节的九块）
+  `/api/runs/{run_id}/full-context`，另挂 `/viewer`）；**单一界面** `case01/vizkit/live_run.py`
+  （**5010**：实时小镇 + 成品记录九块，页面上一组页签切换；见第四节）
 
 产物按"加工程度"分四层落盘，都在 `case01/` 下：
 
@@ -80,15 +80,16 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 规则有三条：
 
 - **目录名必须等于记录里的 `run_id`**。不一致的后果实测过：5002 契约按记录里的 `run_id` 列，
-  5004 面板按目录名列，同一条记录会显示成两个名字。
+  结果面板按目录名列，同一条记录会显示成两个名字。
 - **样本名一经铸定就不再变**（平台通知 `通知平台侧_换样本_20260917.md` 里点名引用它们）；
   只有实跑记录每次新铸一个带时刻的名字（同一天跑多次也不撞）。
 - **两种日期别混**：名字里的日期是**真实运行时间**；记录里的 `start_date` → `end_date`
   （08-27 → 09-15）是**模拟剧情日期**，属于案例内部时间线。实跑记录里**没有**墙上时钟字段，
   所以真实运行时间只存在于名字里——这也是名字必须带时间的根本原因。
 
-一次新跑的固定链路：`live_run.py` 出 `raw.json` → `case01.injector.pipeline --from-record <raw> --reflect`
-出 case01 兼容的 `run.json`（补齐 Reflection 与 Router）→ 5002 自动发现新的 `run_id`。
+一次新跑的固定链路：`live_run.py` 出 `raw.json` → 看护进程自动跑
+`case01.injector.pipeline --from-record <raw> --reflect` 出 case01 兼容的 `run.json`
+（补齐 Reflection 与 Router）→ 5002 与 5010 的结果页签都自动发现新的 `run_id`。
 `live_switch.py --start case01` 会把这条链路的命令连同生成好的 `run_id` 一起打印出来。
 
 ## 三、两个案例的关系与"同一时刻只起一个实时可视化"
@@ -106,7 +107,11 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 - **实时面（跑模拟线程，只许起一个）**：case00 的 `live_fastapi.py`（**5001**）、
   case01 的 `case01/vizkit/live_run.py`（**5010**）。
 - **只读面（不跑模拟，可以随时全开）**：case01 只读契约 `case01/serve.py`（**5002**）、
-  case00 存档只读 `case00/serve.py`（**5003**）、case01 审阅面板 `case01/review_app.py`（**5004**）。
+  case00 存档只读 `case00/serve.py`（**5003**）。
+- **5010 现在身兼两职**（2026-09-19 用户拍板"只维护一个界面"）：它既是 case01 的实时面，
+  也把"成品记录九块"挂在同一个服务上（`/review` 页与 `/api/review/*`，首页一个页签切换）。
+  `--review-only` 是它的**不推演**模式——只服务界面、不占 Ollama，属于只读用途，
+  可以随时开着翻记录；独立的 5004 面板服务已退役。
 
 规则为什么是"只许一个实时"：
 
@@ -125,9 +130,14 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 ```
 python live_switch.py --status                    # 只看现状,不动任何进程
 python live_switch.py --start case01 --nodes 2    # 起 case01(自动先停 case00 与本 case 旧实例)
+python live_switch.py --start case01 --review-only # 不推演,只把"小镇+结果记录"界面起来
 python live_switch.py --start case00              # 切到 case00 的 6 角色小镇
 python live_switch.py --stop all                  # 全停(不碰只读面)
 ```
+
+`--status` 会区分 case01 的三种状态：**在推演 / 在听(已跑完) / 仅审阅(未在推演)**
+（靠 5010 `/health` 里的 `finished`/`finish_reason`，不靠猜）。`--start case00` 不会
+误停一个只处于"仅审阅"的 5010——它没在推演，不抢 Ollama。
 
 它要防两件事，**都是实测踩过的**：
 
@@ -136,7 +146,7 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
    `[Errno 10048] 端口已被占用`、**绑不上端口却照样在后台跑推演**，外面完全看不出
    第二份存在。所以发现进程**不能只看端口**，要按命令行认；又因为 uv venv 的
    `python.exe` 是 trampoline（一个实例父子两个 PID），`--status` 按 ppid 折算实例数，
-   >1 就报 ⚠。`--start` 起完会校验端口真的绑上了，没绑上就把那个新进程收掉并报错，
+   >1 就报「[!] 有 N 个实例」。`--start` 起完会校验端口真的绑上了，没绑上就把那个新进程收掉并报错，
    **绝不留游离实例**。
 
 ## 四、组件化与容器化现状
@@ -149,11 +159,15 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
 - mavis `mavisframework.plugin`（1.2.0 起）：框架级通用插件面，`Simulator(plugins=[...])` 挂载。
 - **`case00/` 容器**（2026-09-19）：场景快照 + 存档索引说明 + 只读服务 5003 + 冻结声明。
   **建成即冻结，后续不维护。**
-- **`case01/review_app.py`**（2026-09-19）：成品记录的交互式审阅面板（**5004**）。做法对齐
-  `live/routes.py` 的 `_render_reflections_page`——自包含 HTML + 原生 JS + `fetch` 打自己的 JSON API，
-  不依赖 Phaser、不需要构建步骤。分九块：概览 / 对话(turns) / 检索(retrievals) / 事件(events) /
-  状态(state_history) / 反思(reflection) / 问题分流(router) / 注入器(injector) / 审计(audit)；
-  六条记录（mavis 三条 + 旧引擎三条）都能选；旧引擎记录没有 `injector` 段，面板显示"无注入器记录"。
+- **`case01/review_app.py`**（2026-09-19 建，同日晚改为**挂件**）：成品记录的结果面板。
+  做法对齐 `live/routes.py` 的 `_render_reflections_page`——自包含 HTML + 原生 JS +
+  `fetch` 打自己的 JSON API，不依赖 Phaser、不需要构建步骤。分九块：概览 / 对话(turns) /
+  检索(retrievals) / 事件(events) / 状态(state_history) / 反思(reflection) /
+  问题分流(router) / 注入器(injector) / 审计(audit)；六条记录（mavis 三条 + 旧引擎三条）都能选；
+  旧引擎记录没有 `injector` 段，面板显示"无注入器记录"。
+  **它不再是独立服务**：路由放在 `APIRouter` 里，由 5010 的实时面 `include_router` 挂上去
+  （`attach_to()`），所以界面只有一个（小镇 / 结果记录 两个页签）。`--port 5004` 的独立跑法
+  只留作排障。
 - **`case01/tools/review_panel_probe.js`**（2026-09-19）：审阅面板的**无头自查**——把页面里的
   `<script>` 抽出来、用最小 DOM stub 在 Node 里真跑一遍九个 pane 的渲染函数（默认把
   `/api/review/runs` 里每条记录都跑一遍），抓"pane 抛异常"与"输出里出现 undefined /
@@ -180,52 +194,50 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
   case00 已冻结，快照要能独立说明"当时是什么样"。
 - case00 **没有**做成 5002 那种机器可读契约：它的存档是每步快照（`simulate-*.json`），
   不是单文件 `run.json`，也没有 reflection/router；冻结之后不值得再定义契约。
-- 审阅面板必须**写自己的 API**（`/api/review/*`），不能往 5002 上加 UI——
-  5002 是冻结的对接契约，它的路径集合有漂移守卫盯着。
+- 结果面板必须**写自己的 API**（`/api/review/*`），不能往 5002 上加 UI——
+  5002 是冻结的对接契约，它的路径集合有漂移守卫盯着。面板自己的健康检查也因此放在
+  `/api/review/health`，避开实时面的 `/health`。
 - 待定：case00 的存档（2.2 GB、38 个 run）是否挑几个代表性的瘦身留档？
   现在靠 `results/` 的 gitignore 保护，删掉无法从 git 恢复。
 
-## 六、给平台的 iframe 接入面（两个窗口）
+## 六、给平台的 iframe 接入面（一个界面）
 
 要求是：**既要有 Phaser 实时小镇窗口，又要有结果窗口，且都能 iframe 插进治理平台**。
+2026-09-19 又加了一条：**只维护一个界面**（人不用开两个地址；`/combined` 那种"两窗一页"
+因为要自己嵌自己而撤掉了）。
 
 **平台只需要一个地址**：
 
 ```
-http://<host>:5004/combined
+http://<host>:5010/          ← 单一界面:首页就是"实时小镇 / 结果记录"两个页签
 ```
 
-它本身就是"小镇 + 结果"两窗一页，且整页可再被 iframe。平台**不必知道** 5001 / 5010
-的存在，也不必知道当前在跑哪个 case——那由运维侧用 `live_switch.py` 决定。
-下面两段是这两个窗口各自的**细粒度接入面**，只有需要单独嵌某一个窗口时才用。
+它既是 case01 的实时面，也把结果九块挂在同一个服务上；整页可再被 iframe。平台**不必知道**
+5001 的存在，也不必知道当前在跑哪个 case——那由运维侧用 `live_switch.py` 决定
+（`--start case01 --review-only` 可以只把这个界面起来而不推演）。
 
-**实时小镇（Phaser；嵌的是场景，不含浮动面板）**
+**实时小镇（Phaser；嵌的是场景，不含浮动面板、也不含页签）**
 
-- case01 的实时面：`http://<host>:5010/embed/scene`　← 本次新增。此前 vizkit 的 live 插件
-  只暴露 `/`，模板里的 `embed` 变量被写死成 `""`，外部平台**没法只嵌场景**。
-- case00 的实时面：`http://<host>:5001/embed/scene`（早就有）
-- 两者都有等价写法：`/?embed=scene`
+- case01：`http://<host>:5010/embed/scene`
+- case00：`http://<host>:5001/embed/scene`
+- 两者都有等价写法：`/?embed=scene`（页签**只在**独立首页出现，嵌入面不带）
 - 场景页的 WebSocket 是 `"ws://" + location.host + "/ws"`，**按 location 拼**，
   所以嵌到哪个端口都连得对（iframe 不改变它自己的 location）。
 
-**结果窗口（case01 成品记录审阅）**
+**结果窗口（case01 成品记录九块）**
 
-- 完整页：`http://<host>:5004/`
-- 嵌入面：`http://<host>:5004/embed/review`（压缩版式：去掉大标题与页边距，贴合 iframe 尺寸）
+- 完整页：`http://<host>:5010/review`（与首页那个页签是同一份页面）
+- 嵌入面：`http://<host>:5010/embed/review`（压缩版式：去掉大标题与页边距，贴合 iframe 尺寸）
 - 深链：`?run=260917-demo-case01-mavis-A&tab=router`——指定默认记录与页签。
   页签 id：`overview` / `turns` / `retrievals` / `events` / `states` / `reflection` /
   `router` / `injector` / `audit`
 - `?embed=1` 与 `/embed/review` 等价
-
-**两窗一页（平台插一个 iframe 就能同时拿到"过程"与"结果"）**
-
-- `http://<host>:5004/combined`——左＝实时小镇 iframe，右＝结果 iframe；整页本身可再被 iframe
-- `?live=http://<host>:5001/embed/scene` 可换小镇源（默认 case01 的 `5010/embed/scene`）
-- `?live=` 只接受 `http(s)`，其它值一律回落默认（测试钉住了，别把任意串塞进 iframe）
+- /**已退役**：`http://<host>:5004/*`（含 `/combined`）。平台侧若还配着 5004，改成上面的 5010。
 
 **四条注意**
 
 - 上述面都**不带** `X-Frame-Options` 与 CSP——测试里钉死了。带上它们，iframe 就白做。
-- 实时面只有 5001 / 5010 两个，**任何时刻只应起一个**；只读面（5002 / 5003 / 5004）可随时全开。
-- 平台若只想看"结果"，只引 5004 即可，**不必**让任何实时面在跑。
-- `/combined` 只负责把给定地址嵌进来，**不负责起服务**——那台机器上谁起、起哪个，是人定的。
+- 实时面只有 5001 / 5010 两个，**任何时刻只应起一个**；只读面（5002 / 5003）可随时全开。
+- 平台若只想看"结果"，引 `5010/embed/review` 即可；这台机器上用
+  `live_switch.py --start case01 --review-only` 起界面，**不必**推演、也不占 Ollama。
+- 5010 既是实时面也是结果面板的宿主，所以它由运维侧起/停；平台只负责引地址。

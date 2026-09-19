@@ -6,15 +6,15 @@
 //   - 输出里的 undefined / [object Object] / NaN   ← 典型是"字段形状变了但面板没跟上"
 // 页面 JS 的语法用 `node --check` 单独查;本脚本查的是**运行期**。
 //
-// 用法(需要先起着面板服务):
+// 用法(需要先起着 5010;它现在同时是小镇与结果面板的单一界面):
 //   node case01/tools/review_panel_probe.js
-//   node case01/tools/review_panel_probe.js --base http://127.0.0.1:5004 260917-demo-case01-mavis-C 260905-demo-case01-old-C
+//   node case01/tools/review_panel_probe.js --base http://127.0.0.1:5010 260917-demo-case01-mavis-C 260905-demo-case01-old-C
 //
 // 退出码:0=全部通过;1=有 pane 抛异常或输出可疑。
 const vm = require('vm');
 
 const argv = process.argv.slice(2);
-let base = 'http://127.0.0.1:5004';
+let base = 'http://127.0.0.1:5010';
 const ids = [];
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--base') { base = argv[++i]; } else { ids.push(argv[i]); }
@@ -40,7 +40,7 @@ function makeSandbox() {
     }),
     // 页面用 location 与 URLSearchParams 读嵌入/深链参数,用 document.body 挂 embed 类;
     // stub 缺了它们会在脚本初始化阶段就抛(那是探针自己的问题,不是被测 pane 的问题)。
-    location: { search: '', pathname: '/', host: '127.0.0.1:5004', protocol: 'http:' },
+    location: { search: '', pathname: '/review', host: '127.0.0.1:5010', protocol: 'http:' },
     URLSearchParams,
     document: {
       getElementById: el,
@@ -61,7 +61,7 @@ process.on('unhandledRejection', (e) => {
 });
 
 (async () => {
-  const pageRes = await fetch(base + '/');
+  const pageRes = await fetch(base + '/review');
   const html = await pageRes.text();
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   if (!m) { console.error('FAIL: 页面里找不到 <script>'); process.exit(1); }

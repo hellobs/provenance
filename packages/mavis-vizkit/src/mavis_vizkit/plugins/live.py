@@ -44,7 +44,8 @@ class LiveVisualizer(Visualizer):
                  template_dir: Optional[str] = None,
                  ping_interval: float = 5.0, stride: int = 0,
                  start_datetime: str = "",
-                 nodes_key: str = "nodes", meta_key: Optional[str] = None):
+                 nodes_key: str = "nodes", meta_key: Optional[str] = None,
+                 extra_tabs: Optional[List[dict]] = None):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -64,6 +65,10 @@ class LiveVisualizer(Visualizer):
         self.ping_interval = float(ping_interval)
         self.stride = int(stride)
         self.start_datetime = start_datetime or "2026-08-27T09:30:00"
+        # 调用方自带的只读面板(可选):形如 [{"id","label","url"}]。
+        # 本包只负责在独立页上渲染一组页签并嵌给定的 URL,**不认识也不猜**那些面板是什么;
+        # 默认空 = 行为与以前完全一致(小的改动、默认关闭)。
+        self.extra_tabs = [dict(t) for t in (extra_tabs or []) if t.get("url")]
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -260,6 +265,7 @@ class LiveVisualizer(Visualizer):
                     "description": {r: "" for r in (self.init_pos or self.roles)},
                     "conversation": {},
                 },
+                "extra_tabs": self.extra_tabs,
             }
 
         @app.get("/", response_class=HTMLResponse)
@@ -280,8 +286,11 @@ class LiveVisualizer(Visualizer):
 
         @app.get("/health")
         async def health():
+            # finished / finish_reason 也报出去:外部(运维脚本、平台)靠它区分
+            # "还在推演" / "已跑完在保持" / "只服务不推演",不必猜。
             return {"status": "ok", "clients": len(self._clients),
-                    "pending": len(self._pending), "roles": self.roles}
+                    "pending": len(self._pending), "roles": self.roles,
+                    "finished": self._finished, "finish_reason": self._finish_reason}
 
         @app.websocket("/ws")
         async def ws_endpoint(ws: WebSocket):
