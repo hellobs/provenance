@@ -71,7 +71,7 @@ def test_index_links_all_runs():
 
 
 def test_render_real_mavis_run_if_present(tmp_path):
-    rid = "demo-C-mavis"
+    rid = "260917-demo-case01-mavis-C"
     rec = viz.load_run(rid, FIXTURES)
     html = viz.page_html(rec)
     assert rec["run_id"] in html

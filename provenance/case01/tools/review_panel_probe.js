@@ -8,7 +8,7 @@
 //
 // 用法(需要先起着面板服务):
 //   node case01/tools/review_panel_probe.js
-//   node case01/tools/review_panel_probe.js --base http://127.0.0.1:5004 demo-A-mavis demo-1
+//   node case01/tools/review_panel_probe.js --base http://127.0.0.1:5004 260917-demo-case01-mavis-C 260905-demo-case01-old-C
 //
 // 退出码:0=全部通过;1=有 pane 抛异常或输出可疑。
 const vm = require('vm');

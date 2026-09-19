@@ -53,7 +53,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 
 | 字段 | 含义 | 给专家看? |
 | --- | --- | --- |
-| `run_id` | 运行标识(如 `demo-2`) | 可作为内部编号 |
+| `run_id` | 运行标识(如 `260905-demo-case01-old-A`) | 可作为内部编号 |
 | `start_date` / `end_date` | 模拟起止日期 | 可显示 |
 | `branch` / `branch_summary` | A/B/C 及自然语言摘要 | **否**(实验元信息,仅内部关联用) |
 | `n_turns` / `n_retrievals` | 对话轮数 / 检索次数 | 可显示 |
@@ -73,8 +73,8 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
   `routing_reason`(路由理由);
 
 > 口径说明(`risk` 取值来源与核对日期 2026-09-18):六份已落盘记录
-> `demo-1` / `demo-2` / `demo-3`(旧引擎)与 `demo-A-mavis` / `demo-B-mavis` /
-> `demo-C-mavis` 的 `router.issues[].risk` 实测均为小写 `high` / `medium` / `low`
+> `260905-demo-case01-old-B` / `260905-demo-case01-old-A` / `260905-demo-case01-old-C`(旧引擎)与 `260917-demo-case01-mavis-A` / `260917-demo-case01-mavis-B` /
+> `260917-demo-case01-mavis-C` 的 `router.issues[].risk` 实测均为小写 `high` / `medium` / `low`
 > (见各 `runs/<run_id>/run.json`)。本契约以小写为准,平台侧勿按大写匹配。
 > **不要为了迁就本说明去改记录。**
 
@@ -84,8 +84,8 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 > 单独用 `issue_id` 会把"不同 run 各自的 issue-1"错配成同一条任务,
 > 造成同一条 Expert Review 建单重复、且跨 run 串数据。契约依此固定主键结构。
 
-> **顶层附加键(核对日期 2026-09-18):** 三条 mavis 样本(`demo-A-mavis` /
-> `demo-B-mavis` / `demo-C-mavis`)的 `run.json` 顶层比本文其它节多出三个键——
+> **顶层附加键(核对日期 2026-09-18):** 三条 mavis 样本(`260917-demo-case01-mavis-A` /
+> `260917-demo-case01-mavis-B` / `260917-demo-case01-mavis-C`)的 `run.json` 顶层比本文其它节多出三个键——
 > `summary`(运行统计:节点数/交互/耗时)、`injector`(injector 状态机内部结构)、
 > `compat`(兼容性检查结果)。这三个都是引擎侧**内部附加键,平台不读**。
 > 其中 `injector` 段含 Branch 实验元信息与逐节点 dialogue **原文,属于实验元数据,
@@ -161,10 +161,10 @@ final → 训练材料池(完整治理记录,见 04 九)
 curl http://127.0.0.1:5002/api/runs
 
 # 2) 取某个 Run 的 Reflection + Router issues,逐 issue 建 Task
-curl http://127.0.0.1:5002/api/runs/demo-3
+curl http://127.0.0.1:5002/api/runs/260905-demo-case01-old-C
 
 # 3) 专家点"View Full Context"
-curl http://127.0.0.1:5002/api/runs/demo-3/full-context
+curl http://127.0.0.1:5002/api/runs/260905-demo-case01-old-C/full-context
 ```
 
 ## 6. 数据更新方式

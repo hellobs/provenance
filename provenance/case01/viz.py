@@ -7,7 +7,7 @@
 输出目录:case01/runs_html/viz/
 用法:
     python -m case01.viz                      # 渲染 runs/ 下全部
-    python -m case01.viz demo-A-mavis demo-B-mavis
+    python -m case01.viz 260917-demo-case01-mavis-A 260905-demo-case01-old-C
 """
 import html as _html
 import json

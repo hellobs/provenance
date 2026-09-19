@@ -88,7 +88,7 @@ def test_mapping_covers_real_case01_run_json():
     因此断言对真实记录亦成立;真实 demo run 不入库,故以 fixture 为准,
     CI 不再静默跳过。
     """
-    path = os.path.join(FIXTURES, "demo-3", "run.json")
+    path = os.path.join(FIXTURES, "260905-demo-case01-old-C", "run.json")
     with open(path, encoding="utf-8") as f:
         real = json.load(f)
     mapped = to_case01_record(_sample_bridge_record(), branch="C")

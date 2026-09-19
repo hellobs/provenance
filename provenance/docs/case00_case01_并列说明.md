@@ -65,21 +65,24 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 
 产物按"加工程度"分四层落盘，都在 `case01/` 下：
 
-- **成品三线**（平台契约读的就是这里）：`runs/demo-A-mavis/run.json`、`runs/demo-B-mavis/`、
-  `runs/demo-C-mavis/`，各约 56 KB，含 turns / retrievals / events / reflection / router / injector
-- **旧引擎对照**（archive 基线 `d41cdec` 的产物，保留不删）：`runs/demo-1|2|3/`
-  （`run.json` + `turns.jsonl` + `retrievals.jsonl` + `branch.json`）
+- **成品三线**（平台契约读的就是这里）：`runs/260917-demo-case01-mavis-A/run.json`、
+  `-B/`、`-C/`，各约 56 KB，含 turns / retrievals / events / reflection / router / injector
+- **旧引擎对照**（archive 基线 `d41cdec` 的产物，保留不删）：
+  `runs/260905-demo-case01-old-{A,B,C}/`（`run.json` + `turns.jsonl` + `retrievals.jsonl` + `branch.json`）
 - **注入器原始与映射**：`runs_injector/`——`def-B/{raw.json,mapped.json}`（默认剧本）、
   `live-B-<日期>/raw.json`（真实跑一次的原始记录）、`smoke/`、`isolation/probe-B.json`
 - **静态审查页**：`runs_html/`（index + 6 个 demo 页 + viz 子目录）
 
-**实跑记录的命名（2026-09-19 定的约定）**：每次实跑生成一个**带真实日期**的名字
-`live-<分支>-<YYYYMMDD-HHMM>`，例如 `live-B-20260919-1424`。规则有三条：
+**记录命名（2026-09-19 定稿）**：`<YYMMDD>-<kind>-<case>-<engine>-<branch>[-HHMM]`。
+样本如 `260905-demo-case01-old-B`（旧引擎）与 `260917-demo-case01-mavis-A`（mavis），
+实跑如 `260919-live-case01-mavis-B-1424`。**日期在最前**（便于按时间排序）、
+**带 `case`**（现在 case00 / case01 并存）、**带 `engine`**（`old` / `mavis`，一眼分出对照）。
+规则有三条：
 
 - **目录名必须等于记录里的 `run_id`**。不一致的后果实测过：5002 契约按记录里的 `run_id` 列，
   5004 面板按目录名列，同一条记录会显示成两个名字。
-- `demo-*` 是**固定的样本名**（平台通知 `通知平台侧_换样本_20260917.md` 里点名引用），不随时间变；
-  只有实跑记录带日期。
+- **样本名一经铸定就不再变**（平台通知 `通知平台侧_换样本_20260917.md` 里点名引用它们）；
+  只有实跑记录每次新铸一个带时刻的名字（同一天跑多次也不撞）。
 - **两种日期别混**：名字里的日期是**真实运行时间**；记录里的 `start_date` → `end_date`
   （08-27 → 09-15）是**模拟剧情日期**，属于案例内部时间线。实跑记录里**没有**墙上时钟字段，
   所以真实运行时间只存在于名字里——这也是名字必须带时间的根本原因。
@@ -158,7 +161,7 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
   只查语法）。用法见文件头；需要面板服务在跑。
 - **两种记录形态必须都认**：mavis 的检索是 `date/mode/injected[]`，旧引擎是
   `current_date/hits[]/source_stats`。首版只认前者，把旧记录的命中明细**整个丢了**
-  （修复后 `demo-3` 的检索块从 1174 字符涨到 4764）。同理旧记录没有 `injector`/`summary`/`compat`，
+  （修复后 `260905-demo-case01-old-C` 的检索块从 1174 字符涨到 4764）。同理旧记录没有 `injector`/`summary`/`compat`，
   面板要分段渲染并明说"该记录早于 mavis 路径"，**不能**渲染成 `mode= / 节点 0 个`。
   另外默认选中的必须是成品三线（mavis），不能落在旧引擎对照记录上。
 
@@ -209,7 +212,7 @@ http://<host>:5004/combined
 
 - 完整页：`http://<host>:5004/`
 - 嵌入面：`http://<host>:5004/embed/review`（压缩版式：去掉大标题与页边距，贴合 iframe 尺寸）
-- 深链：`?run=demo-A-mavis&tab=router`——指定默认记录与页签。
+- 深链：`?run=260917-demo-case01-mavis-A&tab=router`——指定默认记录与页签。
   页签 id：`overview` / `turns` / `retrievals` / `events` / `states` / `reflection` /
   `router` / `injector` / `audit`
 - `?embed=1` 与 `/embed/review` 等价

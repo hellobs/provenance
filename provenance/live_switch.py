@@ -43,7 +43,7 @@ import sys
 import time
 import urllib.request
 
-from case01.run_naming import run_id_for
+from case01.run_naming import live_run_id
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -210,7 +210,7 @@ def start(case, args):
         # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
         # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
         # (名字写岔会让 5002 与 5004 两个面对同一条记录显示两个名字,实测踩过)。
-        run_id = args.run_id or run_id_for(args.branch)
+        run_id = args.run_id or live_run_id(args.branch)
         out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
         cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                "--port", str(LIVE["case01"]), "--hold", str(args.hold),
@@ -277,7 +277,7 @@ def main():
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
     ap.add_argument("--branch", default="B", help="case01:分支 A/B/C")
     ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到 case01/runs_injector/<run_id>/raw.json)")
-    ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 live-<分支>-<真实日期-时刻>)")
+    ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
     ap.add_argument("--name", default="demo", help="case00:模拟名")
     ap.add_argument("--sim-start", dest="sim_start", default="20250213-09:30",
                     help="case00:模拟起始时间(与 --start 的 case 选择不是一回事)")

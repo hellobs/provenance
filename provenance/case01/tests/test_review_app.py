@@ -18,8 +18,8 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "records")
-MAVIS_RUN = "demo-C-mavis"   # 含六段(含 injector)
-OLD_RUN = "demo-3"           # 旧引擎:无 injector 段
+MAVIS_RUN = "260917-demo-case01-mavis-C"   # 含六段(含 injector)
+OLD_RUN = "260905-demo-case01-old-C"       # 旧引擎:无 injector 段
 
 
 @pytest.fixture(autouse=True)
@@ -126,7 +126,7 @@ def test_brief_carries_derived_branch_summary():
     """列表摘要必须带 branch_summary——它**不在 run.json 里**,是服务端推导的一句话。
 
     2026-09-19 面板首版直接读 data.get("branch_summary") 拿到 None,下拉标签里就成了
-    "A 线 · — ｜ demo-A-mavis";用户反馈"我看不懂"。现在改用 5002 契约同源的
+    "A 线 · — ｜ <旧 id>";用户反馈"我看不懂"。现在改用 5002 契约同源的
     full_context._branch_summary,两边口径一致。
     """
     from case01 import full_context as fc
@@ -144,7 +144,7 @@ def test_brief_carries_derived_branch_summary():
 def test_embed_surface_is_served_and_iframe_allowed():
     """嵌入面:仝牧平台用 iframe 引它。同一页,靠前端识别 /embed/ 路径切压缩版式。"""
     c = _client()
-    for path in ("/embed/review", "/?embed=1", "/?run=demo-C-mavis&tab=router"):
+    for path in ("/embed/review", "/?embed=1", "/?run={}&tab=router".format(MAVIS_RUN)):
         r = c.get(path)
         assert r.status_code == 200, path
         assert "/api/review/runs" in r.text, path
