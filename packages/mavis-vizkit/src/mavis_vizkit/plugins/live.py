@@ -86,6 +86,9 @@ class LiveVisualizer(Visualizer):
         self._last_time: str = ""         # 最近一次模拟时间(同上)
         self._finished: bool = False      # 运行是否已结束(由 finish() 或 done 事件置位)
         self._finish_reason: str = ""     # 结束原因(随 done 一起告诉客户端)
+        # "现在可以重开了吗":由调用方说了算 —— 用户要求"结果出完了才给再来一次的按钮",
+        # 而"结果出完"是调用方的事(本包不认识什么结果)。默认 False。
+        self._restart_ready: bool = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
         self._server = None
@@ -180,6 +183,16 @@ class LiveVisualizer(Visualizer):
         self._last_snapshot = None
         self._last_agents = {}
         self._last_time = ""
+        # 新一局开跑 = 这一局的"结果"还没出 → 重开按钮再次收起
+        self._restart_ready = False
+
+    def set_restart_ready(self, ready: bool = True) -> None:
+        """告诉页面"现在可以重开了"(调用方在结果真的出完之后调)。
+
+        为什么不让页面自己按"跑完"就显示按钮:用户要求**结果出完了**才给"再来一次"。
+        跑完(broadcast done)到结果落盘之间还有一段时间,这段时间按钮不该出现。
+        """
+        self._restart_ready = bool(ready)
 
     def finish(self, reason: str = "run_finished") -> None:
         """运行结束:广播一条 `done`,并记住状态以便后到的人也知道。
@@ -321,7 +334,8 @@ class LiveVisualizer(Visualizer):
             return {"status": "ok", "clients": len(self._clients),
                     "pending": len(self._pending), "roles": self.roles,
                     "finished": self._finished, "finish_reason": self._finish_reason,
-                    "can_restart": self.on_restart is not None}
+                    "can_restart": self.on_restart is not None,
+                    "restart_ready": self._restart_ready}
 
         if self.on_restart is not None:
             @app.post("/control/restart")

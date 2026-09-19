@@ -225,10 +225,16 @@ def main(argv=None):
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
                 live.finish("run_finished")
-                if not args.no_map:
-                    _map_run(run_id, branch, out)
-                else:
-                    print("  (--no-map:跳过映射;手工命令见 docs)")
+                # 用户要求:结果出完了才给"重开一局"按钮 —— 所以映射(结果落盘)之后
+                # 才把 restart_ready 置位;映射失败也要置位(否则人卡在这里没法重开),
+                # 但失败原因会在 stdout 与页面提示里写明。
+                try:
+                    if not args.no_map:
+                        _map_run(run_id, branch, out)
+                    else:
+                        print("  (--no-map:跳过映射;手工命令见 docs)")
+                finally:
+                    live.set_restart_ready(True)
                 if args.hold > 0:
                     print("推演已结束,服务保持 {:.0f} 秒(此刻页面显示“已结束”,"
                           "并给出“重开一局”按钮)…".format(args.hold))

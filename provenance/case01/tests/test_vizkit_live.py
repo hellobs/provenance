@@ -160,8 +160,10 @@ def test_restart_button_only_when_caller_registers_it():
     assert 'id="restart-btn"' in page and "restartRun" in page
     assert 'id="restart-box"' in page and 'id="restart-choice-branch"' in page
     assert ">分支A</option>" in page and ">分支C</option>" in page
-    # 按钮默认隐藏:只有状态变成已结束/出错才显示
-    assert 'state === "finished"' in page
+    # 按钮的显示由服务端 restart_ready 决定(结果出完才给),不看"跑完"
+    assert "watchRestartReady" in page
+    assert 'state === "finished"' not in page.split("watchRestartReady")[0][-400:], \
+        "按钮不该在 setSimStatus 里直接显示"
     r = c.post("/control/restart", json={"branch": "A"})
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["detail"] == "已受理"
@@ -170,6 +172,33 @@ def test_restart_button_only_when_caller_registers_it():
     assert c.post("/control/restart").json()["ok"] is True
     assert seen[-1] == {}
     assert c.get("/health").json()["can_restart"] is True
+
+
+def test_restart_button_waits_until_results_are_ready():
+    """用户要求:结果出完了才给"再来一次"的按钮。
+
+    页面不能按"跑完(done)"就显示按钮,只能按服务端的 restart_ready
+    (由调用方在成品记录落盘之后置位)。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5078, on_restart=lambda payload: {"ok": True})
+    c = TestClient(live.app)
+    page = c.get("/").text
+    assert "watchRestartReady" in page, "要有盯 restart_ready 的轮询"
+    assert "/health" in page
+
+    # 跑完但结果还没出:restart_ready=False,按钮不该显示
+    live.finish("run_finished")
+    h = c.get("/health").json()
+    assert h["finished"] is True and h["restart_ready"] is False
+    # 结果出完(调用方置位)
+    live.set_restart_ready(True)
+    assert c.get("/health").json()["restart_ready"] is True
+    # 新一局开跑:再次收起
+    live.begin_run()
+    h2 = c.get("/health").json()
+    assert h2["restart_ready"] is False and h2["finished"] is False
 
 
 def test_restart_callback_failure_is_reported_to_the_page():

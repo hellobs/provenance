@@ -182,13 +182,11 @@
 		el.textContent = text || state;
 		if (box) box.title = text || state;
 		window.__sim_status = state;
-		// 只有"跑完了"才给重开按钮:跑的时候按它没有意义(要等这一局结束)。
-		var rb = document.getElementById("restart-box");
-		if (rb) { rb.style.display = (state === "finished" || state === "error") ? "flex" : "none"; }
+		// 重开按钮**不在这里显示**:用户要求"结果出完了才给再来一次的按钮",
+		// 而"结果出完"是服务端的事(映射完成)——由下面的轮询按 restart_ready 决定。
 		devLog("sys", "状态 → " + (text || state));
 	}
-	// ================= 推演结束的醒目提示 =================
-	// 用户明确要求:"要保证推演结束后有提示"。状态块那行小字不够醒目,
+	// ================= 推演结束的醒目提示 =================	// 用户明确要求:"要保证推演结束后有提示"。状态块那行小字不够醒目,
 	// 所以结束(含出错/中断)时给一条居中大横幅;成品记录还在生成也一起说清楚。
 	function showDoneBanner(reason, extra) {
 		var b = document.getElementById("done-banner");
@@ -206,7 +204,8 @@
 		} else {
 			text = "推演结束" + (extra || "") +
 				"<br><span style='font-weight:normal;font-size:12.5px'>" +
-				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它</span>";
+				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它," +
+				"左上角随后才出现“重开一局”</span>";
 			color = "rgba(15,157,88,0.95)";
 		}
 		if (!b) { devLog("sys", "推演结束:" + reason); return; }
@@ -222,8 +221,34 @@
 	}
 
 	// 推演结束后的小按钮:重开一局(只有调用方注册了 on_restart 才会有这个元素)。
+	// **用户要求:结果出完了才给"再来一次"** —— 所以按钮的显示不看"跑完",只看服务端的
+	// restart_ready(由调用方在成品记录落盘之后置位)。跑完到结果出完这段时间里,
+	// 状态块只写"结果生成中…",按钮不出现。
 	// 请求成功后**刷新页面**——新一局要从零开始(空小镇、清空的对话、新的实时记录),
 	// 原地复用旧页面会把上一局的对话/位置留在屏幕上。
+	var restartPoll = null;
+	function watchRestartReady() {
+		if (restartPoll) return;
+		restartPoll = setInterval(function() {
+			fetch("/health").then(function(r) { return r.json(); }).then(function(h) {
+				var box = document.getElementById("restart-box");
+				var note = document.getElementById("restart-note");
+				if (!box) return;
+				if (h && h.restart_ready) {
+					box.style.display = "flex";
+					box.style.pointerEvents = "";
+					document.getElementById("sim-status-text").textContent =
+						"推演已结束,结果已生成(可以重开)";
+					if (note && !note.textContent) { note.style.display = "block"; note.textContent = ""; }
+					clearInterval(restartPoll); restartPoll = null;
+				} else if (h && h.finished) {
+					document.getElementById("sim-status-text").textContent =
+						"推演已结束,结果生成中…(稍后出现“重开一局”)";
+				}
+			}).catch(function() { /* 网络抖动:下一次再问 */ });
+		}, 3000);
+	}
+
 	function restartRun() {
 		var box = document.getElementById("restart-box");
 		var btn = document.getElementById("restart-btn");
@@ -338,6 +363,8 @@
 				devLog("sys", "Simulation finished" + (reason ? " (" + reason + ")" : ""));
 				sim_finished = true;
 				showDoneBanner(reason, "");
+				// 跑完了:开始盯"结果出完没有"(出完了才给重开按钮)
+				watchRestartReady();
 				if (reason.indexOf("error") === 0) {
 					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
 				} else if (reason === "interrupted") {
