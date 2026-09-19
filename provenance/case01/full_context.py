@@ -189,7 +189,11 @@ def build_full_context(rec: dict) -> str:
     if router.get("issues"):
         parts.append("七、反思中识别出的待审核问题")
         for i in router["issues"]:
-            parts.append("· 问题:{}".format(i.get("summary", "")))
+            # 问题 = 具体行为/判断(陈述句),不是疑问句;风险单独一行写清"错在哪"。
+            # summary 仍叫"问题"是为了不改冻结合同的字段名,措辞已按 2026-09-19 用户要求收敛。
+            parts.append("· 问题(行为/判断):{}".format(i.get("summary", "")))
+            if i.get("risk_note"):
+                parts.append("  风险或错在哪:{}".format(i.get("risk_note")))
             parts.append("  专业类别:{} | 风险等级:{}".format(
                 i.get("field", ""), i.get("risk", "")))
             parts.append("  路由理由:{}".format(i.get("routing_reason", "")))

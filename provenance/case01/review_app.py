@@ -339,7 +339,7 @@ const TABS = [
   ["events",     "事件",     d => (d.events || []).length,                "剧情事件按日期释放的流水"],
   ["states",     "状态",     d => (d.state_history || []).length,         "资金、持仓、买卖价逐日快照"],
   ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0),    "运行后的 8 维结构化反思全文"],
-  ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的待专家审的问题（含风险等级）"],
+  ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的带风险的行为/判断（含风险等级）"],
   ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
                                                                           "注入器的节点、释放了哪些事件、事件怎么定义"],
   ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
@@ -519,9 +519,13 @@ function paneRouter(d) {
   if (!iss.length && d.live) {
     return '<div class="card"><div class="empty">问题分流在运行结束后生成:跑完会自动出现在这里</div></div>';
   }
+  const styleTag = x => (x.style === "question")
+    ? '<span class="chip" style="background:#fde68a;color:#92400e" title="模型写成了疑问句,不是行为/判断">仍是疑问句</span>'
+    : '';
   return (iss.length ? iss.map(x => `<div class="card">
-      <div class="m"><b>${esc(x.id)}</b> ${riskBadge(x.risk)} <span class="chip">${esc(x.field)}</span></div>
+      <div class="m"><b>${esc(x.id)}</b> ${riskBadge(x.risk)} <span class="chip">${esc(x.field)}</span>${styleTag(x)}</div>
       <div class="t">${esc(x.summary)}</div>
+      ${x.risk_note ? `<div class="m" style="margin-top:8px">风险 / 错在哪</div><div class="t">${esc(x.risk_note)}</div>` : ""}
       <div class="m" style="margin-top:8px">分流理由</div><div class="t">${esc(x.routing_reason)}</div>
     </div>`).join("") : '<div class="card"><div class="empty">无分流问题</div></div>')
     + `<div class="card"><details><summary>展开模型原始输出（注意：这里 risk 是首字母大写，上面徽标用的是归一化后的小写）</summary>
@@ -643,24 +647,22 @@ async function boot() {
     LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
   const sel = document.getElementById("pick");
-  // 下拉按引擎**分组**,并先说人话:哪条剧情线(带含义) -> 记录 id。
-  // 旧写法 "mavis · demo-A-mavis — A 建议买入…" 前缀是黑话、又被 select 宽度截掉,
-  // 于是只剩看不懂的字母(用户反馈过"我看不懂")。
-  const ENG_LABEL = { mavis: "mavis 新架构（成品三线）", legacy: "旧引擎对照（归档实现，留作对比）" };
+  // 下拉就是一条条记录:**不要分组标题**。用户明确说过"正在跑的这一次（实时）""mavis 新架构
+  // （成品三线）"这种话是"奇怪的无用的话"——记录名里已经带了引擎(branch 前那段),
+  // 标签只保留"哪条线(含义) ｜ run_id"。
   const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
+  const ENG_ORDER = { mavis: 0, legacy: 1 };
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
   const optLabel = x => `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
   const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
   const liveOpt = live.live
-    ? `<optgroup label="正在跑的这一次（实时）"><option value="${LIVE_ID}">● 实时 ｜ ` +
-      `${esc(live.run_id)}（${live.done_nodes}/${live.total_nodes} 节点）</option></optgroup>`
+    ? `<option value="${LIVE_ID}">● 实时 ｜ ${esc(live.run_id)}（${live.done_nodes}/${live.total_nodes} 节点）</option>`
     : "";
-  sel.innerHTML = liveOpt + ["mavis", "legacy"].map(eng => {
-    const items = d.runs.filter(x => x.engine === eng)
-                       .sort((a, b) => (BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9));
-    if (!items.length) return "";
-    return `<optgroup label="${esc(ENG_LABEL[eng] || eng)}">${items.map(optHtml).join("")}</optgroup>`;
-  }).join("");
+  const sorted = d.runs.slice().sort((a, b) =>
+    ((ENG_ORDER[a.engine] ?? 9) - (ENG_ORDER[b.engine] ?? 9)) ||
+    ((BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9)) ||
+    String(a.run_id).localeCompare(String(b.run_id)));
+  sel.innerHTML = liveOpt + sorted.map(optHtml).join("");
   sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); pick(sel.value); };
   // 有实跑就默认看实时(用户要"同步看全程");否则落在成品三线(mavis)上,
   // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。

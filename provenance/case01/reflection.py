@@ -43,25 +43,36 @@ REFLECTION_PROMPT_CN = (
 )
 
 # 06 第七节·Router(中文逻辑稿,研究设计基准)
+#
+# 2026-09-19 用户反馈:面板里分流出来的"问题"是疑问句
+# ("小规模订单是否可能成为长期增长的起点？""市场上涨是否反映了真实基本面改善？"),
+# 说"至少也是一个行为它带有风险或者其实是做错的才是问题,而不是说疑问句是问题"。
+# 所以第 5 条重写成**必须给出行为/判断的陈述句 + 风险**;疑问句只算"待查",不算问题。
 ROUTER_PROMPT_CN = (
     "你是 Reflection Router。你的任务是分析 Investment AI 已经生成的 Reflection，"
-    "将其中已经明确出现的、需要进一步专业审核的问题拆分出来，并将每个问题路由给适合的"
+    "把其中**确实存在问题**的**具体行为或判断**拆分出来，并将每条路由给适合的"
     "专业专家。请遵守以下要求："
     "1. 只处理 Reflection 中已经出现的问题。不要替 Investment AI 发现它自己没有反思到的"
     "新问题，也不要重新评价整个 Case。"
     "2. 一条 Reflection 可以包含 0 个、1 个或多个需要专业审核的问题。如果包含多个彼此"
     "独立的问题，请分别拆分。"
-    "3. 对每个问题判断最适合的专业领域 / 专家类型。专业类别不预先限定，应根据问题内容"
+    "3. 对每条判断最适合的专业领域 / 专家类型。专业类别不预先限定，应根据问题内容"
     "选择最相关的领域，并与系统当前可用的专家类别进行匹配。"
-    "4. 对每个问题给出风险等级：Low / Medium / High。"
-    "5. 为每个问题生成一段简短、自然语言的问题摘要，使专家在未展开完整记录前即可理解"
-    "需要审核的核心问题。"
-    "6. 为每个问题说明简短的路由理由，说明为什么需要该领域专家参与。"
+    "4. 对每条给出风险等级：Low / Medium / High。"
+    "5. **每条必须写成一个『行为/判断』的陈述句**：谁（哪个角色）在什么依据（或缺少什么"
+    "依据）的情况下做了什么、或没做什么。并在 risk_note 里写清它带来的风险或者错在哪。"
+    "**疑问句不算问题**：凡是『…是否成立？』『…能否…？』『…是什么？』这种只是待查的疑问，"
+    "要么改写成背后的具体行为/判断，要么就不要输出。"
+    "正例 summary：「在没有正式订单确认的情况下，把『被纳入合格供应商名单』当作商业化信号，"
+    "据此向用户给出买入判断」；对应 risk_note：「用户可能据此投入资金，而该依据不足以支撑"
+    "买入判断，且损失不可逆」。"
+    "反例 summary：「被纳入合格供应商名单是否构成商业化信号？」——这是疑问句，不是问题。"
+    "6. 为每条说明简短的路由理由，说明为什么需要该领域专家参与。"
     "7. 如果同一问题涉及多个专业领域，可以路由给多个不同领域的专家。"
     "8. 不要批准、否决或修改 Reflection，不要替专家作最终判断。你的职责仅限于：问题拆分、"
     "分类、风险判断、摘要和专家路由。"
     "9. 不要因为最终结果是正面或负面，就自动判断原始决策或 Reflection 正确或错误。"
-    "对每个识别出的问题输出：问题摘要：专业领域：风险等级：路由理由："
+    "对每个识别出的问题输出：行为/判断摘要：风险或错在哪：专业领域：风险等级：路由理由："
 )
 
 
@@ -152,11 +163,39 @@ ROUTER_RISK_ANCHOR = (
 
 ROUTER_JSON_HINT = (
     "\n\n输出要求:把识别出的每个问题输出为 JSON 数组,不要输出其他内容:\n"
-    '[{"summary": "问题摘要", "field": "专业领域", "risk": "High|Medium|Low", '
+    '[{"summary": "行为/判断的陈述句", "risk_note": "风险或错在哪", '
+    '"field": "专业领域", "risk": "High|Medium|Low", '
     '"routing_reason": "路由理由"}, ...]\n'
     "若没有需要专业审核的问题,输出 []\n"
+    "summary 必须是陈述句(描述做过/没做过的具体行为或判断),**不要写成疑问句**。\n"
     "格式硬性要求:不要使用 ```json 代码围栏;summary/field/routing_reason 等"
     "字段内容中一律不要出现英文双引号(\"),需要引用原文时用中文引号『』或“”。"
+)
+
+# 疑问句判定(2026-09-19):模型偶尔仍把"待查的疑问"当问题输出。
+# 这里做一层确定性检查:命中的会被要求改写一遍;再不合格就**如实标注** style="question",
+# 让面板显出来(不许静默把疑问句当问题)。
+_QUESTION_TAIL = ("?", "？")
+_QUESTION_STARTS = ("是否", "能否", "会不会", "是不是", "有没有", "为什么", "是什么",
+                    "如何", "怎么", "怎样", "何时", "多少", "哪些", "哪一种", "可否")
+
+
+def looks_like_question(text: str) -> bool:
+    """粗略判断一句话是不是疑问句(问号结尾或疑问词开头)。"""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if t.endswith(_QUESTION_TAIL):
+        return True
+    return any(t.startswith(w) for w in _QUESTION_STARTS)
+
+
+ROUTER_REWRITE_HINT = (
+    "上面这些条目的 summary 写成了疑问句,而我们要的是**问题**——即具体的行为/判断"
+    "以及它带来的风险。请把下面这些条目改写成陈述句(谁在什么依据下做了什么/没做什么),"
+    "并补上 risk_note(风险或错在哪);其余字段保持原样。"
+    "只输出 JSON 数组,不要输出其他内容:\n"
+    '[{"id": "原 id", "summary": "改写后的陈述句", "risk_note": "风险或错在哪"}, ...]\n'
 )
 
 _ROUTER_RISKS = {"high", "medium", "low"}
@@ -199,14 +238,19 @@ def _parse_router_json(text: str) -> list:
         summary = str(it.get("summary", "")).strip()
         field = str(it.get("field", "")).strip()
         reason = str(it.get("routing_reason", "")).strip()
+        risk_note = str(it.get("risk_note", "")).strip()
         if not summary and not field:
             continue
         issues.append({
             "id": "issue-{}".format(i + 1),
             "summary": summary,
+            "risk_note": risk_note,
             "field": field,
             "risk": risk,
             "routing_reason": reason,
+            # style: "behavior"=陈述句行为/判断(要的就是这个);"question"=仍是疑问句(未达标,
+            # 面板会标出来,不静默)。见 looks_like_question()。
+            "style": "question" if looks_like_question(summary) else "behavior",
         })
     return issues
 
@@ -257,12 +301,54 @@ def _line_tolerant_parse(chunk: str) -> list:
     return out
 
 
+def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
+    """把"写成了疑问句"的条目交给模型改写一次(陈述句 + risk_note)。
+
+    改写不成也不丢:原样保留并把 style 标成 "question",面板会显出来(不许静默)。
+    """
+    import json as _json
+
+    bad = [x for x in issues if x.get("style") == "question"]
+    if not bad:
+        return issues
+    payload = _json.dumps([{"id": x["id"], "summary": x["summary"]} for x in bad],
+                          ensure_ascii=False)
+    try:
+        text = llm.chat([
+            {"role": "system", "content": "You are the Reflection Router. Respond in Chinese."},
+            {"role": "user", "content": ROUTER_REWRITE_HINT + "\n" + payload},
+        ], temperature=0.2, max_tokens=max_tokens)
+        fixed = {str(it.get("id", "")): it for it in _parse_rewrite_json(text or "")}
+    except Exception:  # noqa: BLE001 - 改写失败不该让整条记录没了;原样保留 + 标注
+        return issues
+    for x in issues:
+        it = fixed.get(x["id"])
+        if not it:
+            continue
+        new_summary = str(it.get("summary", "")).strip()
+        if new_summary and not looks_like_question(new_summary):
+            x["summary"] = new_summary
+            x["style"] = "behavior"
+        note = str(it.get("risk_note", "")).strip()
+        if note and not x.get("risk_note"):
+            x["risk_note"] = note
+    return issues
+
+
+def _parse_rewrite_json(text: str) -> list:
+    """改写结果解析:容忍围栏/杂文本,复用同一套容错。"""
+    return _parse_router_json(text)
+
+
 def run_router(llm, reflection_text: str, material: str = "",
                max_tokens: int = 2048) -> dict:
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
 
     llm: 独立模型(本地 qwen3 或外部均可;M3 先用本地,后续可切)
-    返回 {raw, issues:[{id,summary,field,risk,routing_reason}]}
+    返回 {raw, issues:[{id,summary,risk_note,field,risk,routing_reason,style}]}
+
+    2026-09-19:用户要求"问题"必须是**带风险的行为/判断**,不能是疑问句。
+    所以这里多一步:检出疑问句 → 让模型改写一遍 → 仍有疑问句就标 style=question。
     """
     prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
               "\n\n以下是 Investment AI 生成的 Reflection:\n\n" +
@@ -274,4 +360,4 @@ def run_router(llm, reflection_text: str, material: str = "",
     ], temperature=0.2, max_tokens=max_tokens)
     raw = text or ""
     issues = _parse_router_json(raw)
-    return {"raw": raw, "issues": issues}
+    return {"raw": raw, "issues": _rewrite_question_issues(llm, issues)}

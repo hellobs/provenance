@@ -8,8 +8,9 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01.reflection import (assemble_reflection_material, run_reflection,
-                               run_router, _parse_router_json,
-                               REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN)
+                               run_router, _parse_router_json, looks_like_question,
+                               REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
+                               ROUTER_JSON_HINT)
 
 
 def _sample_run():
@@ -110,6 +111,71 @@ class TestRouterParse:
                 return '[{"summary":"S","field":"F","risk":"High","routing_reason":"R"}]'
         out = run_router(_Fake(), "一段反思")
         assert out["issues"][0]["id"] == "issue-1"
+
+
+class TestRouterProblemsAreBehaviorsNotQuestions:
+    """2026-09-19 用户:分流出来的必须是**带风险的行为/判断**,不能是疑问句。
+
+    "小规模订单是否可能成为长期增长的起点？" 这种只是待查的疑问,不是问题。
+    """
+
+    def _llm(self, *responses):
+        seq = list(responses)
+
+        class _Fake:
+            def __init__(self):
+                self.calls = []
+
+            def chat(self, messages, **kw):
+                self.calls.append(messages)
+                return seq.pop(0) if seq else ""
+
+        return _Fake()
+
+    def test_looks_like_question(self):
+        assert looks_like_question("被纳入名单是否构成商业化信号？")
+        assert looks_like_question("市场上涨是否反映了真实基本面改善?")
+        assert looks_like_question("能否确认订单")
+        assert not looks_like_question("在没有正式订单确认的情况下,把名单当作商业化信号并给出买入判断")
+        assert not looks_like_question("")
+
+    def test_parsed_issue_carries_style_and_risk_note(self):
+        t = ('[{"summary": "在无正式订单确认时据此给出买入判断", "risk_note": "用户可能据此投入资金",'
+             ' "field": "投资顾问责任", "risk": "High", "routing_reason": "涉重大资金"}]')
+        it = _parse_router_json(t)[0]
+        assert it["style"] == "behavior" and it["risk_note"] == "用户可能据此投入资金"
+
+    def test_question_style_is_flagged_not_silently_accepted(self):
+        t = '[{"summary": "小规模订单是否可能成为长期增长的起点？", "field": "F", "risk": "Low", "routing_reason": "R"}]'
+        assert _parse_router_json(t)[0]["style"] == "question"
+
+    def test_run_router_rewrites_questions_into_behaviors(self):
+        llm = self._llm(
+            '[{"summary": "小规模订单是否可能成为长期增长的起点？", "field": "行业", "risk": "Low", "routing_reason": "R"}]',
+            '[{"id": "issue-1", "summary": "把一份小规模订单当作长期增长的起点,并据此调整了判断",'
+            ' "risk_note": "依据不足,可能高估成长性"}]')
+        out = run_router(llm, "一段反思")
+        assert len(llm.calls) == 2, "检出疑问句后应再改写一次"
+        it = out["issues"][0]
+        assert it["style"] == "behavior"
+        assert not looks_like_question(it["summary"])
+        assert it["risk_note"] == "依据不足,可能高估成长性"
+
+    def test_rewrite_failure_keeps_original_but_marks_question(self):
+        """改写也失败时**不许静默**:原样保留并标 style=question,面板会显出来。"""
+        llm = self._llm(
+            '[{"summary": "市场上涨是否反映了真实基本面改善？", "field": "F", "risk": "High", "routing_reason": "R"}]',
+            '我不确定。')
+        out = run_router(llm, "一段反思")
+        it = out["issues"][0]
+        assert it["style"] == "question"
+        assert "是否" in it["summary"], "改写失败时原文保留"
+
+    def test_prompt_bans_questions_and_requires_risk(self):
+        assert "疑问句不算问题" in ROUTER_PROMPT_CN
+        assert "risk_note" in ROUTER_PROMPT_CN
+        assert "陈述句" in ROUTER_PROMPT_CN
+        assert "risk_note" in ROUTER_JSON_HINT
 
 
 class TestPromptsEmbedded:
