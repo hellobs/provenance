@@ -6,7 +6,8 @@ import pytest
 
 from case01 import viz
 
-RUNS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs")
+# 最小化但结构真实的 mavis 记录样本(入库随 CI 可复现,真实 demo run 不入库)
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "records")
 
 
 def _sample() -> dict:
@@ -71,9 +72,7 @@ def test_index_links_all_runs():
 
 def test_render_real_mavis_run_if_present(tmp_path):
     rid = "demo-C-mavis"
-    if not os.path.exists(os.path.join(RUNS, rid, "run.json")):
-        pytest.skip("mavis demo 记录不在本地(gitignored)")
-    rec = viz.load_run(rid)
+    rec = viz.load_run(rid, FIXTURES)
     html = viz.page_html(rec)
     assert rec["run_id"] in html
     assert "<polyline" in html

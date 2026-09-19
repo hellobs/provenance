@@ -7,7 +7,8 @@ import pytest
 
 from case01.injector.record import CASE01_TOP_KEYS, to_case01_record
 
-RUNS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs")
+# 最小化但结构真实的 run 样本(与真实 runs/ 内同 id 记录同构),入库随 CI 可复现
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "records")
 
 
 def _sample_bridge_record() -> dict:
@@ -81,10 +82,13 @@ def test_branch_action_timeline_matches_frozen_engine():
 
 
 def test_mapping_covers_real_case01_run_json():
-    """与仓库里真实的 run.json 交叉校验（demo run 不入库,CI 上自动跳过）。"""
-    path = os.path.join(RUNS, "demo-3", "run.json")
-    if not os.path.exists(path):
-        pytest.skip("demo run 不在本地（gitignored）")
+    """映射必须覆盖 case01 run.json 的顶层键(用入库的 fixture 做交叉校验)。
+
+    fixture 由真实 runs/ 目录内同 id 记录递归收缩而来(保留全部键结构),
+    因此断言对真实记录亦成立;真实 demo run 不入库,故以 fixture 为准,
+    CI 不再静默跳过。
+    """
+    path = os.path.join(FIXTURES, "demo-3", "run.json")
     with open(path, encoding="utf-8") as f:
         real = json.load(f)
     mapped = to_case01_record(_sample_bridge_record(), branch="C")

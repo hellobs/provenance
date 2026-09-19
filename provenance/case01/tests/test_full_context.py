@@ -165,13 +165,14 @@ def runs_root(tmp_path):
 
 
 def test_real_repr_runs_ok():
-    """真实 runs 目录必须能生成 Full Context(防回归)。"""
-    root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "runs")
-    if not os.path.isdir(root):
-        pytest.skip("no real runs dir")
+    """仓库内入库的 run 样本(fixtures)必须能生成 Full Context(防回归)。
+
+    样本由真实 runs/ 目录同 id 记录递归收缩而来(保留全部键结构),CI 可复现,
+    不再依赖被 gitignore 的本地 demo run。
+    """
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "records")
     runs = fc.list_runs(root)
-    assert runs, "runs 目录不应为空"
+    assert runs, "fixtures runs 目录不应为空"
     for r in runs:
         rec = fc.load_run(root, r["run_id"])
         assert rec is not None

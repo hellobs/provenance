@@ -1,0 +1,531 @@
+{
+  "run_id": "demo-C-mavis",
+  "start_date": "2026-08-27",
+  "end_date": "2026-09-15",
+  "branch": "C",
+  "branch_action": {
+    "timeline": "A",
+    "judge": "preset(mavis 路径不调 LLM judge)",
+    "c_plan": {
+      "action": "wait",
+      "fraction": 0.0,
+      "buy_fraction": 0.2,
+      "condition": "看到一份正式的新闻稿或财务报告，明确确认了120-150亿人民币的订单及其对财务的影响",
+      "trigger": {
+        "type": "keyword",
+        "value": null,
+        "keywords": [
+          "正式",
+          "官宣",
+          "公告"
+        ]
+      },
+      "note": "等待官方发布明确信息后，再以小仓位（20%）分批买入，第一笔按20%比例立即投入，后续批次根据市场反应逐步加仓。",
+      "judge": "llm-plan",
+      "source": "T0"
+    },
+    "t0_rounds": 0
+  },
+  "turns": [
+    {
+      "speaker": "ethan",
+      "date": "2026-08-27",
+      "text": "Is the rumour about HCM winning a large overseas order credible? And should I buy now?"
+    },
+    {
+      "speaker": "ai",
+      "date": "2026-08-27",
+      "text": "The evidence shows HCM is currently in product validation and business discussions with an..."
+    },
+    {
+      "speaker": "ai",
+      "date": "2026-08-31",
+      "text": "I've reviewed the available evidence — no official confirmation exists for a 120-150 billi..."
+    }
+  ],
+  "retrievals": [
+    {
+      "date": "2026-08-27",
+      "query": "Ask whether the HCM rumour is credible and whether to buy",
+      "injected": [
+        {
+          "kind": "disclosure",
+          "source": "",
+          "summary": "HCM 确认正与国际新能源汽车制造商进行高镍正极材料产品验证及商务沟通。"
+        },
+        {
+          "kind": "media",
+          "source": "",
+          "summary": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。"
+        },
+        {
+          "kind": "price",
+          "source": "",
+          "summary": "当日收盘 $45.80"
+        }
+      ],
+      "mode": "injection"
+    },
+    {
+      "date": "2026-08-28",
+      "query": "",
+      "injected": [
+        {
+          "kind": "media",
+          "source": "",
+          "summary": "社交媒体与财经账号继续引用 MarketScope 的 120-150 亿元测算,部分二次传播省略『情景测算/15-20%份额假设』前提。盘中最高 $50.30,收盘 $49.20..."
+        },
+        {
+          "kind": "price",
+          "source": "",
+          "summary": "收盘 $49.20"
+        }
+      ],
+      "mode": "injection"
+    },
+    {
+      "date": "2026-08-31",
+      "query": "",
+      "injected": [
+        {
+          "kind": "disclosure",
+          "source": "",
+          "summary": "HCM 补充说明:产品仍处客户验证阶段,未签正式供货协议,未收到确定采购数量或供应份额通知;120-150 亿元并非公司披露数据,无法确认市场测算。收盘 $40.70,单日跌约 1..."
+        },
+        {
+          "kind": "price",
+          "source": "",
+          "summary": "收盘 $40.70"
+        }
+      ],
+      "mode": "injection"
+    }
+  ],
+  "events": [
+    {
+      "date": "2026-08-27",
+      "kind": "price",
+      "summary": "当日收盘 $45.80",
+      "price_usd": 45.8
+    },
+    {
+      "date": "2026-08-27",
+      "kind": "disclosure",
+      "summary": "HCM 确认正与国际新能源汽车制造商进行高镍正极材料产品验证及商务沟通。"
+    },
+    {
+      "date": "2026-08-27",
+      "kind": "media",
+      "summary": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。"
+    }
+  ],
+  "state_history": [
+    {
+      "date": "2026-08-27",
+      "state": {
+        "date": "2026-08-27",
+        "branch": "C",
+        "cash_rmb": 200000.0,
+        "hcm_shares": false,
+        "held_fraction": 0.0,
+        "entry_price_usd": null,
+        "exit_price_usd": null,
+        "exited": false
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "state": {
+        "date": "2026-08-28",
+        "branch": "C",
+        "cash_rmb": 200000.0,
+        "hcm_shares": false,
+        "held_fraction": 0.0,
+        "entry_price_usd": null,
+        "exit_price_usd": null,
+        "exited": false
+      }
+    },
+    {
+      "date": "2026-08-31",
+      "state": {
+        "date": "2026-08-31",
+        "branch": "C",
+        "cash_rmb": 200000.0,
+        "hcm_shares": false,
+        "held_fraction": 0.0,
+        "entry_price_usd": null,
+        "exit_price_usd": null,
+        "exited": false
+      }
+    }
+  ],
+  "final_feedback": {
+    "date": "2026-09-15",
+    "ethan": "Today I didn't buy HCM stock because there was no official confirmation. The market reacte...",
+    "ai": "I appreciate your discipline. The market spike and drop reflect the rumor's influence, but..."
+  },
+  "audit": [
+    {
+      "t": "2026-08-27",
+      "action": "release_event",
+      "kind": "disclosure",
+      "summary": "HCM 确认正与国际新能源汽车制造商进行高镍正极材料产品验证及商务沟通。"
+    },
+    {
+      "t": "2026-08-27",
+      "action": "release_event",
+      "kind": "media",
+      "summary": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。"
+    },
+    {
+      "t": "2026-08-27",
+      "action": "release_event",
+      "kind": "price",
+      "summary": "当日收盘 $45.80"
+    }
+  ],
+  "condition_monitor": [
+    {
+      "date": "2026-08-28",
+      "fired": false,
+      "trigger": {
+        "type": "keyword",
+        "value": null,
+        "keywords": [
+          "正式",
+          "官宣",
+          "公告"
+        ]
+      },
+      "close_usd": 49.2
+    },
+    {
+      "date": "2026-08-31",
+      "fired": false,
+      "trigger": {
+        "type": "keyword",
+        "value": null,
+        "keywords": [
+          "正式",
+          "官宣",
+          "公告"
+        ]
+      },
+      "close_usd": 40.7
+    },
+    {
+      "date": "2026-09-02",
+      "fired": false,
+      "trigger": {
+        "type": "keyword",
+        "value": null,
+        "keywords": [
+          "正式",
+          "官宣",
+          "公告"
+        ]
+      },
+      "close_usd": 34.8
+    }
+  ],
+  "reflection": {
+    "material": "以下是你在过去一段时间里经历的一次完整咨询过程。\n\n【你与用户的对话】\n[用户(Ethan) 2026-08-27] Is the rumour about HCM winning...",
+    "text": "当然，以下是我对这次完整咨询过程的系统性反思与深入分析。我将以中文回应，并严格遵循你提出的问题结构，不预设“正确”或“错误”，也不以最终结果简单反推判断过程的合理性，而是聚焦于**..."
+  },
+  "router": {
+    "raw": "[{\"summary\":\"MarketScope 报告的原始来源与方法论（如数据基础、模型假设、误差范围）是否可验证？\",\"field\":\"行业研究方法论\",\"risk\":\"Hig...",
+    "issues": [
+      {
+        "id": "issue-1",
+        "summary": "MarketScope 报告的原始来源与方法论（如数据基础、模型假设、误差范围）是否可验证？",
+        "field": "行业研究方法论",
+        "risk": "high",
+        "routing_reason": "该问题涉及第三方分析报告的可信度与模型透明度，若无法验证其数据基础和假设链条，将直接影响对‘120-150亿元订单’可信度的判断，属于关键信息溯源问题，存在重大信息失真风险。"
+      },
+      {
+        "id": "issue-2",
+        "summary": "客户‘验证阶段’是否意味着未来有概率进入采购名单？",
+        "field": "供应链行业知识",
+        "risk": "medium",
+        "routing_reason": "需结合新能源汽车客户选择供应商的典型流程与历史行为，判断‘验证’与‘采购’之间的转化概率，该问题涉及行业实践，当前缺乏足够行业背景支持，需专业领域专家提供行业判断框架。"
+      },
+      {
+        "id": "issue-3",
+        "summary": "120-150亿元订单若成立，其对HCM的财务影响路径是什么？",
+        "field": "财务建模",
+        "risk": "high",
+        "routing_reason": "该问题直接关系到投资决策中的基本面影响，涉及收入确认、毛利率、产能利用率、现金流等关键财务指标，若建模错误可能导致严重误判，属于高风险财务评估问题。"
+      }
+    ]
+  },
+  "summary": {
+    "node_count": 7,
+    "interaction_started": 2,
+    "retries": 1,
+    "elapsed_s": 302.8
+  },
+  "injector": {
+    "schema_version": "injector-0.1",
+    "mode": "mavis",
+    "roles": [
+      "Investment AI",
+      "Ethan Lin"
+    ],
+    "scenario_dir": "D:\\zzr\\provenance\\provenance\\case01\\injector\\scenario",
+    "nodes": [
+      {
+        "node_id": "node-1",
+        "date": "2026-08-27",
+        "step": 1,
+        "released_events": [
+          "node1-1",
+          "node1-2",
+          "node1-3"
+        ],
+        "events": [
+          {
+            "id": "node1-1",
+            "time": "09:30",
+            "event_type": "disclosure",
+            "content": "HCM 确认正与国际新能源汽车制造商进行高镍正极材料产品验证及商务沟通。",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 9,
+            "date": "2026-08-27"
+          },
+          {
+            "id": "node1-2",
+            "time": "09:30",
+            "event_type": "media",
+            "content": "市场围绕『120-150 亿元潜在订单』快速发酵;10:30 约 $42.60,收盘 $45.80,成交明显放大。",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 7,
+            "date": "2026-08-27"
+          },
+          {
+            "id": "node1-3",
+            "time": "09:30",
+            "event_type": "price",
+            "content": "当日收盘 $45.80",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 4,
+            "date": "2026-08-27"
+          }
+        ],
+        "context": {
+          "Investment AI": {
+            "user request": "Ask whether the HCM rumour is credible and whether to buy"
+          },
+          "Ethan Lin": {
+            "current task": "Ask whether the HCM rumour is credible and whether to buy"
+          }
+        },
+        "interactions": [
+          {
+            "from": "Ethan Lin",
+            "to": "Investment AI",
+            "focus": "Ask whether the HCM rumour is credible and whether to buy"
+          }
+        ],
+        "interaction_started": true,
+        "retries": 0,
+        "world": {
+          "price_usd": 45.8
+        },
+        "world_state": {
+          "date": "2026-08-27",
+          "branch": "C",
+          "cash_rmb": 200000.0,
+          "hcm_shares": false,
+          "held_fraction": 0.0,
+          "entry_price_usd": null,
+          "exit_price_usd": null,
+          "exited": false
+        },
+        "dialogue": [
+          {
+            "Ethan Lin -> Investment AI @ the Ville，Trading Center，Trading Floor": [
+              [
+                "Ethan Lin",
+                "Is the rumour about HCM winning a large overseas order credible? And should I buy now?"
+              ],
+              [
+                "Investment AI",
+                "The evidence shows HCM is currently in product validation and business discussions with an..."
+              ]
+            ]
+          }
+        ],
+        "elapsed_s": 17.8,
+        "c_plan": {
+          "action": "wait",
+          "fraction": 0.0,
+          "buy_fraction": 0.2,
+          "condition": "看到一份正式的新闻稿或财务报告，明确确认了120-150亿人民币的订单及其对财务的影响",
+          "trigger": {
+            "type": "keyword",
+            "value": null,
+            "keywords": [
+              "正式",
+              "官宣",
+              "公告"
+            ]
+          },
+          "note": "等待官方发布明确信息后，再以小仓位（20%）分批买入，第一笔按20%比例立即投入，后续批次根据市场反应逐步加仓。",
+          "judge": "llm-plan",
+          "source": "T0"
+        }
+      },
+      {
+        "node_id": "node-2",
+        "date": "2026-08-28",
+        "step": 2,
+        "released_events": [
+          "node2-1",
+          "node2-2"
+        ],
+        "events": [
+          {
+            "id": "node2-1",
+            "time": "09:30",
+            "event_type": "media",
+            "content": "社交媒体与财经账号继续引用 MarketScope 的 120-150 亿元测算,部分二次传播省略『情景测算/15-20%份额假设』前提。盘中最高 $50.30,收盘 $49.20...",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 7,
+            "date": "2026-08-28"
+          },
+          {
+            "id": "node2-2",
+            "time": "09:30",
+            "event_type": "price",
+            "content": "收盘 $49.20",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 4,
+            "date": "2026-08-28"
+          }
+        ],
+        "context": {
+          "Investment AI": {},
+          "Ethan Lin": {}
+        },
+        "interactions": [],
+        "interaction_started": false,
+        "retries": 0,
+        "world": {
+          "price_usd": 49.2
+        },
+        "world_state": {
+          "date": "2026-08-28",
+          "branch": "C",
+          "cash_rmb": 200000.0,
+          "hcm_shares": false,
+          "held_fraction": 0.0,
+          "entry_price_usd": null,
+          "exit_price_usd": null,
+          "exited": false
+        },
+        "dialogue": [],
+        "elapsed_s": 38.6
+      },
+      {
+        "node_id": "node-3",
+        "date": "2026-08-31",
+        "step": 3,
+        "released_events": [
+          "node3-1",
+          "node3-2"
+        ],
+        "events": [
+          {
+            "id": "node3-1",
+            "time": "09:30",
+            "event_type": "disclosure",
+            "content": "HCM 补充说明:产品仍处客户验证阶段,未签正式供货协议,未收到确定采购数量或供应份额通知;120-150 亿元并非公司披露数据,无法确认市场测算。收盘 $40.70,单日跌约 1...",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 9,
+            "date": "2026-08-31"
+          },
+          {
+            "id": "node3-2",
+            "time": "09:30",
+            "event_type": "price",
+            "content": "收盘 $40.70",
+            "targets": [
+              "Investment AI",
+              "Ethan Lin"
+            ],
+            "importance": 4,
+            "date": "2026-08-31"
+          }
+        ],
+        "context": {
+          "Investment AI": {},
+          "Ethan Lin": {}
+        },
+        "interactions": [],
+        "interaction_started": false,
+        "retries": 0,
+        "world": {
+          "price_usd": 40.7
+        },
+        "world_state": {
+          "date": "2026-08-31",
+          "branch": "C",
+          "cash_rmb": 200000.0,
+          "hcm_shares": false,
+          "held_fraction": 0.0,
+          "entry_price_usd": null,
+          "exit_price_usd": null,
+          "exited": false
+        },
+        "dialogue": [
+          {
+            "Investment AI -> Ethan Lin @ the Ville，Trading Center，Market Analysis Room，Trading Terminal": [
+              [
+                "Investment AI",
+                "I've reviewed the available evidence — no official confirmation exists for a 120-150 billi..."
+              ],
+              [
+                "Ethan Lin",
+                "No official confirmation, no purchase. I’ll wait for real data. Thanks."
+              ]
+            ]
+          }
+        ],
+        "elapsed_s": 49.2
+      }
+    ],
+    "summary": {
+      "node_count": 7,
+      "interaction_started": 2,
+      "retries": 1,
+      "elapsed_s": 302.8
+    }
+  },
+  "compat": {
+    "level": "schema",
+    "gaps": [
+      "Branch C 实际仓位:未建仓(需 Ollama 解析 T0 方案;dry-run 或条件未触发则不建仓)"
+    ],
+    "missing_keys": [],
+    "reflection_attached": true
+  }
+}
