@@ -227,24 +227,14 @@ def _is_review_only(case):
 
 
 def _start_mapper(run_id, args, raw_out):
-    """起一个脱离的看护进程:等原始记录写好,自动映射成成品记录。
+    """【已停用】原来看护进程的事,现在由实时面进程自己顺序做。
 
-    "实跑成功了但面板里什么都没有"是静默后果,不允许——所以默认自动映射,
-    `--no-map` 可关掉(见 case01/tools/map_after_run.py)。
+    保留函数只为说明历史:`case01/vizkit/live_run.py` 的 `_map_run()` 在跑完当刻
+    顺序映射(重开一局也映射),不再另起进程 —— 否则连点"重开"会堆起多个映射
+    同时抢同一个 Ollama(2026-09-19 实测)。
+    `case01/tools/map_after_run.py` 仍留着,供手工/离线映射用。
     """
-    mapper_log = os.path.join(LOG_DIR, "live_%s.map.log" % "case01")
-    cmd = [sys.executable, "-m", "case01.tools.map_after_run",
-           "--run-id", run_id, "--branch", args.branch,
-           "--raw", raw_out, "--port", str(LIVE["case01"])]
-    try:
-        with open(mapper_log, "ab") as f:
-            subprocess.Popen(cmd, cwd=HERE, stdout=f, stderr=f,
-                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
-    except Exception as e:  # noqa: BLE001 - 起不来也要说清楚,不能静默
-        print("  [!] 看护进程没起来({}: {}),跑完请手工跑上面那条映射命令"
-              .format(type(e).__name__, e))
-        return ""
-    return mapper_log
+    return ""
 
 
 def start(case, args):
@@ -332,9 +322,9 @@ def start(case, args):
         return 1
 
     if run_id and not args.no_map:
-        mapper_log = _start_mapper(run_id, args, out)
-        if mapper_log:
-            print("  看护进程已起:跑完(原始记录写好后)自动映射,日志 {}".format(mapper_log))
+        # 映射现在由实时面进程**自己顺序做**(case01/vizkit/live_run.py 的 _map_run):
+        # 重开一局时再另起看护进程会并发抢同一个 Ollama。这里只提示一句。
+        print("  跑完由实时面自己顺序映射(重开一局也会映射),不发看护进程")
 
     print("\n现状:")
     for c in ("case00", "case01"):

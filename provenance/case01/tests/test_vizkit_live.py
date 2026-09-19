@@ -176,6 +176,48 @@ def test_restart_callback_failure_is_reported_to_the_page():
     assert body["ok"] is False and "桥接挂了" in body["error"]
 
 
+def test_begin_run_clears_finished_state_for_the_next_round():
+    """重开一局时插件必须被"重置":否则第二局从第一秒起就告诉页面"已结束"。"""
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5079)
+    c = TestClient(live.app)
+    live.finish("run_finished")
+    assert c.get("/health").json()["finished"] is True
+    live.begin_run()
+    h = c.get("/health").json()
+    assert h["finished"] is False and h["finish_reason"] == ""
+    # 晚连进来的人这时不该再收到 done
+    with c.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "init"
+
+
+def test_bridge_close_can_keep_the_shared_visualizer():
+    """跨局共享的插件不能被 bridge.close() 关掉(实测:重开后 5010 直接不监听)。"""
+    from case01.injector.bridge import MavisBridge
+
+    class _Viz:
+        name = "live"
+
+        def __init__(self):
+            self.closed = False
+
+        def on_event(self, event):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    b = MavisBridge(nodes=[], roles=ROLES, scenario_dir=SCENARIO, dry_run=True)
+    viz = _Viz()
+    from mavis_vizkit import Fanout
+    b._fanout = Fanout([viz])
+    b.close(keep_visualizers=True)
+    assert viz.closed is False, "重开时不能关掉共享插件"
+    b.close()
+    assert viz.closed is True, "进程退出时才真的关"
+
+
 def test_clock_shows_the_date_not_only_hh_mm():
     """时钟必须带日期。
 

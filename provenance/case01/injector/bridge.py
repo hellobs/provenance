@@ -524,9 +524,14 @@ class MavisBridge:
 
             self._fanout.emit(story_event(dict(ev or {})))
 
-    def close(self) -> None:
-        """收尾:关闭可视化插件,并按所走的路径退订对话接线。"""
-        if self._fanout is not None:
+    def close(self, keep_visualizers: bool = False) -> None:
+        """收尾:关闭可视化插件,并按所走的路径退订对话接线。
+
+        keep_visualizers=True 时**不关**可视化插件 —— 给"一局跑完接着重开一局"用:
+        插件(live 的 HTTP 服务)是跨局共享的,关掉它等于把整个界面弄没
+        (2026-09-19 实测:重开一局后 5010 不再监听,页面直接消失)。
+        """
+        if self._fanout is not None and not keep_visualizers:
             self._fanout.close()
         if self.simulator is None:
             return

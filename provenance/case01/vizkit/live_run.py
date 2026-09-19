@@ -72,26 +72,34 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     return live
 
 
-def _spawn_mapper(run_id, branch, raw_out):
-    """给这一局的原始记录起一个脱离的看护进程(和 live_switch 用的是同一个工具)。
+def _map_run(run_id, branch, raw_out):
+    """把这一局的原始记录映射成成品记录(**在本进程里顺序做**,不另起看护进程)。
 
-    为什么要它:重开一局之后,`live_switch` 当初只给**第一局**起了看护进程,
-    不补的话第二局跑完就没有成品记录 —— 面板上"这片空白没人解释"的老问题会回来。
+    为什么改成顺序做:重开一局时如果每局都起一个独立的映射看护进程,连点几次就会
+    堆起好几个映射都在抢同一个 Ollama —— 新一局的推演也跟着变慢
+    (2026-09-19 实测:三次重开后三个映射进程同时跑)。顺序做就没有并发问题,
+    而且映射完 `<run_id>/run.json` 一落盘,面板那边 `/api/review/live` 就会
+    报 live=false + mapped=true,自动切到成品记录并弹绿条。
+    映射失败**不静默**:打印退出码、输出尾部与手工重跑命令。
     """
-    log_dir = os.path.join(os.environ.get("TEMP", os.path.dirname(raw_out)), "dsh_srv")
-    os.makedirs(log_dir, exist_ok=True)
-    log = os.path.join(log_dir, "live_case01.map.log")
-    cmd = [sys.executable, "-m", "case01.tools.map_after_run",
-           "--run-id", run_id, "--branch", branch,
-           "--raw", os.path.abspath(raw_out), "--port", "0"]
-    try:
-        with open(log, "ab") as f:
-            subprocess.Popen(cmd, cwd=PKG_ROOT, stdout=f, stderr=f,
-                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
-        print("  看护进程已起(本局映射): {}".format(run_id))
-    except Exception as exc:  # noqa: BLE001 - 起不来要说清楚
-        print("  [!] 本局的映射看护进程没起来({}: {}),跑完请手工映射".format(
-            type(exc).__name__, exc))
+    out = os.path.join("case01", "runs", run_id, "run.json")
+    cmd = [sys.executable, "-m", "case01.injector.pipeline",
+           "--branch", branch, "--run-id", run_id,
+           "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
+    print("  正在映射成品记录(约 1-2 分钟)…")
+    t0 = time.time()
+    proc = subprocess.run(cmd, cwd=PKG_ROOT, capture_output=True, text=True)
+    tail = (proc.stdout or "").strip()[-800:]
+    if tail:
+        print(tail)
+    if proc.returncode != 0 or not os.path.exists(os.path.join(PKG_ROOT, out)):
+        print("  [!] 映射失败(exit={}):可在 provenance/provenance 下手工重跑:\n      {}"
+              .format(proc.returncode, " ".join(cmd)))
+        if (proc.stderr or "").strip():
+            print("      stderr 尾部:", proc.stderr.strip()[-400:])
+        return False
+    print("  成品记录已生成({:.0f}s) -> {}".format(time.time() - t0, out))
+    return True
 
 
 def main(argv=None):
@@ -110,6 +118,8 @@ def main(argv=None):
                     help="只服务界面(小镇 + 结果记录),不跑推演;用于随时翻成品记录")
     ap.add_argument("--no-restart", dest="no_restart", action="store_true",
                     help="不提供页面上的『重开一局』按钮(默认提供)")
+    ap.add_argument("--no-map", dest="no_map", action="store_true",
+                    help="跑完不自动映射成成品记录(默认自动映射,由本进程顺序做)")
     args = ap.parse_args(argv)
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
@@ -164,6 +174,9 @@ def main(argv=None):
             ran_once = True
             out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
             print("本次 run_id: {}".format(run_id))
+            # 新的一局开始:先清掉插件上"已结束"的状态,否则第二局从第一秒起
+            # 就告诉页面"已结束"(状态点灰着),看着像没在跑。
+            live.begin_run()
             # 面板是建服务时挂上去的,那时 run_id 还没生成;这里补告一次,
             # 好让面板能写出"本次实跑 <run_id> 还没成品记录(跑完自动生成)"。
             set_current_run(run_id, "实跑跑完会自动映射成成品记录")
@@ -186,7 +199,10 @@ def main(argv=None):
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
                 live.finish("run_finished")
-                _spawn_mapper(run_id, args.branch, out)
+                if not args.no_map:
+                    _map_run(run_id, args.branch, out)
+                else:
+                    print("  (--no-map:跳过映射;手工命令见 docs)")
                 if args.hold > 0:
                     print("推演已结束,服务保持 {:.0f} 秒(此刻页面显示“已结束”,"
                           "并给出“重开一局”按钮)…".format(args.hold))
@@ -204,12 +220,16 @@ def main(argv=None):
                 exit_code = 1
                 break
             finally:
-                bridge.close()
+                # **不要**在这里关掉可视化插件:它是跨局共享的 HTTP 服务,
+                # 关掉等于把整个界面弄没(实测:重开一局后 5010 不再监听)。
+                # 真正的关闭放到进程退出时(finally 外层)。
+                bridge.close(keep_visualizers=True)
             if not restart_flag.is_set():
                 break
             print("重开:开始新的一局(分支 {} 不变)".format(args.branch))
     finally:
-        clear_live()      # 进程要退出了,别让面板一直显示一个已经不动的"实时"
+        live.close()      # 进程要退出了:现在才关服务本身
+        clear_live()      # 别让面板一直显示一个已经不动的"实时"
         print("服务已关闭")
     return exit_code
 

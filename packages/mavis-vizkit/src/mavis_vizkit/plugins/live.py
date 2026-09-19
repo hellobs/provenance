@@ -158,6 +158,17 @@ class LiveVisualizer(Visualizer):
     def finish_reason(self) -> str:
         return self._finish_reason
 
+    def begin_run(self) -> None:
+        """新的一局开始:清掉"已结束"状态。
+
+        为什么要它:插件是**跨局共享**的(HTTP 服务只有一份)。第一局 `finish()` 之后
+        `_finished` 一直是 True —— 不清的话,重开的第二局从第一秒起就告诉页面"已结束"
+        (状态点灰着、done 立刻发出去),页面看着像没在跑。
+        只清状态,不广播:新一局的"在跑"由页面上的 init/快照/agent 消息自然体现。
+        """
+        self._finished = False
+        self._finish_reason = ""
+
     def finish(self, reason: str = "run_finished") -> None:
         """运行结束:广播一条 `done`,并记住状态以便后到的人也知道。
 
