@@ -270,6 +270,9 @@
 			.then(function(r) { return r.json(); })
 			.then(function(d) {
 				if (d && d.ok) {
+					// 受理即**收起按钮**(用户:"既然重开了一次,重开按钮就应该被禁用"):
+					// 不靠 800ms 后的刷新兜底 —— 刷新前这段时间也不能再点。
+					if (box) { box.style.display = "none"; box.style.pointerEvents = ""; }
 					if (note) { note.style.display = "block"; note.textContent = "已重开,页面即将刷新…"; }
 					devLog("sys", "重开已受理:" + (d.detail || d.run_id || ""));
 					setTimeout(function() { location.reload(); }, 800);

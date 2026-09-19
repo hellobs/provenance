@@ -89,6 +89,9 @@ class LiveVisualizer(Visualizer):
         # "现在可以重开了吗":由调用方说了算 —— 用户要求"结果出完了才给再来一次的按钮",
         # 而"结果出完"是调用方的事(本包不认识什么结果)。默认 False。
         self._restart_ready: bool = False
+        # 已经受理过一次重开、还没等到新一局开跑 —— 这期间按钮不该再给,
+        # 服务端也要挡住重复请求(用户:"既然重开了一次,重开按钮就应该被禁用")。
+        self._restart_pending: bool = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
         self._server = None
@@ -183,8 +186,9 @@ class LiveVisualizer(Visualizer):
         self._last_snapshot = None
         self._last_agents = {}
         self._last_time = ""
-        # 新一局开跑 = 这一局的"结果"还没出 → 重开按钮再次收起
+        # 新一局开跑 = 这一局的"结果"还没出 → 重开按钮再次收起;重开请求也已兑现
         self._restart_ready = False
+        self._restart_pending = False
 
     def set_restart_ready(self, ready: bool = True) -> None:
         """告诉页面"现在可以重开了"(调用方在结果真的出完之后调)。
@@ -335,7 +339,8 @@ class LiveVisualizer(Visualizer):
                     "pending": len(self._pending), "roles": self.roles,
                     "finished": self._finished, "finish_reason": self._finish_reason,
                     "can_restart": self.on_restart is not None,
-                    "restart_ready": self._restart_ready}
+                    "restart_ready": self._restart_ready,
+                    "restart_pending": self._restart_pending}
 
         if self.on_restart is not None:
             @app.post("/control/restart")
@@ -354,12 +359,20 @@ class LiveVisualizer(Visualizer):
                         payload = {}
                 except Exception:      # noqa: BLE001 - 没带 body 是正常的
                     payload = {}
+                # 已经受理过一次、还没等到新一局开跑:挡住重复请求
+                # (用户:"既然重开了一次,重开按钮就应该被禁用")
+                if self._restart_pending:
+                    return {"ok": False,
+                            "error": "已经重开过一次了:等新一局开始(或这一局结果出来)再点"}
                 try:
                     res = await asyncio.get_running_loop().run_in_executor(
                         None, lambda: self.on_restart(payload))
                 except Exception as exc:  # noqa: BLE001 - 失败要如实回给页面
                     log.warning("重开回调失败", exc_info=True)
                     return {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}
+                if isinstance(res, dict) and res.get("ok") is False:
+                    return res
+                self._restart_pending = True
                 if isinstance(res, dict):
                     res.setdefault("ok", True)
                     return res

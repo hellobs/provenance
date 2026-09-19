@@ -168,7 +168,8 @@ def test_restart_button_only_when_caller_registers_it():
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["detail"] == "已受理"
     assert seen == [{"branch": "A"}], "页面选的分支要原样交给回调"
-    # 不带 body 也要能打(老页面/curl)
+    # 不带 body 也要能打(老页面/curl);先 begin_run 解除上一条的 pending
+    live.begin_run()
     assert c.post("/control/restart").json()["ok"] is True
     assert seen[-1] == {}
     assert c.get("/health").json()["can_restart"] is True
@@ -199,6 +200,27 @@ def test_restart_button_waits_until_results_are_ready():
     live.begin_run()
     h2 = c.get("/health").json()
     assert h2["restart_ready"] is False and h2["finished"] is False
+
+
+def test_second_restart_request_is_refused_until_the_next_run_starts():
+    """用户要求:重开过一次之后,按钮要禁用 —— 服务端也要挡住重复请求。"""
+    from fastapi.testclient import TestClient
+
+    calls = []
+    live = _live(port=5077, on_restart=lambda payload: calls.append(payload) or {"ok": True})
+    c = TestClient(live.app)
+    assert c.get("/health").json()["restart_pending"] is False
+    assert c.post("/control/restart", json={"branch": "A"}).json()["ok"] is True
+    assert c.get("/health").json()["restart_pending"] is True
+    # 再来一次:被拒(页面此时也不该有按钮,因为 restart_ready 已被清)
+    r2 = c.post("/control/restart", json={"branch": "B"}).json()
+    assert r2["ok"] is False and "已经重开过一次" in r2["error"]
+    assert len(calls) == 1, "第二次请求不该再交给回调"
+    # 新一局开跑 → 解除
+    live.begin_run()
+    assert c.get("/health").json()["restart_pending"] is False
+    assert c.post("/control/restart", json={"branch": "C"}).json()["ok"] is True
+    assert len(calls) == 2
 
 
 def test_restart_callback_failure_is_reported_to_the_page():
