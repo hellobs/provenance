@@ -25,9 +25,10 @@ def test_pipeline_dry_run_writes_mapped_record(tmp_path):
 def test_pipeline_attach_reflection_uses_case01_modules(tmp_path, monkeypatch):
     calls = {}
 
-    def _fake_reflection(llm, rec, max_tokens=3072):
-        calls["reflection"] = {"llm": llm, "run_id": rec.get("run_id")}
-        return {"material": "材料", "text": "反思文本"}
+    def _fake_reflection(llm, rec, max_tokens=4096):
+        calls["reflection"] = {"llm": llm, "run_id": rec.get("run_id"),
+                               "max_tokens": max_tokens}
+        return {"material": "材料", "text": "反思文本", "stripped_opener": True}
 
     def _fake_router(llm, text, material=""):
         calls["router"] = {"llm": llm, "text": text}
@@ -39,7 +40,11 @@ def test_pipeline_attach_reflection_uses_case01_modules(tmp_path, monkeypatch):
 
     record = run_pipeline(branch="B", dry_run=True, reflect=True, llm="LLM")
 
-    assert record["reflection"] == {"material": "材料", "text": "反思文本"}
+    # stripped_opener 也进记录:后处理改过文本必须留痕(不许静默)
+    assert record["reflection"] == {"material": "材料", "text": "反思文本",
+                                    "stripped_opener": True}
+    # 上限从 3072 提到 4096:防 max_tokens 截断(反思约 5 千字)
+    assert calls["reflection"]["max_tokens"] == 4096
     assert record["router"]["issues"] == [{"summary": "s"}]
     assert calls["reflection"]["llm"] == "LLM"
     assert calls["router"]["text"] == "反思文本"

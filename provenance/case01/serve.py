@@ -90,10 +90,17 @@ def index() -> dict:
 
 
 @app.get("/api/runs", tags=["runs"])
-def list_runs() -> dict:
-    """全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。"""
-    runs = fc.list_runs(RUNS_ROOT)
-    return {"runs": runs, "count": len(runs)}
+def list_runs(exclude_questionable: bool = False) -> dict:
+    """全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
+
+    每条记录带 `quality` / `consistency` / `branch_source`(2026-09-19 加,加法字段):
+    `preset` 分支不看 AI 说了什么,可能出现"AI 说不能确认值得买、当事人却满仓"的记录 ——
+    平台可以据此**自己决定**是否给专家看,或提示专家。
+    `?exclude_questionable=1` 只返回 quality="ok" 的记录(平台可选;默认不跳,免得静默少给数据)。
+    """
+    runs = fc.list_runs(RUNS_ROOT, exclude_questionable=exclude_questionable)
+    return {"runs": runs, "count": len(runs),
+            "filter": {"exclude_questionable": bool(exclude_questionable)}}
 
 
 @app.get("/api/runs/{run_id}", tags=["runs"])
@@ -117,6 +124,9 @@ def run_detail(run_id: str) -> dict:
         "n_retrievals": len(rec.get("retrievals") or []),
         "n_events": len(rec.get("events") or []),
         "final_feedback_date": (rec.get("final_feedback") or {}).get("date", ""),
+        "has_reflection": bool(ref.get("text")),
+        # 质检标记(加法字段):预设分支且 AI 立场不一致 → questionable
+        **fc.quality_of(rec),
         "reflection": {
             "generated": bool(ref.get("text")),
             "text": ref.get("text", ""),

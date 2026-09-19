@@ -28,7 +28,8 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     local = llm or OllamaClient()
     router = router_llm or (OpenRouterClient() if external_router else local)
     ref = run_reflection(local, record)
-    record["reflection"] = {"material": ref["material"], "text": ref["text"]}
+    record["reflection"] = {"material": ref["material"], "text": ref["text"],
+                            "stripped_opener": bool(ref.get("stripped_opener"))}
     rout = run_router(router, ref["text"])
     record["router"] = {"raw": rout["raw"], "issues": rout["issues"]}
     # 这两个字段已补齐,从 gaps 里移除

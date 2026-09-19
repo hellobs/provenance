@@ -9,8 +9,53 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01.reflection import (assemble_reflection_material, run_reflection,
                                run_router, _parse_router_json, looks_like_question,
+                               _strip_boilerplate,
                                REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
                                ROUTER_JSON_HINT)
+
+
+def test_strip_boilerplate_removes_llm_openers():
+    """用户 2026-09-19 反馈:10 条反思**全部**以"当然可以。以下是……"这种客套话开头。
+
+    提示词里已禁;这里验后处理兜底能把三种真实开头都剥掉,且**不碰正文**。
+    """
+    # 1) 客套 + 冒号 + 换行
+    a = ("当然可以。以下是我对这次完整咨询过程的系统性反思与深度剖析：\n\n"
+         "### 1. 判断中做得较好的部分\n\n我当时强调了来源单一。")
+    got = _strip_boilerplate(a)
+    assert got.startswith("### 1.") and "我当时强调了来源单一" in got
+    # 2) 元话语首句(实测第 2 类开头:"我将以中文回应,并严格遵循你提出的八个维度…")
+    b = ("我将以中文回应，并严格遵循你提出的八个维度，不预设“正确”或“错误”。"
+         "\n\n### 1. 判断中做得较好的部分")
+    assert _strip_boilerplate(b).startswith("### 1.")
+    # 3) 客套 + 句号 + 分隔线
+    c = "当然可以。以下是对整件事的复盘。\n\n---\n\n### 1. 做得好的地方"
+    got = _strip_boilerplate(c)
+    assert got.startswith("### 1.") and "当然" not in got
+    # 4) 不应误伤:正文直接开始(哪怕正文里有"当然")
+    d = "### 1. 做得好的部分\n\n我当时当然也考虑过来源问题,但没有追问。"
+    assert _strip_boilerplate(d) == d
+    # 5) 空文本不炸
+    assert _strip_boilerplate("") == ""
+    # 6) 提示词里也禁掉了(两道防线)
+    assert "不要以" in REFLECTION_PROMPT_CN and "直接开始反思正文" in REFLECTION_PROMPT_CN
+
+
+def test_run_reflection_flags_stripped_opener():
+    """后处理发生时要留下痕迹(不许静默改文本)。"""
+
+    class _LLM:
+        def chat(self, messages, **kw):
+            return "当然可以。以下是我对这次完整咨询过程的反思：\n\n### 1. 判断过程"
+
+        def native_chat(self, messages, **kw):
+            return self.chat(messages, **kw)
+
+    rec = {"run_id": "r", "branch": "B", "start_date": "2026-08-27",
+           "turns": [], "state_history": [], "events": []}
+    out = run_reflection(_LLM(), rec)
+    assert out["text"].startswith("### 1.")
+    assert out["stripped_opener"] is True
 
 
 def _sample_run():

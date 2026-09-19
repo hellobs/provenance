@@ -233,11 +233,39 @@ def load_run(runs_root: str, run_id: str) -> Optional[dict]:
         return json.load(f)
 
 
-def list_runs(runs_root: str) -> list:
+def quality_of(rec: dict) -> dict:
+    """记录质量标记:分支来源 + T0 立场一致性 → 一个给平台看的 `quality` 字段。
+
+    为什么要有它(2026-09-19,另一个 AI 的体检清单问题 1/5):`preset` 分支不看 AI 说了什么,
+    于是可能出现"AI 说不能确认值得买、当事人却满仓买入"这种自相矛盾的记录。平台拿这些
+    记录建 Expert Review Task 时,专家会直接看到矛盾内容。这里的约定是:
+
+    - ``quality="ok"``          分支由 AI 的 T0 回答判定(judge),或预设但与 AI 立场一致;
+    - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致(记录里自带这是为什么);
+    - ``quality="unverified"``  判不了(没有 T0 对话 / 旧记录没有一致性戳)。
+    """
+    cs = rec.get("consistency") or {}
+    verdict = cs.get("verdict") or ("unverified" if not cs else "unverified")
+    source = ((rec.get("branch_action") or {}).get("source")
+              or cs.get("branch_source") or "")
+    if verdict == "consistent":
+        q = "ok"
+    elif verdict == "inconsistent":
+        q = "questionable"
+    else:
+        q = "unverified"
+    return {"quality": q, "consistency": verdict or "unverified",
+            "branch_source": source, "reason": cs.get("reason", "")}
+
+
+def list_runs(runs_root: str, exclude_questionable: bool = False) -> list:
     """列出所有含 run.json 的 run(按 run_id 倒序)。
 
     仅输出给平台/后端的索引字段(供任务关联与审计),不含对话正文;
     是否向专家展示 branch 字段由平台侧控制。
+
+    ``exclude_questionable=True`` 时跳过 `quality != "ok"` 的记录(平台可选;
+    默认**不跳**,免得静默少给数据 —— 平台要按 `quality` 自己决定)。
     """
     out = []
     if not os.path.isdir(runs_root):
@@ -251,6 +279,9 @@ def list_runs(runs_root: str) -> list:
                 rec = json.load(f)
         except Exception:
             continue
+        q = quality_of(rec)
+        if exclude_questionable and q["quality"] != "ok":
+            continue
         ba = rec.get("branch_action") or {}
         n_turns = len(rec.get("turns") or [])
         out.append({
@@ -263,6 +294,8 @@ def list_runs(runs_root: str) -> list:
             "n_retrievals": len(rec.get("retrievals") or []),
             "has_reflection": bool((rec.get("reflection") or {}).get("text")),
             "router_issue_count": len((rec.get("router") or {}).get("issues", [])),
+            # 质量标记(加法字段,不改既有语义):平台可用它过滤 / 提示专家
+            **q,
         })
     out.sort(key=lambda x: x["run_id"], reverse=True)
     return out

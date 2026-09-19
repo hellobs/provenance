@@ -75,10 +75,15 @@ class DirectClient:
 
     def _dispatch(self, path):
         path = unquote(path)
+        query = ""
+        if "?" in path:
+            path, query = path.split("?", 1)
         if path == "/":
             return serve.index()
         if path == "/api/runs":
-            return serve.list_runs()
+            # 把 query 交给真处理器(直接传参,免得为测试引入 urlparse 依赖)
+            excl = "exclude_questionable=1" in query
+            return serve.list_runs(exclude_questionable=excl)
         if path == "/openapi.json":
             return serve.app.openapi()
         prefix = "/api/runs/"
@@ -103,6 +108,23 @@ class TestListAndDetail:
         assert body["count"] == 2
         ids = [x["run_id"] for x in body["runs"]]
         assert ids == ["run-02", "run-01"]  # 倒序
+        # 质检标记(2026-09-19 加法字段):平台据此决定要不要给专家看
+        for item in body["runs"]:
+            assert item["quality"] in ("ok", "questionable", "unverified")
+            assert "consistency" in item and "branch_source" in item
+        assert body["filter"] == {"exclude_questionable": False}
+
+    def test_list_runs_can_exclude_questionable(self, client):
+        """`?exclude_questionable=1` 只给 quality=ok 的记录(平台可选;默认不跳)。"""
+        r = client.get("/api/runs?exclude_questionable=1")
+        body = r.json()
+        assert body["filter"]["exclude_questionable"] is True
+        assert all(x["quality"] == "ok" for x in body["runs"])
+
+    def test_detail_carries_quality(self, client):
+        m = client.get("/api/runs/run-01").json()
+        assert m["quality"] in ("ok", "questionable", "unverified")
+        assert "consistency" in m and "branch_source" in m
 
     def test_detail_contains_governance_payload(self, client):
         r = client.get("/api/runs/run-01")

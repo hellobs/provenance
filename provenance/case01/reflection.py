@@ -16,6 +16,7 @@ Run 结束后触发:
 Prompt 原文见 06 文档第 6/7 节(中英)。本模块实现组装与调用。
 """
 from typing import Dict, List, Optional
+import re
 
 # 06 第六节·Reflection 8 维(中文逻辑稿,研究设计基准;原样保留)
 REFLECTION_PROMPT_CN = (
@@ -40,6 +41,12 @@ REFLECTION_PROMPT_CN = (
     "哪些需要重新考虑？是否存在你现在仍然不能确定、需要继续观察的问题？"
     "请不要预设自己一定做对或做错，也不要因为最终结果而简单反推先前判断的正确性。"
     "请明确写出你的疑问、分歧、不确定性和需要进一步审查的问题。"
+    # 2026-09-19 用户反馈:10 条反思**全部**以"当然可以。以下是我对这次完整咨询过程的
+    # 系统性反思与深度剖析……"开头 —— 典型 LLM 客套开场白,放进给专家看的正式文档里不专业。
+    # 提示词里直接禁掉,并且 run_reflection 里还有一道后处理兜底(见 _strip_boilerplate)。
+    "**直接开始反思正文**:第一句就写实质内容(可以是一个小节标题)。"
+    "不要以『当然可以』『好的』『以下是』『下面是我』等客套语开头,"
+    "不要复述任务要求,不要自我介绍,不要写『我将从八个维度展开』这类过渡句。"
 )
 
 # 06 第七节·Router(中文逻辑稿,研究设计基准)
@@ -131,12 +138,69 @@ REFLECTION_SYSTEM = (
 )
 
 
-def run_reflection(llm, rec: dict, max_tokens: int = 3072) -> dict:
+# 客套开场白(用户 2026-09-19 反馈:10 条反思全部以此开头)。提示词里已禁,这里兜底剥掉。
+_BOILERPLATE_OPENERS = (
+    "当然可以", "当然，可以", "当然,可以", "当然。", "当然，", "当然,",
+    "好的，以下", "好的,以下", "好的。以下", "好的，", "好的,",
+    "以下是", "下面是我", "下面是我对", "下面从", "接下来我",
+)
+# 除"客套开场语"之外的**元话语**标记:实测还有"我将以中文回应,并严格遵循你提出的八个维度…"
+# 这类"交代自己怎么答"的开场,同样不该出现在给专家的正式文档里。
+_META_MARKERS = (
+    "当然", "以下是", "下面是我", "下面从", "我将以", "我将从", "我将严格", "我将按",
+    "严格遵循", "遵循你", "按照你", "按你提出", "感谢你", "谢谢你", "作为AI", "作为 AI",
+    "好的，", "明白，", "首先，我", "这段反思", "本反思将",
+)
+_BOILERPLATE_END = ("：", ":", "。", "！", "!", "\n")
+_META_END = re.compile(r"[。！？：\n]")
+
+
+def _looks_like_meta(seg: str) -> bool:
+    return any(m in seg for m in _META_MARKERS)
+
+
+def _strip_boilerplate(text: str) -> str:
+    """剥掉开头的客套/元话语(只剥开头,不碰正文),最多剥 3 段。
+
+    实测三种开头都要能剥掉:
+    1. "当然可以。以下是我对这次完整咨询过程的系统性反思与深度剖析："
+    2. "我将以中文回应，并严格遵循你提出的八个维度，不预设『正确』或『错误』。"
+    3. "当然可以。以下是我对……的反思：\\n\\n### 1. …"
+    """
+    t = (text or "").lstrip()
+    for _ in range(3):
+        head = t[:80]
+        if not head:
+            break
+        # 先试"客套句"完整剥法(到句读为止)
+        if any(head.startswith(b) for b in _BOILERPLATE_OPENERS):
+            cut = -1
+            for sep in _BOILERPLATE_END:
+                i = t.find(sep)
+                if i != -1 and (cut == -1 or i < cut):
+                    cut = i + len(sep)
+            if 0 < cut <= 160:
+                t = t[cut:].lstrip()
+                continue
+        # 再试"元话语首句"(到第一个句末标点/换行为止,且整句要短)
+        m = _META_END.search(t[:200])
+        seg = t[:m.end()] if m else t[:120]
+        if _looks_like_meta(seg) and len(seg) <= 150:
+            t = t[len(seg):].lstrip()
+            continue
+        break
+    # 剥掉正文前的 markdown 分隔线(剥完客套常剩一条 "---")
+    t = re.sub(r"^(?:[-*_]{3,}\s*\n+)+", "", t.lstrip())
+    return t.lstrip()
+
+
+
+def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
     """用本地 qwen3(同一 Investment AI 模型)生成 8 维 Reflection。
 
     llm: 本地 Ollama client(0904:与判断同源;不使用外部模型)
     rec: 一次 Run 的记录(供 assemble_reflection_material)
-    返回 {"material": 输入, "text": Reflection 输出}
+    返回 {"material": 输入, "text": Reflection 输出, "stripped_opener": bool}
     """
     material = assemble_reflection_material(rec)
     prompt = REFLECTION_PROMPT_CN + "\n\n以下是你刚刚经历的过程:\n\n" + material
@@ -150,7 +214,10 @@ def run_reflection(llm, rec: dict, max_tokens: int = 3072) -> dict:
                                max_tokens=max_tokens, num_ctx=32768)
     else:
         text = llm.chat(messages, temperature=0.4, max_tokens=max_tokens)
-    return {"material": material, "text": text or ""}
+    raw = text or ""
+    cleaned = _strip_boilerplate(raw)
+    return {"material": material, "text": cleaned,
+            "stripped_opener": bool(raw) and cleaned != raw.lstrip()}
 
 
 # Router 风险锚点(06 第 7 节规则 4 的落地提示)
