@@ -204,3 +204,8 @@ provenance/case01/runs_archive_*/
 # 换场景时 install_scene.py 留下的就地备份(旧版本在 git 历史里,不必入库)
 provenance/case*/scenario/maze.json.*.bak
 provenance/frontend/static/assets/village/tilemap/tilemap.*.bak.json
+# 修正:case01 的 maze 在 injector/scenario 下(比 case00 多一层),上面的规则没盖到
+provenance/case*/*/scenario/maze.json.*.bak
+provenance/case*/scenario/maze.json.*.bak
+# Tiled 另存的"副本"文件不入库
+* - 副本.tmx
