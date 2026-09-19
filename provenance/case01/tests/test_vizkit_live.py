@@ -16,11 +16,12 @@ ROLES = ["Investment AI", "Ethan Lin"]
 ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
 
 
-def _live(port=5099, extra_panels=None):
+def _live(port=5099, extra_panels=None, on_restart=None):
     return create("live", port=port, roles=ROLES, alias=ALIAS, scenario_dir=SCENARIO,
                   static_root=os.path.join(FRONTEND, "static"),
                   template_dir=os.path.join(FRONTEND, "templates"),
-                  ping_interval=30.0, extra_panels=extra_panels)
+                  ping_interval=30.0, extra_panels=extra_panels,
+                  on_restart=on_restart)
 
 
 def test_registered_and_config():
@@ -131,6 +132,48 @@ def test_page_has_loud_end_of_run_banner():
         assert piece in body, "结束提示缺少 {} 文案".format(piece)
     # 结束横幅要盖在剧情事件横幅之上(结束是最该被看见的)
     assert "z-index: 320" in body
+
+
+def test_restart_button_only_when_caller_registers_it():
+    """推演结束后的小按钮"重开一局"(用户要求):注册了 on_restart 才有,没注册就不出现。"""
+    from fastapi.testclient import TestClient
+
+    plain = TestClient(_live(port=5083).app).get("/").text
+    assert 'id="restart-btn"' not in plain, "没注册回调时不该有按钮"
+    assert TestClient(_live(port=5082).app).post("/control/restart").status_code == 404
+
+    calls = []
+
+    def on_restart():
+        calls.append(1)
+        return {"ok": True, "detail": "已受理"}
+
+    live = _live(port=5081, on_restart=on_restart)
+    c = TestClient(live.app)
+    page = c.get("/").text
+    assert 'id="restart-btn"' in page and "restartRun" in page
+    assert 'id="restart-note"' in page, "失败/受理都要有地方写出来"
+    # 按钮默认隐藏:只有状态变成已结束/出错才显示
+    assert "state === \"finished\"" in page or 'state === "finished"' in page
+    r = c.post("/control/restart")
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert r.json()["detail"] == "已受理"
+    assert calls == [1]
+    assert c.get("/health").json()["can_restart"] is True
+
+
+def test_restart_callback_failure_is_reported_to_the_page():
+    """重开失败不能让页面以为成功了(不许静默)。"""
+    from fastapi.testclient import TestClient
+
+    def boom():
+        raise RuntimeError("桥接挂了")
+
+    live = _live(port=5080, on_restart=boom)
+    r = TestClient(live.app).post("/control/restart")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False and "桥接挂了" in body["error"]
 
 
 def test_clock_shows_the_date_not_only_hh_mm():

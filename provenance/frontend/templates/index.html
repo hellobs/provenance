@@ -46,7 +46,17 @@ body { margin: 0; }
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
     <span id="sim-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%;
         background:#f0ad4e; margin-right:6px; vertical-align:middle;"></span><span
-        id="sim-status-text">连接中…</span></div>
+        id="sim-status-text">连接中…</span>
+    {% if can_restart %}
+    <!-- 推演结束后才出现的小按钮:决定要不要重开一局(用户要求)。
+         只有调用方注册了 on_restart 才渲染,否则这个服务不支持重开。 -->
+    <button id="restart-btn" onclick="restartRun()" title="用同样的设置再跑一局"
+        style="display:none; margin-top:6px; width:100%; padding:4px 8px; font:inherit;
+        font-size:12px; cursor:pointer; border:1px solid #cfd6e0; border-radius:7px;
+        background:#2563eb; color:#fff;">重开一局</button>
+    <span id="restart-note" style="display:none; margin-top:4px; font-size:11px; color:#888;"></span>
+    {% endif %}
+</div>
 {% endif %}
 
 <!-- Story event banner (shown when an event is injected) -->

@@ -354,6 +354,9 @@ let LIVE_META = null;   // {run_id, done_nodes, total_nodes}
 let liveTimer = null;
 // 成品记录刚生成时的一句话(绿色) —— 跑完那一刻要有明确提示,不能悄悄换记录。
 let MAPPED_NOTE = "";
+// 用户手动挑了一条旧记录时,记下当时那一局的 run_id:看门狗就不再把同一局拉回实时,
+// 但**新的一局**开始时照样会切过去(重开一局后要能自动跟上)。
+let IGNORED_LIVE = "";
 
 // ---- 嵌入 / 深链参数 ----
 //   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
@@ -604,6 +607,23 @@ async function pick(id) {
 // ---- 实时记录:小镇在动,这里每 2 秒跟着长 ----
 function stopLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
 
+// 看门狗:没在看实时的时候,也每 5 秒问一次"有没有新的一局开始了"。
+// 为什么要它:用户点了"重开一局"之后,新 run_id 的实时记录会出现在 /api/review/live,
+// 而面板这时正停在上一局的成品记录上、已经停止轮询 —— 不主动看就会一直显示旧的那条。
+function startWatch() {
+  if (liveTimer) return;
+  liveTimer = setInterval(async () => {
+    try {
+      const d = await (await fetch("/api/review/live")).json();
+      if (d && d.ok && d.live && d.run_id && d.run_id !== IGNORED_LIVE
+          && (!DATA || DATA.run_id !== d.run_id)) {
+        MAPPED_NOTE = `<div class="note ok">新的一局已开始(${esc(d.run_id)}),已切到实时。</div>`;
+        await boot();
+      }
+    } catch (e) { /* 网络抖动忽略,下一次再问 */ }
+  }, 5000);
+}
+
 async function loadLive(first) {
   let d;
   try {
@@ -671,7 +691,15 @@ async function boot() {
     ((BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9)) ||
     String(a.run_id).localeCompare(String(b.run_id)));
   sel.innerHTML = liveOpt + sorted.map(optHtml).join("");
-  sel.onchange = () => { if (sel.value !== LIVE_ID) stopLive(); MAPPED_NOTE = ""; pick(sel.value); };
+  sel.onchange = () => {
+    if (sel.value !== LIVE_ID) {
+      // 手动挑旧记录:记下当前这一局,看门狗别再把它拉回去(新的一局仍会自动切)
+      IGNORED_LIVE = live.run_id || "";
+      stopLive();
+    }
+    MAPPED_NOTE = "";
+    pick(sel.value);
+  };
   // 有实跑就默认看实时(用户要"同步看全程");否则落在 mavis 记录上,
   // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
@@ -682,10 +710,11 @@ async function boot() {
   }
   if (live.live) { sel.value = LIVE_ID; await loadLive(true); return; }
   const first = d.runs.find(x => x.engine === "mavis") || d.runs[0];
-  if (first) { sel.value = first.run_id; await pick(first.run_id); }
+  if (first) { sel.value = first.run_id; await pick(first.run_id); startWatch(); }
   else {
     document.getElementById("main").innerHTML =
       '<div class="card"><div class="empty">还没有成品记录;跑一次实跑就会实时长出来，跑完自动归档。</div></div>';
+    startWatch();
   }
 }
 boot();

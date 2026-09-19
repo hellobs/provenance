@@ -45,7 +45,8 @@ class LiveVisualizer(Visualizer):
                  ping_interval: float = 5.0, stride: int = 0,
                  start_datetime: str = "",
                  nodes_key: str = "nodes", meta_key: Optional[str] = None,
-                 extra_panels: Optional[List[dict]] = None):
+                 extra_panels: Optional[List[dict]] = None,
+                 on_restart=None):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -70,6 +71,9 @@ class LiveVisualizer(Visualizer):
         # 并把给定 URL 放进卡片的 iframe;**不认识也不猜**那些面板是什么。
         # 默认空 = 行为与以前完全一致(只做加法、默认关闭)。
         self.extra_panels = [dict(t) for t in (extra_panels or []) if t.get("url")]
+        # 可选的"重开"回调(默认 None = 页面不显示按钮、也不挂控制路由)。
+        # 页面推演结束后给一个小按钮,由调用方决定"重开"到底做什么。
+        self.on_restart = on_restart
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -267,6 +271,7 @@ class LiveVisualizer(Visualizer):
                     "conversation": {},
                 },
                 "extra_panels": self.extra_panels,
+                "can_restart": self.on_restart is not None,
             }
 
         @app.get("/", response_class=HTMLResponse)
@@ -291,7 +296,27 @@ class LiveVisualizer(Visualizer):
             # "还在推演" / "已跑完在保持" / "只服务不推演",不必猜。
             return {"status": "ok", "clients": len(self._clients),
                     "pending": len(self._pending), "roles": self.roles,
-                    "finished": self._finished, "finish_reason": self._finish_reason}
+                    "finished": self._finished, "finish_reason": self._finish_reason,
+                    "can_restart": self.on_restart is not None}
+
+        if self.on_restart is not None:
+            @app.post("/control/restart")
+            async def control_restart():
+                """页面上的"重开一局"按钮打这里(通用控制口子,默认关闭)。
+
+                回调由调用方给(本包不认识它做什么);跑在**线程池**里,
+                免得重开这种重活把事件循环堵住。回调返回可 JSON 化的 dict 原样回给页面。
+                """
+                try:
+                    res = await asyncio.get_running_loop().run_in_executor(
+                        None, self.on_restart)
+                except Exception as exc:  # noqa: BLE001 - 失败要如实回给页面
+                    log.warning("重开回调失败", exc_info=True)
+                    return {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}
+                if isinstance(res, dict):
+                    res.setdefault("ok", True)
+                    return res
+                return {"ok": True, "detail": str(res or "")}
 
         @app.websocket("/ws")
         async def ws_endpoint(ws: WebSocket):

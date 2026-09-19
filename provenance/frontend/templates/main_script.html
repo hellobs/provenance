@@ -182,6 +182,9 @@
 		el.textContent = text || state;
 		if (box) box.title = text || state;
 		window.__sim_status = state;
+		// 只有"跑完了"才给重开按钮:跑的时候按它没有意义(要等这一局结束)。
+		var rb = document.getElementById("restart-btn");
+		if (rb) { rb.style.display = (state === "finished" || state === "error") ? "block" : "none"; }
 		devLog("sys", "状态 → " + (text || state));
 	}
 	// ================= 推演结束的醒目提示 =================
@@ -216,6 +219,34 @@
 		devLog("sys", "结束提示已显示:" + reason);
 		// 25 秒后收起横幅,但状态块会一直写着"已结束",不会回到"看不出在不在跑"。
 		setTimeout(function() { b.style.display = "none"; }, 25000);
+	}
+
+	// 推演结束后的小按钮:重开一局(只有调用方注册了 on_restart 才会有这个元素)。
+	// 请求成功后**刷新页面**——新一局要从零开始(空小镇、清空的对话、新的实时记录),
+	// 原地复用旧页面会把上一局的对话/位置留在屏幕上。
+	function restartRun() {
+		var btn = document.getElementById("restart-btn");
+		var note = document.getElementById("restart-note");
+		if (btn) { btn.disabled = true; btn.textContent = "正在重开…"; }
+		fetch("/control/restart", { method: "POST" })
+			.then(function(r) { return r.json(); })
+			.then(function(d) {
+				if (d && d.ok) {
+					if (note) { note.style.display = "block"; note.textContent = "已重开,页面即将刷新…"; }
+					devLog("sys", "重开已受理:" + (d.detail || d.run_id || ""));
+					setTimeout(function() { location.reload(); }, 800);
+				} else {
+					var msg = (d && (d.error || d.detail)) || "未知原因";
+					if (note) { note.style.display = "block"; note.textContent = "重开失败:" + msg; }
+					devLog("error", "重开失败:" + msg);
+					if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
+				}
+			})
+			.catch(function(e) {
+				if (note) { note.style.display = "block"; note.textContent = "重开请求失败:" + e.message; }
+				devLog("error", "重开请求失败:" + e.message);
+				if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
+			});
 	}
 
 	// ================= Global error capture (into console) =================
