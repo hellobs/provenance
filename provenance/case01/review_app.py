@@ -161,6 +161,11 @@ def live_record():
     provider = _LIVE["provider"]
     if provider is None:
         return JSONResponse({"ok": True, "live": False, "run_id": _LIVE["run_id"]})
+    # 成品记录已经落盘(自动映射跑完了)→ 立刻报 live=false:面板会切到成品那份
+    # (那时才有反思与问题分流)。不这么做的话,面板会一直显示实时那份、永远缺两块。
+    if _LIVE["run_id"] and _LIVE["run_id"] in _discover_runs():
+        return JSONResponse({"ok": True, "live": False, "mapped": True,
+                             "run_id": _LIVE["run_id"]})
     try:
         raw = provider()
     except Exception as exc:  # noqa: BLE001 - 取不到也要让面板拿到原因,不能空着

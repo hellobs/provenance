@@ -167,6 +167,24 @@ def test_live_provider_failure_is_reported_not_swallowed():
         review_app.clear_live()
 
 
+def test_live_endpoint_hands_over_once_the_record_is_mapped(monkeypatch, tmp_path):
+    """成品记录一落盘,实时就该让位(live=false),否则面板永远缺反思/问题分流两块。"""
+    from case01 import review_app
+    monkeypatch.setattr(review_app, "RUNS_DIR", str(tmp_path))
+    run_id = "260919-live-case01-mavis-B-7777"
+    review_app.set_live_provider(lambda: _fake_raw(1), run_id=run_id, total_nodes=3)
+    try:
+        c = _client()
+        assert c.get("/api/review/live").json()["live"] is True
+        # 自动映射把成品记录写出来
+        (tmp_path / run_id).mkdir()
+        (tmp_path / run_id / "run.json").write_text("{}", encoding="utf-8")
+        d = c.get("/api/review/live").json()
+        assert d["live"] is False and d.get("mapped") is True
+    finally:
+        review_app.clear_live()
+
+
 def test_live_mode_is_wired_into_the_page():
     """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
     html = _client().get("/review").text
