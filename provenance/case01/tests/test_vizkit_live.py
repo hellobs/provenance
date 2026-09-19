@@ -154,3 +154,36 @@ def test_finish_is_idempotent():
     live.finish("run_finished")
     live.finish("run_finished")
     assert [m["type"] for m in live.pending()] == ["done"]
+
+
+def test_late_joiner_gets_current_state_not_history():
+    """中途连进来的人看到的是"此刻",不是从头回放(否则角色会倒退)。
+
+    本插件是**实时**可视化:快照已经代表当前状态,再把积压的历史 agent 事件
+    放一遍,角色会先跳到最新位置、又被拽回旧位置。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5089)
+    live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [1, 1], "time": "T1"})
+    live.on_event({"type": "agent", "name": "Ethan Lin", "coord": [9, 7], "time": "T2"})
+    client = TestClient(live.app)
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "init"
+        snap = _recv_until(ws, "snapshot")
+        assert snap["agents"]["Ethan Lin"]["coord"] == [9, 7]
+    assert live.pending() == [], "有快照时历史事件应被丢弃(否则角色倒退)"
+
+
+def test_duplicate_init_in_backlog_is_dropped():
+    """积压里那条 init 不再重复发:握手已经发过一次。"""
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5088)
+    live.on_event({"type": "init", "agents": ROLES})
+    live.on_event({"type": "chat_line", "speaker": "Ethan Lin", "text": "hi"})
+    client = TestClient(live.app)
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "init"          # 握手那条
+        msg = ws.receive_json()
+        assert msg["type"] == "chat_line", "积压照发,但不应再出现第二条 init"

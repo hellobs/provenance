@@ -171,6 +171,7 @@ class LiveVisualizer(Visualizer):
 
         合成快照只带前端归位与名牌需要的字段(coord / action / location),
         形状与 `applySnapshot` 的读法一致;拿到真实 snapshot 时仍以真实那份为准。
+        (积压事件流里的重复 `init` 在发送时会被丢掉,见 ws_endpoint。)
         """
         if self._last_snapshot:
             return self._last_snapshot
@@ -296,9 +297,18 @@ class LiveVisualizer(Visualizer):
                 catch = self.catch_up()
                 if catch:
                     await ws.send_json(catch)
-                for msg in self.drain_pending():
-                    if msg:
-                        await ws.send_json(msg)
+                    # 快照已经代表"此刻"的状态,再把积压的历史事件放一遍只会让角色
+                    # **倒退**回去(本插件是实时可视化,不是回放)。丢掉并留痕。
+                    dropped = len(self.drain_pending())
+                    if dropped:
+                        log.info("客户端接入时已有快照,跳过 %d 条历史事件(避免角色倒退)",
+                                 dropped)
+                else:
+                    for msg in self.drain_pending():
+                        # 积压里的 init 丢掉:握手时已经发过一份,重复 init 只会让
+                        # 看协议的人以为握手发生了两次。
+                        if msg and msg.get("type") != "init":
+                            await ws.send_json(msg)
                 # 已经跑完才连进来的人:立刻告诉他"结束了",否则页面只是静悄悄的。
                 if self._finished:
                     await ws.send_json({"type": "done",
