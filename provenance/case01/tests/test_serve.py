@@ -55,6 +55,8 @@ def client(tmp_path, monkeypatch):
                turns=[{"speaker": "ethan", "date": "2026-08-27", "text": "值得买吗?"},
                       {"speaker": "ai", "date": "2026-08-27",
                        "text": "I cannot say the stock is worth buying."}])
+    # run-04:调试跑(--nodes 截断)→ 默认也不该给平台
+    _write_run(tmp_path, "run-04", debug="--nodes 1 截断了节点序列(7→1)")
     monkeypatch.setattr(serve, "RUNS_ROOT", str(tmp_path))
     return DirectClient()
 
@@ -117,8 +119,9 @@ class TestListAndDetail:
         assert body["count"] == 2
         ids = [x["run_id"] for x in body["runs"]]
         assert ids == ["run-02", "run-01"]  # 倒序
-        assert body["excluded"]["questionable"] == 1
-        assert body["excluded"]["run_ids"] == ["run-03"]
+        assert body["excluded"]["count"] == 2
+        assert body["excluded"]["by_kind"] == {"questionable": ["run-03"],
+                                               "debug": ["run-04"]}
         assert "include_questionable" in body["excluded"]["reason"]
         # 质检标记(2026-09-19 加法字段):平台据此决定要不要给专家看
         for item in body["runs"]:
@@ -131,9 +134,16 @@ class TestListAndDetail:
         r = client.get("/api/runs?include_questionable=1")
         body = r.json()
         assert body["filter"]["include_questionable"] is True
-        assert body["count"] == 3
+        assert body["count"] == 4
         assert any(x["quality"] == "questionable" for x in body["runs"])
         assert "excluded" not in body
+
+    def test_quality_of_marks_debug_runs(self):
+        """调试跑(--nodes 截断)必须单独标成 debug,不能被当成正式样本。"""
+        from case01.full_context import quality_of
+        q = quality_of({"debug": "--nodes 1 截断了节点序列(7→1)",
+                        "consistency": {"verdict": "consistent"}})
+        assert q["quality"] == "debug" and "截断" in q["debug"]
 
     def test_detail_carries_quality(self, client):
         m = client.get("/api/runs/run-01").json()

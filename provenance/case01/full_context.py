@@ -248,14 +248,18 @@ def quality_of(rec: dict) -> dict:
     verdict = cs.get("verdict") or ("unverified" if not cs else "unverified")
     source = ((rec.get("branch_action") or {}).get("source")
               or cs.get("branch_source") or "")
-    if verdict == "consistent":
+    if rec.get("debug"):
+        # 调试跑(--nodes 截断等):T0 可能被当成最终反馈节点,内容不完整
+        q = "debug"
+    elif verdict == "consistent":
         q = "ok"
     elif verdict == "inconsistent":
         q = "questionable"
     else:
         q = "unverified"
     return {"quality": q, "consistency": verdict or "unverified",
-            "branch_source": source, "reason": cs.get("reason", "")}
+            "branch_source": source, "reason": cs.get("reason", ""),
+            "debug": rec.get("debug", "")}
 
 
 def list_runs(runs_root: str, exclude_questionable: bool = False) -> list:

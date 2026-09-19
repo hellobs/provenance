@@ -218,7 +218,14 @@ def main(argv=None):
                 restart_req["mode"] = ""
             branch_now[0] = branch        # 回调里读"当前分支"用
             nodes = default_nodes(branch, roles=list(roles))
+            debug_note = ""
             if args.nodes > 0:
+                if args.nodes < len(nodes):
+                    # 截断会把"末节点"变成最终反馈节点(1 节点跑时 T0 就是末节点,
+                    # Ethan 张口就是"我没买…"),这种跑只适合自测 → 记录里必须标出来。
+                    debug_note = ("--nodes {} 截断了节点序列({}→{}):末节点被当成最终反馈节点"
+                                  .format(args.nodes, len(nodes), args.nodes))
+                    print("**调试跑**:" + debug_note)
                 nodes = nodes[:args.nodes]
             # 每跑一次就该有一个能唯一定位的名字:**日期在最前**(便于按时间排序)、
             # 带 case 与引擎、实跑再带 HHMM(同一天跑多次也不撞)。名字里的日期是
@@ -248,6 +255,7 @@ def main(argv=None):
                 run_id=run_id,
                 dry_run=False, max_retries=args.max_retries, branch=branch,
                 branch_mode=branch_mode,
+                debug_note=debug_note,
                 visualizers=[live],
             )
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,

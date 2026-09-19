@@ -66,6 +66,7 @@ class MavisBridge:
         visualizers: Optional[List[object]] = None,
         branch_mode: str = "preset",
         c_plan_file: str = "",
+        debug_note: str = "",
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -90,6 +91,10 @@ class MavisBridge:
         # 而 A 线市场根本没有订单确认事件 → 条件永不触发。用文件能稳定演示
         # "条件触发→建仓→亏损→反思"整条链,记录里会标 source=manual)
         self.c_plan_file = c_plan_file or ""
+        # 调试跑说明(--nodes 截断节点序列等)。**必须进记录**:截断会让"末节点"
+        # 变成最终反馈节点(1 节点跑时 T0 就是末节点 → Ethan 张口就是最终反馈),
+        # 这种记录不该被当成正式样本(2026-09-19 实测 B-1652/B-1654 就是这样来的)。
+        self.debug_note = debug_note or ""
 
         # 可插拔可视化:引擎只产生事件,插件自己决定怎么画(见 vizkit/)
         self._agent_trace: Dict[int, Dict[str, dict]] = {}
@@ -285,6 +290,8 @@ class MavisBridge:
             "branch_mode": self.branch_mode,
             "branch_source": self.branch_source,
             "judge_info": dict(self.judge_info),
+            # 调试跑标记(空串=正式跑);映射进成品记录的 debug 字段
+            "debug": self.debug_note,
             "roles": list(self.roles),
             "scenario_dir": self.scenario_dir,
             "nodes": list(self.records),

@@ -185,6 +185,8 @@ def to_case01_record(record: dict, branch: str = "",
         "router": {},
         # 运行摘要（新增键,便于 CLI/平台快速读取）
         "summary": record.get("summary", {}),
+        # 调试跑说明(--nodes 截断等);空串表示正式跑。serve.py 默认不给这类记录。
+        "debug": record.get("debug", ""),
         # 新增段：injector 的原始节点记录（平台按需读取,不影响既有解析）
         "injector": {
             "schema_version": record.get("schema_version", ""),
