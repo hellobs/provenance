@@ -296,8 +296,21 @@ _PAGE = r"""<!DOCTYPE html>
        竖排时 align-items 管的是宽度,flex-start 会让每块按内容宽(max-content)排,
        于是长段落不换行、被裁在卡片外(实测:英文段落右边整段被切掉)。 */
     .wrap { flex-direction:column; gap:6px; align-items:stretch; }
-    nav { position:static; flex:0 0 auto; display:flex; flex-wrap:wrap; gap:4px; padding:6px; }
-    nav button { width:auto; }
+    /* 窄版导航改成横排的**紧凑小药丸**,并且**去掉外面那个白盒子**。
+       两个坑都要显式覆盖:
+       1) `body.embed nav { flex:0 0 132px }` 的特异性比 `nav` 高 —— 竖排容器里
+          flex-basis 管的是**高度**,于是导航被撑成 132px 高、按钮再沿交叉轴拉伸
+          ("太胖"就是这么来的)。所以要写成 `body.embed nav` 同特异性、且在后面。
+       2) 拉伸之后每颗药丸都跟着变高 —— 必须 `align-items:flex-start` 让按钮回到自然高度。 */
+    nav, body.embed nav {
+      position:static; flex:0 0 auto; align-items:flex-start;
+      display:flex; flex-wrap:wrap; gap:2px; padding:3px 2px;
+      background:transparent; border:0; border-radius:0; border-bottom:1px solid var(--line);
+    }
+    nav button { width:auto; padding:2px 6px; font-size:12px; line-height:1.35;
+                 border-radius:5px; gap:4px; color:#4b5563; }
+    nav button span.n { font-size:11px; }
+    nav button:hover { background:var(--line-soft); }
     .card { padding:8px 10px; }
     .kv { grid-template-columns:1fr; gap:2px 0; }
     .kv .k { font-size:12px; }

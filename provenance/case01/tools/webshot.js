@@ -7,10 +7,16 @@
 //
 // 浏览器:默认找 Edge / Chrome;可用环境变量 BROWSER 指定可执行文件。
 // 用法(需要目标服务在跑):
-//   node case01/tools/webshot.js <url> <宽> <高> <输出.png> [等待毫秒]
+//   node case01/tools/webshot.js <url> <宽> <高> <输出.png> [等待毫秒] [--measure=<选择器>]
 // 例:
 //   node case01/tools/webshot.js "http://127.0.0.1:5010/review?embed=1" 372 900 shots/card.png
 //   node case01/tools/webshot.js "http://127.0.0.1:5010/" 1680 1000 shots/home.png 3000
+//   node case01/tools/webshot.js "http://127.0.0.1:5010/review?embed=1" 372 900 shots/card.png 3000 \
+//        --measure="#nav"        # 顺便把该选择器命中元素的实际宽高打出来
+//
+// `--measure` 是给"看着太胖/太挤"这类问题用的:截图只能看个大概,量出来才知道
+// 到底是哪条 CSS 在撑高度(实测踩过:`body.embed nav{flex:0 0 132px}` 特异性压过
+// 媒体查询里的 `nav`,竖排时 flex-basis 变成**高度**,导航被撑成 132px)。
 //
 // 退出码:0=截好了;2=找不到浏览器;1=CDP 出错。
 const { spawn } = require('child_process');
@@ -32,9 +38,13 @@ function findBrowser() {
   return '';
 }
 
-const [url, wArg, hArg, outArg, waitArg] = process.argv.slice(2);
+const argvRest = process.argv.slice(2);
+const measureArg = argvRest.find((a) => a.startsWith('--measure='));
+const measureSel = measureArg ? measureArg.slice('--measure='.length) : '';
+const pos = argvRest.filter((a) => !a.startsWith('--measure='));
+const [url, wArg, hArg, outArg, waitArg] = pos;
 if (!url || !wArg || !hArg || !outArg) {
-  console.error('用法: node case01/tools/webshot.js <url> <宽> <高> <输出.png> [等待毫秒]');
+  console.error('用法: node case01/tools/webshot.js <url> <宽> <高> <输出.png> [等待毫秒] [--measure=<选择器>]');
   process.exit(2);
 }
 const width = parseInt(wArg, 10), height = parseInt(hArg, 10), waitMs = parseInt(waitArg || '2500', 10);
@@ -89,5 +99,21 @@ async function wsUrl() {
     expression: 'JSON.stringify({vw:window.innerWidth,doc:document.documentElement.scrollWidth})',
     returnByValue: true });
   console.log(`已截图 ${outArg} (${width}x${height}, 视口 ${m.result.value})`);
+  if (measureSel) {
+    const expr = `JSON.stringify(Array.prototype.slice.call(
+      document.querySelectorAll(${JSON.stringify(measureSel)})).slice(0, 12).map(function(el){
+        var r = el.getBoundingClientRect();
+        var cs = getComputedStyle(el);
+        return { tag: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+                 (el.className ? '.' + String(el.className).split(' ').join('.') : ''),
+                 w: Math.round(r.width), h: Math.round(r.height),
+                 font: cs.fontSize, pad: cs.padding, display: cs.display, basis: cs.flexBasis };
+      }))`;
+    const mm = await send('Runtime.evaluate', { expression: expr, returnByValue: true });
+    console.log('量到的尺寸 ' + measureSel + ':');
+    for (const it of JSON.parse(mm.result.value)) {
+      console.log(`  ${it.w}x${it.h}  ${it.tag}  font=${it.font} pad=${it.pad} display=${it.display} basis=${it.basis}`);
+    }
+  }
   ws.close(); child.kill(); process.exit(0);
 })().catch((e) => { console.error('FAIL', e.message); child.kill(); process.exit(1); });
