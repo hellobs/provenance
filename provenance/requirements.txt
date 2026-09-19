@@ -5,8 +5,12 @@
 #   Simulator(plugins=)、agent_core.subscribe_chat_line)。
 #   1.1.0 的制品不含插件面;1.0.0 连钩子都不含,装了会在构造 Simulator 时
 #   TypeError。所以下界必须是 1.2.0。
+#   1.2.1 另修了 _resolve_assets_root 对绝对路径的破坏(吃掉 POSIX 前导斜杠、
+#   把 "D:/x" 拼成驱动器相对路径 "D:x")。case01 传的是相对根,用不到这个修复,
+#   故下界仍留 1.2.0 而不是 1.2.1——抬高下界只会让装有 1.2.0 的环境无谓失败。
+#   传绝对 assets_root 的使用方(含用 MAVIS_ASSETS_ROOT 环境变量)请装 >=1.2.1。
 #   本仓不发布到 PyPI:先在 mavis 仓构建 wheel 再安装
-#   (mavis main 的 1.2.0 提交为 55e7be9,tag v1.2.0;dist/ 不入库,需自行 python -m build)。
+#   (mavis main 的 1.2.1 提交为 1516ada,tag v1.2.1;dist/ 不入库,需自行 python -m build)。
 # 写法用"下界 1.2.0 + 上界 <2.0.0":CI 以 git clone --depth 1 ... main 装框架,
 # main 是移动目标,写死 == 会在 mavis 每次次版本 bump 时把 CI 误打红(那种红不代表缺陷);
 # "基线至少含插件面"这件事由 tools/check_engine_baseline.py 的能力断言独立保证。
