@@ -242,6 +242,17 @@ def nearest_free(coord, blocked, H, W, main):
     return list(best) if best else None
 
 
+def _render_coord(old_array_text, new):
+    """按**原来的排版**渲染坐标数组:原来一行就还一行,原来多行就还多行。
+
+    (第一次实现直接 json.dump 整文件,把 case01 的 `[9, 7]` 拆成 3 行、
+     把 case00 本来就多行的压成一行 —— 换坐标不该顺带重排人家的文件。)
+    """
+    if "\n" not in old_array_text:
+        return "[" + ", ".join(str(v) for v in new) + "]"
+    return "[\n" + ",\n".join("    " + str(v) for v in new) + "\n  ]"
+
+
 def fix_spawns(maze, scenario_dirs, write=False):
     """把落在阻挡格/孤岛上的角色坐标挪到主连通块里最近的空格(改 scenario 的 agent.json)。
 
@@ -288,9 +299,17 @@ def fix_spawns(maze, scenario_dirs, write=False):
             changes.append((d, name, list(coord), new))
             if write:
                 shutil.copy2(p, p + "." + time.strftime("%Y%m%d-%H%M") + ".bak")
-                cfg["coord"] = new
-                with open(p, "w", encoding="utf-8") as f:
-                    json.dump(cfg, f, ensure_ascii=False, indent=2)
+                # **最小改写**:只替换 "coord": [...] 那一段,保留原文件的排版与行尾。
+                # (第一次实现是 json.dump 整文件重写,结果把 [9, 7] 拆成 3 行、还吃掉了末尾换行,
+                #  diff 全是噪声 —— 改研究侧数据不该顺带重排人家的文件。)
+                with open(p, encoding="utf-8") as f:
+                    text = f.read()
+                new_text, n = re.subn(r'("coord"\s*:\s*)(\[[^\]]*\])',
+                                      lambda m: m.group(1) + _render_coord(m.group(2), new),
+                                      text, count=1)
+                if n:
+                    with open(p, "w", encoding="utf-8", newline="") as f:
+                        f.write(new_text)
     return changes
 
 

@@ -69,12 +69,25 @@ def test_build_mavis_wires_hooks_and_agents(monkeypatch, tmp_path):
     # case01_node 条件已注册
     from mavisframework.runtime.simulator import Simulator
     assert "case01_node" in Simulator.CONDITION_CHECKERS
-    # 角色配置来自场景:坐标、角色指令(长回答要求)生效
+    # 角色配置来自场景:坐标、角色指令(长回答要求)生效。
+    # 坐标**从场景文件读**,不写死 —— 换场景/改碰撞会挪坐标(2026-09-19 就有过一次),
+    # 写死的话测试会变成"考场景数据"而不是"考装配是否正确"。
+    import io
+    import json
+    import os
+
+    from case01.injector.pipeline import DEFAULT_SCENARIO as _SCENARIO
+
+    def scenario_coord(role):
+        p = os.path.join(_SCENARIO, "agents", role, "agent.json")
+        with io.open(p, encoding="utf-8") as f:
+            return list(json.load(f)["coord"])
+
     advisor = bridge.game.get_agent(DEFAULT_ROLES[0])
-    assert list(advisor.coord) == [10, 6]
+    assert list(advisor.coord) == scenario_coord(DEFAULT_ROLES[0])
     assert str(advisor.role_directive).startswith("When an investor")
     ethan = bridge.game.get_agent(DEFAULT_ROLES[1])
-    assert list(ethan.coord) == [9, 7]
+    assert list(ethan.coord) == scenario_coord(DEFAULT_ROLES[1])
     assert "ordinary retail investor" in str(ethan.role_directive)
 
 

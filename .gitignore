@@ -209,3 +209,6 @@ provenance/case*/*/scenario/maze.json.*.bak
 provenance/case*/scenario/maze.json.*.bak
 # Tiled 另存的"副本"文件不入库
 * - 副本.tmx
+# --fix-spawns 挪坐标时留下的 agent.json 备份(旧值在 git 历史里)
+provenance/case*/**/agents/*/agent.json.*.bak
+provenance/case*/agents/*/agent.json.*.bak

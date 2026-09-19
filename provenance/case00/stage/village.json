@@ -9,7 +9,7 @@
      "act": {"Michael Chen": {"action": "翻开昨天写到一半的研究报告", "location": "Trading Floor"}}},
     {"t": 2.6, "move": {"Wendy Lin": [12, 9]},
      "act": {"Wendy Lin": {"action": "重跑风险评级", "location": "Trading Floor"}}},
-    {"t": 3.4, "move": {"Daniel Shen": [9, 11]},
+    {"t": 3.4, "move": {"Daniel Shen": [9, 10]},
      "act": {"Daniel Shen": {"action": "把客户的资产配置表推到一边", "location": "Trading Floor"}}},
     {"t": 4.2, "move": {"Kevin Su": [10, 11]},
      "act": {"Kevin Su": {"action": "调出昨天的动量回测", "location": "Trading Floor"}}},

@@ -80,17 +80,21 @@ def test_pinned_move_gets_an_orthogonal_visual_path():
     agents = {"Investment AI": _FakeAgent(maze), "Ethan Lin": _FakeAgent(maze)}
     out = []
     b = _bridge(agents, out)
-    # 起点 = 场景初始坐标(与前端摆的位置同源):Ethan Lin 在 [9,7]
-    assert b._last_visual_coord["Ethan Lin"] == [9, 7], "初始坐标要从场景里播种"
+    # 起点 = 场景初始坐标(与前端摆的位置同源)。**不写死坐标**:换场景/改碰撞后
+    # 场景里的 coord 会变(2026-09-19 就因为 [9,7] 变成阻挡格而被挪到 [10,7]),
+    # 写死会让测试变成"考场景数据"而不是考桥接逻辑。
+    start = list(b._last_visual_coord["Ethan Lin"])
+    assert start, "初始坐标要从场景里播种"
+    dst = [10, 6] if start != [10, 6] else [10, 7]
     # mavis 侧 pin 之后 path 为空(交互要求"同址且静止")
-    b._emit_agent("Ethan Lin", {"coord": [10, 6], "path": [], "action": "walk"}, "t")
+    b._emit_agent("Ethan Lin", {"coord": list(dst), "path": [], "action": "walk"}, "t")
     ev = out[-1]
     assert ev["path"], "没补可视路径 → 前端会斜着滑过去"
     pts = [list(p) for p in ev["path"]]
-    assert pts[0] == [9, 7] and pts[-1] == [10, 6]
+    assert pts[0] == start and pts[-1] == list(dst)
     assert all(abs(pts[i + 1][0] - pts[i][0]) + abs(pts[i + 1][1] - pts[i][1]) == 1
                for i in range(len(pts) - 1)), "每步必须是上下左右,不能斜穿"
-    assert maze.calls == [([9, 7], [10, 6])]
+    assert maze.calls == [(start, list(dst))]
 
 
 def test_mavis_own_path_is_used_as_is():
@@ -99,8 +103,9 @@ def test_mavis_own_path_is_used_as_is():
     agents = {"Investment AI": _FakeAgent(maze), "Ethan Lin": _FakeAgent(maze)}
     out = []
     b = _bridge(agents, out)
-    own = [[9, 7], [9, 6]]
-    b._emit_agent("Ethan Lin", {"coord": [9, 6], "path": own}, "t")
+    start = list(b._last_visual_coord["Ethan Lin"])
+    own = [start, [start[0], max(0, start[1] - 1)]]
+    b._emit_agent("Ethan Lin", {"coord": own[-1], "path": own}, "t")
     assert out[-1]["path"] == own
     assert not maze.calls, "有 mavis 路径时不该再问迷宫"
 
@@ -121,13 +126,14 @@ def test_same_coord_needs_no_path():
     agents = {"Investment AI": _FakeAgent(maze), "Ethan Lin": _FakeAgent(maze)}
     out = []
     b = _bridge(agents, out)
-    b._emit_agent("Ethan Lin", {"coord": [9, 7], "path": []}, "t")   # 原地不动
+    same = list(b._last_visual_coord["Ethan Lin"])          # 原地不动
+    b._emit_agent("Ethan Lin", {"coord": same, "path": []}, "t")
     assert out[-1]["path"] == []
     assert not maze.calls
 
 
 def test_real_maze_path_is_orthogonal():
-    """用真实场景的迷宫再验一次(不依赖假迷宫):两个角色初始格是斜相邻的。"""
+    """用真实场景的迷宫再验一次(不依赖假迷宫):两个角色初始格必须互相可达。"""
     import pytest
     try:
         from mavisframework.config.loader import load_config
@@ -139,8 +145,11 @@ def test_real_maze_path_is_orthogonal():
                       config_path=os.path.join(SCENARIO, "config.json"), assets_root="")
     game = Game("visual-path-test", SCENARIO, cfg, {}, timer=Timer("20260827-09:30"),
                 governance=None, consequence_fn=None)
-    p = game.get_agent("Ethan Lin").maze.find_path([9, 7], [10, 6])
-    assert p, "真实迷宫里这两个格子必须可达"
+    # 坐标从场景读(改场景/改碰撞后自动跟着变);两者必须可达,否则开局就有人走不过去
+    a = list(game.get_agent(ROLES[0]).coord)
+    b = list(game.get_agent(ROLES[1]).coord)
+    p = game.get_agent(ROLES[1]).maze.find_path(a, b)
+    assert p, "真实迷宫里这两个格子必须可达(不可达说明场景里有人被墙围死)"
     pts = [list(c) for c in p]
     assert all(abs(pts[i + 1][0] - pts[i][0]) + abs(pts[i + 1][1] - pts[i][1]) == 1
                for i in range(len(pts) - 1)), pts
