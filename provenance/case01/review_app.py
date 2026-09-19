@@ -64,13 +64,17 @@ def _brief(run_id):
     except Exception as exc:  # noqa: BLE001
         return {"run_id": run_id, "error": "读 run.json 失败: {}".format(exc)}
     router = data.get("router") or {}
+    # branch_summary 在 run.json 里**并不存在**——它是服务端推导的一句话。
+    # 用 5002 契约(serve.py -> full_context._branch_summary)的同一个函数,两边口径就不会分叉。
+    # (之前这里直接 data.get("branch_summary") 拿到 None,下拉标签里就成了 "—"。)
+    from . import full_context as fc
     return {
         "run_id": run_id,
         # 引擎归属:mavis 路径的记录有 injector 段;旧引擎(archive d41cdec)没有。
         # 面板要靠它分组与选默认值,不能只靠 run_id 猜。
         "engine": "mavis" if "injector" in data else "legacy",
         "branch": data.get("branch", ""),
-        "branch_summary": data.get("branch_summary", ""),
+        "branch_summary": fc._branch_summary(data.get("branch", ""), data.get("branch_action") or {}),
         "start_date": data.get("start_date", ""),
         "end_date": data.get("end_date", ""),
         "n_turns": len(data.get("turns") or []),
@@ -116,7 +120,13 @@ _PAGE = r"""<!DOCTYPE html>
            align-items:center; flex-wrap:wrap; }
   header h1 { font-size:16px; margin:0; font-weight:600; }
   header select { background:#26493b; color:#fff; border:1px solid #3c6353; border-radius:6px;
-                  padding:5px 8px; font-size:13px; max-width:300px; }
+                  padding:5px 8px; font-size:13px; max-width:560px; }
+  /* 一行"说人话"的口径说明。之前没有它,而标签又是黑话("mavis · demo-A-mavis — A"),
+     于是用户反馈看不懂——面板不该要求读者先读过设计文档。 */
+  .legend { max-width:1080px; margin:10px auto 0; padding:0 14px; color:#5b6b66;
+            font-size:12px; line-height:1.9; }
+  .legend b { color:#2d6cdf; }
+  .legend .br { color:#b26a00; font-weight:600; }
   header .meta { font-size:12px; color:#cfe3d8; margin-left:auto; }
   header a { color:#cfe3d8; font-size:12px; }
   .wrap { max-width:1080px; margin:16px auto; padding:0 14px; display:flex; gap:16px; align-items:flex-start; }
@@ -165,6 +175,7 @@ _PAGE = r"""<!DOCTYPE html>
   body.embed header h1 { display:none; }
   body.embed header select { max-width:240px; font-size:12px; }
   body.embed header .meta { font-size:11px; }
+  body.embed .legend { display:none; }   /* 嵌入时由平台自带上下文,省这点高度 */
   body.embed .wrap { margin:0; padding:6px 8px 10px; gap:10px; max-width:none; }
   body.embed nav { position:static; flex:0 0 132px; }
   body.embed .card { padding:9px 12px; margin-bottom:9px; }
@@ -176,21 +187,32 @@ _PAGE = r"""<!DOCTYPE html>
   <select id="pick"></select>
   <span class="meta" id="hmeta">加载中…</span>
 </header>
+<div class="legend">
+  这六条记录 = <b>三条剧情线</b> × <b>两个引擎版本</b>。
+  <span class="br">A 线</span>＝建议买入（当事人投入接近全部资金）；
+  <span class="br">B 线</span>＝不建议买入（当事人没买）；
+  <span class="br">C 线</span>＝条件化等待（按条件执行，可能一直不触发）。
+  <b>mavis 新架构</b>＝当前的 case01（注入器挂在 mavis 上）；<b>旧引擎对照</b>＝归档的旧实现，留着做对照、不是废弃数据。
+  左边九块依次是：概览 · 对话（逐轮问答）· 检索（当天查到什么）· 事件（剧情事件何时释放）·
+  状态（资金与持仓）· 反思（8 维反思全文）· 问题分流（拆成待专家审的问题）·
+  注入器（节点与事件定义）· 审计（每一步的操作留痕）。鼠标停在页签上也有说明。
+</div>
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="main"></main>
 </div>
 <script>
 const TABS = [
-  ["overview",   "概览",     () => null],
-  ["turns",      "对话",     d => (d.turns || []).length],
-  ["retrievals", "检索",     d => (d.retrievals || []).length],
-  ["events",     "事件",     d => (d.events || []).length],
-  ["states",     "状态",     d => (d.state_history || []).length],
-  ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0)],
-  ["router",     "问题分流", d => ((d.router || {}).issues || []).length],
-  ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null],
-  ["audit",      "审计",     d => (d.audit || []).length],
+  ["overview",   "概览",     () => null,                                  "这一次运行的来龙去脉与结果总览"],
+  ["turns",      "对话",     d => (d.turns || []).length,                 "咨询者与 Investment AI 的逐轮问答"],
+  ["retrievals", "检索",     d => (d.retrievals || []).length,            "当轮查到了哪些资料（以及那天有没有注入新事实）"],
+  ["events",     "事件",     d => (d.events || []).length,                "剧情事件按日期释放的流水"],
+  ["states",     "状态",     d => (d.state_history || []).length,         "资金、持仓、买卖价逐日快照"],
+  ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0),    "运行后的 8 维结构化反思全文"],
+  ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的待专家审的问题（含风险等级）"],
+  ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
+                                                                          "注入器的节点、释放了哪些事件、事件怎么定义"],
+  ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
 ];
 let DATA = null, TAB = "overview";
 
@@ -216,10 +238,10 @@ function badges(o) {
 }
 
 function renderNav() {
-  document.getElementById("nav").innerHTML = TABS.map(([id, label, count]) => {
+  document.getElementById("nav").innerHTML = TABS.map(([id, label, count, tip]) => {
     let n = "";
     if (DATA) { const c = count(DATA); n = (c === null || c === undefined) ? "" : `<span class="n">${c}</span>`; }
-    return `<button class="${id === TAB ? "on" : ""}" data-t="${id}">${label}${n}</button>`;
+    return `<button class="${id === TAB ? "on" : ""}" data-t="${id}" title="${esc(tip || "")}">${label}${n}</button>`;
   }).join("");
   document.querySelectorAll("nav button").forEach(b => b.onclick = () => { TAB = b.dataset.t; render(); });
 }
@@ -238,8 +260,8 @@ function paneOverview(d) {
   const rows = [
     ["run_id", esc(d.run_id)],
     ["引擎记录", hasInj
-      ? '<span class="chip k">mavis（成品三线）</span>'
-      : '<span class="chip">旧引擎（对照）· 无 injector 段</span>'],
+      ? '<span class="chip k">mavis 新架构（成品三线）</span>'
+      : '<span class="chip">旧引擎对照 · 无注入器段</span>'],
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
     ["日期区间", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
@@ -398,10 +420,11 @@ function render() {
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA);
-    const eng = isMavis ? "mavis" : "旧引擎（无 injector 段）";
+    const eng = isMavis ? "mavis 新架构" : "旧引擎对照（无注入器段）";
+    const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
     const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
     document.getElementById("hmeta").innerHTML =
-      `${esc(DATA.run_id)} · ${esc(eng)} · branch ${esc(DATA.branch)} · ${tail}　` +
+      `${esc(DATA.run_id)} · ${esc(eng)} · ${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${tail}　` +
       `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`;
   }
 }
@@ -416,9 +439,20 @@ async function boot() {
   const r = await fetch("/api/review/runs");
   const d = await r.json();
   const sel = document.getElementById("pick");
-  const tag = x => x.engine === "mavis" ? "mavis" : "旧引擎";
-  sel.innerHTML = d.runs.map(x =>
-    `<option value="${esc(x.run_id)}">${esc(tag(x))} · ${esc(x.run_id)} — ${esc(x.branch || "")} ${esc((x.branch_summary || "").slice(0, 16))}</option>`).join("");
+  // 下拉按引擎**分组**,并先说人话:哪条剧情线(带含义) -> 记录 id。
+  // 旧写法 "mavis · demo-A-mavis — A 建议买入…" 前缀是黑话、又被 select 宽度截掉,
+  // 于是只剩看不懂的字母(用户反馈过"我看不懂")。
+  const ENG_LABEL = { mavis: "mavis 新架构（成品三线）", legacy: "旧引擎对照（归档实现，留作对比）" };
+  const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
+  const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
+  const optLabel = x => `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
+  const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
+  sel.innerHTML = ["mavis", "legacy"].map(eng => {
+    const items = d.runs.filter(x => x.engine === eng)
+                       .sort((a, b) => (BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9));
+    if (!items.length) return "";
+    return `<optgroup label="${esc(ENG_LABEL[eng] || eng)}">${items.map(optHtml).join("")}</optgroup>`;
+  }).join("");
   sel.onchange = () => pick(sel.value);
   // 默认落在成品三线(mavis)上,不要落在旧引擎对照记录上——
   // 否则一打开看到的就是"注入器:无注入器记录"那条,最容易让人以为面板坏了。
