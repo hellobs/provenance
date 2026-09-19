@@ -11,53 +11,22 @@
 body { margin: 0; }
 #game-container { width: 100%; min-height: 300px; }
 {% endif %}
-/* 页签(仅当调用方挂了额外面板时存在):小镇 = 实时过程,额外面板 = 结果等只读面。
-   切到额外面板时,把小镇那一堆 fixed 浮层整套藏掉,免得压在 iframe 上面。 */
-{% if extra_tabs and not embed %}
-#face-tabs { position: fixed; left: 10px; top: 10px; z-index: 400; display: flex; gap: 6px;
-    background: rgba(255,255,255,0.94); border: 1px solid #d8d8d8; border-radius: 9px;
-    padding: 4px 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-#face-tabs button { border: 0; background: transparent; font: inherit; font-size: 13px;
-    color: #556; padding: 5px 11px; border-radius: 6px; cursor: pointer; }
-#face-tabs button.on { background: #2d6cdf; color: #fff; }
-#face-extra { position: fixed; left: 0; right: 0; top: 44px; bottom: 0; z-index: 90;
-    display: none; background: #fff; }
-#face-extra iframe { width: 100%; height: 100%; border: 0; }
-body.face-extra #game-container, body.face-extra #sim-clock, body.face-extra #sim-status,
-body.face-extra #story-banner, body.face-extra #right-col, body.face-extra #timeline-panel,
-body.face-extra #dev-console { display: none !important; }
-body.face-extra #face-extra { display: block; }
-{% endif %}
+/* 调用方挂的额外面板(case01 的"结果记录"就是其一)按 Chat Log 那一套做:
+   右栏里一张可折叠的卡片,头部一行(标题 + 单独打开 + 收起/展开),身体是可滚动的 iframe。
+   它**不是**整页接管:小镇照旧在动,结果在旁边一起看。 */
+.extra-panel { background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
+    display: flex; flex-direction: column; overflow: hidden; }
+.extra-panel .ep-head { padding: 10px 14px; font-weight: bold; font-size: 14px; background: #f6f6f6;
+    border-bottom: 1px solid #e2e2e2; color: #333; cursor: pointer; user-select: none;
+    display: flex; justify-content: space-between; align-items: center; }
+.extra-panel .ep-toggle { color: #888; font-size: 12px; font-weight: normal; }
+.extra-panel .ep-open { color: #2d6cdf; font-size: 12px; font-weight: normal;
+    text-decoration: none; margin-right: 10px; }
+.extra-panel .ep-body { flex: 1; min-height: 0; overflow: hidden; }
+.extra-panel .ep-body iframe { width: 100%; height: 100%; border: 0; display: block; }
 </style>
 <div id="game-container" style="text-align: center"></div>
-
-{% if extra_tabs and not embed %}
-<div id="face-tabs">
-  <button id="face-tab-town" class="on" onclick="showFace('town')">实时小镇</button>
-  {% for t in extra_tabs %}
-  <button class="face-tab" data-face="{{ t.id }}" data-url="{{ t.url }}"
-          onclick="showFace('{{ t.id }}')">{{ t.label }}</button>
-  {% endfor %}
-</div>
-<div id="face-extra"><iframe id="face-extra-frame" title="附加面板"></iframe></div>
-<script>
-// 页签切换:默认小镇;额外面板的 iframe **首次点开才加载**(不拖慢首屏)。
-function showFace(id) {
-  var tabs = document.querySelectorAll("#face-tabs button");
-  for (var i = 0; i < tabs.length; i++) {
-    var t = tabs[i];
-    var mine = (id === "town") ? t.id === "face-tab-town" : t.dataset.face === id;
-    t.className = mine ? "on" : "";
-    if (mine && id !== "town" && t.dataset.url) {
-      var f = document.getElementById("face-extra-frame");
-      if (f && f.getAttribute("src") !== t.dataset.url) f.setAttribute("src", t.dataset.url);
-    }
-  }
-  document.body.classList.toggle("face-extra", id !== "town");
-  window.__face = id;
-}
-</script>
-{% endif %}
 
 <!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
 {% if embed != "goals" and embed != "explain" and embed != "timeline" %}
@@ -108,6 +77,67 @@ function showFace(id) {
         <div id="chat-content" style="padding: 8px 14px; overflow-y: auto; flex: 1; line-height: 1.7; color: #333;"></div>
     </div>
     {% endif %}
+
+    <!-- 调用方挂的额外面板(case01 的"结果记录"):与 Chat Log 同款卡片,可折叠;
+         iframe 首次展开才加载(不拖慢首屏)。没有额外面板时这里一行都不渲染。
+         注意:这个文件的右栏是"if→开 div / 内容 / if→闭 div"的写法,内容**不受**外层 if 管,
+         所以每块面板都要自己带 embed 守卫(照 chat-panel / goals-panel 的样子)。 -->
+    {% if embed != "scene" and embed != "timeline" %}
+    {% for p in extra_panels or [] %}
+    {% if p.url %}
+    <div class="extra-panel" id="panel-{{ p.id }}" style="flex: 2 1 auto; min-height: 220px;">
+        <div class="ep-head" id="panel-head-{{ p.id }}">
+            <span>{{ p.label }}</span>
+            <span>
+                <a class="ep-open" href="{{ p.url }}" target="_blank" rel="noreferrer"
+                   title="在新标签页里打开">单独打开 ↗</a><span class="ep-toggle"
+                   id="panel-toggle-{{ p.id }}">Collapse ▾</span>
+            </span>
+        </div>
+        <div class="ep-body" id="panel-body-{{ p.id }}">
+            <iframe id="panel-frame-{{ p.id }}" data-src="{{ p.url }}"
+                    title="{{ p.label }}"></iframe>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    <script>
+    // 额外面板(Chat Log 同款卡片)的折叠/展开 + iframe 懒加载。
+    // 写成"按卡片遍历"而不是写死 id:调用方挂几个就管几个。
+    document.addEventListener("DOMContentLoaded", function() {
+        var heads = document.querySelectorAll(".extra-panel .ep-head");
+        for (var i = 0; i < heads.length; i++) {
+            (function(head) {
+                var panel = head.closest(".extra-panel");
+                var body = panel ? panel.querySelector(".ep-body") : null;
+                var frame = body ? body.querySelector("iframe") : null;
+                var toggle = head.querySelector(".ep-toggle");
+                function load() {
+                    // 首屏不请求 iframe;展开(默认就是展开)时才把 data-src 落成 src
+                    if (frame && !frame.getAttribute("src") && frame.dataset.src) {
+                        frame.setAttribute("src", frame.dataset.src);
+                    }
+                }
+                load();
+                head.onclick = function(ev) {
+                    if (!body || (ev && ev.target && ev.target.className === "ep-open")) return;
+                    if (body.style.display === "none") {
+                        body.style.display = "block";
+                        if (toggle) toggle.textContent = "Collapse ▾";
+                        if (panel) panel.style.flex = "2 1 auto";
+                        load();
+                    } else {
+                        body.style.display = "none";
+                        if (toggle) toggle.textContent = "Expand ▸";
+                        if (panel) panel.style.flex = "0 0 auto";
+                    }
+                };
+            })(heads[i]);
+        }
+    });
+    </script>
 
     <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
     {% if embed != "scene" and embed != "timeline" %}

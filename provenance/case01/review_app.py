@@ -13,7 +13,8 @@
 面板的路由放在一个 `APIRouter` 里,由 case01 的实时面(5010,
 `case01/vizkit/live_run.py`)**include 进同一个 FastAPI 应用**,于是:
 
-- 5010 页面上多一个"结果记录"页签 —— 小镇(过程)与九块(结果)在**一个界面**里;
+- 5010 页面的右栏里多一张"结果记录"卡片(与 Chat Log 同款:
+  可折叠、可单独打开) —— 小镇(过程)与九块(结果)在**一个界面**里,小镇照旧实时动;
 - 不再需要单独占一个端口的 5004 面板服务(已退役,`--port` 仍可单独跑,仅供排障)。
 
 为什么不是把九块写进 mavis-vizkit:那个包**不认识 case01 的字段**
@@ -196,6 +197,20 @@ _PAGE = r"""<!DOCTYPE html>
   body.embed .wrap { margin:0; padding:6px 8px 10px; gap:10px; max-width:none; }
   body.embed nav { position:static; flex:0 0 132px; }
   body.embed .card { padding:9px 12px; margin-bottom:9px; }
+  /* 窄容器:嵌在 5010 右栏那张卡片里时 iframe 只有 ~380px 宽。
+     媒体查询量的是 iframe 自己的视口宽度,所以这里能把九块的导航改成**横排**、
+     表格允许横向滚动——否则左边那条竖导航会吃掉三分之一宽度,表就挤没了。 */
+  @media (max-width: 700px) {
+    .wrap { flex-direction:column; gap:6px; }
+    nav { position:static; flex:0 0 auto; display:flex; flex-wrap:wrap; gap:4px; padding:6px; }
+    nav button { width:auto; }
+    .card { padding:8px 10px; }
+    .kv { grid-template-columns:1fr; gap:2px 0; }
+    .kv .k { font-size:12px; }
+    pre { max-height:260px; }
+    .card > table, .card table { display:block; overflow-x:auto; white-space:nowrap; }
+    .t { font-size:13px; }
+  }
 </style>
 </head>
 <body>
@@ -484,8 +499,9 @@ boot();
 </html>"""
 
 
-# 两窗一页(`/combined`)已随"只维护一个界面"退役:5010 页面自带"实时小镇 / 结果记录"
-# 页签,平台要结果只引 `/embed/review`,要看过程+结果就引 5010 首页本身。
+# 两窗一页(`/combined`)已随"只维护一个界面"退役:5010 页面右栏自带
+# "结果记录"卡片(与 Chat Log 同款),平台要结果只引 `/embed/review`,
+# 要看"过程+结果"就引 5010 首页本身。
 
 
 @router.get("/review", response_class=HTMLResponse)

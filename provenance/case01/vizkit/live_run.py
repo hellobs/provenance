@@ -4,13 +4,14 @@
 可视化实现已抽到独立包 mavis-vizkit;本命令只负责把 case01 侧的
 roles / alias / scenario / 前端资源根 作为参数喂给它,并把 case01 自己的
 **结果面板**(九块:概览/对话/检索/事件/状态/反思/问题分流/注入器/审计)
-挂到**同一个服务**上——页面上是"实时小镇 / 结果记录"两个页签。
+挂到**同一个服务**上——页面右栏里是"结果记录"卡片(与 Chat Log 同款,可折叠)。
 (独立的 5004 面板服务因此退役,见 case01/review_app.py 的 docstring。)
 
 用法(在 provenance/provenance 下):
     python -m case01.vizkit.live_run --branch B --port 5010
     python -m case01.vizkit.live_run --review-only          # 不推演,只翻成品记录
-然后浏览器打开 http://127.0.0.1:5010/ —— 左侧页签切"实时小镇 / 结果记录"。
+然后浏览器打开 http://127.0.0.1:5010/ —— 左边小镇实时动,右栏是对话与"结果记录"卡片
+(点卡片头部可收起/展开,点"单独打开 ↗"整页看)。
 跑完后默认再保持 60 秒(--hold)方便观察,随后关闭服务。
 跑完会广播一条 `done`:此后(含保持期)打开页面的人会看到"已结束",
 不会被空小镇误导——**不允许静默**。
@@ -37,15 +38,15 @@ SCENARIO = os.path.join(
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
                   scenario_dir="", with_review=True):
-    """建**一个**服务:实时小镇 + case01 结果面板(九块)挂在同一个界面上。
+    """建**一个**服务:实时小镇 + case01 结果面板(九块)。
 
     为什么要挂在一起(2026-09-19 用户拍板"只维护一个界面"):
     5010 原本只有小镇(过程),结果九块在另一个端口的面板服务(5004)上,
-    于是人要看全貌得开两个地址。现在 5010 页面上多一个"结果记录"页签,
-    同一个 FastAPI 应用上就挂着 `/review` 与 `/api/review/*`。
+    于是人要看全貌得开两个地址。现在九块作为**右栏里一张可折叠的卡片**
+    (与 Chat Log 同款)嵌在同一个页面上,小镇照旧在旁边实时动。
 
-    分工:小镇由 mavis-vizkit 提供(它不认识 case01 的字段,只提供 extra_tabs 这个
-    通用口子);九块由 case01 侧挂上去。5004 那个独立服务随之退役。
+    分工:小镇与"卡片"由 mavis-vizkit 提供(它不认识 case01 的字段,只提供
+    extra_panels 这个通用口子);九块由 case01 侧挂上去。5004 那个独立服务随之退役。
     """
     roles = list(roles or DEFAULT_ROLES)
     live = mavis_vizkit.create(
@@ -53,7 +54,9 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         alias=ROLE_TEXTURE_ALIAS, scenario_dir=scenario_dir or SCENARIO,
         static_root=os.path.join(_FRONTEND, "static"),
         template_dir=os.path.join(_FRONTEND, "templates"),
-        extra_tabs=[{"id": "review", "label": "结果记录", "url": "/review"}])
+        # ?embed=1:卡片里的 iframe 用压缩版式(去掉大标题与页边距),贴合 380px 宽的卡片
+        extra_panels=[{"id": "review", "label": "结果记录",
+                       "url": "/review?embed=1"}])
     if with_review:
         from ..review_app import attach_to
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。
@@ -87,13 +90,13 @@ def main(argv=None):
     live = build_service(host=args.host, port=args.port, roles=roles,
                          run_id=args.run_id, scenario_dir=scenario)
     live.start()
-    print("界面已启动: {}  (小镇 + 结果记录页签;Ctrl+C 结束)".format(live.url()))
+    print("界面已启动: {}  (小镇 + 右栏“结果记录”卡片;Ctrl+C 结束)".format(live.url()))
 
     if args.review_only:
         # 不推演,只服务界面。告诉页面"没有在推演",别让人对着空小镇猜
         # (状态点会显示成"仅审阅模式")。这样它就是个可以随时开着的只读面。
         live.finish("review_only")
-        print("仅审阅模式:没有在推演,小镇页签为空;结果记录页签可翻 case01/runs/")
+        print("仅审阅模式:没有在推演,小镇为空;右栏“结果记录”卡片可翻 case01/runs/")
         try:
             while True:
                 time.sleep(3600)

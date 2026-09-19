@@ -3,8 +3,8 @@
 
 为什么要有它
 -----------
-`--start case01` 只负责起实时推演并落一份 `raw.json`;要在结果面板(现在挂在 5010
-的 `/review` 页签上)/只读契约(5002)里看到这条记录,还得再跑一次
+`--start case01` 只负责起实时推演并落一份 `raw.json`;要在结果面板(现在是 5010
+页面右栏的"结果记录"卡片)/只读契约(5002)里看到这条记录,还得再跑一次
 `python -m case01.injector.pipeline ... --from-record <raw> --reflect --out <run.json>`。
 这一步以前是**手工**的,忘了跑的结果就是:实跑明明成功了,但两个面上什么都没有——
 属于"静默后果",按本工作区的铁律不允许。
@@ -139,7 +139,7 @@ def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> 
         log("[失败] 映射命令返回 0,但成品文件不存在:{}".format(out))
         return 1
     log("[ok] 成品记录已生成({:.0f}s):{}".format(dt, out))
-    log("  看结果: http://127.0.0.1:5010/review   (或 5010 首页的“结果记录”页签;选 {})".format(run_id))
+    log("  看结果: http://127.0.0.1:5010/review  (或 5010 首页右栏“结果记录”卡片;选 {})".format(run_id))
     return 0
 
 

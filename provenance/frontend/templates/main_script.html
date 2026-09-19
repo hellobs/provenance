@@ -159,6 +159,15 @@
 			t.innerHTML = "Expand ▸";
 		}
 	}
+	// ================= 治理约束面板不适用时:收起并说明(**不允许静默**) =================
+	// case01 的 5010 上没有 /api/goals(那是 case00 的接口),面板以前会永远停在
+	// "Loading goals...",看起来像坏了。现在直接收起,并在 dev console 里写明原因。
+	function goalsUnavailable(why) {
+		var panel = document.getElementById("goals-panel");
+		if (panel) panel.style.display = "none";
+		devLog("sys", "治理约束面板已收起:" + why);
+	}
+
 	// ================= 运行状态指示(live 模式) =================
 	// **不允许静默**:页面必须能一眼看出"连接中 / 推演进行中 / 已结束 / 出错"。
 	// 起因:推演跑完后服务继续保持(--hold),新打开页面的人只看到一个不动的小镇、
@@ -1724,8 +1733,15 @@
 				interventionsData = out.interventions || [];
 				roleTypes = out.role_types || {};
 				goalsRender();
+			} else {
+				// 这个页面没有治理约束接口(比如 case01 的 5010:那是 case00 的面板)。
+				// 以前这里静默什么都不做,面板就永远停在 "Loading goals..." —— 看起来像坏了。
+				// **不允许静默**:收起它并说明原因。
+				goalsUnavailable("本页面没有 /api/goals:治理约束面板只适用于 case00 的实时面");
 			}
-		}).catch(function() {});
+		}).catch(function(err) {
+			goalsUnavailable("治理约束取不到(" + (err && err.message ? err.message : err) + ")");
+		});
 		// event delegation on goals-body
 		var body = document.getElementById("goals-body");
 		if (!body) return;

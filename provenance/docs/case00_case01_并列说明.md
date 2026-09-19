@@ -61,7 +61,7 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
   （事实层、市场时间线、分支判定；纯净，只 import 标准库）
 - 服务：只读契约 `case01/serve.py`（**5002**：`/api/runs`、`/api/runs/{run_id}`、
   `/api/runs/{run_id}/full-context`，另挂 `/viewer`）；**单一界面** `case01/vizkit/live_run.py`
-  （**5010**：实时小镇 + 成品记录九块，页面上一组页签切换；见第四节）
+  （**5010**：实时小镇 + 成品记录九块，九块是右栏里与 Chat Log 同款的卡片；见第四节）
 
 产物按"加工程度"分四层落盘，都在 `case01/` 下：
 
@@ -89,7 +89,7 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 
 一次新跑的固定链路：`live_run.py` 出 `raw.json` → 看护进程自动跑
 `case01.injector.pipeline --from-record <raw> --reflect` 出 case01 兼容的 `run.json`
-（补齐 Reflection 与 Router）→ 5002 与 5010 的结果页签都自动发现新的 `run_id`。
+（补齐 Reflection 与 Router）→ 5002 与 5010 的结果卡片都自动发现新的 `run_id`。
 `live_switch.py --start case01` 会把这条链路的命令连同生成好的 `run_id` 一起打印出来。
 
 ## 三、两个案例的关系与"同一时刻只起一个实时可视化"
@@ -109,7 +109,8 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 - **只读面（不跑模拟，可以随时全开）**：case01 只读契约 `case01/serve.py`（**5002**）、
   case00 存档只读 `case00/serve.py`（**5003**）。
 - **5010 现在身兼两职**（2026-09-19 用户拍板"只维护一个界面"）：它既是 case01 的实时面，
-  也把"成品记录九块"挂在同一个服务上（`/review` 页与 `/api/review/*`，首页一个页签切换）。
+  也把"成品记录九块"挂在同一个服务上（`/review` 页与 `/api/review/*`，首页右栏那张
+  "结果记录"卡片就是它，与 Chat Log 同款可折叠）。
   `--review-only` 是它的**不推演**模式——只服务界面、不占 Ollama，属于只读用途，
   可以随时开着翻记录；独立的 5004 面板服务已退役。
 
@@ -166,7 +167,7 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
   问题分流(router) / 注入器(injector) / 审计(audit)；六条记录（mavis 三条 + 旧引擎三条）都能选；
   旧引擎记录没有 `injector` 段，面板显示"无注入器记录"。
   **它不再是独立服务**：路由放在 `APIRouter` 里，由 5010 的实时面 `include_router` 挂上去
-  （`attach_to()`），所以界面只有一个（小镇 / 结果记录 两个页签）。`--port 5004` 的独立跑法
+  （`attach_to()`），所以界面只有一个（小镇实时动 + 右栏"结果记录"卡片）。`--port 5004` 的独立跑法
   只留作排障。
 - **`case01/tools/review_panel_probe.js`**（2026-09-19）：审阅面板的**无头自查**——把页面里的
   `<script>` 抽出来、用最小 DOM stub 在 Node 里真跑一遍九个 pane 的渲染函数（默认把
@@ -209,24 +210,24 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
 **平台只需要一个地址**：
 
 ```
-http://<host>:5010/          ← 单一界面:首页就是"实时小镇 / 结果记录"两个页签
+http://<host>:5010/          ← 单一界面:小镇实时动 + 右栏"结果记录"卡片(可折叠)
 ```
 
 它既是 case01 的实时面，也把结果九块挂在同一个服务上；整页可再被 iframe。平台**不必知道**
 5001 的存在，也不必知道当前在跑哪个 case——那由运维侧用 `live_switch.py` 决定
 （`--start case01 --review-only` 可以只把这个界面起来而不推演）。
 
-**实时小镇（Phaser；嵌的是场景，不含浮动面板、也不含页签）**
+**实时小镇（Phaser；嵌的是场景，不含浮动面板、也不含结果卡片）**
 
 - case01：`http://<host>:5010/embed/scene`
 - case00：`http://<host>:5001/embed/scene`
-- 两者都有等价写法：`/?embed=scene`（页签**只在**独立首页出现，嵌入面不带）
+- 两者都有等价写法：`/?embed=scene`（结果卡片**只在**独立首页出现，嵌入面不带）
 - 场景页的 WebSocket 是 `"ws://" + location.host + "/ws"`，**按 location 拼**，
   所以嵌到哪个端口都连得对（iframe 不改变它自己的 location）。
 
 **结果窗口（case01 成品记录九块）**
 
-- 完整页：`http://<host>:5010/review`（与首页那个页签是同一份页面）
+- 完整页：`http://<host>:5010/review`（卡片里嵌的就是它，加 `?embed=1` 压缩版式）
 - 嵌入面：`http://<host>:5010/embed/review`（压缩版式：去掉大标题与页边距，贴合 iframe 尺寸）
 - 深链：`?run=260917-demo-case01-mavis-A&tab=router`——指定默认记录与页签。
   页签 id：`overview` / `turns` / `retrievals` / `events` / `states` / `reflection` /

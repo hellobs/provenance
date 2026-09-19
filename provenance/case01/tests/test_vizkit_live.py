@@ -16,11 +16,11 @@ ROLES = ["Investment AI", "Ethan Lin"]
 ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
 
 
-def _live(port=5099, extra_tabs=None):
+def _live(port=5099, extra_panels=None):
     return create("live", port=port, roles=ROLES, alias=ALIAS, scenario_dir=SCENARIO,
                   static_root=os.path.join(FRONTEND, "static"),
                   template_dir=os.path.join(FRONTEND, "templates"),
-                  ping_interval=30.0, extra_tabs=extra_tabs)
+                  ping_interval=30.0, extra_panels=extra_panels)
 
 
 def test_registered_and_config():
@@ -189,24 +189,31 @@ def test_duplicate_init_in_backlog_is_dropped():
         assert msg["type"] == "chat_line", "积压照发,但不应再出现第二条 init"
 
 
-def test_extra_tabs_render_only_when_caller_provides_them():
-    """调用方挂了额外面板才出页签;没挂的 face(比如 case00)一行都不多。
+def test_extra_panels_render_as_cards_only_when_caller_provides_them():
+    """调用方挂了额外面板才出卡片(与 Chat Log 同款);没挂的 face(比如 case00)一行都不多。
 
-    这是"单一界面"的通用口子:本包不认识那些面板是什么,只按给定 URL 嵌进 iframe。
+    这是"单一界面"的通用口子:本包不认识那些面板是什么,只把给定 URL 放进卡片的 iframe。
+    2026-09-19 用户要求结果记录像 Chat Log 那样**嵌在页面里**,不要整页接管。
     """
     from fastapi.testclient import TestClient
 
     plain = TestClient(_live(port=5087).app).get("/").text
-    assert 'id="face-tabs"' not in plain, "没给 extra_tabs 时不该出现页签"
+    assert 'class="extra-panel"' not in plain, "没给 extra_panels 时不该出现卡片"
 
-    live = _live(port=5086, extra_tabs=[{"id": "review", "label": "结果记录",
-                                         "url": "/review"}])
+    live = _live(port=5086, extra_panels=[{"id": "review", "label": "结果记录",
+                                           "url": "/review?embed=1"}])
     c = TestClient(live.app)
     page = c.get("/").text
-    assert 'id="face-tabs"' in page and "结果记录" in page
-    assert 'data-url="/review"' in page, "页签要指向调用方给的地址"
-    # 嵌入面(case00/平台只要场景)不带页签,免得把别人的界面塞进 iframe
-    assert 'id="face-tabs"' not in c.get("/embed/scene").text
+    assert 'id="panel-review"' in page and "结果记录" in page
+    assert 'data-src="/review?embed=1"' in page, "卡片里 iframe 要指向调用方给的地址"
+    # 同款卡片的三个部件:可点头部、折叠标记、单独打开
+    for piece in ('id="panel-head-review"', 'id="panel-toggle-review"',
+                  'id="panel-body-review"', "ep-open"):
+        assert piece in page, piece
+    # 不是整页接管:不该再有那套"切走小镇"的页签机制
+    assert "face-tabs" not in page and "showFace" not in page
+    # 嵌入面(case00/平台只要场景)不带卡片,免得把别人的界面塞进 iframe
+    assert 'class="extra-panel"' not in c.get("/embed/scene").text
 
 
 def test_health_reports_finished_state():
@@ -222,10 +229,11 @@ def test_health_reports_finished_state():
 
 
 def test_single_interface_service_hosts_town_and_review_panel():
-    """**只维护一个界面**:5010 的服务同时给出小镇页与结果面板(九块)。
+    """**只维护一个界面**:5010 的页面里同时有小镇与结果面板(九块)。
 
-    2026-09-19 用户拍板:小镇(过程)与结果(九块)合并到一个界面,
-    独立的 5004 面板服务退役。做法 = 实时面 include case01 的结果面板路由。
+    2026-09-19 用户拍板:小镇(过程)与结果(九块)合并到一个界面,独立的 5004 面板服务
+    退役;结果面板要**像 Chat Log 那样嵌在右栏卡片里**(不是整页接管的页签)。
+    做法 = 实时面 include case01 的结果面板路由 + 给它一张卡片(extra_panels)。
     """
     from fastapi.testclient import TestClient
 
@@ -235,8 +243,9 @@ def test_single_interface_service_hosts_town_and_review_panel():
                          run_id="260919-live-case01-mavis-B-0001")
     c = TestClient(live.app)
     page = c.get("/").text
-    assert 'id="face-tabs"' in page, "首页要有页签"
-    assert "结果记录" in page and 'data-url="/review"' in page
+    assert 'id="panel-review"' in page, "结果记录要作为卡片嵌在页面里"
+    assert 'data-src="/review?embed=1"' in page
+    assert 'id="chat-panel"' in page and 'id="right-col"' in page, "与 Chat Log 同栏"
     # 同一个服务上确实挂着结果面板(页面 + 数据)
     assert c.get("/review").status_code == 200
     runs = c.get("/api/review/runs")

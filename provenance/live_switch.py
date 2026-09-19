@@ -29,7 +29,7 @@
 `/health` 里的 `finished`/`finish_reason`,不再靠猜。
 
 给平台侧的口径:平台**只需要一个地址**——`http://<host>:5010/`
-(case01 单一界面:实时小镇 + 结果记录两个页签)。只看结果就引
+(case01 单一界面:实时小镇 + 右栏"结果记录"卡片)。只看结果就引
 `http://<host>:5010/embed/review`,只看小镇 `http://<host>:5010/embed/scene`。
 平台不必知道 case00 的 5001,也不必知道当前在跑哪个 case。
 

@@ -45,7 +45,7 @@ class LiveVisualizer(Visualizer):
                  ping_interval: float = 5.0, stride: int = 0,
                  start_datetime: str = "",
                  nodes_key: str = "nodes", meta_key: Optional[str] = None,
-                 extra_tabs: Optional[List[dict]] = None):
+                 extra_panels: Optional[List[dict]] = None):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -66,9 +66,10 @@ class LiveVisualizer(Visualizer):
         self.stride = int(stride)
         self.start_datetime = start_datetime or "2026-08-27T09:30:00"
         # 调用方自带的只读面板(可选):形如 [{"id","label","url"}]。
-        # 本包只负责在独立页上渲染一组页签并嵌给定的 URL,**不认识也不猜**那些面板是什么;
-        # 默认空 = 行为与以前完全一致(小的改动、默认关闭)。
-        self.extra_tabs = [dict(t) for t in (extra_tabs or []) if t.get("url")]
+        # 本包只负责把它们渲染成与 Chat Log 同款的**可折叠卡片**(右栏里,不是整页接管),
+        # 并把给定 URL 放进卡片的 iframe;**不认识也不猜**那些面板是什么。
+        # 默认空 = 行为与以前完全一致(只做加法、默认关闭)。
+        self.extra_panels = [dict(t) for t in (extra_panels or []) if t.get("url")]
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -265,7 +266,7 @@ class LiveVisualizer(Visualizer):
                     "description": {r: "" for r in (self.init_pos or self.roles)},
                     "conversation": {},
                 },
-                "extra_tabs": self.extra_tabs,
+                "extra_panels": self.extra_panels,
             }
 
         @app.get("/", response_class=HTMLResponse)
