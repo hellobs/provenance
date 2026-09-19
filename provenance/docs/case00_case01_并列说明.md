@@ -152,3 +152,39 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
   5002 是冻结的对接契约，它的路径集合有漂移守卫盯着。
 - 待定：case00 的存档（2.2 GB、38 个 run）是否挑几个代表性的瘦身留档？
   现在靠 `results/` 的 gitignore 保护，删掉无法从 git 恢复。
+
+## 六、给平台的 iframe 接入面（两个窗口）
+
+要求是：**既要有 Phaser 实时小镇窗口，又要有结果窗口，且都能 iframe 插进治理平台**。
+四个面现在已经齐了。
+
+**实时小镇（Phaser；嵌的是场景，不含浮动面板）**
+
+- case01 的实时面：`http://<host>:5010/embed/scene`　← 本次新增。此前 vizkit 的 live 插件
+  只暴露 `/`，模板里的 `embed` 变量被写死成 `""`，外部平台**没法只嵌场景**。
+- case00 的实时面：`http://<host>:5001/embed/scene`（早就有）
+- 两者都有等价写法：`/?embed=scene`
+- 场景页的 WebSocket 是 `"ws://" + location.host + "/ws"`，**按 location 拼**，
+  所以嵌到哪个端口都连得对（iframe 不改变它自己的 location）。
+
+**结果窗口（case01 成品记录审阅）**
+
+- 完整页：`http://<host>:5004/`
+- 嵌入面：`http://<host>:5004/embed/review`（压缩版式：去掉大标题与页边距，贴合 iframe 尺寸）
+- 深链：`?run=demo-A-mavis&tab=router`——指定默认记录与页签。
+  页签 id：`overview` / `turns` / `retrievals` / `events` / `states` / `reflection` /
+  `router` / `injector` / `audit`
+- `?embed=1` 与 `/embed/review` 等价
+
+**两窗一页（平台插一个 iframe 就能同时拿到"过程"与"结果"）**
+
+- `http://<host>:5004/combined`——左＝实时小镇 iframe，右＝结果 iframe；整页本身可再被 iframe
+- `?live=http://<host>:5001/embed/scene` 可换小镇源（默认 case01 的 `5010/embed/scene`）
+- `?live=` 只接受 `http(s)`，其它值一律回落默认（测试钉住了，别把任意串塞进 iframe）
+
+**四条注意**
+
+- 上述面都**不带** `X-Frame-Options` 与 CSP——测试里钉死了。带上它们，iframe 就白做。
+- 实时面只有 5001 / 5010 两个，**任何时刻只应起一个**；只读面（5002 / 5003 / 5004）可随时全开。
+- 平台若只想看"结果"，只引 5004 即可，**不必**让任何实时面在跑。
+- `/combined` 只负责把给定地址嵌进来，**不负责起服务**——那台机器上谁起、起哪个，是人定的。

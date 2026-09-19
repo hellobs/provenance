@@ -160,19 +160,19 @@ class LiveVisualizer(Visualizer):
                           StaticFiles(directory=alias_dir), name="alias-" + alias)
         app.mount("/static", StaticFiles(directory=self.static_root), name="static")
 
-        @app.get("/", response_class=HTMLResponse)
-        async def index(request: Request):
+        def _ctx(embed: str) -> dict:
+            """页面上下文。embed 非空时模板隐藏浮动面板——供外部平台 iframe 只取场景。"""
             phaser = "/static/vendor/phaser.min.js"
             if not os.path.exists(os.path.join(self.static_root, "vendor", "phaser.min.js")):
                 phaser = "https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"
-            ctx = {
+            return {
                 "persona_names": list(self.init_pos.keys()) or list(self.roles),
                 "step": 1,
                 "play_speed": 1,
                 "zoom": 0,
                 "live_mode": True,
                 "phaser_src": phaser,
-                "embed": "",
+                "embed": embed,
                 "stride": self.stride,
                 "sec_per_step": self.stride,
                 "persona_init_pos": dict(self.init_pos),
@@ -182,7 +182,22 @@ class LiveVisualizer(Visualizer):
                     "conversation": {},
                 },
             }
-            return templates.TemplateResponse(request, "index.html", ctx)
+
+        @app.get("/", response_class=HTMLResponse)
+        async def index(request: Request):
+            # ?embed=scene 与 /embed/scene 等价:嵌入方不改路径也能只取场景
+            return templates.TemplateResponse(
+                request, "index.html", _ctx(request.query_params.get("embed", "")))
+
+        @app.get("/embed", response_class=HTMLResponse)
+        @app.get("/embed/scene", response_class=HTMLResponse)
+        async def embed_scene(request: Request):
+            """只取 Phaser 场景(隐藏浮动面板),供外部平台 iframe 引用。
+
+            此前本插件只暴露 `/`,而模板里的 `embed` 变量被写死成 "",
+            外部平台因此无法只嵌场景。这里补上嵌入面,并让 `/?embed=scene` 等价。
+            """
+            return templates.TemplateResponse(request, "index.html", _ctx("scene"))
 
         @app.get("/health")
         async def health():

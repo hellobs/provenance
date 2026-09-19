@@ -84,3 +84,19 @@ def test_index_page_renders_with_alias_assets(frontend, scenario_dir):
                           .format(role)).status_code == 200
     health = client.get("/health").json()
     assert health["status"] == "ok" and health["roles"] == [ROLE_A, ROLE_B]
+
+
+def test_embed_scene_routes_serve_bare_scene(frontend, scenario_dir):
+    """嵌入面:外部平台靠它 iframe 只取场景。
+
+    5001(provenance 的实时服务)早就有 /embed/scene;本插件此前只有 /,
+    模板里的 embed 变量被写死成 ""——于是 case01 这条实时线没法只嵌场景。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(frontend, scenario_dir, port=5095)
+    client = TestClient(live.app)
+    for path in ("/embed/scene", "/embed", "/?embed=scene"):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        assert ROLE_A in r.text and ROLE_B in r.text, path

@@ -38,7 +38,16 @@ function makeSandbox() {
       ok: true, status: 200, text: async () => '',
       json: async () => (String(url).includes('/api/review/runs') ? fakeRuns : {}),
     }),
-    document: { getElementById: el, querySelectorAll: () => [], createElement: el },
+    // 页面用 location 与 URLSearchParams 读嵌入/深链参数,用 document.body 挂 embed 类;
+    // stub 缺了它们会在脚本初始化阶段就抛(那是探针自己的问题,不是被测 pane 的问题)。
+    location: { search: '', pathname: '/', host: '127.0.0.1:5004', protocol: 'http:' },
+    URLSearchParams,
+    document: {
+      getElementById: el,
+      querySelectorAll: () => [],
+      createElement: el,
+      body: { classList: { add: () => {}, remove: () => {} } },
+    },
   };
   sandbox.globalThis = sandbox;
   sandbox.window = sandbox;

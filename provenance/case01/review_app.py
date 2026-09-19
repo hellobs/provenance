@@ -10,6 +10,15 @@
 
 本服务**只读**、不跑模拟,所以不受"同一时刻只允许一个实时可视化"的限制,可随时开着。
 
+对外面(给仝牧平台 iframe 用):
+
+- `/`              完整页(带大标题)
+- `/embed/review`  嵌入面:同一页,压缩版式(去掉大标题与页边距),贴合 iframe 尺寸
+- `/combined`      **两窗一页**:左=实时小镇(Phaser),右=本面板;整体可再被 iframe 引用,
+                   所以平台插一个 iframe 就能同时拿到"过程"与"结果"
+- 深链参数:`?run=<run_id>` 指定默认记录、`?tab=<页签 id>` 指定默认页签、`?embed=1` 压缩版式、
+  `/combined?live=<小镇地址>` 指定小镇源(默认 case01 的实时面 5010;case00 那个小镇传 5001)
+
 注意与 5002 的关系:5002(`case01/serve.py`)是**冻结合同面**(`/api/runs` 等,平台对接用),
 不要往它上面加 UI;审阅面独立成本服务,免得污染契约。
 """
@@ -149,6 +158,16 @@ _PAGE = r"""<!DOCTYPE html>
   .bar { height:6px; border-radius:3px; background:#eef2f0; overflow:hidden; margin-top:4px; }
   .bar i { display:block; height:100%; background:var(--accent); }
   .num { font-variant-numeric:tabular-nums; }
+  /* 嵌入模式(?embed=1 或 /embed/review):给仝牧平台用 iframe 引用时用。
+     去掉大标题与页边距、压缩表头,让面板贴合 iframe 尺寸,而不是自带一整套页面外框。 */
+  body.embed { background:#fff; }
+  body.embed header { padding:6px 10px; gap:10px; }
+  body.embed header h1 { display:none; }
+  body.embed header select { max-width:240px; font-size:12px; }
+  body.embed header .meta { font-size:11px; }
+  body.embed .wrap { margin:0; padding:6px 8px 10px; gap:10px; max-width:none; }
+  body.embed nav { position:static; flex:0 0 132px; }
+  body.embed .card { padding:9px 12px; margin-bottom:9px; }
 </style>
 </head>
 <body>
@@ -174,6 +193,18 @@ const TABS = [
   ["audit",      "审计",     d => (d.audit || []).length],
 ];
 let DATA = null, TAB = "overview";
+
+// ---- 嵌入 / 深链参数 ----
+//   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
+//   /embed/review  等价于 ?embed=1
+//   ?run=<run_id>  指定默认记录(不填则落在第一条 mavis 记录)
+//   ?tab=<id>      指定默认页签(overview/turns/retrievals/events/states/reflection/router/injector/audit)
+const Q = new URLSearchParams(location.search);
+const EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") === 0;
+if (EMBED) { document.body.classList.add("embed"); }
+const WANT_RUN = Q.get("run") || "";
+const WANT_TAB = Q.get("tab") || "";
+if (WANT_TAB && TABS.some(t => t[0] === WANT_TAB)) { TAB = WANT_TAB; }
 
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -391,7 +422,9 @@ async function boot() {
   sel.onchange = () => pick(sel.value);
   // 默认落在成品三线(mavis)上,不要落在旧引擎对照记录上——
   // 否则一打开看到的就是"注入器:无注入器记录"那条,最容易让人以为面板坏了。
-  const first = d.runs.find(x => x.engine === "mavis") || d.runs[0];
+  // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
+  const first = (WANT_RUN && d.runs.find(x => x.run_id === WANT_RUN))
+             || d.runs.find(x => x.engine === "mavis") || d.runs[0];
   if (first) { await pick(first.run_id); }
   else { document.getElementById("main").innerHTML = '<div class="card"><div class="empty">记录根下没有 run.json</div></div>'; }
 }
@@ -401,9 +434,78 @@ boot();
 </html>"""
 
 
+# 两窗一页:左=实时小镇(Phaser),右=成品记录审阅。整体再被 iframe 引用也成立,
+# 所以仝牧平台插**一个** iframe 就能同时拿到"过程"与"结果"两个窗口。
+_DEFAULT_LIVE_TOWN = (os.environ.get("CASE01_LIVE_TOWN_URL")
+                      or "http://127.0.0.1:5010/embed/scene")
+
+_COMBINED = r"""<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>case01 · 实时小镇 + 成品记录</title>
+<style>
+  html, body { height:100%; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#0f1a16; }
+  .bar { height:32px; display:flex; align-items:center; gap:10px; padding:0 12px;
+         background:#1d3a2f; color:#cfe3d8; font-size:12px; }
+  .bar b { color:#fff; }
+  .bar .sp { margin-left:auto; }
+  .bar a { color:#cfe3d8; }
+  .split { display:flex; height:calc(100% - 32px); gap:6px; padding:6px; box-sizing:border-box; }
+  .pane { flex:1 1 50%; min-width:0; background:#fff; border:1px solid #2a4a3c;
+          border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+  .pane h2 { margin:0; padding:6px 10px; font-size:12px; font-weight:500; color:#456;
+             background:#f4f6f5; border-bottom:1px solid #dde4e0; }
+  .pane iframe { flex:1; width:100%; border:0; }
+</style>
+</head>
+<body>
+<div class="bar"><b>GTC Case 01</b> · 实时小镇（Phaser）＋ 成品记录审阅
+  <span class="sp">小镇源 <code>__LIVE__</code>｜同一时刻只应有一个实时面在跑｜
+  <a href="/embed/review" target="_blank" rel="noreferrer">单独打开结果窗 ↗</a></span></div>
+<div class="split">
+  <div class="pane">
+    <h2>① 实时小镇（Phaser，mavis 推演）</h2>
+    <iframe src="__LIVE__" title="实时小镇"></iframe>
+  </div>
+  <div class="pane">
+    <h2>② 成品记录（Reflection / Router / 注入器）</h2>
+    <iframe src="/embed/review" title="成品记录审阅"></iframe>
+  </div>
+</div>
+</body>
+</html>"""
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     return HTMLResponse(_PAGE)
+
+
+@app.get("/embed/review", response_class=HTMLResponse)
+def embed_review():
+    """嵌入面:与 / 同一页,靠前端识别 /embed/ 路径切到压缩版式。
+
+    单独做这一个路由(而不是把面板塞进 5002)是为了不污染冻结的对接契约;
+    本服务只读、不跑模拟,所以随时可以开着。
+    """
+    return HTMLResponse(_PAGE)
+
+
+@app.get("/combined", response_class=HTMLResponse)
+def combined(live: str = ""):
+    """实时小镇 + 成品记录,两窗一页;整体可再被 iframe 引用(给仝牧平台用)。
+
+    ?live= 指定小镇地址(默认 case01 的实时面 5010/embed/scene;
+    要看 case00 那个小镇就传 http://127.0.0.1:5001/embed/scene)。
+    本页只负责把给定地址嵌进来,**不负责起服务**——"任何时刻只允许一个实时面在跑"
+    这条规则由起服务的人守(见 docs/case00_case01_并列说明.md 第三节)。
+    """
+    url = (live or "").strip() or _DEFAULT_LIVE_TOWN
+    if not (url.startswith("http://") or url.startswith("https://")):
+        url = _DEFAULT_LIVE_TOWN          # 只接受 http(s),别的一律回落到默认
+    return HTMLResponse(_COMBINED.replace("__LIVE__", url))
 
 
 def main():

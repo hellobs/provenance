@@ -122,6 +122,34 @@ def test_legacy_run_lacks_injector_and_summary():
         assert absent not in d, absent
 
 
+def test_embed_surface_is_served_and_iframe_allowed():
+    """嵌入面:仝牧平台用 iframe 引它。同一页,靠前端识别 /embed/ 路径切压缩版式。"""
+    c = _client()
+    for path in ("/embed/review", "/?embed=1", "/?run=demo-C-mavis&tab=router"):
+        r = c.get(path)
+        assert r.status_code == 200, path
+        assert "/api/review/runs" in r.text, path
+    # 默认不该带 X-Frame-Options / CSP——带上了 iframe 就白做
+    headers = {k.lower() for k in c.get("/embed/review").headers}
+    assert "x-frame-options" not in headers
+    assert "content-security-policy" not in headers
+
+
+def test_combined_page_hosts_both_windows():
+    """两窗一页:实时小镇 iframe + 结果 iframe,整页本身也可再被 iframe。"""
+    c = _client()
+    body = c.get("/combined").text
+    assert "/embed/review" in body, "结果窗应 iframe 本服务的嵌入面"
+    assert "http://127.0.0.1:5010/embed/scene" in body, "默认小镇源 = case01 实时面"
+    # ?live= 可换成别的小镇(case00 的 5001 也是 Phaser 小镇)
+    r2 = c.get("/combined", params={"live": "http://127.0.0.1:5001/embed/scene"})
+    assert "http://127.0.0.1:5001/embed/scene" in r2.text
+    # 非 http(s) 一律回落默认:不把任意串塞进 iframe
+    r3 = c.get("/combined", params={"live": "javascript:alert(1)"})
+    assert "javascript:" not in r3.text
+    assert "http://127.0.0.1:5010/embed/scene" in r3.text
+
+
 def test_index_page_is_self_contained():
     html = _client().get("/").text
     assert "<script>" in html
