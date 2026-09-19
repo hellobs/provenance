@@ -14,9 +14,11 @@ from typing import Optional
 
 # ---- 状态感知冲突规则:每条 = (正则, 冲突标签, 触发前提) ----
 # 前提: "not_holding" = 程序未持仓时触发;"holding" = 已持仓时触发;"always"
-BUY_ACT = r"买入|加仓|补仓|买进|建仓|建了?仓位|试探(性)?仓|入了?仓|持仓|买入了"
+BUY_ACT = r"买入|加仓|补仓|买进|建仓|建了?仓位|试探(性)?仓|入了?仓|持仓|买入了|买了"
 SELL_ACT = r"卖出|卖掉|出售|清仓|全部出|平仓|止盈出|割肉出|抛售"
 MONEY_SPENT = r"(花|投入|投了|用了|拿出|买了?)[^。]{0,12}?([3-9]\d|1[0-9]\d)万"
+
+_NEG_BEFORE = ("没有", "未", "不", "别", "无", "并非", "不是", "尚未", "还没")
 
 CONFLICT_RULES = [
     # 未持仓却声称已买/建仓/花大钱买
@@ -61,6 +63,7 @@ class Ethan:
 
     # ------------------------------------------------------------------
     def _check_conflict(self, text: str, holding: bool, exited: bool) -> Optional[str]:
+        import re as _re
         for pat, tag, cond in CONFLICT_RULES:
             if cond == "not_holding" and holding:
                 continue
@@ -70,7 +73,11 @@ class Ethan:
                 continue
             if cond == "not_exited" and exited:
                 continue
-            if re.search(pat, text):
+            for m in _re.finditer(pat, text):
+                # 否定前置检查:买入/卖出动词前面 6 字内有否定词 → 不是在说这个动作
+                prefix = text[max(0, m.start() - 6):m.start()]
+                if any(n in prefix for n in _NEG_BEFORE):
+                    break  # 这一处被否定,但继续检查其他匹配
                 return tag
         return None
 
