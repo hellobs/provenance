@@ -61,12 +61,10 @@ def test_case00_village_declarative_load():
     assert set(gov["Mr. Zhou"].keys()) == {
         "Maximize Returns", "Speculative Freedom", "Trust in Advisors", "Risk Tolerance"}
     assert gov["Mr. Zhou"]["Trust in Advisors"] == 0.4482758620689656
-    # custom 不再背负价值权重;仍只留资产路径与沙盒参数
-    assert "value_tendency" not in s.custom
-    assert set(s.custom.keys()) == {"scenario_assets", "sandbox_params"}
-
-    # 资产路径忠实指向冻结留档(引擎不消费,仅声明)
-    assert s.custom["scenario_assets"]["story"].endswith("story.json")
+    # 资产路径与沙盒参数也提升为 world 标准段(彻底废除 custom 逃生舱)
+    assert s.assets["story"].endswith("story.json")
+    assert s.assets["agents"].endswith("agents/")
+    assert bool(s.params)                      # 沙盒参数逐字透传
 
 
 def test_case00_value_tendency_is_engine_consumed():

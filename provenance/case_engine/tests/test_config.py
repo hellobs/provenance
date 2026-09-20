@@ -72,9 +72,10 @@ def test_sections_default_to_empty_dict():
     assert cfg.router == {}
 
 
-def test_custom_passthrough():
-    cfg = load(_proto(), custom={"x": 1})
-    assert cfg.custom == {"x": 1}
+def test_world_standard_sections_load():
+    cfg = load(_proto(), assets={"story": "x"}, params={"percept": {}})
+    assert cfg.assets == {"story": "x"}
+    assert cfg.params == {"percept": {}}
 
 
 def test_validate_ok():

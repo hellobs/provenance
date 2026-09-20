@@ -99,12 +99,12 @@ class ExperimentEval(EngineStrategy):
 
 
 class SandboxValue(EngineStrategy):
-    """生成式价值权重沙盒:消费 scenario.custom.sandbox_params;原语需桥 mavisframework。"""
+    """生成式价值权重沙盒:消费 scenario.world 的 params/assets/value_tendency;原语需桥 mavisframework。"""
     engine_id = "sandbox-value"
 
     def supports(self, scenario) -> bool:
-        custom = getattr(scenario, "custom", None) or {}
-        return bool(custom.get("sandbox_params"))
+        params = getattr(scenario, "params", None) or {}
+        return bool(params)
 
     def describe(self) -> Dict[str, str]:
         from case_engine.engines import ENGINES
@@ -115,9 +115,9 @@ class SandboxValue(EngineStrategy):
         """数据驱动装配预检线:核验 scenario 声明是否能指向 mavis 可装配的资产/参数。
 
         `run_type = "assembly-check"` —— 不跑沙盒(移动/感知/调度/价值演化需 mavis 实跑),
-        只做**确定性静态预检**:把 `custom.scenario_assets`(相对 provenance 根)逐条解析到
+        只做**确定性静态预检**:把 `world.assets`(相对 provenance 根)逐条解析到
         绝对路径,校验存在性 + JSON 可解析性;校验角色数、价值权重(governance/initial)
-        是否齐备;校验 `sandbox_params` 是否声明。绝不假装产出 checkpoints。
+        是否齐备;校验 `world.params` 是否声明。绝不假装产出 checkpoints。
         """
         import json
         import os
@@ -125,18 +125,15 @@ class SandboxValue(EngineStrategy):
         from case_engine.scenarios import default_cases_root
 
         base = base or os.path.dirname(default_cases_root())
-        custom = getattr(scenario, "custom", None) or {}
-        assets = custom.get("scenario_assets") or {}
-        params = custom.get("sandbox_params") or {}
-        # 价值权重走标准段 value_tendency(Config 已并入 world.value_tendency,
-        # 兼容回退旧 custom.value_tendency);取不到即空,由预检如实标注。
-        tendency = (getattr(scenario, "value_tendency", None)
-                    or custom.get("value_tendency") or {})
+        assets = getattr(scenario, "assets", None) or {}
+        params = getattr(scenario, "params", None) or {}
+        # 价值权重走标准段 world.value_tendency;取不到即空,由预检如实标注。
+        tendency = getattr(scenario, "value_tendency", None) or {}
 
         checks: Dict[str, Dict[str, Any]] = {}
-        # 1. 必填声明段
-        for key, present in (("sandbox_params", bool(params)),
-                             ("scenario_assets", bool(assets)),
+        # 1. 必填声明段(world 标准段命名:assets / params / value_tendency)
+        for key, present in (("params", bool(params)),
+                             ("assets", bool(assets)),
                              ("value_tendency", bool(tendency))):
             checks[key] = {"ok": present,
                            "detail": "已声明" if present else "缺失"}

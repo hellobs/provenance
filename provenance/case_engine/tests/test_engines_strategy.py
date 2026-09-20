@@ -22,7 +22,7 @@ def test_supports_is_orthogonal_pairs():
     c01 = _load("case01_stock")
     assert ExperimentEval().supports(c01) is True
     assert ExperimentEval().supports(c00) is False      # 无 branch 段
-    assert SandboxValue().supports(c00) is True         # 有 custom.sandbox_params
+    assert SandboxValue().supports(c00) is True         # 有 world.params
     assert SandboxValue().supports(c01) is False        # 无沙盒参数
 
 

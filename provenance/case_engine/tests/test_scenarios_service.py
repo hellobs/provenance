@@ -133,8 +133,8 @@ def test_case00_sandbox_value_assembly_check():
 
     assert res["engine"] == "sandbox-value"
     assert res["run_type"] == "assembly-check"
-    # 关键段齐备
-    for sec in ("sandbox_params", "scenario_assets", "value_tendency"):
+    # 关键段齐备(world 标准段命名)
+    for sec in ("params", "assets", "value_tendency"):
         assert res["checks"][sec]["ok"], res["checks"][sec]
     # 资产:case00/scenario 冻结留档应全部存在且 JSON 可解析;agents 是目录
     assets = res["checks"]["assets"]["detail"]
@@ -154,8 +154,8 @@ def test_case00_sandbox_assembly_reports_missing_asset(tmp_path):
     # 迷你场景:声明指向的 story 在 base(tmp)下必然不存在;无角色
     s = _MiniScenario(
         case_id="mini_sandbox",
-        custom={"scenario_assets": {"story": "case00/scenario/story.json"},
-                "sandbox_params": {"percept": {"mode": "box"}}},
+        assets={"story": "case00/scenario/story.json"},
+        params={"percept": {"mode": "box"}},
     )
     res = SandboxValue().run(s, base=str(tmp_path))
     assert res["run_type"] == "assembly-check"
@@ -165,11 +165,12 @@ def test_case00_sandbox_assembly_reports_missing_asset(tmp_path):
 
 
 class _MiniScenario:
-    """最小场景鸭子类型:只带 SandboxValue 预检消费的 custom/roles/case_id。"""
+    """最小场景鸭子类型:只带 SandboxValue 预检消费的 world 标准段/roles/case_id。"""
 
-    def __init__(self, case_id, custom, roles=None):
+    def __init__(self, case_id, assets, params, roles=None):
         self.case_id = case_id
-        self.custom = custom
+        self.assets = assets
+        self.params = params
         self.roles = roles or [type("R", (), {"id": "a"})(), type("R", (), {"id": "b"})()]
 
     @property

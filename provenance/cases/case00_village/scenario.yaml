@@ -6,8 +6,8 @@
 #   case00 = provenance 原生的 6 角色投资咨询**沙盒**仿真(移动/感知/调度/
 #   关系/价值倾向演化)。case_engine 暂不建模这些沙盒原语,本文件只做**声明**:
 #   - 引擎侧:roles/meta 可加载、可校验(满足 case_engine 的 Validate 契约);
-#   - 沙盒侧:价值权重(value_tendency)、剧情/关系/地图、沙盒参数经 `custom`
-#     原样透传,**语义仍由旧沙盒引擎持有**(live_fastapi.py + live/,端口 5001)。
+#   - 沙盒侧:价值权重(value_tendency)、资产路径(assets)、沙盒参数(params)统一落在
+#     `world` 标准段(不设 custom 逃生舱);**语义仍由旧沙盒引擎持有**
 #   本文件不改动、不复制运行语义;资产路径指向冻结留档 case00/scenario/。
 # 价值数据逐字取自 governance.json 与各 agent.json(忠实原文,不做润色/改动)。
 # ============================================================
@@ -119,11 +119,9 @@ world:
         Trust in Advisors: 0.1
         Risk Tolerance: 0.1
 
-# ---- 场景语义(沙盒资产与参数;引擎经 custom 透传,不建模) ----
-custom:
-  # 沙盒/剧情/地图 资产路径(相对 provenance 根;指向冻结留档 case00/scenario/,
+# 沙盒/剧情/地图 资产路径(相对 provenance 根;指向冻结留档 case00/scenario/,
   # 不复制、不二义漂移)
-  scenario_assets:
+  assets:
     story: case00/scenario/story.json               # 38 个日内剧情事件(s-001..)@simulation=investment
     relationships: case00/scenario/relationships.json  # 12 条角色关系
     maze: case00/scenario/maze.json                 # 小镇地图
@@ -131,7 +129,7 @@ custom:
     governance: governance.json                     # 制度层价值权重(仓库根)
 
   # 沙盒运行参数(逐字取 case00/scenario/config.json)
-  sandbox_params:
+  params:
     percept: {mode: box, vision_r: 8, att_bandwidth: 8}
     schedule: {max_try: 2, diversity: 3}
     think: {llm_provider: ollama, interval: 1000, poignancy_max: 100000}

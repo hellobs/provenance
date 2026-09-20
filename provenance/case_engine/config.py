@@ -2,7 +2,8 @@
 """ScenarioConfig —— scenario.yaml 的加载、校验与类型安全访问(引擎通用)。
 
 设计原则:
-- 只定义引擎真正消费的字段;case 专属字段经 `custom` 原样透传,不在此建模;
+- 只定义引擎真正消费的字段;case 专属字段统一落在 `world` 标准段(assets/params/
+  value_tendency),不设 custom 逃生舱;
 - 「默认值兜底」:能安全缺省的字段给出中性默认(case 不填就不开)。
 - 从文件加载,不做整目录扫描(场景目录遍历归 cli/serve,不在本文件)。
 """
@@ -43,10 +44,13 @@ class Config:
     branch: dict = field(default_factory=dict)
     # timeline:声明式时间线(A/B 线价格事件),由 branch 路由选线;经 nodes 装配。
     timeline: dict = field(default_factory=dict)
-    # value_tendency:案例的价值权重(如 case00 的 governance + initial_tendency)。
-    # 标准段在 world.value_tendency;兼容回退旧 custom.value_tendency(逐字透传)。
+    # value_tendency:案例的价值权重(如 case00 的 governance + initial_tendency),
+    # 标准段 world.value_tendency,sandbox-value 真读取校验。
     value_tendency: dict = field(default_factory=dict)
-    custom: dict = field(default_factory=dict)
+    # assets / params:沙盒资产的资产路径与沙盒参数(原 case00 的 scenario_assets /
+    # sandbox_params,从 custom 提升为 world 标准段;彻底废除 custom 逃生舱)。
+    assets: dict = field(default_factory=dict)
+    params: dict = field(default_factory=dict)
 
     @property
     def case_id(self) -> str:
@@ -90,21 +94,21 @@ def _coerce(proto) -> Config:
     world = proto.get("world") or {}
     state_schema = dict(world.get("state_schema") or {})
     value_tendency = dict(world.get("value_tendency") or {})
-    if not value_tendency:
-        # 兼容旧布局:case00 的价值权重一度只放在 custom.value_tendency。
-        value_tendency = dict((proto.get("custom") or {}).get("value_tendency") or {})
+    assets = dict(world.get("assets") or {})
+    params = dict(world.get("params") or {})
     return Config(
         meta=meta,
         roles=roles,
         state_schema=state_schema,
         value_tendency=value_tendency,
+        assets=assets,
+        params=params,
         reflection=dict(proto.get("reflection") or {}),
         router=dict(proto.get("router") or {}),
         consistency=dict(proto.get("consistency") or {}),
         retrieval=dict(proto.get("retrieval") or {}),
         branch=dict(proto.get("branch") or {}),
         timeline=dict(proto.get("timeline") or {}),
-        custom=dict(proto.get("custom") or {}),
     )
 
 
