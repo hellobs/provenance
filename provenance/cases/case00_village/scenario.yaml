@@ -50,10 +50,9 @@ roles:
     type: user                      # 资深散户(高频求教者)
     llm: local
 
-# ---- 场景语义(引擎透传,custom 不建模;引擎不消费这里) ----
-custom:
-  # 注:case00 的状态不是 case01 那种单个主角 state_schema,而是每角色的
-  # "价值权重向量"。故不占用 world.state_schema,全部放这里原样透传。
+# ---- 价值权重:引擎标准段(note case00 的状态是每角色的权重向量,非 case01 的
+#      单个主角 state_schema;经 world.value_tendency 供 sandbox-value 预检消费) ----
+world:
   value_tendency:
     # 制度层价值权重(逐字取 governance.json;6 角色 × 3~4 维)
     governance:
@@ -120,6 +119,8 @@ custom:
         Trust in Advisors: 0.1
         Risk Tolerance: 0.1
 
+# ---- 场景语义(沙盒资产与参数;引擎经 custom 透传,不建模) ----
+custom:
   # 沙盒/剧情/地图 资产路径(相对 provenance 根;指向冻结留档 case00/scenario/,
   # 不复制、不二义漂移)
   scenario_assets:

@@ -128,7 +128,10 @@ class SandboxValue(EngineStrategy):
         custom = getattr(scenario, "custom", None) or {}
         assets = custom.get("scenario_assets") or {}
         params = custom.get("sandbox_params") or {}
-        tendency = custom.get("value_tendency") or {}
+        # 价值权重走标准段 value_tendency(Config 已并入 world.value_tendency,
+        # 兼容回退旧 custom.value_tendency);取不到即空,由预检如实标注。
+        tendency = (getattr(scenario, "value_tendency", None)
+                    or custom.get("value_tendency") or {})
 
         checks: Dict[str, Dict[str, Any]] = {}
         # 1. 必填声明段

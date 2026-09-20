@@ -38,12 +38,13 @@ def test_case01_conflict_rules_present():
 
 
 def test_case00_village_declarative_load():
-    """case00 声明化:引擎仅加载/校验,沙盒语义经 custom 原样透传。
+    """case00 声明化 + 价值权重提为标准段:引擎真读取 value_tendency,沙盒资产/参数经 custom 透传。
 
     case00 是 6 角色沙盒仿真,其状态是"每角色价值权重向量(value_tendency)",
-    不是 case01 那种单个主角 state_schema。断言语义:roles 可过 Validate,6 角色齐;
-    价值权重(制度层+个人起点)忠实透传在 custom,未被引擎改写/丢弃。
-    (用户拍板:仅声明化不重写语义;沙盒运行语义仍由 live/ 旧引擎持有。)
+    不是 case01 那种单个主角 state_schema —— 但 value_tendency 已被提升为引擎
+    标准段 world.value_tendency(与 case01 的标准段入口一致),供 sandbox-value
+    预检消费;scenario_assets / sandbox_params 仍经 custom 透传(沙盒运行语义
+    由 live/ 旧引擎持有,语义不被引擎改写/丢弃)。
     """
     s = _load("case00_village")
     assert s.case_id == "case00_village"
@@ -52,16 +53,39 @@ def test_case00_village_declarative_load():
     assert ai.type == "ai_tool"
     assert len(others) == 5 and all(r.type == "user" for r in others)
 
-    it = s.custom["value_tendency"]["initial_tendency"]
-    gov = s.custom["value_tendency"]["governance"]
+    # 价值权重走引擎标准段(不再是 custom 逃生舱)
+    it = s.value_tendency["initial_tendency"]
+    gov = s.value_tendency["governance"]
     assert len(it) == 6 and len(gov) == 6
     # 每个角色 3~4 维价值权重,权重忠实保留(未被引擎改写)
     assert set(gov["Mr. Zhou"].keys()) == {
         "Maximize Returns", "Speculative Freedom", "Trust in Advisors", "Risk Tolerance"}
     assert gov["Mr. Zhou"]["Trust in Advisors"] == 0.4482758620689656
+    # custom 不再背负价值权重;仍只留资产路径与沙盒参数
+    assert "value_tendency" not in s.custom
+    assert set(s.custom.keys()) == {"scenario_assets", "sandbox_params"}
 
     # 资产路径忠实指向冻结留档(引擎不消费,仅声明)
     assert s.custom["scenario_assets"]["story"].endswith("story.json")
+
+
+def test_case00_value_tendency_is_engine_consumed():
+    """value_tendency 提为标准段后,被 sandbox-value 真读取并校验(非纯 custom 透传)。
+
+    验证:预检的 value_tendency「已声明」判定基于标准段(而非旧 custom 位置转化),
+    且 6 角色权重匹配(governance/initial 两本账都能按角色名解析)。
+    """
+    from case_engine.engines import build_for
+    s = _load("case00_village")
+    res = build_for(s).run(s)   # base 走引擎默认(provenance 根),相对资产路径可解析
+    checks = res["checks"]
+    # 必填段判定用标准段 value_tendency(存在)
+    assert checks["value_tendency"]["ok"] is True
+    # 6 角色价值权重都匹配上(governance/initial)
+    role_checks = checks["roles"]["detail"]
+    assert len(role_checks) == 6
+    assert all(v["ok"] for v in role_checks.values())
+    assert res["all_ok"] is True
 
 
 def test_scenario_declares_registered_engine():

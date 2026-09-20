@@ -43,6 +43,9 @@ class Config:
     branch: dict = field(default_factory=dict)
     # timeline:声明式时间线(A/B 线价格事件),由 branch 路由选线;经 nodes 装配。
     timeline: dict = field(default_factory=dict)
+    # value_tendency:案例的价值权重(如 case00 的 governance + initial_tendency)。
+    # 标准段在 world.value_tendency;兼容回退旧 custom.value_tendency(逐字透传)。
+    value_tendency: dict = field(default_factory=dict)
     custom: dict = field(default_factory=dict)
 
     @property
@@ -86,10 +89,15 @@ def _coerce(proto) -> Config:
         ))
     world = proto.get("world") or {}
     state_schema = dict(world.get("state_schema") or {})
+    value_tendency = dict(world.get("value_tendency") or {})
+    if not value_tendency:
+        # 兼容旧布局:case00 的价值权重一度只放在 custom.value_tendency。
+        value_tendency = dict((proto.get("custom") or {}).get("value_tendency") or {})
     return Config(
         meta=meta,
         roles=roles,
         state_schema=state_schema,
+        value_tendency=value_tendency,
         reflection=dict(proto.get("reflection") or {}),
         router=dict(proto.get("router") or {}),
         consistency=dict(proto.get("consistency") or {}),
@@ -163,6 +171,19 @@ def consistency_signals(cfg: Config) -> Dict[str, List[str]]:
         "cond_words": list(c.get("cond_words") or []),
         "negators": list(c.get("negators") or []),
         "neg_phrases": list(c.get("neg_phrases") or []),
+    }
+
+
+def value_tendency_args(cfg: Config) -> Dict[str, Any]:
+    """从标准段取价值权重两本账(governance + initial_tendency),供 sandbox 预检消费。
+
+    语义原样透传(不改写/不归一,权重忠实保留);缺任一账则回空,由引擎如实标注。
+    """
+    vt = cfg.value_tendency or {}
+    return {
+        "governance": dict(vt.get("governance") or {}),
+        "initial_tendency": dict(vt.get("initial_tendency") or {}),
+        "present": bool(vt),
     }
 
 
