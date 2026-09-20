@@ -5,23 +5,34 @@ import types
 
 import pytest
 
-# 伪造 mavisframework 包,使 conditions 内的 import 可独立测试
-mavis = types.ModuleType("mavisframework")
-runtime = types.ModuleType("mavisframework.runtime")
-sim = types.ModuleType("mavisframework.runtime.simulator")
-mavis.runtime = runtime
-runtime.simulator = sim
-sys.modules["mavisframework"] = mavis
-sys.modules["mavisframework.runtime"] = runtime
-sys.modules["mavisframework.runtime.simulator"] = sim
+# 伪造 mavisframework 包,使 conditions 内的 import 可独立测试。
+#
+# 2026-09-20 修:pytest 会把所有测试模块 import 进**同一个进程**,原来在模块顶层写
+# `sys.modules["mavisframework"] = 假包` 会**污染其它套件** —— 假包没有 __path__,
+# 于是同进程里 case01 的测试再想 `import mavisframework.core` 就报
+# "No module named 'mavisframework.core'; 'mavisframework' is not a package"
+# (实测:两套一起跑 3 失败 7 错误,分开各跑全绿)。
+# 现在改成 fixture 内 monkeypatch,测试结束自动还原。
+@pytest.fixture(autouse=True)
+def _fake_mavisframework(monkeypatch):
+    mavis = types.ModuleType("mavisframework")
+    runtime = types.ModuleType("mavisframework.runtime")
+    sim = types.ModuleType("mavisframework.runtime.simulator")
+    mavis.runtime = runtime
+    runtime.simulator = sim
+    monkeypatch.setitem(sys.modules, "mavisframework", mavis)
+    monkeypatch.setitem(sys.modules, "mavisframework.runtime", runtime)
+    monkeypatch.setitem(sys.modules, "mavisframework.runtime.simulator", sim)
+    return sim
 
 
 @pytest.fixture(autouse=True)
-def _isolate_import():
+def _isolate_import(_fake_mavisframework):
     from case_engine.conditions import install_node_condition
     _install_registry.setdefault("fn", install_node_condition)
+    _install_registry.setdefault("sim", _fake_mavisframework)
     yield
-    sim.register_condition = None  # 复位,确保每测试独立
+    _fake_mavisframework.register_condition = None  # 复位,确保每测试独立
 
 
 _install_registry = {}
@@ -41,9 +52,9 @@ def _make_fake_simulator():
 
 
 @pytest.fixture
-def fake_sim(monkeypatch):
+def fake_sim(_fake_mavisframework):
     _Sim = _make_fake_simulator()
-    monkeypatch.setattr(sim, "Simulator", _Sim, raising=False)
+    _fake_mavisframework.Simulator = _Sim
     return _Sim
 
 
