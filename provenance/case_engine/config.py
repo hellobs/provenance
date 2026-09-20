@@ -133,3 +133,19 @@ def validated(cfg: Config) -> Config:
     if errs:
         raise ValueError("scenario 配置不合法: " + "; ".join(errs))
     return cfg
+
+
+def consistency_signals(cfg: Config) -> Dict[str, List[str]]:
+    """把 scenario 的 consistency 段转成 case_engine.consistency 需要的 signals 结构。
+
+    scenario.yaml 里用 buy_words/cond_words/negators/neg_phrases(可读、业务词)
+    转成引擎的 {buy_words, cond_words, negators, neg_phrases}。缺省为空 → 引擎全 unknown,
+    与 defaultValue 兜底一致。
+    """
+    c = cfg.consistency
+    return {
+        "buy_words": list(c.get("buy_words") or []),
+        "cond_words": list(c.get("cond_words") or []),
+        "negators": list(c.get("negators") or []),
+        "neg_phrases": list(c.get("neg_phrases") or []),
+    }
