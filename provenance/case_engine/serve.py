@@ -21,13 +21,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from case_engine.config import load_yaml
 from case_engine.engines import describe
-from case_engine.scenarios import by_id, discover
+from case_engine.scenarios import by_id, default_cases_root, discover
 
-# cases 根目录:case_engine/serve.py 的上级的上级 = provenance/provenance 下的 cases
-CASES_ROOT = os.environ.get(
-    "CASE_ENGINE_CASES_ROOT",
-    os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cases")),
-)
+# cases 根目录:统一从 scenarios.default_cases_root() 定位(环境变量可覆盖)
+CASES_ROOT = default_cases_root()
 
 # case_id 只允许字母数字、下划线、短横线(与 config._SAFE_CASE_ID 一致),杜绝路径穿越。
 _SAFE_CASE_ID = re.compile(r"^[A-Za-z0-9_\-]+$")

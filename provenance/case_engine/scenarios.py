@@ -17,6 +17,15 @@ from case_engine.engines import resolve
 SCENARIO_FILENAME = "scenario.yaml"
 
 
+def default_cases_root() -> str:
+    """定位 cases 根目录:case_engine/ 上一级(provenance/provenance)下的 cases;环境变量可覆盖。
+
+    供 cli/serve 复用的唯一取根入口,避免各处重复定位漂移。
+    """
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.environ.get("CASE_ENGINE_CASES_ROOT", os.path.join(base, "cases"))
+
+
 @dataclass
 class ScenarioInfo:
     case_id: str
