@@ -148,3 +148,57 @@ def test_config_drives_branch_router():
     assert router.classify("这是个复杂的问题") == "C"
     # 空 → default(C)
     assert router.classify("") == "C"
+
+
+def test_end_to_end_scenario_drives_engine():
+    """端到端:一份 scenario.yaml 串起引擎全链路(分支→世界→反思→一致性)。
+
+    用 case01_stock 的配置 + 假 LLM,证明「场景数据驱动引擎」是一个整体:
+    从同一份 config 取分支规则、构造 EntityState、跑反思、做一致性判定。
+    这是 engine 对 case01 的接管证明(case00 冻结,明确排除在重构外)。"""
+    from case_engine.branch import RuleBranchRouter
+    from case_engine.config import branch_args, consistency_signals, reflection_args
+    from case_engine.consistency import quick_scan
+    from case_engine.reflection import run_reflection
+    from case_engine.world import EntityState
+
+    s = _load("case01_stock")
+
+    # 1) 世界:state_schema 动态构造状态(无硬编码字段)
+    st = EntityState(s.state_schema)
+    assert st.get("cash_rmb") == 200000
+    assert st.get("hcm_shares") is False
+
+    # 2) 分支:由 config 规则路由
+    bargs = branch_args(s)
+    router = RuleBranchRouter(default=bargs["default_branch"],
+                              rules=bargs["rules"],
+                              fallback_map=bargs["fallback_map"])
+    rec = {
+        "branch": "C",
+        "start_date": "2026-08-27",
+        "turns": [
+            {"speaker": "ethan", "date": "2026-08-27",
+             "text": "Is this trustworthy? Should I buy?"},
+            {"speaker": "ai", "date": "2026-08-27",
+             "text": "I recommend taking a small partial position, only after official confirmation."},
+        ],
+        "final_feedback": {"date": "2026-09-15", "ethan": "我没有买入。", "ai": "明白了。"},
+    }
+    # C 线:含 conditional("轻仓"/"分批"/"等待确认") → C
+    assert router.classify("我建议先轻仓分批等官方确认后再介入") == "C"
+
+    # 3) 反思:由 config 驱动生成
+    llm = _FakeLLM()
+    rargs = reflection_args(s)
+    ref = run_reflection(llm, rec, **rargs)
+    assert ref["text"]
+
+    # 4) 一致性:由 config 信号词判定 C 线自洽。
+    # 注意:consistency 信号词表是英文(忠实取自 case01/consistency.py 原文),
+    # 零 LLM 快筛只认英文词;真实中文对话会判 unknown 再走 LLM judge。
+    # 这里用英文条件化表述命中 cond 词表(partial position / official confirmation),
+    # 无买入词 → cond>0 & pos==0 → C 线 consistent,证明配置驱动一致性判定。
+    signals = consistency_signals(s)
+    verdict, _ = quick_scan(rec, signals)
+    assert verdict == "consistent"

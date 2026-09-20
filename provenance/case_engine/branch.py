@@ -50,7 +50,7 @@ class RuleBranchRouter:
 
     两种接口,语义分离:
     - **旧命名列表**(no_action/refuse/conditional/anti_allin):向后兼容 —— 四类词
-      任一命中都归到 `default`(原 case01 语义:vocab 命中即判为 B/C 保守默认)。
+      任一命中都归到 `default`(原实现语义:vocab 命中即判为保守默认分支)。
     - **rules 映射**(新接口,scenario 注入):`{branch_id: [关键词...]}` 的**有序**规则表,
       classify 按表顺序找首个命中分支,都不中 → default。用于精确路由到多个分支。
     二者互斥:传入 rules 时用规则表;否则用旧四参。

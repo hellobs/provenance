@@ -193,7 +193,7 @@ def branch_args(cfg: Config) -> Dict[str, Any]:
     refuse = list(b.get("refuse") or [])
     conditional = list(b.get("conditional") or [])
     anti_allin = list(b.get("anti_allin") or [])
-    # 原 case01 语义:NO_BUY/REFUSE→B;CONDITIONAL/ANTI_ALLIN→C
+    # 原实现语义:no_buy/refuse → B;conditional/anti_allin → C
     if no_buy or refuse:
         rules["B"] = no_buy + refuse
     if conditional or anti_allin:
