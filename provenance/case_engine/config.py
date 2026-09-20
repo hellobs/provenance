@@ -41,6 +41,8 @@ class Config:
     consistency: dict = field(default_factory=dict)
     retrieval: dict = field(default_factory=dict)
     branch: dict = field(default_factory=dict)
+    # timeline:声明式时间线(A/B 线价格事件),由 branch 路由选线;经 nodes 装配。
+    timeline: dict = field(default_factory=dict)
     custom: dict = field(default_factory=dict)
 
     @property
@@ -93,6 +95,7 @@ def _coerce(proto) -> Config:
         consistency=dict(proto.get("consistency") or {}),
         retrieval=dict(proto.get("retrieval") or {}),
         branch=dict(proto.get("branch") or {}),
+        timeline=dict(proto.get("timeline") or {}),
         custom=dict(proto.get("custom") or {}),
     )
 
@@ -214,3 +217,57 @@ def branch_args(cfg: Config) -> Dict[str, Any]:
         "judge_prompt": str(b.get("judge_prompt") or ""),
         "fallback_map": dict(b.get("fallback_map") or {}),
     }
+
+
+def select_timeline(cfg: Config, branch: str):
+    """分支 → 选一条时间线(声明式)。返回 (line_id, date->[events]) 或 None。
+
+    优先级:
+    1. timeline.branch_map 的 {branch: line_id};
+    2. branch fallback_map 里携带的 timeline 分派(如 {A:{timeline:"A"}});
+    3. timeline.lines 仅一条 → 直接用它。
+    找不到或未声明 timeline → None(该场景无时间线,保持旧最小行为)。
+    """
+    t = cfg.timeline
+    lines = dict(t.get("lines") or {})
+    if not lines:
+        return None
+    # branch → line_id
+    line_id = (t.get("branch_map") or {}).get(branch, "")
+    if not line_id:
+        b = cfg.branch.get("fallback_map") or {}
+        meta = b.get(branch) or {}
+        line_id = str(meta.get("timeline", ""))
+    if not line_id:
+        line_id = next(iter(lines), "")
+    events = lines.get(line_id)
+    if events is None:
+        return None
+    tl = {str(d): [dict(e) for e in (evs or [])] for d, evs in events.items()}
+    header = {
+        "line_id": line_id,
+        "t0": [dict(e) for e in (t.get("t0") or [])],
+        "interactions": dict(t.get("interactions") or {}),
+        "final_date": str((cfg.meta or {}).get("end_date") or ""),
+        "start_date": str((cfg.meta or {}).get("start_date") or ""),
+        "role_ids": [r.id for r in cfg.roles],
+    }
+    return (line_id, tl, header)
+
+
+def merge_t0(events_by_date: dict, t0_events, start_date: str = "") -> dict:
+    """把 T0(咨询当天,与分支无关)的证据放进 T0 咨询日,作为独立起始节点。
+
+    优先放 start_date(咨询日)当日;该日已有事件则在最前插入(T0 是当天先发生的事实)。
+    start_date 为空则并入最小日(兼容缺省)。
+    """
+    t0 = list(t0_events or [])
+    if not t0:
+        return events_by_date
+    out = dict(events_by_date)
+    if not out:
+        return out
+    day = start_date or min(out.keys())
+    evs = [dict(e) for e in t0] + [dict(e) for e in (out.get(day) or [])]
+    out[day] = evs
+    return out

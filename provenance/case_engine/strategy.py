@@ -83,6 +83,10 @@ class ExperimentEval(EngineStrategy):
             "state": st.to_dict(),
             "consistency": {"verdict": verdict, "reason": reason},
         }
+        # 时间线装配:分支 → 选一条声明式 timeline → 节点序列(确定性,不调 LLM)。
+        timeline = _assemble_timeline(scenario, branch, result)
+        if timeline:
+            result["timeline"] = timeline
         if out_dir:
             import json
             import os
@@ -205,3 +209,38 @@ BUILTIN_STRATEGIES = {
     "experiment-eval": lambda scenario: ExperimentEval(),
     "sandbox-value": lambda scenario: SandboxValue(),
 }
+
+
+def _assemble_timeline(scenario, branch: str, result: dict) -> List[dict]:
+    """分支 → 选声明式时间线 → 节点序列(确定性,不调 LLM)。
+
+    场景未声明 timeline 时返回空(保持旧最小行为)。互动的 focus 文案由场景
+    `timeline.interactions` 提供(引擎不内置业务词);T0 证据与分支无关,并入首日。
+    返回节点 dict 列表;任何异常回退为空,不让分支主环因时间线而崩。
+    """
+    try:
+        from case_engine.config import merge_t0, select_timeline
+        from case_engine.nodes import nodes_from_timeline
+
+        sel = select_timeline(scenario, branch)
+        if sel is None:
+            return []
+        line_id, tl, header = sel
+        merged = merge_t0(tl, header["t0"], header["start_date"])
+        interactions = header["interactions"] or {}
+        templates = {}
+        if isinstance(interactions, dict) and interactions.get("first"):
+            templates["first"] = dict(interactions["first"])
+            if interactions.get("final"):
+                templates["final"] = dict(interactions["final"])
+        nodes = nodes_from_timeline(
+            merged,
+            roles=header["role_ids"] or None,
+            key_nodes="first_last",
+            final_date=header["final_date"] or "",
+            append_final=True,
+            interaction_templates=templates or None,
+        )
+        return [n.to_dict() for n in nodes]
+    except Exception:  # noqa: BLE001 —— 时间线装配失败不该让整个 run 崩
+        return []

@@ -175,3 +175,94 @@ class _MiniScenario:
     @property
     def engine(self):
         return "sandbox-value"
+
+
+# ---------------------------------------------------------------------------
+# 时间线声明式化 + 装配
+# ---------------------------------------------------------------------------
+def _case01():
+    from case_engine.config import load_yaml
+    return load_yaml(os.path.join(CASES_ROOT, "case01_stock", "scenario.yaml"))
+
+
+def test_timeline_loaded_into_config():
+    """case01 的 timeline 段能声明式加载进 Config,不给其它段造成回归。"""
+    s = _case01()
+    assert s.timeline["branch_map"] == {"A": "A", "B": "B", "C": "A"}
+    assert len(s.timeline["t0"]) == 3
+    assert set(s.timeline["lines"].keys()) == {"A", "B"}
+    # 仍能构造状态(时间线不应干扰世界状态)
+    assert s.state_initial()["cash_rmb"] == 200000
+
+
+def test_select_timeline_by_branch():
+    """分支 → 正确选中 A/B 线(优先用 branch_map;兼容 fallback_map 携带的 timeline)。"""
+    from case_engine.config import select_timeline
+    s = _case01()
+    _, tl_a, _ = select_timeline(s, "A")
+    assert tl_a["2026-09-07"][0]["kind"] == "disclosure"   # A 线:落空
+    _, tl_b, _ = select_timeline(s, "B")
+    assert tl_b["2026-09-07"][0]["kind"] == "research"     # B 线:落地
+    # C 走 A 线(与 case01 BRANCH_TO_TIMELINE 一致)
+    lid_c, tl_c, _ = select_timeline(s, "C")
+    assert lid_c == "A"
+    assert tl_c["2026-09-07"][0]["kind"] == "disclosure"
+
+
+def test_run_assembles_timeline_nodes():
+    """ExperimentEval 真跑后产出按日期装配的节点序列,首末含对角交互 + 价格 world。
+
+    确定性、不调 LLM:节点来自声明式 timeline,而非模型。
+    """
+    from case_engine.engines import build_for
+    s = _case01()
+    res = build_for(s).run(s, input_text="我建议分阶段先小规模试点")  # → C → Timeline A
+    assert res["branch"] == "C"
+    nodes = res.get("timeline") or []
+    assert nodes, "应有时间线节点"
+    # 首节点是 T0 咨询日(meta.start_date),含 T0 三事实 → 价格 world 45.80
+    first = nodes[0]
+    assert first["date"] == "2026-08-27"
+    assert first["require_interaction"] is True
+    kinds0 = {e["event_type"] for e in first["events"]}
+    assert "disclosure" in kinds0 and "price" in kinds0
+    assert first["world"].get("price_usd") == 45.80
+    # 次日(08-28)进入所选线的当日收盘价
+    assert nodes[1]["date"] == "2026-08-28"
+    assert nodes[1]["world"].get("price_usd") == 49.20
+    # 首末节点各带一次对角交互(T0 咨询 / 最终反馈)
+    assert first["interactions"] and first["interactions"][0]["to"] == "investment_ai"
+    assert nodes[-1]["interactions"] and nodes[-1]["interactions"][0]["to"] == "investment_ai"
+    # 最终反馈落 meta.end_date
+    assert nodes[-1]["date"] == s.meta["end_date"]
+
+
+def test_timeline_no_drift_vs_case01_timelines():
+    """防漂移守卫:scenario.yaml 的 timeline 与 case01/world/timelines.py 逐字一致。
+
+    双份必须同步(案例当前仍保留 .py 实现在线);若任一侧改动,此测试标红提醒。
+    比较:branch_map、T0 三事件、A/B 两线逐日事件(kind/summary/source/price_usd)。
+    """
+    from case01.world.timelines import BRANCH_TO_TIMELINE, T0_EVENTS
+    from case01.world.timelines import build_timeline
+    s = _case01()
+    # branch_map ↔ BRANCH_TO_TIMELINE
+    assert {str(k): str(v) for k, v in BRANCH_TO_TIMELINE.items()} == s.timeline["branch_map"]
+    # t0 ↔ T0_EVENTS(仅比较语义字段)
+    assert _strip_timeline_events(s.timeline["t0"]) == _strip_timeline_events(T0_EVENTS)
+    # lines ↔ timeline_a()/timeline_b()
+    for branch, line_id in BRANCH_TO_TIMELINE.items():
+        py = _strip_timeline_events_by_date(build_timeline(branch))
+        yaml = _strip_timeline_events_by_date(s.timeline["lines"][line_id])
+        # py 含 t0 首日,yaml 的 t0 独立;比较时去掉 py 首日里的 t0 事件
+        py_root = {d: evs for d, evs in py.items() if d in yaml}
+        assert py_root == yaml, "timeline {} 声明与 .py 不一致".format(line_id)
+
+
+def _strip_timeline_events(events):
+    return [(e.get("kind"), e.get("summary"), e.get("source"), e.get("price_usd"))
+            for e in events]
+
+
+def _strip_timeline_events_by_date(lines):
+    return {d: _strip_timeline_events(evs) for d, evs in lines.items()}
