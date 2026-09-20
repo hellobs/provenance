@@ -116,3 +116,62 @@ def test_case02_generality_discovers_and_runs():
     assert res["consistency"]["verdict"] == "consistent"
     # 状态由 scenario.state_schema 动态构造,无硬编码字段
     assert res["state"] == {"approved": False, "budget": 100000, "staged": False}
+
+
+def test_case00_sandbox_value_assembly_check():
+    """sandbox-value 装配预检:case00 声明能指向 mavis 可装配的资产/参数。
+
+    不跑沙盒,只验证声明式配置能**静态指向**冻结留档 assets(确定性预检线)。
+    """
+    from case_engine.config import load_yaml
+    from case_engine.engines import build_for
+    from case_engine.strategy import SandboxValue
+
+    s = load_yaml(os.path.join(CASES_ROOT, "case00_village", "scenario.yaml"))
+    assert isinstance(build_for(s), SandboxValue)
+    res = build_for(s).run(s)
+
+    assert res["engine"] == "sandbox-value"
+    assert res["run_type"] == "assembly-check"
+    # 关键段齐备
+    for sec in ("sandbox_params", "scenario_assets", "value_tendency"):
+        assert res["checks"][sec]["ok"], res["checks"][sec]
+    # 资产:case00/scenario 冻结留档应全部存在且 JSON 可解析;agents 是目录
+    assets = res["checks"]["assets"]["detail"]
+    for key in ("story", "relationships", "maze", "agents", "governance"):
+        assert assets[key]["ok"], "{}: {}".format(key, assets[key])
+    # 行政:6 角色各自有价值权重
+    roles = res["checks"]["roles"]["detail"]
+    assert len(roles) == 6
+    assert all(v["ok"] for v in roles.values())
+    assert res["all_ok"] is True
+
+
+def test_case00_sandbox_assembly_reports_missing_asset(tmp_path):
+    """装配预检要能如实报出缺失,绝不假装可装配(反作弊)。"""
+    from case_engine.strategy import SandboxValue
+
+    # 迷你场景:声明指向的 story 在 base(tmp)下必然不存在;无角色
+    s = _MiniScenario(
+        case_id="mini_sandbox",
+        custom={"scenario_assets": {"story": "case00/scenario/story.json"},
+                "sandbox_params": {"percept": {"mode": "box"}}},
+    )
+    res = SandboxValue().run(s, base=str(tmp_path))
+    assert res["run_type"] == "assembly-check"
+    assert res["all_ok"] is False
+    assert res["checks"]["assets"]["detail"]["story"]["ok"] is False
+    assert res["checks"]["roles"]["ok"] is False  # 无角色 → 行政预检不通过
+
+
+class _MiniScenario:
+    """最小场景鸭子类型:只带 SandboxValue 预检消费的 custom/roles/case_id。"""
+
+    def __init__(self, case_id, custom, roles=None):
+        self.case_id = case_id
+        self.custom = custom
+        self.roles = roles or [type("R", (), {"id": "a"})(), type("R", (), {"id": "b"})()]
+
+    @property
+    def engine(self):
+        return "sandbox-value"

@@ -65,7 +65,7 @@ def _do_run(root: str, case_id: str, engine_id: str, input_text: str) -> int:
 
     选引擎 = build_for(scenario, requested):`--engine` 覆盖场景推荐引擎。
     experiment-eval 已接免 LLM 最小线(分支/一致性,产出结果);sandbox-value
-    需 mavis 桥仍未接线 —— 如实报告,绝不假装产出。
+        接装配预检线(资产/参数齐备性,产出 assembly-check)。
     """
     scenario, rc = _load_scenario(root, case_id)
     if scenario is None:
@@ -78,6 +78,20 @@ def _do_run(root: str, case_id: str, engine_id: str, input_text: str) -> int:
     try:
         out = strat.run(scenario, input_text=input_text)
         print("run:      完成 ({})".format(out.get("run_type", "?")))
+        if out.get("run_type") == "assembly-check":
+            checks = out.get("checks") or {}
+            for k, v in checks.items():
+                if not v.get("ok"):
+                    detail = v.get("detail", "")
+                    if isinstance(detail, dict):
+                        detail = ", ".join(
+                            "{}={}".format(n, d.get("ok")) for n, d in detail.items())
+                    print("  [!] {}: {}".format(k, detail))
+            print("all_ok:   {}".format(out.get("all_ok")))
+            print("note:     {}".format(out.get("note")))
+            if out.get("artifact"):
+                print("artifact: {}".format(out["artifact"]))
+            return 0 if out.get("all_ok") else 4   # 装配预检不通过 = 不能真跑
         print("branch:   {}".format(out.get("branch", "")))
         cs = out.get("consistency") or {}
         print("consist:  {} — {}".format(cs.get("verdict", ""), cs.get("reason", "")))

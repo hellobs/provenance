@@ -106,8 +106,98 @@ class SandboxValue(EngineStrategy):
         from case_engine.engines import ENGINES
         return {"engine": self.engine_id, **ENGINES.get(self.engine_id, {})}
 
-    def run(self, scenario, **kw: Any) -> Any:
-        raise NotImplementedError("sandbox-value 需桥接 mavisframework 沙盒,尚未实现")
+    def run(self, scenario, base: str = "", out_dir: str = "",
+            **kw: Any) -> Dict[str, Any]:
+        """数据驱动装配预检线:核验 scenario 声明是否能指向 mavis 可装配的资产/参数。
+
+        `run_type = "assembly-check"` —— 不跑沙盒(移动/感知/调度/价值演化需 mavis 实跑),
+        只做**确定性静态预检**:把 `custom.scenario_assets`(相对 provenance 根)逐条解析到
+        绝对路径,校验存在性 + JSON 可解析性;校验角色数、价值权重(governance/initial)
+        是否齐备;校验 `sandbox_params` 是否声明。绝不假装产出 checkpoints。
+        """
+        import json
+        import os
+
+        from case_engine.scenarios import default_cases_root
+
+        base = base or os.path.dirname(default_cases_root())
+        custom = getattr(scenario, "custom", None) or {}
+        assets = custom.get("scenario_assets") or {}
+        params = custom.get("sandbox_params") or {}
+        tendency = custom.get("value_tendency") or {}
+
+        checks: Dict[str, Dict[str, Any]] = {}
+        # 1. 必填声明段
+        for key, present in (("sandbox_params", bool(params)),
+                             ("scenario_assets", bool(assets)),
+                             ("value_tendency", bool(tendency))):
+            checks[key] = {"ok": present,
+                           "detail": "已声明" if present else "缺失"}
+
+        # 2. 资产存在性 + JSON 可解析性(逐个,不拖垮整体)
+        json_assets = ("story", "relationships", "maze", "governance")
+        asset_checks: Dict[str, Dict[str, Any]] = {}
+        _all_paths_ok = True
+        for key in ("story", "relationships", "maze", "agents", "governance"):
+            rel = assets.get(key, "")
+            if not rel:
+                asset_checks[key] = {"ok": False, "detail": "未声明路径"}
+                _all_paths_ok = False
+                continue
+            abs_p = os.path.normpath(os.path.join(base, rel))
+            exists = os.path.exists(abs_p)
+            parse_ok, parse_note = True, ""
+            if exists and key in json_assets:
+                try:
+                    with open(abs_p, encoding="utf-8") as f:
+                        json.load(f)
+                except Exception as exc:  # noqa: BLE001 —— 只记录,不中断预检
+                    parse_ok, parse_note = False, type(exc).__name__
+            if key == "agents":
+                ok = exists and os.path.isdir(abs_p)
+            else:
+                ok = exists and parse_ok
+            asset_checks[key] = {
+                "ok": bool(ok),
+                "detail": "存在" if exists else "缺失",
+                "path": rel,
+            }
+            if key in json_assets and exists and not parse_ok:
+                asset_checks[key]["detail"] = "JSON 无法解析: {}".format(parse_note)
+            if not ok:
+                _all_paths_ok = False
+        checks["assets"] = {"ok": _all_paths_ok, "detail": asset_checks}
+
+        # 3. 行政:角色数 + 每角色的价值权重(governance/initial)是否齐备
+        #    权重键用 display_name(如 "AI Advisor"),角色 id 是 snake_case;两者都查。
+        gov = tendency.get("governance") or {}
+        init = tendency.get("initial_tendency") or {}
+        role_checks: Dict[str, Dict[str, Any]] = {}
+        for r in getattr(scenario, "roles", []):
+            rid = r.id
+            names = {rid, r.display_name} if getattr(r, "display_name", "") else {rid}
+            has = any(n in gov or n in init for n in names)
+            role_checks[rid] = {"ok": bool(has), "detail": "有价值权重" if has else "无权重"}
+        checks["roles"] = {"ok": all(v["ok"] for v in role_checks.values())
+                           and len(role_checks) >= 2, "detail": role_checks}
+
+        all_ok = all(v["ok"] for v in checks.values())
+        result: Dict[str, Any] = {
+            "engine": self.engine_id,
+            "run_type": "assembly-check",   # 装配预检,非沙盒实跑
+            "scenario": scenario.case_id,
+            "base": base,
+            "checks": checks,
+            "all_ok": all_ok,
+            "note": "可装配" if all_ok else "存在缺失,需先补齐后再进 mavis 实跑",
+        }
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+            fn = os.path.join(out_dir, "{}_sandbox.json".format(scenario.case_id))
+            with open(fn, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            result["artifact"] = fn
+        return result
 
 
 # 默认内置：engine_id → 无状态策略构造器。场景运行所选引擎可从注册表工厂产出。

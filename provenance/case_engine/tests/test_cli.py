@@ -83,8 +83,8 @@ def test_cli_run_missing_input_is_usage_error(capsys):
     assert "无法执行" in out
 
 
-def test_cli_run_engine_override_not_wired(capsys):
-    """--engine 强选 sandbox-value(case01 无沙盒输入,supports ✘ 且仍未接线)→ 返回码 4。"""
+def test_cli_run_engine_override_sandbox_on_case01(capsys):
+    """--engine 强选 sandbox-value 跑 case01(无沙盒输入):装配预检 all_ok=False → 返回码 4。"""
     from case_engine import cli
     rc = cli.main(["run", "case01_stock", "--engine", "sandbox-value", "--input", "x"])
     out = capsys.readouterr().out
@@ -92,7 +92,18 @@ def test_cli_run_engine_override_not_wired(capsys):
     assert "engine:   sandbox-value" in out
     assert "显式覆盖: True" in out
     assert "supports: ✘" in out
-    assert "未接线" in out
+    assert "assembly-check" in out or "缺失" in out
+
+
+def test_cli_run_sandbox_value_case00(capsys):
+    """sandbox-value 跑 case00 本体:装配预检全绿(all_ok=True)→ 返回码 0。"""
+    from case_engine import cli
+    rc = cli.main(["run", "case00_village", "--engine", "sandbox-value"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "engine:   sandbox-value" in out
+    assert "assembly-check" in out
+    assert "all_ok:   True" in out
 
 
 def test_cli_engines_lists_and_matrix(capsys):
