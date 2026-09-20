@@ -52,7 +52,7 @@ ROUTER = RuleBranchRouter(
 
 
 def test_router_classify_and_route_meta():
-    b, meta = ROUTER.route("我建议不要买入,观望")
+    b, meta = ROUTER.route("我认为不宜参与,还是回避")
     assert b == "y" and meta["timeline"] == "Y"
     assert meta["judge"] == "rules"
 
@@ -85,7 +85,7 @@ def test_plan_parser_derives_trigger_from_condition():
 
 # ---- derive_trigger / evaluate_trigger ----
 def test_derive_trigger_price_pattern():
-    trig = derive_trigger("价格跌破 15 美元再买")
+    trig = derive_trigger("价格跌破 15 再出手")
     assert trig["type"] == "price_below" and trig["value"] == 15.0
 
 

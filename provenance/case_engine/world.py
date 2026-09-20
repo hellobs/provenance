@@ -9,10 +9,10 @@
   隐藏 Branch/未来时间线/未披露私人信息。
 - 程序决定事实,LLM 只负责表达(冲突由上层检测重生成)。
 
-通用化要点(2026-09-20,从 case01/world/state.py 迁移):
+通用化要点(2026-09-20,从原 case 仓 state 模块迁移):
 - 主角状态字段不硬编码,由 `world.state_schema` 动态构建(见 EntityState)。
 - 事件数值用通用 `value` 承载(上游场景定义其语义,如价格/数额)。
-- 买卖/退出等业务动作收敛为 `update_state(key, value)` + 审计,由场景上层编排。
+- 状态变更动作收敛为 `update_state(key, value)` + 审计,由场景上层编排。
 
 纯逻辑、可单测:不 import LLM/网络/任何业务包。日期用字符串 %Y-%m-%d 比较(ISO 字典序)。
 """

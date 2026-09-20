@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Branch 判定与条件化方案解析(引擎通用框架,业务数据全部注入)。
 
-从 case01/world/branch.py 迁移(2026-09-20):
+从原 case 仓的 branch 模块迁移(2026-09-20):
 - 判定/解析的**框架**(结构化 JSON 解析、钳制、清洗、关键词路由的流程)是通用逻辑;
 - 具体语义(A/B/C 该是什么、『不买』/『待确认』等关键词、判定 prompt、价格正则、
   否定词表、确认词表)全部作为构造参数 / 函数参数由 scenario.yaml 注入。
@@ -13,11 +13,11 @@ import json
 import re
 from typing import Tuple, Dict, List
 
-# 通用价格条件正则:跌破/跌破等 → below,涨破/涨过等 → above。(数值语义由场景定义)
+# 通用价格条件正则:跌破/跌破等 → below,涨破/涨过等 → above。数值单位语义由场景定义。
 DEFAULT_PRICE_PATTERNS = [
-    (re.compile(r"(跌破|跌至|跌到|回调到|回调至|低于|回到)\s*(\d+(?:\.\d+)?)\s*(美元|USD|刀)?"),
+    (re.compile(r"(跌破|跌至|跌到|回调到|回调至|低于|回到)\s*(\d+(?:\.\d+)?)"),
      "price_below"),
-    (re.compile(r"(涨破|涨过|涨至|涨到|突破|高于|站上|站稳|站回|回到)\s*(\d+(?:\.\d+)?)\s*(美元|USD|刀)?"),
+    (re.compile(r"(涨破|涨过|涨至|涨到|突破|高于|站上|站稳|站回|回到)\s*(\d+(?:\.\d+)?)"),
      "price_above"),
 ]
 
