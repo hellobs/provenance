@@ -64,6 +64,23 @@ def test_case00_village_declarative_load():
     assert s.custom["scenario_assets"]["story"].endswith("story.json")
 
 
+def test_scenario_declares_registered_engine():
+    """每个 scene 的 meta.engine 必须指向已注册的引擎 id(多引擎配合使用)。"""
+    from case_engine.engines import known, ENGINES, DEFAULT_ENGINE
+    assert DEFAULT_ENGINE == "experiment-eval"
+    assert {"experiment-eval", "sandbox-value"} <= set(ENGINES)
+    for cid in ("case01_stock", "case00_village"):
+        s = _load(cid)
+        assert known(s.engine), "{}.engine 未注册: {}".format(cid, s.engine)
+    # 默认兜底:未显式声明 engine 的场景回退到受控实验引擎
+    from case_engine.config import load, validate
+    bare = load({"meta": {"case_id": "x"}, "roles": [{"id": "r"}]})
+    assert bare.engine == "experiment-eval"
+    # validate 拒绝未注册的 engine(阻止错误启动)
+    bad = load({"meta": {"case_id": "x", "engine": "nope"}, "roles": [{"id": "r"}]})
+    assert any("engine" in e for e in validate(bad))
+
+
 def test_config_drives_consistency_scan():
     """最小闭环:scenario 的 consistency 段 → 引擎 quick_scan 判定(Phase 3 首个证明)。"""
     s = _load("case01_stock")

@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from case_engine.engines import DEFAULT_ENGINE, known
+
 
 _SAFE_CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]*$")
 
@@ -48,6 +50,11 @@ class Config:
     @property
     def name(self) -> str:
         return self.meta.get("name", "")
+
+    @property
+    def engine(self) -> str:
+        """场景绑定的引擎 id(meta.engine);未声明回退默认引擎。"""
+        return self.meta.get("engine") or DEFAULT_ENGINE
 
     def state_initial(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
@@ -126,6 +133,9 @@ def validate(cfg: Config) -> List[str]:
             errs.append("存在没有 id 的角色")
     if len({r.id for r in cfg.roles}) != len(cfg.roles):
         errs.append("roles.id 重复")
+    declared_engine = cfg.meta.get("engine")
+    if declared_engine and not known(declared_engine):
+        errs.append("meta.engine 未注册: {!r}".format(declared_engine))
     return errs
 
 

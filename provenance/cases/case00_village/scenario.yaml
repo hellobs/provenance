@@ -16,6 +16,7 @@ meta:
   case_id: case00_village
   name: "6 角色投资咨询中心"
   description: "provenance 原生的 6 角色多 agent 投资咨询沙盒:角色在投资咨询中心按制度约束与剧情事件连续仿真,价值倾向(value_tendency)随交互演化"
+  engine: sandbox-value             # 生成式价值权重沙盒引擎(移动/感知/调度/价值倾向)
   simulation: "investment"          # 取自 story/relationships 的 simulation 字段
   start_date: "2025-02-13"          # live_fastapi 的 --start(沙盒墙钟起始)
   runtime: "live_fastapi.py(5001) + live/"   # 过渡:沙盒语义仍由旧引擎持有
