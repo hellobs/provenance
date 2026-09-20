@@ -226,7 +226,11 @@ def build_full_context(rec: dict) -> str:
 
 
 def load_run(runs_root: str, run_id: str) -> Optional[dict]:
-    p = os.path.join(runs_root, run_id, "run.json")
+    # 路径穿越防护:run_id 不得含路径分隔符或 ..
+    safe_id = os.path.basename(run_id.strip().replace("\\", "/"))
+    if safe_id != run_id.strip() or ".." in run_id:
+        return None
+    p = os.path.join(runs_root, safe_id, "run.json")
     if not os.path.exists(p):
         return None
     with open(p, encoding="utf-8") as f:
