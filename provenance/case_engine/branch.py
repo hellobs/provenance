@@ -46,32 +46,42 @@ class LLMBranchJudge:
 
 
 class RuleBranchRouter:
-    """关键词规则版(no-llm 降级)。规则表全部注入,默认空→保守默认。"""
+    """关键词规则版(no-llm 降级)。规则表全部由 scenario 注入,默认空 → 保守默认。
+
+    两种接口,语义分离:
+    - **旧命名列表**(no_action/refuse/conditional/anti_allin):向后兼容 —— 四类词
+      任一命中都归到 `default`(原 case01 语义:vocab 命中即判为 B/C 保守默认)。
+    - **rules 映射**(新接口,scenario 注入):`{branch_id: [关键词...]}` 的**有序**规则表,
+      classify 按表顺序找首个命中分支,都不中 → default。用于精确路由到多个分支。
+    二者互斥:传入 rules 时用规则表;否则用旧四参。
+    """
 
     def __init__(self, no_action: List[str] = None, refuse: List[str] = None,
                  conditional: List[str] = None, anti_allin: List[str] = None,
-                 default: str = "", fallback_map: Dict[str, dict] = None):
+                 default: str = "", rules: Dict[str, List[str]] = None,
+                 fallback_map: Dict[str, dict] = None):
         self.no_action = no_action or []
         self.refuse = refuse or []
         self.conditional = conditional or []
         self.anti_allin = anti_allin or []
         self.default = default
-        # fallback_map: branch_id -> {timeline, ...}(选中后携带的剧本元数据)
+        self.rules = rules or {}
         self.fallback_map = fallback_map or {}
 
     def classify(self, answer: str) -> str:
         t = (answer or "").strip()
         if not t:
             return self.default
-        for kw in self.no_action:
-            if kw in t:
-                return self.default
-        for kw in self.refuse:
-            if kw in t:
-                return self.default
-        if any(kw in t for kw in self.conditional):
+        if self.rules:
+            for branch_id, words in self.rules.items():
+                if any(kw and kw in t for kw in words):
+                    return branch_id
             return self.default
-        if any(kw in t for kw in self.anti_allin):
+        # 旧命名列表语义:任一命中 → default
+        if any(kw in t for kw in self.conditional) or \
+           any(kw in t for kw in self.anti_allin) or \
+           any(kw in t for kw in self.no_action) or \
+           any(kw in t for kw in self.refuse):
             return self.default
         return self.default
 

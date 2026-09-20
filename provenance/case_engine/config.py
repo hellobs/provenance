@@ -38,6 +38,7 @@ class Config:
     router: dict = field(default_factory=dict)
     consistency: dict = field(default_factory=dict)
     retrieval: dict = field(default_factory=dict)
+    branch: dict = field(default_factory=dict)
     custom: dict = field(default_factory=dict)
 
     @property
@@ -84,6 +85,7 @@ def _coerce(proto) -> Config:
         router=dict(proto.get("router") or {}),
         consistency=dict(proto.get("consistency") or {}),
         retrieval=dict(proto.get("retrieval") or {}),
+        branch=dict(proto.get("branch") or {}),
         custom=dict(proto.get("custom") or {}),
     )
 
@@ -148,4 +150,57 @@ def consistency_signals(cfg: Config) -> Dict[str, List[str]]:
         "cond_words": list(c.get("cond_words") or []),
         "negators": list(c.get("negators") or []),
         "neg_phrases": list(c.get("neg_phrases") or []),
+    }
+
+
+def reflection_args(cfg: Config) -> Dict[str, Any]:
+    """从 scenario.reflection 组装 case_engine.reflection.run_reflection 的可注入参数。
+
+    对应参数:reflection_prompt=prompt_cn, reflection_system=system_prompt,
+    max_tokens/temperature 由 run_reflection 的注入覆盖(temperature 引擎固定 0.4,
+    max_tokens 由调用方显式传参决定——这里不带,避免冲突)。
+    speaker_labels 由 case 的 roles 推断:ai_tool 角色当"助手"/"assistant",
+    user 角色当"提问方";缺省用引擎中性值。
+    """
+    r = cfg.reflection
+    labels: Dict[str, str] = {}
+    assistant_ids = {x.id for x in cfg.roles if x.type == "ai_tool"}
+    asker_ids = tuple(x.id for x in cfg.roles if x.type == "user")
+    if assistant_ids:
+        labels["assistant"] = next(iter(assistant_ids))
+    if asker_ids:
+        labels["asker"] = asker_ids[0]
+    return {
+        "reflection_prompt": str(r.get("prompt_cn")
+                                 or r.get("prompt") or ""),
+        "reflection_system": str(r.get("system_prompt") or ""),
+        "speaker_labels": labels or None,
+        "asker_speaker": asker_ids,
+        "fb_asker_key": str(r.get("fb_asker_key") or "client"),
+    }
+
+
+def branch_args(cfg: Config) -> Dict[str, Any]:
+    """从 scenario.branch 组装 RuleBranchRouter / LLMBranchJudge 的可注入参数。
+
+    把 scenario 的 no_buy/refuse 归到分支 X、conditional/anti_allin 归到分支 Y 的
+    语义映射恢复为有序 rules(顺序即优先级):先 B(拒绝/不参与) 后 C(条件化),
+    其余 → default。judge_prompt 供 LLMBranchJudge 使用。
+    """
+    b = cfg.branch
+    rules: Dict[str, List[str]] = {}
+    no_buy = list(b.get("no_buy") or [])
+    refuse = list(b.get("refuse") or [])
+    conditional = list(b.get("conditional") or [])
+    anti_allin = list(b.get("anti_allin") or [])
+    # 原 case01 语义:NO_BUY/REFUSE→B;CONDITIONAL/ANTI_ALLIN→C
+    if no_buy or refuse:
+        rules["B"] = no_buy + refuse
+    if conditional or anti_allin:
+        rules["C"] = conditional + anti_allin
+    return {
+        "rules": rules,
+        "default_branch": str(b.get("default_branch") or ""),
+        "judge_prompt": str(b.get("judge_prompt") or ""),
+        "fallback_map": dict(b.get("fallback_map") or {}),
     }
