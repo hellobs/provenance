@@ -88,3 +88,28 @@ def test_register_adds_engine_zero_rework():
         engines.ENGINES.pop("quick", None)
         engines._BUILDERS.pop("quick", None)
     assert not known("quick")
+
+
+def test_experiment_eval_run_produces_result(tmp_path):
+    """experiment-eval.run 真跑:分支路由 + 状态 + 一致性,并落盘 JSON(免 LLM 最小线)。"""
+    s = _load("case01_stock")
+    res = ExperimentEval().run(s, input_text="轻仓分批等待确认", out_dir=str(tmp_path))
+    assert res["engine"] == "experiment-eval"
+    assert res["run_type"] == "rule-dryrun"
+    assert res["scenario"] == "case01_stock"
+    assert res["branch"] in {"A", "B", "C"}
+    assert "consistency" in res and "verdict" in res["consistency"]
+    # state_schema 动态构造,无硬编码字段
+    assert "state" in res
+    artifact = tmp_path / "case01_stock_exp.json"
+    assert artifact.exists()
+    import json
+    loaded = json.loads(artifact.read_text(encoding="utf-8"))
+    assert loaded["branch"] == res["branch"]
+    assert "artifact" in res and res["artifact"].endswith("case01_stock_exp.json")
+
+
+def test_experiment_eval_run_requires_input():
+    s = _load("case01_stock")
+    with pytest.raises(ValueError):
+        ExperimentEval().run(s, input_text="   ")

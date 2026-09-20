@@ -42,8 +42,56 @@ class ExperimentEval(EngineStrategy):
         from case_engine.engines import ENGINES
         return {"engine": self.engine_id, **ENGINES.get(self.engine_id, {})}
 
-    def run(self, scenario, **kw: Any) -> Any:
-        raise NotImplementedError("experiment-eval 的运行(pipeline 通用化)尚未接线")
+    def run(self, scenario, input_text: str = "", out_dir: str = "",
+            **kw: Any) -> Dict[str, Any]:
+        """免 LLM 最小真跑线:用 scenario 数据 + 一条给定回答,产出分支/状态/一致性。
+
+        `run_type = "rule-dryrun"` —— 这是实验线第一段可运行的闭环(分支路由 +
+        状态构造 + 一致性快筛),不调用 LLM;LLM 表达/反思/检索留待 pipeline 接入,
+        故绝不伪装成完整 `run.json`。返回结果 dict,`out_dir` 给出则落盘 JSON。
+        """
+        from case_engine.branch import RuleBranchRouter
+        from case_engine.config import branch_args, consistency_signals
+        from case_engine.consistency import quick_scan
+        from case_engine.world import EntityState
+
+        input_text = (input_text or "").strip()
+        if not input_text:
+            raise ValueError("experiment-eval.run 需要 input_text(受判的对象回答)")
+        bargs = branch_args(scenario)
+        router = RuleBranchRouter(default=bargs["default_branch"],
+                                  rules=bargs["rules"],
+                                  fallback_map=bargs["fallback_map"])
+        branch = router.classify(input_text)
+        st = EntityState(scenario.state_schema)
+        ai_ids = tuple(r.id for r in scenario.roles if r.type == "ai_tool")
+        ai = ai_ids[0] if ai_ids else "ai"
+        start_date = str((scenario.meta or {}).get("start_date") or "")
+        rec = {
+            "scenario": scenario.case_id,
+            "start_date": start_date,
+            "branch": branch,
+            "turns": [{"speaker": ai, "date": start_date, "text": input_text}],
+        }
+        verdict, reason = quick_scan(rec, consistency_signals(scenario),
+                                     speaker_ids=ai_ids or ("ai",))
+        result: Dict[str, Any] = {
+            "engine": self.engine_id,
+            "run_type": "rule-dryrun",      # 免 LLM 最小线;LLM 线留待 pipeline 接入
+            "scenario": scenario.case_id,
+            "branch": branch,
+            "state": st.to_dict(),
+            "consistency": {"verdict": verdict, "reason": reason},
+        }
+        if out_dir:
+            import json
+            import os
+            os.makedirs(out_dir, exist_ok=True)
+            fn = os.path.join(out_dir, "{}_exp.json".format(scenario.case_id))
+            with open(fn, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            result["artifact"] = fn
+        return result
 
 
 class SandboxValue(EngineStrategy):

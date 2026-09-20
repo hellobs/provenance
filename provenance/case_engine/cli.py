@@ -60,28 +60,36 @@ def _do_show(root: str, case_id: str) -> int:
     return 0
 
 
-def _do_run(root: str, case_id: str, engine_id: str) -> int:
-    """探测:用选定引擎「跑」一份场景(自由搭配核心的可见演示)。
+def _do_run(root: str, case_id: str, engine_id: str, input_text: str) -> int:
+    """用选定引擎跑一份场景(自由搭配核心的可见演示)。
 
-    选引擎规则 = build_for(scenario, requested):`--engine` 覆盖场景推荐引擎。
-    run() 尚未接线(pipeline/mavis 桥),故如实报告「未接线」而非假装产出。
+    选引擎 = build_for(scenario, requested):`--engine` 覆盖场景推荐引擎。
+    experiment-eval 已接免 LLM 最小线(分支/一致性,产出结果);sandbox-value
+    需 mavis 桥仍未接线 —— 如实报告,绝不假装产出。
     """
     scenario, rc = _load_scenario(root, case_id)
     if scenario is None:
         return rc
     strat = build_for(scenario, requested=engine_id)
     ok = strat.supports(scenario)
-    print("case_id:   {}".format(case_id))
-    print("engine:    {} (显式覆盖: {})".format(strat.engine_id, bool(engine_id)))
-    print("supports:  {}".format("✔ 可跑" if ok else "✘ 缺本引擎所需输入"))
-    print("show 里该场景推荐 engine: {}".format(scenario.engine))
+    print("case_id:  {}".format(case_id))
+    print("engine:   {} (显式覆盖: {})".format(strat.engine_id, bool(engine_id)))
+    print("supports: {}".format("✔ 可跑" if ok else "✘ 缺本引擎所需输入"))
     try:
-        strat.run(scenario)
-        print("run:       完成")
+        out = strat.run(scenario, input_text=input_text)
+        print("run:      完成 ({})".format(out.get("run_type", "?")))
+        print("branch:   {}".format(out.get("branch", "")))
+        cs = out.get("consistency") or {}
+        print("consist:  {} — {}".format(cs.get("verdict", ""), cs.get("reason", "")))
+        if out.get("artifact"):
+            print("artifact: {}".format(out["artifact"]))
         return 0
     except NotImplementedError as exc:
-        print("run:       未接线 —— {}".format(exc))
+        print("run:      未接线 —— {}".format(exc))
         return 0 if ok else 4
+    except ValueError as exc:
+        print("run:      无法执行 —— {}".format(exc))
+        return 4
 
 
 def _do_engines(root: str, case_id: str) -> int:
@@ -113,9 +121,10 @@ def main(argv=None) -> int:
     sub.add_parser("list", help="列出所有已发现场景")
     ps = sub.add_parser("show", help="查看单场景声明")
     ps.add_argument("case_id", help="场景 id(即 case 目录名)")
-    pr = sub.add_parser("run", help="探测:用选定引擎跑一份场景(可 --engine 覆盖)")
+    pr = sub.add_parser("run", help="用选定引擎跑一份场景(可 --engine/--input)")
     pr.add_argument("case_id", help="场景 id(即 case 目录名)")
     pr.add_argument("--engine", default="", help="指定引擎(默认用场景推荐的 meta.engine)")
+    pr.add_argument("--input", default="", help="受判的对象回答(experiment-eval 需要)")
     pe = sub.add_parser("engines", help="列出全部已注册引擎(及可选兼容矩阵)")
     pe.add_argument("--case-id", default="", help="若给,显示该场景的引擎兼容矩阵")
     args = parser.parse_args(argv)
@@ -127,7 +136,7 @@ def main(argv=None) -> int:
     if args.cmd == "show":
         return _do_show(root, args.case_id)
     if args.cmd == "run":
-        return _do_run(root, args.case_id, args.engine)
+        return _do_run(root, args.case_id, args.engine, args.input)
     return _do_engines(root, args.case_id)
 
 
