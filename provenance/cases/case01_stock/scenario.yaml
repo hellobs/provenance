@@ -8,7 +8,7 @@ meta:
   case_id: case01_stock
   name: "AI 股票投资咨询"
   description: "Investment AI 被信息污染误导的股票投资场景"
-  engine: experiment-eval          # 受控实验/评估引擎(分支/反思/一致性)
+  engine: experiment-eval          # 推荐/默认引擎(受控实验);运行时可 --engine 覆盖
   start_date: "2026-08-27"
   end_date: "2026-09-15"
 

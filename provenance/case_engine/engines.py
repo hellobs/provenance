@@ -1,23 +1,28 @@
 # -*- coding: utf-8 -*-
-"""引擎注册表:scenario.meta.engine → 引擎元信息(引擎通用)。
+"""引擎注册与工厂(引擎通用):scenario.meta.engine → 可注入的引擎策略。
 
-引擎 = 一类「可被声明的运行方式」。场景在 `meta.engine` 里声明自己挂哪类引擎;
-`case_engine.config` 只负责加载/校验这份声明,真正驱动由各引擎(桥)实现。
-多引擎 + 多场景配合使用:每个引擎小而纯净、互不依赖。
+分层(设计模式:注册表 + 工厂;策略具体实现见 `strategy.py`):
+- `ENGINES`：描述表(id → 元信息),供 known/resolve/describe 与人类浏览。
+- `_BUILDERS`：构造表(id → `(scenario) -> EngineStrategy`),工厂从这里产出策略实例。
+- `build_for(scenario, requested)`：**自由搭配的核心** —— `requested` 显式覆盖场景
+  推荐引擎;未指定则用场景 `meta.engine`(推荐/默认)。
+- `supported_by(scenario)`：对一份场景枚举「所有能跑它的引擎」,供服务/CLI 展示兼容矩阵。
 
-命名约定:
-- id 用连字符小写(experiment-eval / sandbox-value);
-- 描述用中性词,不夹带任何具体 case 的业务词(纯度守卫会扫 case_engine/)。
+设计原则:
+- 场景 = 数据;引擎 = 可注入、可组合的策略;**同一场景可与不同引擎自由搭配**(`requested`)。
+- 新增引擎只需 `register(id, builder)` + 一个策略类,零改动消费端。
 """
-from typing import Dict
+from typing import Any, Callable, Dict, List
 
-# 已知引擎注册表:id → {name, output, primitives, note}
+from case_engine.strategy import BUILTIN_STRATEGIES, EngineStrategy
+
+# 已知引擎注册表:id → {name, output, primitives, note}(描述用中性词,不夹带业务词)
 ENGINES: Dict[str, Dict[str, str]] = {
     "experiment-eval": {
         "name": "受控实验 / 评估",
         "output": "run.json",
         "primitives": "branch(分支) / reflection(反思) / consistency(一致性) / retrieval(检索)",
-        "note": "把一次咨询压成一条分支线,可审计、可复现",
+        "note": "把一次场景交互压成一条分支线,可审计、可复现",
     },
     "sandbox-value": {
         "name": "生成式价值权重沙盒",
@@ -29,6 +34,19 @@ ENGINES: Dict[str, Dict[str, str]] = {
 
 # 默认引擎:scene 未声明 engine 时兜底(沿用既有受控实验形态,向后兼容)
 DEFAULT_ENGINE = "experiment-eval"
+
+# 工厂构造表:id → builder(scenario -> EngineStrategy);启动时注册内置策略
+_BuildFn = Callable[[Any], EngineStrategy]
+_BUILDERS: Dict[str, _BuildFn] = {}
+
+
+def _register_builtin() -> None:
+    for eid, builder in BUILTIN_STRATEGIES.items():
+        if eid not in _BUILDERS:
+            _BUILDERS[eid] = builder
+
+
+_register_builtin()
 
 
 def known(engine_id: str) -> bool:
@@ -51,3 +69,46 @@ def describe(engine_id: str = "") -> Dict[str, str]:
     """返回引擎元信息;空值解析为默认引擎。"""
     rid = resolve(engine_id)
     return {"engine": rid, **ENGINES[rid]}
+
+
+def register(engine_id: str, builder: _BuildFn, meta: Dict[str, str]) -> None:
+    """注册一个新引擎:builder(scenario)->EngineStrategy + 描述 meta。消费端零改动。"""
+    if not engine_id or not engine_id.isalnum() and not all(
+            c.isalnum() or c in "-_" for c in engine_id):
+        raise ValueError("非法引擎 id: {!r}".format(engine_id))
+    if engine_id in ENGINES:
+        raise ValueError("引擎已注册: {!r}".format(engine_id))
+    ENGINES[engine_id] = meta
+    _BUILDERS[engine_id] = builder
+
+
+def build(engine_id: str = "", scenario: Any = None) -> EngineStrategy:
+    """从工厂产出一个引擎策略实例;engine_id 空则用默认引擎。"""
+    rid = resolve(engine_id)
+    builder = _BUILDERS.get(rid)
+    if builder is None:
+        raise ValueError("引擎 {!r} 没有可用的策略构造器".format(rid))
+    return builder(scenario)
+
+
+def build_for(scenario: Any, requested: str = "") -> EngineStrategy:
+    """为一场景选出引擎策略(自由搭配核心)。
+
+    - `requested` 非空:用它**覆盖**场景推荐引擎(可自由搭配);
+    - 空:用 scenario.meta.engine(推荐/默认)。
+    返回的实例是否真能跑该场景由 `strategy.supports(scenario)` 判定(不在此拦)。
+    """
+    engine_id = requested or getattr(scenario, "engine", "") or DEFAULT_ENGINE
+    return build(engine_id, scenario)
+
+
+def supported_by(scenario: Any) -> List[str]:
+    """对一份场景,枚举注册表里「能跑它」的全部引擎 id(supports=True)。"""
+    out: List[str] = []
+    for eid in ENGINES:
+        try:
+            if build(eid, scenario).supports(scenario):
+                out.append(eid)
+        except Exception:  # noqa: BLE001 —— 单个引擎异常不影响枚举整体
+            continue
+    return out

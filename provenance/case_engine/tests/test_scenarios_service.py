@@ -65,6 +65,10 @@ def test_serve_discovery_and_detail():
         assert dj["engine"] == "sandbox-value"
         assert dj["engine_meta"]["name"] == "生成式价值权重沙盒"
         assert dj["n_roles"] == 6
+        # 自由搭配:该场景可被 sandbox-value 跑(experiment-eval 缺输入,不该进元矩阵)
+        sups = {e["engine"] for e in dj["supported_engines"]}
+        assert "sandbox-value" in sups
+        assert "experiment-eval" not in sups
 
         d1 = c.get("/api/scenarios/case01_stock")
         assert d1.status_code == 200

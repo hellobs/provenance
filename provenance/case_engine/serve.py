@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from case_engine.config import load_yaml
-from case_engine.engines import describe
+from case_engine.engines import describe, supported_by
 from case_engine.scenarios import by_id, default_cases_root, discover
 
 # cases 根目录:统一从 scenarios.default_cases_root() 定位(环境变量可覆盖)
@@ -84,11 +84,15 @@ def scenario_detail(case_id: str) -> dict:
     if info.problem:
         raise HTTPException(status_code=502, detail=info.problem)
     cfg = load_yaml(info.path)
+    engine_ids = supported_by(cfg)
     return {
         "case_id": info.case_id,
         "name": info.name,
         "engine": info.engine,
         "engine_meta": describe(info.engine),
+        # 自由搭配:注册表里所有能跑这份场景的引擎(策略 supports 枚举)
+        "supported_engines": [{"engine": e, **describe(e)}
+                              for e in engine_ids],
         "roles": [{"id": r.id, "type": r.type, "llm": r.llm}
                   for r in cfg.roles],
         "state_schema": {k: v.get("type", "any")
