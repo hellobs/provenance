@@ -36,6 +36,19 @@ cd D:\zzr\provenance\provenance
 .\.venv-live\Scripts\python.exe -m case00.serve --port 5003
 ```
 
+## 声明化场景(2026-09-20,仅声明化不重写语义)
+
+case00 新增一份给场景引擎 `case_engine` 用的声明式配置
+`cases/case00_village/scenario.yaml`(目录名即 `case_id = case00_village`)。
+它只做**声明**:6 个角色、价值权重(制度层 `governance.json` + 各 `agent.json` 的
+`initial_tendency`)、剧情/关系/地图资产路径、沙盒参数,全部经 `custom` 原样透传;
+引擎能加载、能校验,但**不建模** case00 的迷宫沙盒语义。
+
+**沙盒运行语义不变**:实时仍走 `live_fastapi.py`(5001)与 `live/`,只读存档仍走
+本目录 `serve.py`(5003)。价值权重 `value_tendency` 依旧是 case00 的状态本体。
+此声明为过渡态:case00 与 case01 由同一 `case_engine` 声明加载,但 case00 的
+沙盒原语引擎尚未实现。
+
 ## 两条硬约定
 
 1. **同一时刻只允许一个实时可视化。** case00 的实时（5001）与 case01 的实时（5010）

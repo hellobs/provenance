@@ -44,6 +44,13 @@ cd D:\zzr\provenance\provenance
   `/api/runs/{run_id}`（快照步数 + 最后一步的角色坐标与 value_tendency）、`/health`。
 - `case00/README.md`——冻结声明与两条硬约定。
 
+**声明化场景（2026-09-20，仅声明化不重写语义）**：case00 另有一份
+`cases/case00_village/scenario.yaml` 供场景引擎 `case_engine` 加载/校验——
+6 角色 + 价值权重（制度层 `governance.json` + 各 agent 的 `initial_tendency`）+
+资产路径全部经 `custom` 透传。此时 case00 与 case01 由同一 `case_engine` 声明加载，
+但 case00 的沙盒原语引擎未实现，**运行语义不变**：实时仍 `live_fastapi.py`（5001）、
+只读仍 `case00/serve.py`（5003）。
+
 启动只读面：
 
 ```

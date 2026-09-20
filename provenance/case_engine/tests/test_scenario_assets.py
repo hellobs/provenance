@@ -37,6 +37,33 @@ def test_case01_conflict_rules_present():
                       "sold", "exited", "cash_mismatch"]
 
 
+def test_case00_village_declarative_load():
+    """case00 声明化:引擎仅加载/校验,沙盒语义经 custom 原样透传。
+
+    case00 是 6 角色沙盒仿真,其状态是"每角色价值权重向量(value_tendency)",
+    不是 case01 那种单个主角 state_schema。断言语义:roles 可过 Validate,6 角色齐;
+    价值权重(制度层+个人起点)忠实透传在 custom,未被引擎改写/丢弃。
+    (用户拍板:仅声明化不重写语义;沙盒运行语义仍由 live/ 旧引擎持有。)
+    """
+    s = _load("case00_village")
+    assert s.case_id == "case00_village"
+    ai = next(r for r in s.roles if r.id == "ai_advisor")
+    others = [r for r in s.roles if r.id != "ai_advisor"]
+    assert ai.type == "ai_tool"
+    assert len(others) == 5 and all(r.type == "user" for r in others)
+
+    it = s.custom["value_tendency"]["initial_tendency"]
+    gov = s.custom["value_tendency"]["governance"]
+    assert len(it) == 6 and len(gov) == 6
+    # 每个角色 3~4 维价值权重,权重忠实保留(未被引擎改写)
+    assert set(gov["Mr. Zhou"].keys()) == {
+        "Maximize Returns", "Speculative Freedom", "Trust in Advisors", "Risk Tolerance"}
+    assert gov["Mr. Zhou"]["Trust in Advisors"] == 0.4482758620689656
+
+    # 资产路径忠实指向冻结留档(引擎不消费,仅声明)
+    assert s.custom["scenario_assets"]["story"].endswith("story.json")
+
+
 def test_config_drives_consistency_scan():
     """最小闭环:scenario 的 consistency 段 → 引擎 quick_scan 判定(Phase 3 首个证明)。"""
     s = _load("case01_stock")
