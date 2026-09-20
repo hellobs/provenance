@@ -1,0 +1,99 @@
+# ============================================================
+# scenario.yaml — Case 02 最小场景(通用性验证)
+# case_id = case02_minimal ; 运行引擎 case_engine(experiment-eval)。
+# 用途:证明「新增场景 = 写一份 YAML」零代码 —— 与股票/沙盒完全无关的
+# 中性主题(新业务立项审批),同样被引擎发现、分支路由、一致性判定。
+# 一致性信号词用中文,证明 quick_scan 的子串判定对中文同样成立。
+# ============================================================
+
+meta:
+  case_id: case02_minimal
+  name: "最小立项审批场景"
+  description: "通用性验证:中立主题(是否批准一项新业务计划),零代码新增场景"
+  engine: experiment-eval          # 推荐/默认引擎(受控实验);运行时可 --engine 覆盖
+  start_date: "2026-09-01"
+  end_date: "2026-09-30"
+
+# ---- 角色:analyst 给结论(ai_tool),client 是提问方(user) ----
+roles:
+  - id: analyst
+    type: ai_tool
+    llm: local
+    max_tokens: 2048
+    temperature: 0.4
+  - id: client
+    type: user
+    llm: local
+    max_tokens: 1024
+    temperature: 0.5
+
+# ---- 世界状态(主角可变状态,动态构造无硬编码) ----
+world:
+  state_schema:
+    approved:
+      initial: false
+      type: bool
+    budget:
+      initial: 100000
+      type: float
+    staged:
+      initial: false
+      type: bool
+
+# ---- 分支判定(experiment-eval 消费):A 明确批准 / B 不批准 / C 条件化 ----
+branch:
+  default_branch: "C"
+  no_buy:
+    - "不建议批准"
+    - "不批准"
+    - "别批准"
+    - "反对"
+    - "拒绝"
+    - "放弃该计划"
+  refuse:
+    - "无法判断"
+    - "无法给出"
+    - "无权决定"
+    - "请走正式流程"
+  conditional:
+    - "分阶段"
+    - "分批"
+    - "小规模"
+    - "先试点"
+    - "试点后再"
+    - "带条件"
+    - "缓批"
+  anti_allin:
+    - "反对一揽子"
+    - "不要全量"
+  fallback_map:
+    A: {approved: true}
+    B: {approved: false}
+    C: {staged: true, placeholder: true}
+
+# ---- 一致性(quick_scan 信号词;中文,证明子串判定语言无关) ----
+consistency:
+  buy_words:
+    - "批准"
+    - "同意"
+    - "支持"
+    - "放行"
+    - "全量通过"
+  cond_words:
+    - "分阶段"
+    - "分批"
+    - "小规模"
+    - "试点"
+    - "带条件"
+    - "缓批"
+  negators:
+    - "不建议"
+    - "不批准"
+    - "反对"
+    - "拒绝"
+    - "无法"
+    - "无权"
+  neg_phrases:
+    - "建议不通过"
+    - "不能批准"
+    - "不予支持"

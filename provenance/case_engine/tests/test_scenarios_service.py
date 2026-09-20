@@ -84,3 +84,35 @@ def test_serve_404_unknown_and_bad_case_id():
         # 路径穿越字符被拒(而非回读任意文件)
         assert c.get("/api/scenarios/..%2F..%2F").status_code == 404
         assert c.get("/api/scenarios/../").status_code == 404
+
+
+def test_case02_generality_discovers_and_runs():
+    """通用性验证:一个与既有场景无关的最小新场景,零代码即可被发现并真跑。"""
+    from case_engine.config import load_yaml
+    from case_engine.engines import build_for, supported_by
+    from case_engine.strategy import ExperimentEval
+
+    s = load_yaml(os.path.join(CASES_ROOT, "case02_minimal", "scenario.yaml"))
+    assert s.case_id == "case02_minimal"
+    assert s.name == "最小立项审批场景"
+    assert s.engine == "experiment-eval"
+
+    # 发现层:case02 进发现列表,且无加载 problem
+    ids = {x.case_id for x in discover(CASES_ROOT)}
+    assert "case02_minimal" in ids
+    info = by_id(CASES_ROOT, "case02_minimal")
+    assert info is not None and not info.problem
+    assert info.engine == "experiment-eval"
+
+    # 兼容矩阵:case02 仅被 experiment-eval 支持
+    assert supported_by(s) == ["experiment-eval"]
+
+    # 真跑:中文条件化方案 → C 线,一致性信号词中文命中 → consistent(确定性)
+    strat = build_for(s)
+    res = strat.run(s, input_text="建议分阶段先小规模试点")
+    assert strat.engine_id == "experiment-eval"
+    assert res["run_type"] == "rule-dryrun"
+    assert res["branch"] == "C"
+    assert res["consistency"]["verdict"] == "consistent"
+    # 状态由 scenario.state_schema 动态构造,无硬编码字段
+    assert res["state"] == {"approved": False, "budget": 100000, "staged": False}
