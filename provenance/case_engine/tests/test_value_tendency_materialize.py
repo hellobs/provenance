@@ -248,3 +248,69 @@ def test_real_case00_is_already_single_source():
 
 def test_cli_on_real_case_reports_consistent():
     assert cli.main(["materialize-value-tendency", "case00_village"]) == 0
+
+# ---------------------------------------------------------------- 边界(补)
+
+def test_ledger_keyed_by_display_name_resolves(tmp_path):
+    base = str(tmp_path)
+    os.makedirs(os.path.join(base, AGENTS_REL, "AI Advisor"), exist_ok=True)
+    io.open(os.path.join(base, AGENTS_REL, "AI Advisor", "agent.json"), "w",
+            encoding="utf-8", newline="").write(
+        json.dumps({"name": "AI Advisor", "initial_tendency": dict(STALE)},
+                   ensure_ascii=False, indent=4))
+    io.open(os.path.join(base, GOV_REL), "w", encoding="utf-8", newline="").write(
+        json.dumps({"roles": dict(STALE)}, ensure_ascii=False, indent=4))
+    data = {
+        "meta": {"case_id": "mini"},
+        # 角色 id 是 snake_case,display_name 才是声明里的键
+        "roles": [{"id": "ai_advisor", "display_name": "AI Advisor", "type": "ai_tool"}],
+        "world": {"value_tendency": {"governance": {"AI Advisor": dict(GOV)},
+                                     "initial_tendency": {"AI Advisor": dict(INIT)}},
+                  "assets": {"agents": AGENTS_REL, "governance": GOV_REL}},
+    }
+    cfg = cfg_mod.load(data)
+    plan = cfg_mod.value_tendency_plan(cfg)
+    assert plan["roles"]["ai_advisor"]["governance_key"] == "AI Advisor", plan["roles"]
+    assert plan["all_ok"], plan
+    rep = materialize(cfg, base=base, apply=True)
+    assert rep["problems"] == [], rep
+    got = json.loads(io.open(os.path.join(base, AGENTS_REL, "AI Advisor", "agent.json"),
+                             encoding="utf-8").read())["initial_tendency"]
+    assert got == pytest.approx(INIT)
+
+
+def test_declared_role_without_asset_dir_is_reported(tmp_path):
+    """声明里有角色、但资产目录不存在:如实报问题,不崩、不写。"""
+    data, base, _root = _mk_case(tmp_path, agents=("role_one",))
+    data["roles"].append({"id": "role_two", "display_name": "role_two", "type": "user"})
+    data["world"]["value_tendency"]["governance"]["role_two"] = dict(GOV)
+    data["world"]["value_tendency"]["initial_tendency"]["role_two"] = dict(INIT)
+    before = _tree_hash(base)
+    rep = materialize(cfg_mod.load(data), base=base, apply=True)
+    assert rep["problems"], rep
+    assert any("角色资产不存在" in p for p in rep["problems"])
+    # role_one 的合法部分仍然落盘;role_two 被跳过而不是崩
+    assert _tree_hash(base) != before
+    assert not rep["ok"]
+
+
+def test_cli_exit_code_is_3_when_refused(tmp_path, capsys):
+    data, base, cases_root = _mk_case(tmp_path)
+    data["world"].pop("value_tendency")
+    io.open(os.path.join(cases_root, "mini", "scenario.yaml"), "w",
+            encoding="utf-8", newline="").write(_yaml(data))
+    rc = cli.main(["--cases-dir", cases_root, "materialize-value-tendency", "mini", "--apply"])
+    out = capsys.readouterr().out
+    assert rc == 3, (rc, out)
+    assert "拒绝" in out
+
+
+def test_cli_base_override(tmp_path, capsys):
+    data, base, cases_root = _mk_case(tmp_path)
+    io.open(os.path.join(cases_root, "mini", "scenario.yaml"), "w",
+            encoding="utf-8", newline="").write(_yaml(data))
+    # 故意让默认 base( cases 的上一级 )与真实资产根不同,再用 --base 指回来
+    rc = cli.main(["--cases-dir", cases_root, "materialize-value-tendency", "mini",
+                   "--base", base])
+    out = capsys.readouterr().out
+    assert rc == 0 and "需改" in out, out
