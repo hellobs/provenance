@@ -186,11 +186,81 @@ def value_tendency_args(cfg: Config) -> Dict[str, Any]:
 
     语义原样透传(不改写/不归一,权重忠实保留);缺任一账则回空,由引擎如实标注。
     """
-    vt = cfg.value_tendency or {}
+    vt = getattr(cfg, "value_tendency", None) or {}   # 鸭子类型:桩场景可能没有该字段
     return {
         "governance": dict(vt.get("governance") or {}),
         "initial_tendency": dict(vt.get("initial_tendency") or {}),
         "present": bool(vt),
+    }
+
+
+def value_tendency_plan(cfg: Config) -> Dict[str, Any]:
+    """把声明里的价值权重解析成"能不能落到每个角色"的映射计划 + 逐项体检。
+
+    **这是「声明 → 资产」的唯一映射入口**(2026-09-21 收口:把权重的**声明与装配**收进引擎)。
+    以前 `value_tendency_args()` 无人引用,映射等于空的;而 case00 的 `governance.json`
+    与各 `agent.json` 的 `initial_tendency` 是**手抄**的副本 —— 声明、装配、运行三处各一份,
+    谁改一边都不会有人知道。
+
+    这里只做**纯函数**解析与校验,不写任何文件:
+    - 键匹配:角色既认 `id`(snake_case)也认 `display_name`(声明里用的是后者);
+    - 每个角色两本账:缺账 / 维度为空 / 值非数值 / 和不为 1 都如实报出来;
+    - 声明里多出的角色键(不属于任何已声明角色)也报出来,不当没看见;
+    - `materialize` 给出"若据声明生成资产,应该写成什么" —— 案例侧与工具据此生成,
+      生成物与声明就不可能分叉。
+    """
+    args = value_tendency_args(cfg)
+    gov = args["governance"]
+    init = args["initial_tendency"]
+
+    role_keys: Dict[str, set] = {}
+    for r in getattr(cfg, "roles", []) or []:
+        rid = getattr(r, "id", "") or ""
+        if not rid:
+            continue
+        keys = {rid}
+        dn = getattr(r, "display_name", "") or ""
+        if dn:
+            keys.add(dn)
+        role_keys[rid] = keys
+
+    def look(ledger: dict, rid: str):
+        for k in role_keys.get(rid, ()):
+            if k in ledger:
+                return k, dict(ledger[k] or {})
+        return "", {}
+
+    def dim_report(dims: dict) -> Dict[str, Any]:
+        bad = [d for d, w in dims.items() if not isinstance(w, (int, float))]
+        total = sum(w for w in dims.values() if isinstance(w, (int, float)))
+        return {"n_dims": len(dims), "non_numeric": bad,
+                "total": round(float(total), 6),
+                "sums_to_one": (abs(float(total) - 1.0) <= 0.02) if dims else False}
+
+    roles: Dict[str, Dict[str, Any]] = {}
+    claimed = set()
+    for rid in role_keys:
+        gkey, gdims = look(gov, rid)
+        ikey, idims = look(init, rid)
+        claimed |= {k for k in (gkey, ikey) if k}
+        g_rep, i_rep = dim_report(gdims), dim_report(idims)
+        ok = bool(gdims) and bool(idims) and not g_rep["non_numeric"] and not i_rep["non_numeric"]
+        roles[rid] = {"ok": ok, "governance_key": gkey, "initial_key": ikey,
+                      "governance": g_rep, "initial_tendency": i_rep}
+
+    unknown = sorted({k for k in list(gov) + list(init) if k and k not in claimed})
+    missing = sorted(rid for rid, v in roles.items() if not v["ok"])
+
+    return {
+        "present": args["present"],
+        "roles": roles,
+        "unknown_keys": unknown,
+        "roles_missing_ledger": missing,
+        "materialize": {
+            "governance.json": {k: dict(v or {}) for k, v in gov.items()},
+            "initial_tendency": {k: dict(v or {}) for k, v in init.items()},
+        },
+        "all_ok": bool(args["present"]) and not missing and not unknown,
     }
 
 

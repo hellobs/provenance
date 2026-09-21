@@ -192,18 +192,38 @@ class SandboxValue(EngineStrategy):
                 _all_paths_ok = False
         checks["assets"] = {"ok": _all_paths_ok, "detail": asset_checks}
 
-        # 3. 行政:角色数 + 每角色的价值权重(governance/initial)是否齐备
-        #    权重键用 display_name(如 "AI Advisor"),角色 id 是 snake_case;两者都查。
-        gov = tendency.get("governance") or {}
-        init = tendency.get("initial_tendency") or {}
+        # 3. 行政:角色数 + 每角色的价值权重是否**真能落到**该角色
+        #    2026-09-21:改用 config.value_tendency_plan() —— 声明→资产的唯一映射入口。
+        #    原先只查 "这个名字在两本账里出现过没",看不出"缺一整本账""维度为空"
+        #    "多了别人的键"这类真问题。
+        from case_engine.config import value_tendency_plan
+
+        plan = value_tendency_plan(scenario)
         role_checks: Dict[str, Dict[str, Any]] = {}
-        for r in getattr(scenario, "roles", []):
-            rid = r.id
-            names = {rid, r.display_name} if getattr(r, "display_name", "") else {rid}
-            has = any(n in gov or n in init for n in names)
-            role_checks[rid] = {"ok": bool(has), "detail": "有价值权重" if has else "无权重"}
-        checks["roles"] = {"ok": all(v["ok"] for v in role_checks.values())
-                           and len(role_checks) >= 2, "detail": role_checks}
+        for rid, info in (plan.get("roles") or {}).items():
+            g, i = info["governance"], info["initial_tendency"]
+            role_checks[rid] = {
+                "ok": bool(info["ok"]),
+                "detail": {
+                    "governance": {"key": info["governance_key"],
+                                   "n_dims": g["n_dims"], "sums_to_one": g["sums_to_one"]},
+                    "initial_tendency": {"key": info["initial_key"],
+                                         "n_dims": i["n_dims"], "sums_to_one": i["sums_to_one"]},
+                } if info["ok"] else {
+                    "问题": ("缺账" if not info["governance_key"] or not info["initial_key"]
+                            else "维度/取值异常"),
+                    "governance": info["governance_key"] or "(缺)",
+                    "initial_tendency": info["initial_key"] or "(缺)",
+                },
+            }
+        checks["roles"] = {
+            "ok": bool(role_checks) and all(v["ok"] for v in role_checks.values())
+            and len(role_checks) >= 2 and not plan.get("unknown_keys"),
+            "detail": role_checks,
+            # 声明里多出来的角色键:如实报出来(不当没看见),它是"三处各一份"的典型症状
+            "unknown_keys": plan.get("unknown_keys") or [],
+            "roles_missing_ledger": plan.get("roles_missing_ledger") or [],
+        }
 
         all_ok = all(v["ok"] for v in checks.values())
         result: Dict[str, Any] = {
