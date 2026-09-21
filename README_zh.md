@@ -6,6 +6,24 @@
 面向"AI 价值形成过程可解释、可治理"的演示(Global Trust Challenge)。应用场景为投资咨询(二级市场):
 智能体在空间环境中基于情境作判断、移动、对话,每一步可配置、可解释、可实时可视化。
 
+## 0. 现状速览（2026-09-21）
+
+**分层**：声明（场景数据）→ 引擎（`case_engine/`，可注册、可替换）→ 案例（`case01/`、`case00/`）
+→ 内核（`mavisframework`，独立发版，v1.3.0）→ 呈现（`packages/mavis-vizkit`，mavis 插件）。
+
+**服务（本机）**：
+
+- `5010` 唯一对接入口（实时面 + 数据面：聚合索引 `/api/runs`、专家安全视图 `/api/run-detail/...`、
+  六个 `/embed/*` 嵌入面）
+- `5002` case01 只读契约 · `5003` case00 存档只读 · `5004` 多场景只读 · `5020` 像素布景 ·
+  `8060` 配置工具
+
+**测试**：`python -m pytest tests`（外层）· `python -m pytest case01/tests case_engine/tests`
+· `packages/mavis-vizkit` 自带套件 · `../mavis` 内核套件。
+
+**文档入口**：`provenance/docs/文档索引.md`（状态一览）；平台对接口径见
+`provenance/docs/平台对接契约_5010唯一入口.md`。
+
 ## 1. 架构
 
 ```
@@ -38,19 +56,19 @@ CI 会先用 `tools/check_engine_baseline.py` 断言插件面存在,再跑测试
 git clone https://github.com/hellobs/mavis.git ../mavis
 # 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # 生成 dist/mavisframework-1.2.0-py3-none-any.whl
+uv build                              # 生成 dist/mavisframework-1.3.0-py3-none-any.whl
 cd ../provenance
 
 # 2.2 创建环境并安装依赖(uv 或 conda)
 # uv
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
-pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
+pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 
@@ -97,7 +115,7 @@ cd provenance/provenance
 python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
 ```
 
-浏览器打开 http://127.0.0.1:5001/
+浏览器打开 http://127.0.0.1:5001/（旧端口；现行入口 5010）
 
 ## 5. 角色配置
 

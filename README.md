@@ -9,6 +9,25 @@ The application scenario is investment advisory (secondary market): agents
 make context-based judgments, move and converse within a spatial environment,
 with every step configurable, explainable and visualizable in real time.
 
+## 0. Current state (2026-09-21)
+
+**Layers**: scenario declaration (data) -> engine (`case_engine/`, registrable & replaceable)
+-> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.0)
+-> presentation (`packages/mavis-vizkit`, a mavis plugin).
+
+**Services (localhost)**:
+
+- `5010` the single integration entry (live face + data face: aggregate `/api/runs`,
+  expert-safe `/api/run-detail/...`, six `/embed/*` surfaces)
+- `5002` case01 read-only contract · `5003` case00 archive (read-only) ·
+  `5004` multi-scenario (read-only) · `5020` staged pixel scene · `8060` config tool
+
+**Tests**: `python -m pytest tests` (outer) · `python -m pytest case01/tests case_engine/tests`
+· the `packages/mavis-vizkit` suite · the `../mavis` kernel suite.
+
+**Docs**: start at `provenance/docs/文档索引.md` (status index); the platform-facing contract is
+`provenance/docs/平台对接契约_5010唯一入口.md`.
+
 ## 1. Architecture
 
 ```
@@ -45,19 +64,19 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 #   or SSH (requires a configured SSH key added to your GitHub account):
 # git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # produces dist/mavisframework-1.2.0-py3-none-any.whl
+uv build                              # produces dist/mavisframework-1.3.0-py3-none-any.whl
 cd ../provenance
 
 # 2.2 Create the environment and install dependencies (uv or conda)
 # uv
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
 uv pip install -r requirements.txt
 
 # conda
 conda create -n provenance python=3.12
 conda activate provenance
-pip install ../mavis/dist/mavisframework-1.2.0-py3-none-any.whl
+pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
 pip install -r requirements.txt
 ```
 
@@ -108,7 +127,7 @@ cd provenance/provenance
 python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
 ```
 
-Open http://127.0.0.1:5001/ in a browser.
+Open http://127.0.0.1:5001/ (legacy; current entry: 5010) in a browser (legacy port; the current single entry point is 5010).
 
 ## 5. Role Configuration
 
