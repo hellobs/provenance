@@ -286,6 +286,89 @@ if os.path.isfile(inst):
             len(walk), len(sizes)))
 
 print("=" * 88)
+print("K. 案例侧遗留与职责重复(补漏:抽出通用层后,原案例该退的有没有退)")
+_case_roots = [os.path.join(PKG, "case01"), os.path.join(PKG, "case00")]
+_all_py = []
+for _r in (PKG,):
+    for _dp, _dn, _fn in os.walk(_r):
+        _dn[:] = [d for d in _dn if d not in (".venv", ".venv-live", "__pycache__",
+                                              ".uv-cache", "node_modules", "build",
+                                              "runs", "results", "runs_html")]
+        for _f in _fn:
+            if _f.endswith(".py"):
+                _all_py.append(os.path.join(_dp, _f))
+
+
+def _refs(name, kind="import"):
+    """谁引用了这个模块(返回 非测试文件 列表)。
+
+    认三种写法:from case01.x import / from ..x import / 字符串引用("case01.x:app")。
+    这几类都要认,否则会把还在跑的模块(如 case01.serve 由 uvicorn 以字符串启动)误判成死代码。
+    """
+    import re as _re
+    # 三种写法都要认,少一种就会把"还在跑的模块"判成死代码(已踩过两次):
+    #   from case01.x import ...        / from .x / from ..x  / import case01.x
+    #   from case01 import x            ← 这条最容易漏(名字前没有点)
+    #   "case01.x" 字符串引用(uvicorn case01.serve:app、脚本里的路径)
+    p = _re.compile(
+        r"(?:from\s+\.{{0,2}}{}\s+import"                       # from .x import
+        r"|from\s+case01(?:\.\w+)*\s+import\s+[^\n]*\b{}\b"   # from case01[.y] import x
+        r"|import\s+(?:case01(?:\.\w+)*\.)?{}\b"               # import case01.x
+        r"|case01\.{}(?![\w]))".format(name, name, name, name))
+    out = set()
+    for pth in _all_py:
+        rel = os.path.relpath(pth, PKG).replace("\\", "/")
+        if rel == "case01/{}.py".format(name):
+            continue
+        try:
+            txt = io.open(pth, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        if not p.search(txt):
+            continue
+        if os.path.basename(pth).startswith("test_") or "/tests/" in rel:
+            continue
+        out.add(rel)
+    return sorted(out)
+
+
+_legacy = ["orchestrator", "run", "consistency", "reflection", "run_naming", "render", "viz"]
+_dead, _dup = [], []
+for m in _legacy:
+    fp = os.path.join(PKG, "case01", "{}.py".format(m))
+    if not os.path.isfile(fp):
+        continue
+    loc = len(io.open(fp, encoding="utf-8", errors="replace").read().split("\n"))
+    refs = _refs(m)
+    engine_twin = os.path.join(PKG, "case_engine", "{}.py".format(m))
+    if not refs:
+        _dead.append((m, loc))
+    if os.path.isfile(engine_twin):
+        _dup.append((m, loc, len(io.open(engine_twin, encoding="utf-8",
+                                        errors="replace").read().split("\n"))))
+    say("legacy", bool(refs), "case01/{}: {} 行,非测试引用 {} 处{}".format(
+        m, loc, len(refs), "" if refs else "  ← 候选死代码"))
+engine_loc = 0
+for _dp, _dn, _fn in os.walk(os.path.join(PKG, "case_engine")):
+    _dn[:] = [d for d in _dn if d != "__pycache__"]
+    for _f in _fn:
+        if _f.endswith(".py") and "tests" not in _dp:
+            engine_loc += len(io.open(os.path.join(_dp, _f), encoding="utf-8",
+                                      errors="replace").read().split("\n"))
+legacy_loc = sum(loc for _m, loc in _dead) + sum(
+    len(io.open(os.path.join(PKG, "case01", m + ".py"), encoding="utf-8", errors="replace")
+        .read().split("\n")) for m in ("orchestrator", "run", "consistency", "reflection")
+    if os.path.isfile(os.path.join(PKG, "case01", m + ".py")))
+print("  · 与 case_engine 同名(职责重复)的案例侧模块: {}".format(
+    ", ".join("{}({}行 vs 引擎{}行)".format(m, a, b) for m, a, b in _dup) or "无"))
+print("  · 死代码候选: {}".format(", ".join("{}({}行)".format(m, n) for m, n in _dead) or "无"))
+case01_uses_engine = _refs("case_engine")
+say("legacy", False if not case01_uses_engine else True,
+    "case01 是否引用 case_engine: {}".format("是" if case01_uses_engine else
+                                          "否 —— 两套协议实现并存,旧路径待退役"))
+print("  · 代码量:案例侧遗留(4 模块)约 {} 行 vs 通用层 case_engine {} 行".format(legacy_loc, engine_loc))
+
+print("=" * 88)
 print("J. 工具幂等 / 未收口")
 a = sh('"{}" -X utf8 "{}" --banner'.format(PY, os.path.join(PKG, "tools", "doc_audit.py")))
 b = sh('"{}" -X utf8 "{}" --banner'.format(PY, os.path.join(PKG, "tools", "doc_audit.py")))
