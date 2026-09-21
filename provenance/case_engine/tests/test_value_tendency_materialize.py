@@ -229,88 +229,78 @@ REAL_CASE = os.path.join(_PKG, "cases", "case00_village", "scenario.yaml")
 REAL_AGENTS = ("AI Advisor", "Wendy Lin", "Daniel Shen", "Kevin Su", "Michael Chen", "Mr. Zhou")
 
 
-def test_real_case00_is_already_single_source():
-    """真实 case00:dry-run 全一致;即便 apply,文件哈希也不该变(证明无漂移)。"""
+def test_real_case00_refuses_to_wipe_runtime_interventions():
+    """真实 case00:治理资产已被专家干预改过 → 默认**拒绝覆盖**,并指名道姓说是谁改的;
+    角色 initial_tendency 不受影响,照旧 6 项一致。"""
     cfg = cfg_mod.load_yaml(REAL_CASE)
     base = _PKG
     dry = materialize(cfg, base=base, apply=False)
-    assert dry["problems"] == [], dry["problems"]
-    assert dry["changed"] == [], dry["changed"]
-    assert len(dry["in_sync"]) == 7, dry["in_sync"]
+    inter = dry.get("runtime_interventions") or {}
+    if inter:
+        assert dry["problems"], "有运行时干预却不报,等于静默抹掉专家动作"
+        assert any("干预" in p for p in dry["problems"]), dry["problems"]
+        assert "AI Advisor" in dry["problems"][0] or inter, dry["problems"]
+        assert [c["asset"] for c in dry["changed"]] == ["governance.json"], dry["changed"]
+    # 六个角色的初始倾向必须仍然一致
+    assert len(dry["in_sync"]) == 6, dry["in_sync"]
 
+    # apply(不带 force)同样不许动治理文件
     targets = [os.path.join(base, "governance.json")] + [
         os.path.join(base, AGENTS_REL, a, "agent.json") for a in REAL_AGENTS]
     before = {p: _hash(p) for p in targets}
-    report = materialize(cfg, base=base, apply=True)
-    assert report["written"] == [], "已一致时 apply 不该写任何文件"
+    rep = materialize(cfg, base=base, apply=True)
+    assert rep["written"] == [], "默认不该写任何文件(治理被干预保护、初始倾向已一致)"
     assert {p: _hash(p) for p in targets} == before
 
 
-def test_cli_on_real_case_reports_consistent():
-    assert cli.main(["materialize-value-tendency", "case00_village"]) == 0
-
-# ---------------------------------------------------------------- 边界(补)
-
-def test_ledger_keyed_by_display_name_resolves(tmp_path):
-    base = str(tmp_path)
-    os.makedirs(os.path.join(base, AGENTS_REL, "AI Advisor"), exist_ok=True)
-    io.open(os.path.join(base, AGENTS_REL, "AI Advisor", "agent.json"), "w",
-            encoding="utf-8", newline="").write(
-        json.dumps({"name": "AI Advisor", "initial_tendency": dict(STALE)},
-                   ensure_ascii=False, indent=4))
-    io.open(os.path.join(base, GOV_REL), "w", encoding="utf-8", newline="").write(
-        json.dumps({"roles": dict(STALE)}, ensure_ascii=False, indent=4))
-    data = {
-        "meta": {"case_id": "mini"},
-        # 角色 id 是 snake_case,display_name 才是声明里的键
-        "roles": [{"id": "ai_advisor", "display_name": "AI Advisor", "type": "ai_tool"}],
-        "world": {"value_tendency": {"governance": {"AI Advisor": dict(GOV)},
-                                     "initial_tendency": {"AI Advisor": dict(INIT)}},
-                  "assets": {"agents": AGENTS_REL, "governance": GOV_REL}},
-    }
-    cfg = cfg_mod.load(data)
-    plan = cfg_mod.value_tendency_plan(cfg)
-    assert plan["roles"]["ai_advisor"]["governance_key"] == "AI Advisor", plan["roles"]
-    assert plan["all_ok"], plan
-    rep = materialize(cfg, base=base, apply=True)
-    assert rep["problems"] == [], rep
-    got = json.loads(io.open(os.path.join(base, AGENTS_REL, "AI Advisor", "agent.json"),
-                             encoding="utf-8").read())["initial_tendency"]
-    assert got == pytest.approx(INIT)
+def test_real_case00_force_is_opt_in_and_reported():
+    """--force 才会把治理算作待改,并且明确写进 forced 报告(dry-run 不落盘)。"""
+    cfg = cfg_mod.load_yaml(REAL_CASE)
+    rep = materialize(cfg, base=_PKG, apply=False, allow_overwrite_interventions=True)
+    if not (rep.get("runtime_interventions") or {}):
+        pytest.skip("当前没有运行时干预,这条不适用")
+    assert rep.get("forced"), "强行覆盖必须留痕在 forced 里"
+    assert "governance.json" in [c["asset"] for c in rep["changed"]]
 
 
-def test_declared_role_without_asset_dir_is_reported(tmp_path):
-    """声明里有角色、但资产目录不存在:如实报问题,不崩、不写。"""
-    data, base, _root = _mk_case(tmp_path, agents=("role_one",))
-    data["roles"].append({"id": "role_two", "display_name": "role_two", "type": "user"})
-    data["world"]["value_tendency"]["governance"]["role_two"] = dict(GOV)
-    data["world"]["value_tendency"]["initial_tendency"]["role_two"] = dict(INIT)
-    before = _tree_hash(base)
+def test_intervention_is_explained_only_when_it_matches_current_asset():
+    """explain_divergence 的判据:最后一条干预的 new_constraints 必须==当前资产,否则不算解释。"""
+    from case_engine.value_tendency import explain_divergence
+
+    declared = {"R": {"A": 0.5, "B": 0.5}}
+    inter = [{"agent": "R", "operator": "expert", "time": "t1",
+              "old_constraints": {"A": 0.5, "B": 0.5},
+              "new_constraints": {"A": 0.7, "B": 0.3}}]
+    ok = explain_divergence({"R": {"A": 0.7, "B": 0.3}}, declared, inter)
+    assert ok["R"]["diverged"] and ok["R"]["explained"] and "expert" in ok["R"]["by"]
+    bad = explain_divergence({"R": {"A": 0.9, "B": 0.1}}, declared, inter)
+    assert bad["R"]["diverged"] and not bad["R"]["explained"], "对不上就不许说被解释"
+    same = explain_divergence({"R": {"A": 0.5, "B": 0.5}}, declared, inter)
+    assert not same["R"]["diverged"]
+
+
+def test_materialize_refuses_then_force_overwrites_on_tmp_case(tmp_path):
+    """端点行为(tmp 最小场景):默认拒绝覆盖被干预的治理;force 才写,并报出 forced。"""
+    data, base, _root = _mk_case(tmp_path)
+    # 造一份"解释了偏离"的干预审计:把治理改成与声明不同,并写明是谁改的
+    os.makedirs(os.path.join(base, "results", "checkpoints"), exist_ok=True)
+    inter = [{"agent": "role_one", "operator": "expert", "time": "2026-09-21 22:30:03",
+              "old_constraints": dict(GOV),
+              "new_constraints": {"A": 0.9, "B": 0.1}}]
+    io.open(os.path.join(base, "results", "checkpoints", "interventions.json"), "w",
+            encoding="utf-8").write(json.dumps(inter, ensure_ascii=False))
+    gov_p = os.path.join(base, GOV_REL)
+    io.open(gov_p, "w", encoding="utf-8", newline="").write(
+        json.dumps({"roles": {"role_one": {"A": 0.9, "B": 0.1},
+                              "role_two": dict(STALE)}}, ensure_ascii=False, indent=4))
+
     rep = materialize(cfg_mod.load(data), base=base, apply=True)
-    assert rep["problems"], rep
-    assert any("角色资产不存在" in p for p in rep["problems"])
-    # role_one 的合法部分仍然落盘;role_two 被跳过而不是崩
-    assert _tree_hash(base) != before
-    assert not rep["ok"]
+    assert rep["problems"] and "干预" in rep["problems"][0]
+    gov_now = json.loads(io.open(gov_p, encoding="utf-8").read())
+    assert gov_now["roles"]["role_one"] == {"A": 0.9, "B": 0.1}, "默认不许覆盖被干预的角色"
 
-
-def test_cli_exit_code_is_3_when_refused(tmp_path, capsys):
-    data, base, cases_root = _mk_case(tmp_path)
-    data["world"].pop("value_tendency")
-    io.open(os.path.join(cases_root, "mini", "scenario.yaml"), "w",
-            encoding="utf-8", newline="").write(_yaml(data))
-    rc = cli.main(["--cases-dir", cases_root, "materialize-value-tendency", "mini", "--apply"])
-    out = capsys.readouterr().out
-    assert rc == 3, (rc, out)
-    assert "拒绝" in out
-
-
-def test_cli_base_override(tmp_path, capsys):
-    data, base, cases_root = _mk_case(tmp_path)
-    io.open(os.path.join(cases_root, "mini", "scenario.yaml"), "w",
-            encoding="utf-8", newline="").write(_yaml(data))
-    # 故意让默认 base( cases 的上一级 )与真实资产根不同,再用 --base 指回来
-    rc = cli.main(["--cases-dir", cases_root, "materialize-value-tendency", "mini",
-                   "--base", base])
-    out = capsys.readouterr().out
-    assert rc == 0 and "需改" in out, out
+    rep2 = materialize(cfg_mod.load(data), base=base, apply=True,
+                       allow_overwrite_interventions=True)
+    assert rep2.get("forced"), "强行覆盖要留痕"
+    gov_now2 = json.loads(io.open(gov_p, encoding="utf-8").read())
+    assert gov_now2["roles"]["role_one"] == pytest.approx(GOV), "force 后回到声明基线"

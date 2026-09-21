@@ -57,18 +57,60 @@ def _load_json(path: str) -> Optional[Any]:
         return None
 
 
-def _same(a: Any, b: Any) -> bool:
-    """数值容差比较:权重是长小数,JSON 往返后要能判等。"""
+def _same(a: Any, b: Any, tol: float = 1e-12) -> bool:
+    """数值容差比较(递归):权重是长小数,JSON 往返后要能判等。"""
     if isinstance(a, dict) and isinstance(b, dict):
-        return set(a) == set(b) and all(_same(a[k], b[k]) for k in a)
+        return set(a) == set(b) and all(_same(a[k], b[k], tol) for k in a)
     if isinstance(a, list) and isinstance(b, list):
-        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+        return len(a) == len(b) and all(_same(x, y, tol) for x, y in zip(a, b))
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        return abs(float(a) - float(b)) <= 1e-12
+        return abs(float(a) - float(b)) <= tol
     return a == b
 
 
-def materialize(cfg: Config, base: str, apply: bool = False) -> Dict[str, Any]:
+def _load_interventions(base: str, path: str = "") -> list:
+    """读运行时干预审计(默认 <base>/results/checkpoints/interventions.json)。
+
+    读不到就回空 —— 但不能因此假装"没有干预":调用方据"文件是否存在"来区分
+    "没有干预" 与 "查不到审计",见 explain_divergence() 的 note 字段。
+    """
+    p = path or os.path.join(base, "results", "checkpoints", "interventions.json")
+    data = _load_json(p)
+    return [x for x in (data or []) if isinstance(x, dict)]
+
+
+def explain_divergence(current: dict, declared: dict, interventions: list,
+                       tol: float = 1e-9) -> Dict[str, Any]:
+    """逐角色判断:资产与声明的不一致,能不能被运行时干预解释。
+
+    返回 {role: {"diverged": bool, "explained": bool, "by": "谁 @ 何时"}}。
+    解释成立的判据:该角色最后一条 operator=expert 的 new_constraints 与**当前资产**一致
+    (即"资产的现状就是那次干预的结果")。
+    """
+    out: Dict[str, Any] = {}
+    for role, want in (declared or {}).items():
+        cur = (current or {}).get(role)
+        if cur is None:
+            out[role] = {"diverged": True, "explained": False, "by": ""}
+            continue
+        diverged = not _same(cur, want, tol)
+        if not diverged:
+            out[role] = {"diverged": False, "explained": False, "by": ""}
+            continue
+        last = None
+        for rec in interventions or []:
+            if str(rec.get("agent", "")) == role and rec.get("operator") != "undo":
+                last = rec
+        ok = bool(last) and _same(dict(last.get("new_constraints") or {}), cur, tol)
+        out[role] = {"diverged": True, "explained": ok,
+                     "by": "{} @ {}".format(last.get("operator", "?"), last.get("time", "?"))
+                     if ok else ""}
+    return out
+
+
+def materialize(cfg: Config, base: str, apply: bool = False,
+                interventions_path: str = "",
+                allow_overwrite_interventions: bool = False) -> Dict[str, Any]:
     """把声明里的价值权重落到资产上;返回逐项报告(默认 dry-run)。
 
     `base`:资产相对路径的根(与 `SandboxValue.run(base=...)` 同一口径)。
@@ -102,11 +144,31 @@ def materialize(cfg: Config, base: str, apply: bool = False) -> Dict[str, Any]:
     want_gov = {"roles": mat["governance.json"]}
     if gov_path:
         cur = _load_json(gov_path)
+        cur_roles = (cur or {}).get("roles") if isinstance(cur, dict) else None
         if _same(cur, want_gov):
             report["in_sync"].append({"asset": rel_gov, "kind": "governance"})
         else:
-            report["changed"].append({"asset": rel_gov, "kind": "governance"})
-            if apply:
+            # 先问一句:这份偏离能不能被运行时干预解释?能 → 默认不许覆盖(否则抹掉专家动作)
+            inter = _load_interventions(base, interventions_path)
+            expl = explain_divergence(cur_roles or {}, mat["governance.json"], inter)
+            blocked = {r: v for r, v in expl.items() if v["explained"]}
+            if blocked:
+                report["runtime_interventions"] = blocked
+                if not allow_overwrite_interventions:
+                    report["problems"].append(
+                        "治理资产已被运行时干预改写,拒绝覆盖(要重置回声明基线请显式 --force): "
+                        + "; ".join("{} ({})".format(r, v["by"]) for r, v in blocked.items()))
+                    report["ok"] = False
+                    report["changed"].append({"asset": rel_gov, "kind": "governance",
+                                              "skipped": "有运行时干预"})
+                    gov_path = ""      # 跳过本文件的写入,继续处理 initial_tendency
+                else:
+                    report.setdefault("forced", []).append(
+                        {"asset": rel_gov, "note": "强行覆盖运行时干预: "
+                         + "; ".join("{} ({})".format(r, v["by"]) for r, v in blocked.items())})
+            if gov_path:
+                report["changed"].append({"asset": rel_gov, "kind": "governance"})
+            if apply and gov_path:
                 os.makedirs(os.path.dirname(gov_path), exist_ok=True)
                 # 先算文本再打开写:open(...,"w") 会截断文件,而 _dump_like 要读原文件探测排版
                 body = _dump_like(gov_path, want_gov)

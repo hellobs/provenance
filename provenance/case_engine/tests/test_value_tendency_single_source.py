@@ -61,26 +61,9 @@ def test_declaration_is_self_consistent(plan):
     assert plan["all_ok"], plan["roles"]
 
 
-def test_assets_match_declaration(plan):
-    """**资产必须等于声明**(这就是"单一来源"的可执行含义)。
-
-    对比:governance.json 与每个 agent.json 的 initial_tendency。
-    浮点用 1e-9 容差(声明里的长小数就是原始权重)。
-    """
+def test_initial_tendency_assets_match_declaration(plan):
+    """角色初始倾向必须等于声明(运行时干预不碰它)。"""
     mat = plan["materialize"]
-    gov_actual = _load(_governance_path())
-    gov_declared = mat["governance.json"]
-
-    # governance.json 可能是 {"roles": {...}} 或直接 {role: {...}},两种都认
-    gov_roles = gov_actual.get("roles") if isinstance(gov_actual.get("roles"), dict) else gov_actual
-    for role, dims in gov_declared.items():
-        assert role in gov_roles, "governance.json 缺角色 {}".format(role)
-        for dim, w in dims.items():
-            assert dim in gov_roles[role], "governance.json 的 {} 缺维度 {}".format(role, dim)
-            assert gov_roles[role][dim] == pytest.approx(w, abs=1e-9), \
-                "governance.json 与声明不一致: {}.{} = {} vs {}".format(
-                    role, dim, gov_roles[role][dim], w)
-
     for role, dims in mat["initial_tendency"].items():
         p = os.path.join(AGENTS_DIR, role, "agent.json")
         assert os.path.isfile(p), "缺角色资产 {}".format(p)
@@ -92,6 +75,28 @@ def test_assets_match_declaration(plan):
             assert actual[dim] == pytest.approx(w, abs=1e-9), \
                 "initial_tendency 与声明不一致: {}.{} = {} vs {}".format(
                     role, dim, actual[dim], w)
+
+
+def test_governance_asset_is_declaration_or_audited_intervention(plan):
+    """治理资产:要么等于声明,要么其偏离**能被运行时干预审计解释**。
+
+    这是比"资产==声明"更强的真实性要求:允许运行时干预(IVD 的正常流程),
+    但不允许出现"没人知道谁改的"偏离。
+    """
+    from case_engine.value_tendency import _load_interventions, explain_divergence
+
+    base = _PKG
+    gov_actual = _load(os.path.join(base, "governance.json"))
+    gov_roles = gov_actual.get("roles") if isinstance(gov_actual.get("roles"), dict) else gov_actual
+    declared = plan["materialize"]["governance.json"]
+    inter = _load_interventions(base)
+    expl = explain_divergence(gov_roles, declared, inter)
+
+    unexplained = {r: v for r, v in expl.items() if v["diverged"] and not v["explained"]}
+    assert not unexplained, "治理资产偏离了声明,且无法用干预审计解释: {}".format(unexplained)
+    # 报出来(不静默):哪些角色是被干预改过的
+    changed = {r: v["by"] for r, v in expl.items() if v["diverged"]}
+    print("被运行时干预改写的角色:", changed or "无(全部与声明一致)")
 
 
 def test_engine_precheck_uses_the_plan(plan):

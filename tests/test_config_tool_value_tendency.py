@@ -67,8 +67,12 @@ def test_config_tool_uses_the_engine_mapping():
 
 
 @pytest.mark.skipif(not os.path.isdir(_MAVIS_TOOL), reason="mavis 仓不在预期位置")
-def test_config_tool_payload_matches_real_governance_asset():
-    """再对一层:工具生成的 payload 也要等于**仓里真实的** governance.json。"""
+def test_config_tool_payload_is_declaration_based():
+    """config_tool 生成的是**声明派生**的治理(不是仓里那份可能已被干预改过的资产)。
+
+    这条以前拿"真实 governance.json"当基准 —— 本轮体检发现该文件会被运行时专家干预改写,
+    所以基准改成声明;资产的偏离由 case_engine 的单一来源测试用"审计解释"来管。
+    """
     if _MAVIS_TOOL not in sys.path:
         sys.path.insert(0, _MAVIS_TOOL)
     try:
@@ -76,7 +80,10 @@ def test_config_tool_payload_matches_real_governance_asset():
     except Exception as exc:                                       # noqa: BLE001
         pytest.skip("config_tool 依赖缺失: {}".format(exc))
 
+    from case_engine.config import load as ce_load, value_tendency_plan
+
     decl = _yaml_to_dict(SCENARIO)
+    want = value_tendency_plan(ce_load(decl))["materialize"]["governance.json"]
     tool = scenario_builder.governance_payload(decl)
-    real = json.loads(io.open(os.path.join(_PKG, "governance.json"), encoding="utf-8").read())
-    assert _same(tool["roles"], real["roles"])
+    assert tool.get("used_engine") is True
+    assert _same(tool["roles"], want)

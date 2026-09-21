@@ -124,7 +124,8 @@ def _do_engines(root: str, case_id: str) -> int:
     return 0
 
 
-def _do_materialize(root: str, case_id: str, apply: bool, base: str) -> int:
+def _do_materialize(root: str, case_id: str, apply: bool, base: str,
+                    force: bool = False) -> int:
     """把声明里的价值权重落到资产(governance.json + 各 agent.json 的 initial_tendency)。
 
     默认 dry-run;`--apply` 才写。声明为准,单向覆盖资产(2026-09-21 收口 ②)。
@@ -137,7 +138,8 @@ def _do_materialize(root: str, case_id: str, apply: bool, base: str) -> int:
     if scenario is None:
         return rc
     base = base or _os.path.dirname(_os.path.abspath(root))
-    report = materialize(scenario, base=base, apply=apply)
+    report = materialize(scenario, base=base, apply=apply,
+                         allow_overwrite_interventions=force)
     print("case:     {}".format(case_id))
     print("base:     {}".format(base))
     print("结论:     {}".format(summary_line(report)))
@@ -145,6 +147,8 @@ def _do_materialize(root: str, case_id: str, apply: bool, base: str) -> int:
         print("  需改:  {} ({})".format(item["asset"], item["kind"]))
     for item in report["in_sync"]:
         print("  一致:  {} ({})".format(item["asset"], item["kind"]))
+    for f in report.get("forced") or []:
+        print("  强行:  {}".format(f["note"]))
     for p in report["problems"]:
         print("  问题:  {}".format(p))
     return 0 if report.get("ok", False) else 3
@@ -172,6 +176,8 @@ def main(argv=None) -> int:
     pm.add_argument("case_id", help="场景 id(即 case 目录名)")
     pm.add_argument("--apply", action="store_true", help="真的写盘(缺省只报告)")
     pm.add_argument("--base", default="", help="资产相对路径的根(默认 cases 根的上一级)")
+    pm.add_argument("--force", action="store_true",
+                    help="连运行时专家干预一起覆盖(默认拒绝:干预是审计留痕,不该被静默抹掉)")
     args = parser.parse_args(argv)
 
     root = args.cases_dir or default_cases_root()
@@ -183,7 +189,8 @@ def main(argv=None) -> int:
     if args.cmd == "run":
         return _do_run(root, args.case_id, args.engine, args.input)
     if args.cmd == "materialize-value-tendency":
-        return _do_materialize(root, args.case_id, args.apply, args.base)
+        return _do_materialize(root, args.case_id, args.apply, args.base,
+                               getattr(args, "force", False))
     return _do_engines(root, args.case_id)
 
 
