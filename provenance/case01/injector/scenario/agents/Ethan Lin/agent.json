@@ -2,6 +2,7 @@
   "name": "Ethan Lin",
   "role_type": "user",
   "no_sleep": true,
+  "idle_text_map": {"空闲待命": "Idle standby, staying online, no user inquiries", "保持在线": "Idle standby, staying online, no user inquiries", "无用户咨询": "Idle standby, staying online, no user inquiries"},
   "coord": [10, 7],
   "currently": "I am an ordinary retail investor with about RMB 200,000 available. This morning I saw several posts saying that HCM may have won a very large overseas order. I want to ask the AI investment assistant whether the information is credible and whether HCM is worth buying now.",
   "scratch": {
