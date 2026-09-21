@@ -124,6 +124,32 @@ def _do_engines(root: str, case_id: str) -> int:
     return 0
 
 
+def _do_materialize(root: str, case_id: str, apply: bool, base: str) -> int:
+    """把声明里的价值权重落到资产(governance.json + 各 agent.json 的 initial_tendency)。
+
+    默认 dry-run;`--apply` 才写。声明为准,单向覆盖资产(2026-09-21 收口 ②)。
+    """
+    import os as _os
+
+    from case_engine.value_tendency import materialize, summary_line
+
+    scenario, rc = _load_scenario(root, case_id)
+    if scenario is None:
+        return rc
+    base = base or _os.path.dirname(_os.path.abspath(root))
+    report = materialize(scenario, base=base, apply=apply)
+    print("case:     {}".format(case_id))
+    print("base:     {}".format(base))
+    print("结论:     {}".format(summary_line(report)))
+    for item in report["changed"]:
+        print("  需改:  {} ({})".format(item["asset"], item["kind"]))
+    for item in report["in_sync"]:
+        print("  一致:  {} ({})".format(item["asset"], item["kind"]))
+    for p in report["problems"]:
+        print("  问题:  {}".format(p))
+    return 0 if report.get("ok", False) else 3
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m case_engine",
@@ -141,6 +167,11 @@ def main(argv=None) -> int:
     pr.add_argument("--input", default="", help="受判的对象回答(experiment-eval;缺省取场景 inputs 样本)")
     pe = sub.add_parser("engines", help="列出全部已注册引擎(及可选兼容矩阵)")
     pe.add_argument("--case-id", default="", help="若给,显示该场景的引擎兼容矩阵")
+    pm = sub.add_parser("materialize-value-tendency",
+                        help="把声明里的价值权重落到资产(默认 dry-run,加 --apply 才写)")
+    pm.add_argument("case_id", help="场景 id(即 case 目录名)")
+    pm.add_argument("--apply", action="store_true", help="真的写盘(缺省只报告)")
+    pm.add_argument("--base", default="", help="资产相对路径的根(默认 cases 根的上一级)")
     args = parser.parse_args(argv)
 
     root = args.cases_dir or default_cases_root()
@@ -151,6 +182,8 @@ def main(argv=None) -> int:
         return _do_show(root, args.case_id)
     if args.cmd == "run":
         return _do_run(root, args.case_id, args.engine, args.input)
+    if args.cmd == "materialize-value-tendency":
+        return _do_materialize(root, args.case_id, args.apply, args.base)
     return _do_engines(root, args.case_id)
 
 
