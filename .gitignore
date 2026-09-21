@@ -212,3 +212,7 @@ provenance/case*/scenario/maze.json.*.bak
 # --fix-spawns 挪坐标时留下的 agent.json 备份(旧值在 git 历史里)
 provenance/case*/**/agents/*/agent.json.*.bak
 provenance/case*/agents/*/agent.json.*.bak
+
+# 审计/共享临时目录(工作区里有,但不入库)
+.audit-tmp/
+.trae-html-share-packages/
