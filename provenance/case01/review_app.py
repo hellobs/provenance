@@ -412,9 +412,11 @@ function paneOverview(d) {
     ["判定方式", dash(ba.judge)],
     // 分支来源与 T0 一致性:预设分支不看 AI 说了什么,自相矛盾的记录必须自己说出来
     // (实测 A-1720:AI 说"不能确认值得买",A 线却让当事人满仓买入)
-    ["分支来源", ba.source === "preset"
-      ? '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定'
-      : (ba.source === "judge" ? '<span class="chip k">由 AI 回答判定</span>' : "—")],
+    ["分支来源", ba.pending
+      ? '<span class="chip">judge(待 T0 判定)</span> 本次由 AI 的 T0 回答决定,现在还没跑到'
+      : (ba.source === "preset"
+        ? '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定'
+        : (ba.source === "judge" ? '<span class="chip k">由 AI 回答判定</span>' : "—"))],
     ["T0 立场一致性", badge
       ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
       : '<span class="chip">未校验</span>'],

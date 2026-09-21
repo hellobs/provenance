@@ -37,6 +37,17 @@
   })();
   </script>
   {% endif %}
+  <script>
+  /* 顶栏是 fixed 的:页面主体靠 body 的 padding-top 让位,但我们的固定面板
+     (左栏 clock/状态/console、右栏 Chat Log + 结果记录、结束横幅)是 position:fixed,
+     拿不到 padding —— 结果就是 Chat Log 被顶栏压住(用户实测反馈)。
+     这里把"让位高度"写成 CSS 变量,面板一律用 calc(var(--top-offset) + Npx) 定位。
+     嵌入 iframe 时上面的脚本已把 padding 归零、导航摘掉 → 变量为 0,面板贴顶。 */
+  (function () {
+    var pad = parseInt(getComputedStyle(document.body).paddingTop || "0", 10) || 0;
+    document.documentElement.style.setProperty("--top-offset", pad + "px");
+  })();
+  </script>
   {% block content %}
   {% endblock content %}
 

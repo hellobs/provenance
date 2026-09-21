@@ -32,7 +32,7 @@ body { margin: 0; }
      而不是各自写死 fixed top —— 状态块会随"重开一局"按钮出现而变高,写死 top 就会压住
      console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。 -->
 {% if embed != "goals" and embed != "explain" and embed != "timeline" %}
-<div id="left-col" style="position: fixed; left: 16px; top: 60px; z-index: 150; width: 320px;
+<div id="left-col" style="position: fixed; left: 16px; top: calc(var(--top-offset, 0px) + 16px); z-index: 150; width: 320px;
     display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
 
 <!-- Simulation clock (HTML, independent of Phaser rendering for reliability) -->
@@ -105,7 +105,7 @@ body { margin: 0; }
 </div><!-- /#left-col -->
 
 <!-- Story event banner (shown when an event is injected) -->
-<div id="story-banner" style="position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+<div id="story-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px); left: 50%; transform: translateX(-50%);
     z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
     padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
@@ -113,7 +113,7 @@ body { margin: 0; }
 <!-- 推演结束的醒目提示(**用户明确要求"推演结束后要有提示"**)。
      状态块那行小字不够——跑完是最该被看见的时刻,所以给一条居中的大横幅:
      结束原因、节点数、以及"结果记录还在生成,约 1-2 分钟"。 -->
-<div id="done-banner" style="position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+<div id="done-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px); left: 50%; transform: translateX(-50%);
     z-index: 320; border: 2px solid #fff; border-radius: 10px; padding: 12px 20px;
     font-size: 14px; color: #fff; font-weight: bold; display: none; max-width: 70%;
     text-align: center; box-shadow: 0 6px 26px rgba(0,0,0,0.35); line-height: 1.6;"></div>
@@ -121,7 +121,7 @@ body { margin: 0; }
 
 <!-- Right column: chat log (top) + goal adjustment panel (below) -->
 {% if embed != "scene" and embed != "timeline" %}
-<div id="right-col" style="position: fixed; right: 16px; top: 16px; width: 380px; z-index: 150;
+<div id="right-col" style="position: fixed; right: 16px; top: calc(var(--top-offset, 0px) + 16px); width: 380px; z-index: 150;
     display: flex; flex-direction: column; gap: 12px;
     {% if embed %}bottom: 16px;{% else %}bottom: 210px;{% endif %}">
 {% endif %}
