@@ -82,6 +82,17 @@ def test_run_detail_raw_view_is_opt_in():
     assert "injector" in body["data"] or "branch_action" in body["data"]
 
 
+def test_non_case01_sources_are_unverified_not_hidden():
+    """case00 痕迹/压缩成品没有一致性戳 → unverified,**不该**被当成可疑记录滤掉。
+
+    (判不了 ≠ 有问题:滤掉它们等于悄悄少给平台数据。)
+    """
+    body = _call(H.list_all_runs())
+    others = [r for r in body["runs"] if r.get("source") in ("checkpoint", "compressed")]
+    for r in others:
+        assert r["quality"] == "unverified", r
+
+
 def test_expert_safe_record_keeps_contract_keys():
     """白名单要覆盖平台契约 §2.2 明确要读的那些键。"""
     rec = {"run_id": "r", "start_date": "d", "end_date": "e", "turns": [1],

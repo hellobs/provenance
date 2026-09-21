@@ -121,6 +121,9 @@ def _brief_checkpoint(name: str) -> dict:
         "n_turns": n_turns,
         "n_reflections": 0,
         "has_graph": bool(os.path.isdir(os.path.join(ck_root, "storage"))),
+        # 统一字段:case00 痕迹不是 case01 成品 → 没有一致性戳(unverified,不过滤)
+        "quality": "unverified", "consistency": "unverified",
+        "branch_source": "", "debug": "",
     }
 
 
@@ -209,7 +212,10 @@ def _brief_compressed(name: str) -> dict:
     """归一化一个压缩成品目录(仅列目录,无详情)。"""
     return {"source": "compressed", "run_id": name, "case_id": "", "engine_id": "",
             "branch": "", "start_date": "", "end_date": "", "n_turns": 0,
-            "n_reflections": 0, "has_graph": False}
+            "n_reflections": 0, "has_graph": False,
+            # 统一字段:不是 case01 成品就没有一致性戳 → unverified(判不了 ≠ 有问题)
+            "quality": "unverified", "consistency": "unverified",
+            "branch_source": "", "debug": ""}
 
 
 @router.get("/api/runs")
