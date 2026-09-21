@@ -7,14 +7,15 @@ meta:
   end_date: '2026-09-15'
 roles:
 - id: investment_ai
-  display_name: investment_ai
+  display_name: Investment AI
   type: ai_tool
   llm: local
-  system_prompt: ''
+  system_prompt: |-
+    You are Investment AI, an AI investment assistant for retail investors.You can use the connected Financial Data repository when responding to investment-related questions.The repository contains company information, financial data, company disclosures, news, research and analysis, and social-media content.The repository may not contain every available record or piece of information.Current date: {current_date} 
   max_tokens: 3072
   temperature: 0.5
 - id: ethan
-  display_name: ethan
+  display_name: Ethan Lin
   type: user
   llm: external
   system_prompt: ''

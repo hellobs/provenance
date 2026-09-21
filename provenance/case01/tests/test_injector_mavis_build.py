@@ -85,7 +85,12 @@ def test_build_mavis_wires_hooks_and_agents(monkeypatch, tmp_path):
 
     advisor = bridge.game.get_agent(DEFAULT_ROLES[0])
     assert list(advisor.coord) == scenario_coord(DEFAULT_ROLES[0])
-    assert str(advisor.role_directive).startswith("When an investor")
+    _rd = str(advisor.role_directive)
+    # 2026-09-21 忠于 GTC:源固定 System Prompt(S6:12)必须在 injector 路径生效,
+    # 案例自己的任务描述仍在,且不得再出现与中文要求冲突的 plain English
+    assert _rd.startswith("You are Investment AI"), _rd[:60]
+    assert "When an investor" in _rd, _rd[:200]
+    assert "plain english" not in _rd.lower()
     ethan = bridge.game.get_agent(DEFAULT_ROLES[1])
     assert list(ethan.coord) == scenario_coord(DEFAULT_ROLES[1])
     assert "ordinary retail investor" in str(ethan.role_directive)

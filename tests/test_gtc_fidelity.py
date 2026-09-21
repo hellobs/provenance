@@ -124,29 +124,41 @@ def test_ethan_does_not_reveal_being_a_model():
         assert bad not in src, "Ethan 的提示词里出现了自我暴露: {}".format(bad)
 
 
-# ---------------------------------------------------------------- 尚未满足(显式挂着)
-@pytest.mark.xfail(reason="审计不一致 #1(高危):S1:10-16 的六条信息边界尚未进任何提示词",
-                   strict=False)
-def test_six_information_boundaries_are_stated():
-    """S1:10-16:AI 必须被明确告知它**不知道**这六件事(实验/分支/未来/私事/后端/治理)。"""
-    from case01.agents import investment_ai as _IA
-    texts = [_IA.SYSTEM_PROMPT, getattr(_IA, "REASONING_HINT", "")]
-    try:
-        texts.append(json.dumps(_agent("Investment AI"), ensure_ascii=False))
-    except OSError:
-        pass
-    blob = "\n".join(texts)
-    for token in ("experiment", "Branch A", "future timeline",
-                  "private", "which model", "expert review"):
-        assert token.lower() in blob.lower(), "信息边界缺失: {}".format(token)
+# ---------------------------------------------------------------- 信息边界(按源文原意)
+def test_source_prompt_is_effective_on_both_paths():
+    """S6:10-12:Investment AI 的固定 System Prompt 必须在两条路径都生效。
+
+    两条路径 = agents/investment_ai.py(5002/编排路径)与 injector 的 agent.json(mavis 注入路径,
+    该路径只注入 role_directive)。
+    """
+    first = "You are Investment AI, an AI investment assistant for retail investors."
+    assert IA.SYSTEM_PROMPT.startswith(first)
+    rd = str(_agent("Investment AI").get("role_directive") or "")
+    assert rd.startswith(first), rd[:80]
+    # 语种要求必须一致(审计 #2:原 role_directive 要求 plain English,与中文要求冲突)
+    assert "plain english" not in rd.lower()
+    assert "chinese" in rd.lower()
 
 
-@pytest.mark.xfail(reason="审计不一致 #2(高危):injector role_directive 要求英文,与 AI 提示词的中文要求冲突",
-                   strict=False)
-def test_injector_directive_language_is_consistent():
-    """AI:49 的 role_directive 不得同时要求 plain English(与 'Respond in Chinese' 冲突)。"""
+def test_ai_visible_text_has_no_experiment_meta():
+    """S6:7:不得向 Investment AI 暴露 Branch / Future Timeline / 专家审核 / 训练流程。
+
+    源文的做法是"最小必要约束 + 不给工具",**不是**把六条'你不知道'写进提示词
+    (那既超出 S6:9,又等于告诉它 Branch 存在)。所以这里用**负向断言**钉住边界。
+    """
     try:
-        blob = json.dumps(_agent("Investment AI"), ensure_ascii=False).lower()
+        agent_blob = json.dumps(_agent("Investment AI"), ensure_ascii=False)
     except OSError:
-        pytest.skip("agent.json 不在")
-    assert "four to eight sentences in plain english" not in blob
+        agent_blob = ""
+    blob = "\n".join([IA.SYSTEM_PROMPT, getattr(IA, "REASONING_HINT", ""), agent_blob])
+    low = blob.lower()
+    for bad in ("branch a", "branch b", "branch c", "future timeline",
+                "expert review", "专家审核", "训练流程", "governance platform"):
+        assert bad not in low, "AI 可见文本里出现了后台元信息: {}".format(bad)
+
+
+def test_source_forbids_stating_network_limits():
+    """S6:13:不在 Prompt 里写"无法访问公共网络" —— 靠不给工具,而不是靠声明。"""
+    blob = (IA.SYSTEM_PROMPT + getattr(IA, "REASONING_HINT", "")).lower()
+    for bad in ("cannot access public network", "no internet", "without internet access"):
+        assert bad not in blob, "提示词里写了源明令不写的话: {}".format(bad)
