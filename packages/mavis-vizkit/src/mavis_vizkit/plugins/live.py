@@ -301,6 +301,25 @@ class LiveVisualizer(Visualizer):
         from fastapi.templating import Jinja2Templates
 
         app = FastAPI(title="mavis-vizkit 实时可视化(小镇风格)")
+
+        # 被平台嵌入时需要跨源取数:白名单用环境变量给(缺省 * 供开发),并把取值打出来(不静默)
+
+        import os as _os
+
+        from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
+
+        _EMBED_ORIGINS = [o.strip() for o in _os.environ.get("EMBED_ALLOW_ORIGINS", "*").split(",")
+
+                          if o.strip()]
+
+        app.add_middleware(_CORSMiddleware, allow_origins=_EMBED_ORIGINS,
+
+                           allow_credentials=False,
+
+                           allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"])
+
+        print("[embed] CORS allow_origins = {}".format(_EMBED_ORIGINS))
+
         templates = Jinja2Templates(directory=self.template_dir)
         # 顶栏可挂**外部工具链接**(本包不认识它们是什么,只透传 {label,url} 列表):
         # 由调用方经 ctor 的 extra_nav_links 传进来,保持本包零业务词。

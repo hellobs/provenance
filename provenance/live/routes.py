@@ -26,6 +26,23 @@ from live.reflections import (
 )
 
 app = FastAPI(title="Provenance Live (FastAPI)")
+
+# 被平台嵌入时需要跨源取数:白名单用环境变量给(缺省 * 供开发),并把取值打出来(不静默)
+import os as _os
+
+from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
+
+_EMBED_ORIGINS = [o.strip() for o in _os.environ.get("EMBED_ALLOW_ORIGINS", "*").split(",")
+                  if o.strip()]
+app.add_middleware(
+    _CORSMiddleware,
+    allow_origins=_EMBED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+print("[embed] CORS allow_origins = {}".format(_EMBED_ORIGINS))
+
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(state.BASE_DIR, "frontend/static")),
