@@ -357,7 +357,10 @@ class TestPageRender:
         out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_pages")
         os.makedirs(out_dir, exist_ok=True)
         for path, fn in [("/", "index.html"),
-                         ("/embed/timeline", "timeline.html")]:
+                         ("/embed/timeline", "timeline.html"),
+                         # 数据界面(history.html)也 dump 出来:它的列表/详情全是自渲染 JS,
+                         # 以前不在冒烟范围内,改版(2026-09-21 版式重做)容易悄悄写坏语法。
+                         ("/embed/explore", "explore.html")]:
             r = client.get(path)
             assert r.status_code == 200
             with open(os.path.join(out_dir, fn), "w", encoding="utf-8") as f:

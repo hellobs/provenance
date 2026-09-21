@@ -7,21 +7,103 @@
      数据来自 /api/runs 的 scenarios 发现层。
    - 右侧:点任意 run → fetch /api/run-detail/<source>/<run_id> 自渲染详情。
      刻意不用 /embed/review —— 它只挂 case01 实时面,别的 case 跑会 404。
-   ====================================================================== #}
-<div style="max-width:1320px; margin:10px auto; padding:0 14px;">
-  <h4 style="margin:6px 0 2px;">历史数据一览
-    <small style="color:#888; font-weight:normal;">来源 = /api/runs(所有场景 × 引擎的历史运行,按场景分层)</small>
-  </h4>
 
-  <div class="row">
-    <div class="col-md-3" style="padding-right:8px;">
-      <div class="list-group" id="explore-menu"
-           style="max-height:78vh; overflow:auto; margin-top:6px;"></div>
-    </div>
-    <div class="col-md-9">
-      <div id="explore-detail" style="background:#fff; border:1px solid #e6e6e6;
-          border-radius:10px; min-height:72vh; margin-top:6px;"></div>
-    </div>
+   版式(2026-09-21 用户反馈"风格老旧 + 字重叠"):改成学术/克制的一版 ——
+   去掉 Bootstrap 的面板阴影与深色标签,只留细线、留白与等宽数字;
+   列表行用 flex(min-width:0 + 省略号)排版,长 run_id 不再压到右边的计数上。
+   ====================================================================== #}
+<style>
+  /* 只作用于本页,不碰共享顶栏 */
+  .explore-wrap { max-width: 1180px; margin: 22px auto 40px; padding: 0 20px; }
+  .explore-title {
+    font-family: Georgia, "Songti SC", "Source Han Serif SC", serif;
+    font-size: 21px; font-weight: 600; letter-spacing: .01em;
+    color: #1f2933; margin: 0 0 2px;
+  }
+  .explore-sub { color: #6b7280; font-size: 12.5px; line-height: 1.7; margin-bottom: 18px; }
+  .explore-cols { display: flex; gap: 22px; align-items: flex-start; }
+  .explore-menu {
+    flex: 0 0 320px; max-height: 78vh; overflow: auto;
+    border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;
+    padding: 6px 0; font-size: 13px;
+  }
+  .explore-main {
+    flex: 1 1 auto; min-width: 0; border: 1px solid #e5e7eb; border-radius: 4px;
+    background: #fff; min-height: 72vh;
+  }
+  @media (max-width: 860px) { .explore-cols { flex-direction: column; } .explore-menu { flex: 1 1 auto; width: 100%; } }
+
+  /* 列表行:min-width:0 + 省略号,长 id 不再和右侧计数重叠 */
+  .mi {
+    display: flex; align-items: baseline; gap: 8px; min-width: 0;
+    padding: 6px 10px; border-bottom: 1px solid #f3f4f6;
+    color: #1f2933; text-decoration: none !important; cursor: pointer;
+  }
+  .mi:last-child { border-bottom: 0; }
+  .mi:hover { background: #f9fafb; }
+  .mi.on { background: #f3f6fa; box-shadow: inset 2px 0 0 #1f4e79; }
+  .mi-tag {
+    flex: 0 0 auto; font-size: 11px; letter-spacing: .02em;
+    border: 1px solid #d1d5db; border-radius: 3px; padding: 0 4px; color: #4b5563;
+    background: #fff;
+  }
+  .mi-tag.review { border-color: #9db6d0; color: #1f4e79; }
+  .mi-tag.checkpoint { border-color: #cbd5e1; color: #475569; }
+  .mi-tag.compressed { border-color: #d6cfc0; color: #6b5b3e; }
+  .mi-text {
+    flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-family: Consolas, "SFMono-Regular", monospace; font-size: 12px;
+  }
+  .mi-n {
+    flex: 0 0 auto; color: #6b7280; font-variant-numeric: tabular-nums; font-size: 11.5px;
+  }
+  .mg {                       /* 场景分组标题行 */
+    display: flex; align-items: baseline; gap: 8px; min-width: 0;
+    padding: 9px 10px 6px; cursor: pointer;
+  }
+  .mg:hover { background: #f9fafb; }
+  .mg-name {
+    flex: 1 1 auto; min-width: 0; font-weight: 600; color: #111827; font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mg-eng { color: #6b7280; font-weight: 400; font-size: 12px; }
+  .mg-n { flex: 0 0 auto; color: #6b7280; font-variant-numeric: tabular-nums; font-size: 12px; }
+
+  /* 右侧详情:定义列表式,细线分隔 */
+  .card-pad { padding: 20px 24px 26px; }
+  .card-id { font-family: Consolas, monospace; font-size: 15px; color: #111827; margin: 10px 0 14px; overflow-wrap: anywhere; }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: .02em; border: 1px solid #d1d5db;
+         border-radius: 3px; padding: 1px 6px; color: #4b5563; margin-right: 6px; }
+  .tag.review { border-color: #9db6d0; color: #1f4e79; }
+  .tag.checkpoint { border-color: #cbd5e1; color: #475569; }
+  .tag.compressed { border-color: #d6cfc0; color: #6b5b3e; }
+  .kv { display: flex; gap: 14px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+  .kv-k { flex: 0 0 116px; color: #6b7280; font-size: 12.5px; }
+  .kv-v { flex: 1 1 auto; min-width: 0; color: #1f2933; font-size: 13px; overflow-wrap: anywhere; }
+  .sec { margin-top: 22px; }
+  .sec-h { font-size: 13px; font-weight: 600; color: #111827; padding-bottom: 6px;
+           border-bottom: 1px solid #e5e7eb; margin-bottom: 10px; }
+  .sec-b { max-height: 46vh; overflow: auto; font-size: 13px; color: #1f2933; }
+  .mono { font-family: Consolas, "SFMono-Regular", monospace; font-size: 12px; }
+  pre.quote { white-space: pre-wrap; background: #fafafa; border: 1px solid #f0f0f0;
+              border-radius: 3px; padding: 10px 12px; margin: 0; font-size: 12.5px; }
+  .hint { color: #6b7280; font-size: 12.5px; line-height: 1.8; }
+  .stat-row { display: flex; gap: 26px; margin: 14px 0 6px; }
+  .stat { min-width: 92px; }
+  .stat-n { font-size: 22px; color: #111827; font-variant-numeric: tabular-nums; }
+  .stat-k { color: #6b7280; font-size: 12px; }
+</style>
+
+<div class="explore-wrap">
+  <div class="explore-title">历史数据一览</div>
+  <div class="explore-sub">
+    来源 <span class="mono">/api/runs</span>(所有场景 × 引擎的历史运行,按场景分层)。
+    左侧点场景展开,点单条 run 看详情;详情由本页自渲染,不依赖当前跑的是哪个实时面。
+  </div>
+
+  <div class="explore-cols">
+    <div class="explore-menu" id="explore-menu"></div>
+    <div class="explore-main" id="explore-detail"></div>
   </div>
 </div>
 
@@ -40,8 +122,8 @@
   function labelTxt(source) {
     return source === "review" ? "成品 run" : source === "checkpoint" ? "运行时痕迹" : "压缩成品";
   }
-  function labelCls(source) {
-    return source === "review" ? "label-info" : source === "checkpoint" ? "label-default" : "label-warning";
+  function tagCls(source) {
+    return source === "review" ? "review" : source === "checkpoint" ? "checkpoint" : "compressed";
   }
 
   // 场景分组:先用 /api/runs 的 scenarios 初始化分组,再把 runs 归进所属场景。
@@ -73,35 +155,31 @@
   // ---- 右侧渲染 ----
   function briefCard(r) {
     function row(k, v) {
-      return '<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid #f2f2f2;">' +
-             '<div style="width:110px; color:#888; flex-shrink:0;">' + k + '</div>' +
-             '<div style="word-break:break-all;">' + v + '</div></div>';
+      return '<div class="kv"><div class="kv-k">' + k + '</div>' +
+             '<div class="kv-v">' + v + '</div></div>';
     }
     var extra = "";
-    if (r.error) extra = '<div class="alert alert-warning" style="margin:10px 0;">' + esc(r.error) + '</div>';
-    if (r.source === "review") {
-      if (r.branch) extra += row("剧情线", esc(r.branch));
-      if (r.engine_name) extra += row("引擎", esc(r.engine_name));
-    }
-    var h = '<div style="padding:16px 20px;">' +
-      '<span class="label ' + labelCls(r.source) + '">' + labelTxt(r.source) + '</span> ' +
-      '<span class="label label-primary">' + esc(r.case_name || r.case_id || "—") + '</span>' +
-      '<h4 style="margin:10px 0 4px; word-break:break-all;">' + esc(r.run_id) + '</h4>' + extra +
+    if (r.error) extra = '<div class="hint" style="color:#9b2c2c;">' + esc(r.error) + '</div>';
+    var h = '<div class="card-pad">' +
+      '<span class="tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
+      '<span class="tag">' + esc(r.case_name || r.case_id || "—") + '</span>' +
+      '<div class="card-id">' + esc(r.run_id) + '</div>' + extra +
       row("场景", esc(r.case_name || r.case_id || "—")) +
       row("引擎", esc(r.engine_name || r.engine_id || "—")) +
-      row("分支 / branch", esc(r.branch || "—")) +
+      row("分支", esc(r.branch || "—")) +
       row("开始时间", esc(r.start_date || "—")) +
       row("结束时间", esc(r.end_date || "—")) +
       row("对话轮次", esc(r.n_turns != null ? r.n_turns : "—")) +
       row("反思条数", esc(r.n_reflections != null ? r.n_reflections : "—")) +
       row("数据完整性", r.has_graph ? "完整" : "—") +
-      '<div style="margin-top:12px;">加载详情中…</div>' +
+      '<div class="hint" style="margin-top:14px;">加载详情中…</div>' +
       '</div>';
     return h;
   }
 
   function showError(msg) {
-    detail.innerHTML = '<div class="alert alert-danger" style="margin:16px;">' + esc(msg) + '</div>';
+    detail.innerHTML = '<div class="card-pad"><div class="hint" style="color:#9b2c2c;">' +
+                       esc(msg) + '</div></div>';
   }
 
   // ---- 详情自渲染 ----
@@ -133,21 +211,19 @@
   }
 
   function sec(title, inner) {
-    return '<div class="panel panel-default" style="margin-top:12px;">' +
-           '<div class="panel-heading" style="font-weight:600;">' + esc(title) + '</div>' +
-           '<div class="panel-body" style="max-height:46vh; overflow:auto;">' + inner + '</div></div>';
+    return '<div class="sec"><div class="sec-h">' + esc(title) + '</div>' +
+           '<div class="sec-b">' + inner + '</div></div>';
   }
 
   function kvRows(obj) {
     var out = "";
     Object.keys(obj || {}).forEach(function (k) {
       var v = obj[k];
-      out += '<div style="display:flex; gap:10px; padding:4px 0; border-bottom:1px solid #f4f4f4;">' +
-             '<div style="width:130px; color:#888; flex-shrink:0;">' + esc(k) + '</div>' +
-             '<div style="white-space:pre-wrap; word-break:break-all;">' +
+      out += '<div class="kv"><div class="kv-k">' + esc(k) + '</div>' +
+             '<div class="kv-v mono">' +
              esc(typeof v === "string" ? v : JSON.stringify(v)) + '</div></div>';
     });
-    return out || '<div style="color:#aaa;">(无)</div>';
+    return out || '<div class="hint">(无)</div>';
   }
 
   function renderReview(body, r) {
@@ -161,30 +237,35 @@
       "n_issues": (rt.issues || []).length,
       "has_reflection": !!(rf.text)
     }));
-    if (body.summary) inner += sec("摘要", '<pre style="white-space:pre-wrap;">' + esc(body.summary) + '</pre>');
-    if (rf.text) inner += sec("反思", '<pre style="white-space:pre-wrap; background:#f8f8f8;">' + esc(rf.text) + '</pre>');
+    if (body.summary) inner += sec("摘要", '<pre class="quote">' + esc(body.summary) + '</pre>');
+    if (rf.text) inner += sec("反思", '<pre class="quote">' + esc(rf.text) + '</pre>');
     // 对话 turns
     if (t.length) {
       var conv = t.map(function (turn, i) {
         var who = (turn.sender || turn.speaker || turn.agent || "?").toString();
         var game = turn.game_or_world || turn.content || turn.text || JSON.stringify(turn);
         var g = typeof game === "string" ? game : JSON.stringify(game);
-        return '<div style="padding:6px 0; border-bottom:1px dashed #eee;">' +
-               '<b>#' + (i + 1) + ' ' + esc(who) + '</b> ' + esc(g) + '</div>';
+        return '<div class="kv"><div class="kv-k">#' + (i + 1) + ' ' + esc(who) + '</div>' +
+               '<div class="kv-v">' + esc(g) + '</div></div>';
       }).join("");
       inner += sec("对话(" + t.length + ")", conv);
     }
     if ((rt.issues || []).length) {
-      var issues = rt.issues.map(function (it, i) {
-        return '<div class="label label-' + (String(it.risk || "").toLowerCase() === "high" ? "danger" : "warning") +
-               '" style="margin-right:6px;">' + esc(it.risk || "risk") + '</div>' +
-               '<div style="margin:4px 0 8px;">' + esc(it.summary || JSON.stringify(it)) + '</div>';
+      var issues = rt.issues.map(function (it) {
+        var risk = String(it.risk || "").toLowerCase();
+        var cls = risk === "high" ? "review" : "compressed";
+        return '<div style="padding:8px 0; border-bottom:1px solid #f3f4f6;">' +
+               '<span class="tag ' + cls + '">' + esc(it.risk || "risk") + '</span>' +
+               (it.field ? '<span class="tag">' + esc(it.field) + '</span>' : '') +
+               '<div style="margin-top:5px;">' + esc(it.summary || JSON.stringify(it)) + '</div>' +
+               (it.risk_note ? '<div class="hint" style="margin-top:3px;">风险:' + esc(it.risk_note) + '</div>' : '') +
+               '</div>';
       }).join("");
       inner += sec("问题分流(" + (rt.issues || []).length + ")", issues);
     }
     detail.innerHTML = briefCard(r).replace(
-      '<div style=\"margin-top:12px;\">加载详情中…</div>',
-      '<div style=\"margin-top:12px;\">' + inner + '</div>');
+      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      '<div style="margin-top:4px;">' + inner + '</div>');
   }
 
   function renderCheckpoint(body, r) {
@@ -195,30 +276,29 @@
       var list = msgs.map(function (m, i) {
         var who = (m.speaker || m.agent || m.sender || "?").toString();
         var txt = typeof (m.content || m.text) === "string" ? (m.content || m.text) : JSON.stringify(m);
-        return '<div style="padding:5px 0; border-bottom:1px dashed #eee;"><b>[' + (i + 1) + ']</b> ' +
-               esc(who) + ': ' + esc(txt) + '</div>';
+        return '<div class="kv"><div class="kv-k">[' + (i + 1) + '] ' + esc(who) + '</div>' +
+               '<div class="kv-v">' + esc(txt) + '</div></div>';
       }).join("");
       inner += sec("对话(" + msgs.length + "/" + (conv.messages || []).length + ")", list);
     } else {
-      inner += sec("对话", '<div style="color:#aaa;">该痕迹无对话消息(可能只有倾向/轨迹快照)</div>');
+      inner += sec("对话", '<div class="hint">该痕迹无对话消息(可能只有倾向/轨迹快照)</div>');
     }
     var shots = (body.shots || []).map(function (s) {
       return '<li>' + esc(s) + '</li>';
     }).join("");
-    if (shots) inner += sec("倾向/轨迹快照", '<ul style="padding-left:20px;">' + shots + '</ul>');
+    if (shots) inner += sec("倾向/轨迹快照", '<ul style="padding-left:18px; margin:0;">' + shots + '</ul>');
     detail.innerHTML = briefCard(r).replace(
-      '<div style=\"margin-top:12px;\">加载详情中…</div>',
-      '<div style=\"margin-top:12px;\">' + inner + '</div>');
+      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      '<div style="margin-top:4px;">' + inner + '</div>');
   }
 
   function renderCompressed(body, r) {
     var files = (body.files || []).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join("");
     detail.innerHTML = briefCard(r).replace(
-      '<div style=\"margin-top:12px;\">加载详情中…</div>',
-      '<div style=\"margin-top:12px;\">' +
-      '<div style="color:rgba(0,0,0,.45)">压缩成品仅保留文件清单,原始运行见对应场景的痕迹/成品。</div>' +
-      (files ? '<div class="panel panel-default" style="margin-top:12px;"><div class="panel-heading">内容文件</div>' +
-               '<div class="panel-body"><ul style="padding-left:20px;">' + files + '</ul></div></div>' : '') +
+      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      '<div style="margin-top:4px;">' +
+      '<div class="hint">压缩成品仅保留文件清单,原始运行见对应场景的痕迹/成品。</div>' +
+      (files ? sec("内容文件", '<ul style="padding-left:18px; margin:0;">' + files + '</ul>') : '') +
       '</div>');
   }
 
@@ -226,22 +306,22 @@
   function showOverview(res) {
     var by = { review: 0, checkpoint: 0, compressed: 0 };
     (res.runs || []).forEach(function (r) { by[r.source] = (by[r.source] || 0) + 1; });
+    function stat(k, n) {
+      return '<div class="stat"><div class="stat-n">' + n + '</div><div class="stat-k">' + k + '</div></div>';
+    }
     detail.innerHTML =
-      '<div style="padding:18px 22px;">' +
-      '<h4>汇总</h4>' +
-      '<div class="row" style="margin-top:6px;">' +
-        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">成品 run<br><b>' + by.review + '</b></div></div>' +
-        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">运行时痕迹<br><b>' + by.checkpoint + '</b></div></div>' +
-        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">压缩成品<br><b>' + by.compressed + '</b></div></div>' +
-      '</div>' +
-      '<p style="margin-top:6px; color:#666; font-size:13px;">左侧按【场景 · 引擎】列出全部历史运行。' +
-      '点击任意场景标题展开该场景的 run,点击 run 查看详情。' +
-      '详情由历史界面自行渲染,不依赖当前跑的是哪个实时面。</p></div>';
+      '<div class="card-pad">' +
+      '<div class="explore-title" style="font-size:17px;">汇总</div>' +
+      '<div class="stat-row">' + stat("成品 run", by.review) +
+        stat("运行时痕迹", by.checkpoint) + stat("压缩成品", by.compressed) + '</div>' +
+      '<div class="hint" style="margin-top:10px;">左侧按【场景 · 引擎】列出全部历史运行:' +
+      '点场景标题展开,点单条 run 看详情。详情由本页自渲染,不依赖当前跑的是哪个实时面。</div>' +
+      '</div>';
   }
 
   function clearActive() {
-    [].forEach.call(menu.querySelectorAll(".active"),
-                    function (el) { el.classList.remove("active"); });
+    [].forEach.call(menu.querySelectorAll(".on"),
+                    function (el) { el.classList.remove("on"); });
   }
 
   function renderMenu(res) {
@@ -250,61 +330,57 @@
     // 概览行
     var ov = document.createElement("a");
     ov.href = "javascript:void(0);";
-    ov.className = "list-group-item active";
-    ov.innerHTML = '<span class="label label-default">总计</span> ' + (res.runs || []).length + ' 条历史记录';
-    ov.addEventListener("click", function () { clearActive(); ov.classList.add("active"); showOverview(res); });
+    ov.className = "mi on";
+    ov.innerHTML = '<span class="mi-tag">总计</span>' +
+                   '<span class="mi-text" style="font-family:inherit;">' +
+                   (res.runs || []).length + ' 条历史记录</span>';
+    ov.addEventListener("click", function () { clearActive(); ov.classList.add("on"); showOverview(res); });
     menu.appendChild(ov);
 
     // 场景分组标题 + run 列表(折叠)
     var doc = document.createDocumentFragment();
-    function sectionTitle(text, n, badgeCls) {
+    function sectionTitle(name, engineName, n) {
       var t = document.createElement("a");
       t.href = "javascript:void(0);";
-      t.className = "list-group-item";
-      t.style.fontWeight = "600";
-      t.innerHTML = '<span class="label ' + badgeCls + '" style="margin-right:6px;">场景</span>' +
-                    esc(text) + ' <span class="badge">' + n + '</span>';
+      t.className = "mg";
+      t.innerHTML = '<span class="mi-tag">场景</span>' +
+                    '<span class="mg-name" title="' + esc(name + " · " + engineName) + '">' +
+                    esc(name) + ' <span class="mg-eng">· ' + esc(engineName) + '</span></span>' +
+                    '<span class="mg-n">' + n + '</span>';
       return t;
     }
     function runLink(r) {
       var a = document.createElement("a");
       a.href = "javascript:void(0);";
-      a.className = "list-group-item";
-      a.style.paddingLeft = "28px";
-      a.innerHTML = '<span class="label ' + labelCls(r.source) + '" style="margin-right:6px;">' +
-                    labelTxt(r.source) + '</span>' + esc(r.run_id);
-      if (r.n_turns) {
-        var b = document.createElement("span");
-        b.className = "badge";
-        b.textContent = r.n_turns + "轮";
-        a.appendChild(b);
-      }
-      a.addEventListener("click", function () { clearActive(); a.classList.add("active"); renderDetail(r); });
+      a.className = "mi";
+      a.style.paddingLeft = "22px";
+      a.innerHTML = '<span class="mi-tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
+                    '<span class="mi-text" title="' + esc(r.run_id) + '">' + esc(r.run_id) + '</span>' +
+                    (r.n_turns ? '<span class="mi-n">' + r.n_turns + ' 轮</span>' : '');
+      a.addEventListener("click", function () { clearActive(); a.classList.add("on"); renderDetail(r); });
       return a;
     }
     // 场景顺序:发现层顺序 + 未归档兜底
     G.order.forEach(function (cid) {
       var g = G.groups[cid];
-      var title = sectionTitle(g.name + " · " + (g.engine_name || "引擎"), g.items.length, "label-primary");
-      title.classList.add("scene-head");
+      var title = sectionTitle(g.name, g.engine_name || "引擎", g.items.length);
       var body = document.createElement("div");
       body.style.display = "none";
       g.items.forEach(function (r) { body.appendChild(runLink(r)); });
       title.addEventListener("click", function () {
-        clearActive(); title.classList.add("active");
+        clearActive(); title.classList.add("on");
         body.style.display = body.style.display === "none" ? "" : "none";
       });
       doc.appendChild(title);
       doc.appendChild(body);
     });
     if (G.ungrouped.items.length) {
-      var t2 = sectionTitle(G.ungrouped.name, G.ungrouped.items.length, "label-default");
+      var t2 = sectionTitle(G.ungrouped.name, "未归档", G.ungrouped.items.length);
       var b2 = document.createElement("div");
       b2.style.display = "none";
       G.ungrouped.items.forEach(function (r) { b2.appendChild(runLink(r)); });
-      t2.classList.add("scene-head");
       t2.addEventListener("click", function () {
-        clearActive(); t2.classList.add("active");
+        clearActive(); t2.classList.add("on");
         b2.style.display = b2.style.display === "none" ? "" : "none";
       });
       doc.appendChild(t2);
