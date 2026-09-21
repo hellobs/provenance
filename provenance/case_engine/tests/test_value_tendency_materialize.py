@@ -241,8 +241,9 @@ def test_real_case00_refuses_to_wipe_runtime_interventions():
         assert any("干预" in p for p in dry["problems"]), dry["problems"]
         assert "AI Advisor" in dry["problems"][0] or inter, dry["problems"]
         assert [c["asset"] for c in dry["changed"]] == ["governance.json"], dry["changed"]
-    # 六个角色的初始倾向必须仍然一致
-    assert len(dry["in_sync"]) == 6, dry["in_sync"]
+    # 六个角色的初始倾向必须仍然一致(治理那本账可能因干预而偏离,故不按总数断言)
+    agents_in_sync = [c for c in dry["in_sync"] if c["kind"] == "initial_tendency"]
+    assert len(agents_in_sync) == 6, dry["in_sync"]
 
     # apply(不带 force)同样不许动治理文件
     targets = [os.path.join(base, "governance.json")] + [
