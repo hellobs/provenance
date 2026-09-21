@@ -4,8 +4,8 @@
 全局状态在 live/state.py。本文件只做:参数解析 → 启动模拟线程 → uvicorn。
 
 用法不变:
-  python live_fastapi.py --name sim --start "20250213-09:30" --stride 2 --step 0 --port 5001
-  python live_fastapi.py --resume --name stock-en7 --step 0 --port 5001
+  python live_fastapi.py --name sim --start "20250213-09:30" --stride 2 --step 0 --port 5010
+  python live_fastapi.py --resume --name stock-en7 --step 0 --port 5010
 """
 import argparse
 import json
@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--resume", action="store_true", help="Resume running the simulation")
     parser.add_argument("--step", type=int, default=0, help="The simulate step (<=0 means run forever)")
     parser.add_argument("--stride", type=int, default=2, help="The step stride in minute")
-    parser.add_argument("--port", type=int, default=5001, help="The server port")
+    parser.add_argument("--port", type=int, default=5010, help="The server port")
     parser.add_argument("--no-sim", action="store_true",
                         help="Only serve the Web layer (pages/API/embed), do not start the simulation thread")
     args = parser.parse_args()

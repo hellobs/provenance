@@ -2,6 +2,7 @@
 
 拆分自 live_fastapi.py;全局状态从 live.state 读取(模块属性,run_simulation 注入)。
 """
+import datetime as _dt
 import json
 import os
 
@@ -30,6 +31,9 @@ app.mount(
     StaticFiles(directory=os.path.join(state.BASE_DIR, "frontend/static")),
     name="static",
 )
+# 统一历史数据界面(/api/runs + /embed/explore)来自共享模块;case01 实时面同样挂载。
+from live.history import router as history_router  # noqa: E402 —— 局部导入避免顶层循环依赖
+app.include_router(history_router)
 templates = Jinja2Templates(directory=os.path.join(state.BASE_DIR, "frontend/templates"))
 
 
@@ -76,6 +80,26 @@ def load_initial_payload(start_datetime, stride):
     }
 
 
+async def _active_components() -> list:
+    """当前 case00 活动引擎(case00 的 case_id 映射沙盒价值引擎)激活的组件清单。
+
+    以场景声明的 `meta.engine`(通常 sandbox-value)为准;读取失败回退到
+    sandbox-value 的组件(其含 governance),保证 case00 治理面板不缺位。
+    """
+    try:
+        from case_engine import engines as _eng
+        from case_engine.config import load_yaml
+
+        p = os.path.join(state.BASE_DIR, "cases", "case00_village", "scenario.yaml")
+        eid = "sandbox-value"
+        if os.path.isfile(p):
+            cfg = load_yaml(p)
+            eid = getattr(cfg, "engine", None) or eid
+        return _eng.components(eid)
+    except Exception:  # noqa: BLE001 —— 派生失败回退 sandbox-value 组件,不缺治理
+        return ["scene", "chat", "governance", "timeline", "reflection"]
+
+
 async def _render_index(request: Request, embed: str = ""):
     speed = int(request.query_params.get("speed", 0))
     zoom = float(request.query_params.get("zoom", 0))
@@ -93,6 +117,7 @@ async def _render_index(request: Request, embed: str = ""):
         phaser_src = "/static/vendor/phaser.min.js"
     else:
         phaser_src = "https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"
+    comps = await _active_components()
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -104,14 +129,41 @@ async def _render_index(request: Request, embed: str = ""):
             "live_mode": True,
             "phaser_src": phaser_src,
             "embed": embed,
+            # 治理/权重/干预时间轴面板是否可用的唯一判断:由活动引擎组件决定
+            "governance": "governance" in comps,
+            "engine_components": comps,
             **payload,
         },
     )
 
 
+@app.get("/health")
+async def health():
+    """统一探活/结束状态协议(与 case01 vizkit 的 /health 字段对齐)。
+
+    case00 没有"重开一局"(那是 case01 的协议),故 can_restart / restart_ready 恒为
+    False;前端据此不显示重开按钮。finished/finish_reason 供探活与"已结束不得静默"。
+    体检发现:此前 case00 无此端点,若前端因故轮询 /health 会一直 404。
+    """
+    st = state.sim_state
+    status = st.get("status", "")
+    return {
+        "service": "case00-live",
+        "finished": status == "done",
+        "finish_reason": ("run_finished" if status == "done" else ""),
+        "can_restart": False,
+        "restart_ready": False,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return await _render_index(request, embed="")
+    # 5010 唯一实时入口时,首页 = 完整 case00 可视化平台:
+    # 中央小镇场景(Phaser)在动,右侧治理约束面板(滑条/倾向/解释)+ 底部干预时间轴同屏。
+    # 传 embed=""(而非 "goals"):main_script 的 wantScene = !embedMode 才成立,
+    # 否则会不建 Phaser、主区空白、只剩治理面板(用户:点运行后只有面板没有小镇,异常)。
+    # 纯面板仍走各自的 /embed/*(goals / explain / timeline / scene)。
+    return await _render_index(request)
 
 
 @app.get("/embed", response_class=HTMLResponse)
@@ -127,6 +179,7 @@ async def embed_index(request: Request):
     - /embed/explain     : 倾向成因解释面板(构成分解+窗口明细+干预因果链)
     - /embed/timeline    : 干预时间轴面板(全部角色干预事件 + 撤销 + 详情)
     - /embed/reflections : 反思标记面板(人机协同闭环,LoRA 线数据入口)
+    统一数据界面 /embed/explore 由共享模块 live/history.py 提供(case00/case01 通用)。
     共享同一 WebSocket/数据源;通过 URL 参数控制 index.html 面板显隐。
     """
     path = request.url.path.rstrip("/")
@@ -986,6 +1039,10 @@ async def ws_endpoint(ws: WebSocket):
             await ws.send_json(data)
     except WebSocketDisconnect:
         pass
+    except RuntimeError as e:
+        # 客户端断开后仍试图 send 的常见竞态("Cannot call send once a close message"):
+        # 正常的断线,不该当异常打 traceback 刷屏(体检发现 live_case00.out 反复出现)。
+        log.debug("websocket send 竞态(连接已关闭): %s", e)
     except Exception:
         # 断线是常态;但非断线的异常必须留痕,否则前端黑屏时无从排查。
         log.warning("websocket 连接异常关闭", exc_info=True)

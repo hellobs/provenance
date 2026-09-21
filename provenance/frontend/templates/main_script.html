@@ -18,6 +18,15 @@
 	let FRONTEND_VERSION = "v10-path";   // frontend version (cache-busting)
 	let move_speed = 1.0;             // pixels/frame (60fps) ≈ 1.9 tiles/s, walking feel
 	let movement_target = {};         // agent -> waypoint queue (pixels)
+
+	// ---- 碰撞消费:场景是带 Collisions 图层的,移动必须撞墙即止,否则角色会直线穿墙 ----
+	// colLayer 在 create() 阶段挂载;tileWall 判断"某像素点所在 tile 是否不可通行"。
+	let colLayer = null;
+	function tileWall(px, py) {
+		if (!colLayer) return false;
+		let t = colLayer.getTileAt(Math.floor(px / tile_width), Math.floor(py / tile_width), true);
+		return !!(t && t.collide);
+	}
 	let sim_finished = false;
 	let sim_error = "";
 	let display_time = null;          // currently displayed time (Date)
@@ -366,8 +375,10 @@
 				devLog("sys", "Simulation finished" + (reason ? " (" + reason + ")" : ""));
 				sim_finished = true;
 				showDoneBanner(reason, "");
-				// 跑完了:开始盯"结果出完没有"(出完了才给重开按钮)
-				watchRestartReady();
+				// 跑完了:开始盯"结果出完没有"(出完了才给重开按钮)。
+				// 仅当页面真有重开框(case01 的 /health 协议)才轮询;case00 没有
+				// /health,若从这里无条件轮询会一直打 404(体检发现)。
+				if (document.getElementById("restart-box")) watchRestartReady();
 				if (reason.indexOf("error") === 0) {
 					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
 				} else if (reason === "interrupted") {
@@ -570,7 +581,14 @@
 
 		const collisionsLayer = map.createLayer("Collisions", collisions, 0, 0);
 
-		collisionsLayer.setCollisionByProperty({ collide: true });
+		colLayer = collisionsLayer;   // 供 tileWall() 在移动时做穿墙检测
+		window.__colLayer = collisionsLayer;   // 暴露调试句柄:验证 Collisions 图层已生效(勿依赖)
+
+		// Collisions 图层用 blocks tileset(32126/32127)画的墙,但该 tileset 的 tile **没有**
+		// collide 属性 -> setCollisionByProperty({collide:true}) 一个都匹配不到,前次穿墙正是
+		// 因此(永不碰撞)。Tiled 里"涂墙"本质是涂非空格,故改为"非空格一律碰撞":
+		// setCollisionByExclusion([-1]) = 除空格(gap,index -1)外全部设 collide。
+		collisionsLayer.setCollisionByExclusion([-1]);
 
 		collisionsLayer.setDepth(-1);
 		foregroundL1Layer.setDepth(2);
@@ -827,11 +845,18 @@
 					curr_persona.anims.stop();
 				}
 			} else {
-				// move smoothly toward the current waypoint
+				// move smoothly toward the current waypoint, but never clip through walls:
+				// walk into an obstacle tile is rejected (X already try Y, slide along the wall).
+				// 修穿墙:此前直接 body.x/y += vx/vy 直线冲向单一目标点,完全无视 Collisions 图层;
+				// 而后端每次只推"终点"(path 恒为单点,无路径规划),直线必然穿墙/穿家具。
 				let vx = dx / dist * step_px;
 				let vy = dy / dist * step_px;
-				curr_persona.body.x += vx;
-				curr_persona.body.y += vy;
+				// 用角色 hitbox 中心判碰撞(body 30x40, offset 0,0)
+				let cx = curr_persona.body.x + 15;
+				let cy = curr_persona.body.y + 20;
+				if (!tileWall(cx + vx, cy)) curr_persona.body.x += vx;      // X 轴上没墙才走
+				if (!tileWall(cx, cy + vy)) curr_persona.body.y += vy;      // Y 轴同理(与 X 正交,不产生斜穿)
+				// 若一下没走到(某轴被墙挡),下一帧仍会继续朝目标试;撞墙即止,绝不硬穿。
 
 				// walking animation (by movement direction)
 				let dir = Math.abs(dx) > Math.abs(dy) ? (vx > 0 ? "r" : "l") : (vy > 0 ? "d" : "u");

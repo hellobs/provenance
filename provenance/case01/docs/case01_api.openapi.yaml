@@ -9,8 +9,14 @@
 # 顶层键读/写约定(对应 run.json;页面 prose 契约 §2.2):
 #   平台要读:run_id / 日期 / turns / retrievals / events / state_history /
 #            final_feedback / audit / condition_monitor / reflection / router。
-#   引擎侧附加键、平台不读:summary / injector / compat。其中 injector 含 Branch
-#           实验元信息与逐节点 dialogue 原文,不得进专家视图(与 full-context 同一边界)。
+#   引擎侧附加键、平台不读:summary / injector / compat / quality / debug。
+#            其中 injector 含 Branch 实验元信息与逐节点 dialogue 原文,不得进专家视图
+#            (与 full-context 同一信息边界);quality/debug 供平台**内部**决定要不要建单,
+#            同样不得展示给专家。
+#   2026-09-20 变更:索引与详情新增 quality / consistency / branch_source / debug;
+#            `/api/runs` 默认排除 quality=questionable 与 debug,并在 excluded 里报明
+#            (要全量加 ?include_questionable=1)。专家全文(full-context)**不受影响**:
+#            它仍然不含任何分支/判定/预设等实验元信息。
 openapi: 3.1.0
 info:
   title: GTC Case 01 · Run 只读数据服务
@@ -38,8 +44,24 @@ paths:
       tags:
       - runs
       summary: List Runs
-      description: 全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
+      description: |-
+        全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
+
+        **默认会少给两类记录**(2026-09-20 起):
+        - `quality=questionable`:预设分支与 Investment AI 的 T0 立场自相矛盾的记录;
+        - `quality=debug`:调试跑(如 `--nodes` 截断,内容不完整)。
+        少给了什么**不静默**:响应里的 `excluded` 会给出计数、run_id 与原因。
+        需要全量时加 `?include_questionable=1`。
+        `quality=unverified`(旧记录没有一致性戳)照常返回 —— 判不了 ≠ 有问题。
       operationId: list_runs_api_runs_get
+      parameters:
+      - name: include_questionable
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: true = 连 questionable/debug 一起返回(默认 false)。
       responses:
         '200':
           description: Successful Response
@@ -57,6 +79,15 @@ paths:
                   count:
                     type: integer
                     description: Run 数量。
+                  filter:
+                    type: object
+                    description: 本次请求实际用的过滤开关(回显)。
+                    additionalProperties: true
+                  excluded:
+                    type: object
+                    description: |-
+                      被默认排除的记录(仅在真的有排除时出现)。
+                      `count`/`by_kind`(按 quality 分类的 run_id 列表)/`reason`。
                 required:
                 - runs
                 - count
@@ -229,6 +260,24 @@ components:
         run_id:
           type: string
           description: Run 标识。
+        quality:
+          type: string
+          enum: [ok, questionable, debug, unverified]
+          description: |-
+            质检标记(2026-09-20 加,加法字段)。
+            ok=分支与 T0 立场一致(或由 T0 判定);questionable=预设分支与 T0 立场矛盾;
+            debug=调试跑(内容不完整);unverified=旧记录没有一致性戳。
+            默认只返回 ok / unverified。
+        consistency:
+          type: string
+          enum: [consistent, inconsistent, unknown, unverified]
+          description: T0 立场与该 Run 分支的一致性判定结果。
+        branch_source:
+          type: string
+          description: 分支从哪来(preset=运行参数指定 / judge=由 T0 回答判定)。
+        debug:
+          type: string
+          description: 调试跑说明(空串=正式跑);用于解释 quality=debug 的原因。
         start_date:
           type: string
           description: 开始日期。

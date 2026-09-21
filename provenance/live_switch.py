@@ -3,17 +3,18 @@
 
 为什么要它
 ----------
-实时面有两个**实现**,属于两个不同的 case:
+实时面有两个**实现**,属于两个不同的 case,但**都跑在同一个 5010 端口**:
 
-- case00(原初 6 角色投资咨询小镇):`live_fastapi.py`,端口 **5001**
-- case01(2 角色、节点驱动的注入器推演):`case01/vizkit/live_run.py`,端口 **5010**
+- case00(原初 6 角色投资咨询小镇):`live_fastapi.py`
+- case01(2 角色、节点驱动的注入器推演):`case01/vizkit/live_run.py`
 
-两个 case 各自需要实时面,但**任何时刻只允许起一个**:两者共用同一个本地 Ollama,
-同时跑会把双方都拖慢,演示时屏幕上也不该有两套在动。
+**5010 是平台唯一实时入口**:前一个 case(即 config_tool 运行组合选中的那个)在此
+服务。两 case **互为互斥**:`--start` 会先停另一个 case 的实时面;因为两者共用同一个
+本地 Ollama,同时跑会把双方都拖慢,演示时屏幕上也不该有两套在动。
 
 只读面(5002 契约 / 5003 case00 存档)**不跑模拟,不受此限**,本脚本不碰。
-**case01 的 5010 现在同时是"单一界面"**(小镇 + 结果记录九块,`--review-only`
-就是只翻结果不推演)——2026-09-19 起独立的 5004 面板服务已退役。
+`case01` 的 `--review-only` 就是只翻结果不推演(停掉当前在跑的那个也一样的逻辑)。
+2026-09-19 起独立的 5004 面板服务已退役。
 
 本脚本要防的两件事(都是实测踩过的)
 ---------------------------------
@@ -24,14 +25,18 @@
    并在起完后**校验端口真的绑上了**;没绑上就把新进程收掉并报错,绝不留游离实例。
 
 因此进程发现**不能只看端口**:游离实例不监听任何端口,只能按命令行认。
+而且因为两 case **共用 5010**,端口**不归属任何单一 case**——靠端口判断"哪个 case
+在跑"会把另一个 case 的进程误判进自己头上(实测会误杀),所以**本 case 的进程必须
+只用命令行特征(`live_fastapi.py` / `vizkit.live_run`)找**;5010 只用来确认"谁把
+端口绑上了"。
 `--status` 会顺带报出匹配到的进程数,数量 >1 就是有游离实例。
-状态还区分"在推演 / 已跑完在保持 / 仅审阅(`--review-only`)"——靠 5010 的
-`/health` 里的 `finished`/`finish_reason`,不再靠猜。
+状态还区分"在推演 / 已跑完在保持 / 仅审阅(`--review-only`)":case01 靠 5010 的
+`/health` 里的 `finished`/`finish_reason`,case00 靠 `/api/goals` 的倾向角色数。
 
-给平台侧的口径:平台**只需要一个地址**——`http://<host>:5010/`
-(case01 单一界面:实时小镇 + 右栏"结果记录"卡片)。只看结果就引
-`http://<host>:5010/embed/review`,只看小镇 `http://<host>:5010/embed/scene`。
-平台不必知道 case00 的 5001,也不必知道当前在跑哪个 case。
+给平台侧的口径:平台**只需要一个地址**——`http://<host>:5010/`(单一入口,当前选中的 case
+于此服务;case00 首页=中央小镇场景 + 右栏治理约束面板 + 底部干预时间轴,case01 首页=实时小镇 +
+右栏"结果记录"卡片)。只看结果就引 case01 的 `http://<host>:5010/embed/review`。
+平台不必知道当前在跑哪个 case、也不必知道各 case 的独立端口。
 
 用法(在 `provenance/provenance` 下执行)
 --------------------------------------
@@ -58,7 +63,7 @@ from case01.run_naming import live_run_id
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-LIVE = {"case00": 5001, "case01": 5010}
+LIVE = {"case00": 5010, "case01": 5010}  # 5010 是唯一实时入口,两 case 互斥共用
 LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
              "case01": "注入器推演(vizkit town)"}
 # 命令行特征:按它认进程(端口判断不到游离实例)
@@ -102,15 +107,21 @@ def _procs_by_cmdline(needle):
 
 
 def live_procs(case):
-    """该 case 实时面的进程 {pid: ppid}(含不监听端口的游离实例)。"""
-    procs = _procs_by_cmdline(CMD_NEEDLE[case])
-    for pid in _pids_by_port(LIVE[case]):
-        procs.setdefault(pid, 0)
-    return procs
+    """该 case 实时面的进程 {pid: ppid}(含不监听端口的游离实例)。
+
+    **只按命令行认**:两 case 共用 5010,端口不归属单 case,若把端口 pid 加进来会把
+    另一个 case 的进程算到自己头上(停时误杀)。游离实例不监听端口,也正需要靠命令行补。
+    """
+    return _procs_by_cmdline(CMD_NEEDLE[case])
 
 
 def live_pids(case):
     return set(live_procs(case))
+
+
+def _port_bound_by(case):
+    """5010 上是否有**本 case** 的进程在听(两 case 共用端口,须两端交集才算)。"""
+    return bool(set(live_pids(case)) & _pids_by_port(LIVE[case]))
 
 
 def n_instances(procs):
@@ -131,7 +142,7 @@ def probe(case):
     port = LIVE[case]
     procs = live_procs(case)
     info = {"case": case, "port": port, "name": LIVE_NAME[case], "pids": sorted(procs),
-            "n_inst": n_instances(procs), "listening": bool(_pids_by_port(port)),
+            "n_inst": n_instances(procs), "listening": _port_bound_by(case),
             "simulating": None, "detail": ""}
     if not info["listening"]:
         info["detail"] = "未监听端口"
@@ -163,7 +174,7 @@ def probe(case):
 def _state(i):
     """一行状态。只报能从外部确证的东西:
 
-    - case00(5001):用 /api/goals 的倾向角色数判断,可靠(--no-sim 时为 0);
+    - case00(5010):用 /api/goals 的倾向角色数判断,可靠(--no-sim 时为 0);
     - case01(5010):用 /health 的 finished/finish_reason 分清
       "在推演" / "已跑完在保持" / "仅审阅(--review-only,不推演)"。
       (2026-09-19 加了 finished 字段;在那之前分不清"还在跑"和"跑完在保持"。)
@@ -191,8 +202,9 @@ def status():
         pids = sorted(_pids_by_port(port))
         print("  :{:<5} {:<24} {}".format(port, what,
               "listening pid={}".format(pids[0]) if pids else "down"))
-    print("\n平台侧只需要一个地址: http://<host>:5010/ (case01 单一界面:小镇 + 结果记录)")
-    print("  只看结果 http://<host>:5010/embed/review ｜ 只看小镇 http://<host>:5010/embed/scene")
+    print("\n平台侧只需要一个地址: http://<host>:5010/ (唯一实时入口,当前选中的 case 在此)")
+    print("  case00:首页=小镇+治理约束面板+干预时间轴 ｜ 纯场景 /embed/scene ｜ 纯治理 /embed/goals")
+    print("  case01:首页=小镇+结果记录 ｜ 只看结果 /embed/review ｜ 只看小镇 /embed/scene")
 
 
 # ---------------------------------------------------------------------------
@@ -216,16 +228,6 @@ def stop(case, quiet=False):
     return len(pids)
 
 
-def _is_review_only(case):
-    """该 case 当前在听的那个实例是不是"仅审阅"(不推演)。
-
-    靠 5010 的 /health(实时插件报 finished/finish_reason)判断,不靠猜命令行。
-    """
-    i = probe(case)
-    return bool(i["listening"]) and not i["simulating"] \
-        and i.get("finish_reason") == "review_only"
-
-
 def _start_mapper(run_id, args, raw_out):
     """【已停用】原来看护进程的事,现在由实时面进程自己顺序做。
 
@@ -240,21 +242,16 @@ def _start_mapper(run_id, args, raw_out):
 def start(case, args):
     other = "case01" if case == "case00" else "case00"
     review_only = bool(getattr(args, "review_only", False))
-    if case == "case01" and review_only:
-        # 仅审阅:不推演、不占 Ollama,所以**不必**停另一个 case 的实时面
-        # (它俩不会互相拖慢)。只清本端口上的旧实例。
-        print("仅审阅模式(--review-only):不跑推演,只服务界面;不会停 case00 的实时面。")
-        stop(case)
+    if review_only:
+        print("仅审阅模式(--review-only):不跑推演,只服务界面。")
     else:
         print("按「同时只允许一个实时面」的规则——先停另一个,再停本 case 的旧实例(防游离):")
-        if case == "case00" and _is_review_only("case01"):
-            # case01 只是"仅审阅"(不推演),不该被停掉:它不抢 Ollama,
-            # 而且那是看结果记录的唯一界面。
-            print("  case01 :5010 只是「仅审阅」(未在推演),保留不动。")
-        else:
-            stop(other)
-        stop(case)
-    if live_pids(case) or (not (case == "case01" and review_only) and live_pids(other)):
+    # 两 case **共用 5010(唯一入口)**:无论对方是推演还是仅审阅,都得先停——
+    # 否则对方占着 5010,新进程绑不上端口(而 injector 游离实例会照跑推演,
+    # 外面却看不出第二份存在)。
+    stop(other)
+    stop(case)
+    if live_pids(case) or live_pids(other):
         print("  [!] 仍有实时进程没清干净,继续起会得到两个实例;先手工处理:")
         for c in ("case00", "case01"):
             print("    {}: {}".format(c, sorted(live_pids(c))))
@@ -334,7 +331,7 @@ def start(case, args):
         j = probe(c)
         extra = "  实例数={}".format(j["n_inst"]) if j["n_inst"] else ""
         print("  {:<6} :{:<5} {}{}".format(c, j["port"], _state(j), extra))
-    print("\n平台入口(一个): http://<host>:5010/  ｜ 只看结果 .../embed/review ｜ 只看小镇 .../embed/scene")
+    print("\n平台入口(一个): http://<host>:5010/  (当前选中的 case 在此;case00 首页权重面板,case01 小镇+结果)")
     return 0
 
 

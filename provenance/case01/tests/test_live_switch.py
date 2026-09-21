@@ -12,7 +12,7 @@
 真正起停进程的部分**不做自动化测试**:它要杀进程、依赖 netstat/PowerShell,
 不适合放进 CI(那是 `--status` / `--start` 手工验收的活)。
 """
-from live_switch import LIVE, _state, n_instances
+from live_switch import CMD_NEEDLE, LIVE, LIVE_NAME, _state, n_instances
 
 
 def test_n_instances_folds_trampoline_pair():
@@ -42,6 +42,13 @@ def test_state_only_claims_what_it_can_prove():
                    "simulating": False}) == "在听(未在推演:--no-sim)"
 
 
-def test_two_live_faces_use_distinct_ports():
-    assert LIVE["case00"] != LIVE["case01"]
+def test_two_live_faces_share_single_live_entry():
+    # 5010 是**唯一实时入口**,两 case 互为互斥、共用同一端口;端口不归属任一 case,
+    # 所以"哪个 case 在跑"只能靠命令行特征认(见 live_switch 模块 docstring)。
     assert set(LIVE) == {"case00", "case01"}
+    # 唯一实时入口:两 case 端口必须相同;且都落在"唯一实时端口"这一份常量上。
+    assert len({LIVE[c] for c in LIVE}) == 1
+    # 命令行为何是判属依据:同端口之下,两 case 必须有各自唯一的命令行特征(不能互认)。
+    assert set(CMD_NEEDLE) == {"case00", "case01"}
+    assert CMD_NEEDLE["case00"] != CMD_NEEDLE["case01"]
+    assert all(CMD_NEEDLE[c] for c in CMD_NEEDLE)

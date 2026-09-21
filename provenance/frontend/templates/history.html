@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block content %}
+{# ======================================================================
+   统一数据界面(embed=explore):由 live/history.py 的 /embed/explore 渲染。
+   - 左侧:按【场景 · 引擎】分组的树形菜单(覆盖所有场景,不只 case01),
+     数据来自 /api/runs 的 scenarios 发现层。
+   - 右侧:点任意 run → fetch /api/run-detail/<source>/<run_id> 自渲染详情。
+     刻意不用 /embed/review —— 它只挂 case01 实时面,别的 case 跑会 404。
+   ====================================================================== #}
+<div style="max-width:1320px; margin:10px auto; padding:0 14px;">
+  <h4 style="margin:6px 0 2px;">历史数据一览
+    <small style="color:#888; font-weight:normal;">来源 = /api/runs(所有场景 × 引擎的历史运行,按场景分层)</small>
+  </h4>
+
+  <div class="row">
+    <div class="col-md-3" style="padding-right:8px;">
+      <div class="list-group" id="explore-menu"
+           style="max-height:78vh; overflow:auto; margin-top:6px;"></div>
+    </div>
+    <div class="col-md-9">
+      <div id="explore-detail" style="background:#fff; border:1px solid #e6e6e6;
+          border-radius:10px; min-height:72vh; margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var menu = document.getElementById("explore-menu");
+  var detail = document.getElementById("explore-detail");
+  if (!menu || !detail) return;
+
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = (s == null) ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  function labelTxt(source) {
+    return source === "review" ? "成品 run" : source === "checkpoint" ? "运行时痕迹" : "压缩成品";
+  }
+  function labelCls(source) {
+    return source === "review" ? "label-info" : source === "checkpoint" ? "label-default" : "label-warning";
+  }
+
+  // 场景分组:先用 /api/runs 的 scenarios 初始化分组,再把 runs 归进所属场景。
+  function groupRuns(runs, scenarios) {
+    var groups = {};   // case_id -> {name, engine, engine_name, items:[]}
+    (scenarios || []).forEach(function (s) {
+      groups[s.case_id] = { name: s.name || s.case_id, engine: s.engine,
+                            engine_name: s.engine_name || s.engine, items: [] };
+    });
+    var ungrouped = { name: "未归档数据", engine: "", engine_name: "", items: [] };
+    (runs || []).forEach(function (r) {
+      var cid = r.case_id || "";
+      if (groups[cid]) groups[cid].items.push(r);
+      else ungrouped.items.push(r);
+    });
+    // 排序:item 按结束时间倒序
+    Object.keys(groups).forEach(function (k) {
+      groups[k].items.sort(function (a, b) {
+        return String(b.end_date || "").localeCompare(String(a.end_date || ""));
+      });
+    });
+    ungrouped.items.sort(function (a, b) {
+      return String(b.end_date || "").localeCompare(String(a.end_date || ""));
+    });
+    var order = (scenarios || []).map(function (s) { return s.case_id; });
+    return { groups: groups, order: order, ungrouped: ungrouped };
+  }
+
+  // ---- 右侧渲染 ----
+  function briefCard(r) {
+    function row(k, v) {
+      return '<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid #f2f2f2;">' +
+             '<div style="width:110px; color:#888; flex-shrink:0;">' + k + '</div>' +
+             '<div style="word-break:break-all;">' + v + '</div></div>';
+    }
+    var extra = "";
+    if (r.error) extra = '<div class="alert alert-warning" style="margin:10px 0;">' + esc(r.error) + '</div>';
+    if (r.source === "review") {
+      if (r.branch) extra += row("剧情线", esc(r.branch));
+      if (r.engine_name) extra += row("引擎", esc(r.engine_name));
+    }
+    var h = '<div style="padding:16px 20px;">' +
+      '<span class="label ' + labelCls(r.source) + '">' + labelTxt(r.source) + '</span> ' +
+      '<span class="label label-primary">' + esc(r.case_name || r.case_id || "—") + '</span>' +
+      '<h4 style="margin:10px 0 4px; word-break:break-all;">' + esc(r.run_id) + '</h4>' + extra +
+      row("场景", esc(r.case_name || r.case_id || "—")) +
+      row("引擎", esc(r.engine_name || r.engine_id || "—")) +
+      row("分支 / branch", esc(r.branch || "—")) +
+      row("开始时间", esc(r.start_date || "—")) +
+      row("结束时间", esc(r.end_date || "—")) +
+      row("对话轮次", esc(r.n_turns != null ? r.n_turns : "—")) +
+      row("反思条数", esc(r.n_reflections != null ? r.n_reflections : "—")) +
+      row("数据完整性", r.has_graph ? "完整" : "—") +
+      '<div style="margin-top:12px;">加载详情中…</div>' +
+      '</div>';
+    return h;
+  }
+
+  function showError(msg) {
+    detail.innerHTML = '<div class="alert alert-danger" style="margin:16px;">' + esc(msg) + '</div>';
+  }
+
+  // ---- 详情自渲染 ----
+  function renderDetail(r) {
+    detail.innerHTML = briefCard(r);
+    fetch("/api/run-detail/" + encodeURIComponent(r.source) + "/" + encodeURIComponent(r.run_id),
+          { cache: "no-store" })
+      .then(function (rsp) { return rsp.json().then(function (j) { return { ok: rsp.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.ok) {
+          var msg = (res.j && res.j.errors && res.j.errors[0]) ? res.j.errors[0] : "读详情失败";
+          document.querySelector("#explore-detail .alert-warning, #explore-detail div:last-of-type");
+          detail.innerHTML = briefCard(r).replace(
+            '<div style=\"margin-top:12px;\">加载详情中…</div>',
+            '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">' + esc(msg) + '</div>');
+          return;
+        }
+        var body = res.j.data;
+        if (r.source === "review") renderReview(body, r);
+        else if (r.source === "checkpoint") renderCheckpoint(body, r);
+        else renderCompressed(body, r);
+      })
+      .catch(function (err) {
+        detail.innerHTML = briefCard(r).replace(
+          '<div style=\"margin-top:12px;\">加载详情中…</div>',
+          '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">详情请求失败: ' +
+          esc(String(err && err.message || err)) + '</div>');
+      });
+  }
+
+  function sec(title, inner) {
+    return '<div class="panel panel-default" style="margin-top:12px;">' +
+           '<div class="panel-heading" style="font-weight:600;">' + esc(title) + '</div>' +
+           '<div class="panel-body" style="max-height:46vh; overflow:auto;">' + inner + '</div></div>';
+  }
+
+  function kvRows(obj) {
+    var out = "";
+    Object.keys(obj || {}).forEach(function (k) {
+      var v = obj[k];
+      out += '<div style="display:flex; gap:10px; padding:4px 0; border-bottom:1px solid #f4f4f4;">' +
+             '<div style="width:130px; color:#888; flex-shrink:0;">' + esc(k) + '</div>' +
+             '<div style="white-space:pre-wrap; word-break:break-all;">' +
+             esc(typeof v === "string" ? v : JSON.stringify(v)) + '</div></div>';
+    });
+    return out || '<div style="color:#aaa;">(无)</div>';
+  }
+
+  function renderReview(body, r) {
+    var inner = "";
+    var t = body.turns || [], rt = body.router || {}, rf = body.reflection || {};
+    inner += sec("概览", kvRows({
+      "run_id": body.run_id, "branch": body.branch,
+      "start_date": body.start_date, "end_date": body.end_date,
+      "n_turns": t.length, "n_retrievals": (body.retrievals || []).length,
+      "n_events": (body.events || []).length,
+      "n_issues": (rt.issues || []).length,
+      "has_reflection": !!(rf.text)
+    }));
+    if (body.summary) inner += sec("摘要", '<pre style="white-space:pre-wrap;">' + esc(body.summary) + '</pre>');
+    if (rf.text) inner += sec("反思", '<pre style="white-space:pre-wrap; background:#f8f8f8;">' + esc(rf.text) + '</pre>');
+    // 对话 turns
+    if (t.length) {
+      var conv = t.map(function (turn, i) {
+        var who = (turn.sender || turn.speaker || turn.agent || "?").toString();
+        var game = turn.game_or_world || turn.content || turn.text || JSON.stringify(turn);
+        var g = typeof game === "string" ? game : JSON.stringify(game);
+        return '<div style="padding:6px 0; border-bottom:1px dashed #eee;">' +
+               '<b>#' + (i + 1) + ' ' + esc(who) + '</b> ' + esc(g) + '</div>';
+      }).join("");
+      inner += sec("对话(" + t.length + ")", conv);
+    }
+    if ((rt.issues || []).length) {
+      var issues = rt.issues.map(function (it, i) {
+        return '<div class="label label-' + (String(it.risk || "").toLowerCase() === "high" ? "danger" : "warning") +
+               '" style="margin-right:6px;">' + esc(it.risk || "risk") + '</div>' +
+               '<div style="margin:4px 0 8px;">' + esc(it.summary || JSON.stringify(it)) + '</div>';
+      }).join("");
+      inner += sec("问题分流(" + (rt.issues || []).length + ")", issues);
+    }
+    detail.innerHTML = briefCard(r).replace(
+      '<div style=\"margin-top:12px;\">加载详情中…</div>',
+      '<div style=\"margin-top:12px;\">' + inner + '</div>');
+  }
+
+  function renderCheckpoint(body, r) {
+    var inner = "";
+    var conv = body.conversation || {};
+    var msgs = (conv.messages || conv.turns || []).slice(0, 200);
+    if (msgs.length) {
+      var list = msgs.map(function (m, i) {
+        var who = (m.speaker || m.agent || m.sender || "?").toString();
+        var txt = typeof (m.content || m.text) === "string" ? (m.content || m.text) : JSON.stringify(m);
+        return '<div style="padding:5px 0; border-bottom:1px dashed #eee;"><b>[' + (i + 1) + ']</b> ' +
+               esc(who) + ': ' + esc(txt) + '</div>';
+      }).join("");
+      inner += sec("对话(" + msgs.length + "/" + (conv.messages || []).length + ")", list);
+    } else {
+      inner += sec("对话", '<div style="color:#aaa;">该痕迹无对话消息(可能只有倾向/轨迹快照)</div>');
+    }
+    var shots = (body.shots || []).map(function (s) {
+      return '<li>' + esc(s) + '</li>';
+    }).join("");
+    if (shots) inner += sec("倾向/轨迹快照", '<ul style="padding-left:20px;">' + shots + '</ul>');
+    detail.innerHTML = briefCard(r).replace(
+      '<div style=\"margin-top:12px;\">加载详情中…</div>',
+      '<div style=\"margin-top:12px;\">' + inner + '</div>');
+  }
+
+  function renderCompressed(body, r) {
+    var files = (body.files || []).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join("");
+    detail.innerHTML = briefCard(r).replace(
+      '<div style=\"margin-top:12px;\">加载详情中…</div>',
+      '<div style=\"margin-top:12px;\">' +
+      '<div style="color:rgba(0,0,0,.45)">压缩成品仅保留文件清单,原始运行见对应场景的痕迹/成品。</div>' +
+      (files ? '<div class="panel panel-default" style="margin-top:12px;"><div class="panel-heading">内容文件</div>' +
+               '<div class="panel-body"><ul style="padding-left:20px;">' + files + '</ul></div></div>' : '') +
+      '</div>');
+  }
+
+  // ---- 左侧菜单(概览 + 场景分组) ----
+  function showOverview(res) {
+    var by = { review: 0, checkpoint: 0, compressed: 0 };
+    (res.runs || []).forEach(function (r) { by[r.source] = (by[r.source] || 0) + 1; });
+    detail.innerHTML =
+      '<div style="padding:18px 22px;">' +
+      '<h4>汇总</h4>' +
+      '<div class="row" style="margin-top:6px;">' +
+        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">成品 run<br><b>' + by.review + '</b></div></div>' +
+        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">运行时痕迹<br><b>' + by.checkpoint + '</b></div></div>' +
+        '<div class="col-md-4"><div class="well" style="text-align:center; margin-bottom:8px;">压缩成品<br><b>' + by.compressed + '</b></div></div>' +
+      '</div>' +
+      '<p style="margin-top:6px; color:#666; font-size:13px;">左侧按【场景 · 引擎】列出全部历史运行。' +
+      '点击任意场景标题展开该场景的 run,点击 run 查看详情。' +
+      '详情由历史界面自行渲染,不依赖当前跑的是哪个实时面。</p></div>';
+  }
+
+  function clearActive() {
+    [].forEach.call(menu.querySelectorAll(".active"),
+                    function (el) { el.classList.remove("active"); });
+  }
+
+  function renderMenu(res) {
+    var G = groupRuns(res.runs, res.scenarios);
+    showOverview(res);
+    // 概览行
+    var ov = document.createElement("a");
+    ov.href = "javascript:void(0);";
+    ov.className = "list-group-item active";
+    ov.innerHTML = '<span class="label label-default">总计</span> ' + (res.runs || []).length + ' 条历史记录';
+    ov.addEventListener("click", function () { clearActive(); ov.classList.add("active"); showOverview(res); });
+    menu.appendChild(ov);
+
+    // 场景分组标题 + run 列表(折叠)
+    var doc = document.createDocumentFragment();
+    function sectionTitle(text, n, badgeCls) {
+      var t = document.createElement("a");
+      t.href = "javascript:void(0);";
+      t.className = "list-group-item";
+      t.style.fontWeight = "600";
+      t.innerHTML = '<span class="label ' + badgeCls + '" style="margin-right:6px;">场景</span>' +
+                    esc(text) + ' <span class="badge">' + n + '</span>';
+      return t;
+    }
+    function runLink(r) {
+      var a = document.createElement("a");
+      a.href = "javascript:void(0);";
+      a.className = "list-group-item";
+      a.style.paddingLeft = "28px";
+      a.innerHTML = '<span class="label ' + labelCls(r.source) + '" style="margin-right:6px;">' +
+                    labelTxt(r.source) + '</span>' + esc(r.run_id);
+      if (r.n_turns) {
+        var b = document.createElement("span");
+        b.className = "badge";
+        b.textContent = r.n_turns + "轮";
+        a.appendChild(b);
+      }
+      a.addEventListener("click", function () { clearActive(); a.classList.add("active"); renderDetail(r); });
+      return a;
+    }
+    // 场景顺序:发现层顺序 + 未归档兜底
+    G.order.forEach(function (cid) {
+      var g = G.groups[cid];
+      var title = sectionTitle(g.name + " · " + (g.engine_name || "引擎"), g.items.length, "label-primary");
+      title.classList.add("scene-head");
+      var body = document.createElement("div");
+      body.style.display = "none";
+      g.items.forEach(function (r) { body.appendChild(runLink(r)); });
+      title.addEventListener("click", function () {
+        clearActive(); title.classList.add("active");
+        body.style.display = body.style.display === "none" ? "" : "none";
+      });
+      doc.appendChild(title);
+      doc.appendChild(body);
+    });
+    if (G.ungrouped.items.length) {
+      var t2 = sectionTitle(G.ungrouped.name, G.ungrouped.items.length, "label-default");
+      var b2 = document.createElement("div");
+      b2.style.display = "none";
+      G.ungrouped.items.forEach(function (r) { b2.appendChild(runLink(r)); });
+      t2.classList.add("scene-head");
+      t2.addEventListener("click", function () {
+        clearActive(); t2.classList.add("active");
+        b2.style.display = b2.style.display === "none" ? "" : "none";
+      });
+      doc.appendChild(t2);
+      doc.appendChild(b2);
+    }
+    menu.appendChild(doc);
+  }
+
+  fetch("/api/runs", { cache: "no-store" })
+    .then(function (rsp) { return rsp.json(); })
+    .then(function (res) { renderMenu(res); })
+    .catch(function (err) {
+      showError("读取 /api/runs 失败: " + String(err && err.message || err));
+    });
+})();
+</script>
+{% endblock content %}
+
+{% block js_content %}
+{# 数据界面为纯静态页面,不加载 Phaser/WebSocket。 #}
+{% endblock js_content %}

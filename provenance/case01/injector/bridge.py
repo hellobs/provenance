@@ -452,7 +452,11 @@ class MavisBridge:
             if agent is None:
                 continue
             try:
-                # [越界·半公开] schedule.daily_schedule 是子对象内部字段
+                # [越界·半公开] schedule.daily_schedule 是子对象内部字段。
+                # 归属演示/编排层(见 docs/case01_触点白名单.md §〇):只为"节点时刻
+                # 需要一段对话"而钉角色同址;只影响是否生成日程,不改 agent 决定。
+                # make_schedule() 幂等,重复调用由框架自行判断,无需读内部字段——
+                # 但这里需在"未生成"时才调,保留读取以最小化对既有行为的影响。
                 if len(getattr(agent.schedule, "daily_schedule", []) or []) < 1:
                     agent.make_schedule()
             except Exception as e:      # 日程生成失败不阻塞(下一步会再试)
@@ -464,7 +468,9 @@ class MavisBridge:
                 except Exception as e:
                     self.game.logger.warning(
                         "pin: move failed for {}: {}".format(name, e))
-            # [越界·内部状态] 清空运行时路径:没有公开入口,只能直写
+            # [越界·内部状态] 清空运行时路径:没有公开入口,只能直写。
+            # 同上属演示/编排层:mavis 的对话前置条件看运行时 path,同址且空路径
+            # 才可能触发交互;这项只影响"能否触发对话",不经手 agent 的台词。
             agent.path = []
             cfg = self.config.get("agents", {}).get(name)
             if cfg is not None and coord is not None:

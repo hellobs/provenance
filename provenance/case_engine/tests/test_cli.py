@@ -74,10 +74,24 @@ def test_cli_run_uses_scenario_recommended_engine_and_runs(capsys):
     assert "未接线" not in out
 
 
-def test_cli_run_missing_input_is_usage_error(capsys):
-    """experiment-eval 需要 --input;缺则无法执行并返回非零。"""
+def test_cli_run_without_input_uses_scenario_sample(capsys):
+    """未给 --input 时,experiment-eval 自动取场景 inputs 样本自检,不再报错。"""
     from case_engine import cli
     rc = cli.main(["run", "case01_stock"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "run:      完成" in out
+    assert "branch:" in out
+
+
+def test_cli_run_missing_input_no_samples_is_usage_error(tmp_path, capsys):
+    """场景无 inputs 样本且未给 --input 时,才真无法执行并返回非零。"""
+    from case_engine import cli
+    (tmp_path / "bare").mkdir()
+    (tmp_path / "bare" / "scenario.yaml").write_text(
+        "meta:\n  case_id: bare\n  engine: experiment-eval\n"
+        "roles:\n  - id: a\nbranch:\n  default_branch: C\n", encoding="utf-8")
+    rc = cli.main(["--cases-dir", str(tmp_path), "run", "bare"])
     out = capsys.readouterr().out
     assert rc == 4
     assert "无法执行" in out

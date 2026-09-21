@@ -52,6 +52,20 @@ def _get_case(case_id: str):
     return info
 
 
+@app.get("/api/engine-components", tags=["engines"])
+def engine_components() -> dict:
+    """每引擎激活的组件 id 清单(引擎→组件的数据契约,供前端/服务折叠面板)。"""
+    from case_engine.engines import ENGINES
+    return {
+        "count": len(ENGINES),
+        "engines": {
+            eid: {"name": (m or {}).get("name", ""),
+                  "components": list((m or {}).get("components") or [])}
+            for eid, m in ENGINES.items()
+        },
+    }
+
+
 @app.get("/", tags=["meta"])
 def index() -> dict:
     return {

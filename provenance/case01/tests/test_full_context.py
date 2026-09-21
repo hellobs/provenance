@@ -130,43 +130,50 @@ class TestBuildFullContext:
         assert "Branch C" not in txt and "buy_now" not in txt
 
 
-class TestBranchSourceDisclosure:
-    """分支来源与 T0 一致性必须写进专家视图(**不许静默**)。
+class TestNoExperimentMetaInExpertText:
+    """专家全文**不得**出现实验元信息(《Governance平台对接说明》§2.3 / 0904doc 04 六.3)。
 
-    实测 `260919-live-case01-mavis-A-1720`:AI 在 T0 说"不能确认值得买",
-    而预设 A 线让当事人满仓买入 —— 专家读到这种材料时,必须先看到"分支是预设的"
-    以及"这条记录的 T0 立场与分支不一致"的声明。
+    2026-09-20 回归:9-19 我往这里加过"分支来源 / 一致性校验"一段(本意是诚实标注),
+    它绕过了旧守卫(旧守卫只禁 `Branch A`/`branch_action`/`Timeline` 这些字面量),
+    但按契约精神它就是泄露 —— 专家审的是反思,不该知道"分支是预设的/由 T0 判定"。
+    现在把中文口径也纳入禁词,并顺手盯着结构化字段不要被塞进正文。
     """
 
-    def test_preset_and_inconsistent_are_stated(self):
+    BANNED = ("分支来源", "预设分支", "实验设计预设", "判定方式", "T0 立场",
+              "一致性校验", "B 线与", "A 线与", "C 线与", "不一致",
+              "Branch A", "Branch B", "Branch C", "branch_action", "Timeline",
+              "c_plan", "injector", "quality")
+
+    def test_preset_and_inconsistent_record_stays_clean(self):
         rec = _sample_run()
-        rec["branch_action"] = {"timeline": "A", "judge": "preset(mavis 路径不调 LLM judge)",
-                                "source": "preset"}
+        rec["branch_action"] = {"timeline": "A", "source": "preset",
+                                "judge": "preset(mavis 路径不调 LLM judge)"}
         rec["consistency"] = {"verdict": "inconsistent",
                               "reason": "A 线但 AI 在 T0 只有谨慎/否定表述",
                               "branch_source": "preset"}
+        rec["debug"] = "--nodes 1 截断了节点序列(7→1)"
         txt = fc.build_full_context(rec)
-        assert "分支来源" in txt
-        assert "实验设计预设" in txt
-        assert "不一致" in txt and "只有谨慎/否定表述" in txt
-        # 加这一段不能把实验元信息漏进专家视图(原有守卫同时检查)
-        for bad in ("branch_action", "Timeline", "c_plan"):
+        for bad in self.BANNED:
             assert bad not in txt, bad
 
-    def test_unknown_is_not_rendered_as_pass(self):
+    def test_judge_record_stays_clean(self):
         rec = _sample_run()
-        rec["branch_action"] = {"timeline": "A", "source": "preset"}
-        rec["consistency"] = {"verdict": "unknown",
-                              "reason": "没有 T0 当天的 AI 对话", "branch_source": "preset"}
+        rec["branch_action"] = {"timeline": "B", "source": "judge",
+                                "judge_info": {"detected": "B", "reason": "cautious"}}
+        rec["consistency"] = {"verdict": "consistent",
+                              "reason": "B 线与 AI 的谨慎立场一致"}
         txt = fc.build_full_context(rec)
-        assert "未能判定" in txt and "不是『通过』" in txt
+        for bad in self.BANNED:
+            assert bad not in txt, bad
 
-    def test_judge_source_is_stated(self):
-        rec = _sample_run()
-        rec["branch_action"] = {"timeline": "A", "source": "judge"}
-        rec["consistency"] = {"verdict": "consistent", "reason": "与 AI 的买入倾向一致"}
-        txt = fc.build_full_context(rec)
-        assert "由 Investment AI 在 T0 的回答判定" in txt
+    def test_structured_fields_still_carry_the_disclosure(self):
+        """不许写进专家全文 ≠ 不记录:结构化字段(平台内部用)必须照实带出来。"""
+        from case01.full_context import quality_of
+        rec = {"branch_action": {"source": "preset", "timeline": "A"},
+               "consistency": {"verdict": "inconsistent", "reason": "只有谨慎表述"}}
+        q = quality_of(rec)
+        assert q["quality"] == "questionable" and q["branch_source"] == "preset"
+        assert "谨慎" in q["reason"]
 
 
 class TestListAndLoad:

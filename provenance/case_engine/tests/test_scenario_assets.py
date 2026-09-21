@@ -38,13 +38,12 @@ def test_case01_conflict_rules_present():
 
 
 def test_case00_village_declarative_load():
-    """case00 声明化 + 价值权重提为标准段:引擎真读取 value_tendency,沙盒资产/参数经 custom 透传。
+    """case00 声明化:沙盒资产/参数/价值权重统一落在 world 标准段(不再用 custom 逃生舱)。
 
     case00 是 6 角色沙盒仿真,其状态是"每角色价值权重向量(value_tendency)",
-    不是 case01 那种单个主角 state_schema —— 但 value_tendency 已被提升为引擎
+    不是 case01 那种单个主角 state_schema——但 value_tendency 已被提升为引擎
     标准段 world.value_tendency(与 case01 的标准段入口一致),供 sandbox-value
-    预检消费;scenario_assets / sandbox_params 仍经 custom 透传(沙盒运行语义
-    由 live/ 旧引擎持有,语义不被引擎改写/丢弃)。
+    预检真消费校验;资产路径 / 沙盒参数同样落 world.assets / world.params。
     """
     s = _load("case00_village")
     assert s.case_id == "case00_village"
@@ -68,9 +67,9 @@ def test_case00_village_declarative_load():
 
 
 def test_case00_value_tendency_is_engine_consumed():
-    """value_tendency 提为标准段后,被 sandbox-value 真读取并校验(非纯 custom 透传)。
+    """value_tendency/assets/params 落 world 标准段后,被 sandbox-value 真读取并校验。
 
-    验证:预检的 value_tendency「已声明」判定基于标准段(而非旧 custom 位置转化),
+    验证:预检的 value_tendency「已声明」判定基于标准段(而非 custom 位置转化),
     且 6 角色权重匹配(governance/initial 两本账都能按角色名解析)。
     """
     from case_engine.engines import build_for

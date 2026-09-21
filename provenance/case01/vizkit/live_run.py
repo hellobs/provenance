@@ -76,6 +76,10 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。
         attach_to(live.app, current_run_id=run_id,
                   note="实跑跑完会自动映射成成品记录")
+    # 统一历史数据界面(/api/runs + /embed/explore)与 case00 同一个共享模块,
+    # 于是 case01 实时面同样可开数据界面、同样能翻到 all 的历史。
+    from live.history import router as history_router
+    live.app.include_router(history_router)
     return live
 
 

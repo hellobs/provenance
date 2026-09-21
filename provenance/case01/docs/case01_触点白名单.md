@@ -4,6 +4,32 @@
 > 让越界在 review 时可见,而不是靠记忆。
 > 对应 mavis 侧文档:`D:\zzr\mavis\docs\tutorial-extension.md`(扩展面),
 > 契约测试:`D:\zzr\mavis\tests\test_extension_surface.py`。
+>
+> 2026-09-21 补充 §二之"导演面 vs 自治面的语义边界"。
+
+## 〇、导演面 vs 自治面:interaction_request 的语义边界(2026-09-21)
+
+**一句话边界**:agent 的"话"永远自治(LLM 生成);外部只能在**演示/编排层**
+指定"哪些节点需要发生一段交互、话题是什么(focus)",不能替代 agent 的决定或台词。
+
+**为什么立这条**:case01 有一个正式 Run 路径(`case01/orchestrator.py`,纯流程编排,
+零 mavis、零 interaction_request——陈总场景说明要的结构化边界节点 T0/最终反馈 就落在
+这里)和一个实时可视化演示路径(`case01/injector/bridge.py`,复现正式 Run 的样子)。
+只有**演示路径**为了让"节点时刻有段对话"好看,借用了 mavis 的
+`Simulator(interaction_request=)` 触发交互——它是一个**迷你导演器**。
+
+**与 IVD 主张的关系(重要)**:IVD 的核心承诺是"价值判断是 AI 内部的、涌现的;
+行为不可控 OK,形成过程必须可审计"。**forced 交互不在 IVD 明文中被等价禁止**,
+但它本质是"外部指定谁和谁、在何时、谈什么主题",方向上是排斥 agent 自主的。
+IVD 的初心仍保存在正式 Run 路径里(那里没有任何导演);演示路径的导演器是
+**可视化复现的工程折衷,不属于 case01 实验本身的心智主张**。因此:
+
+1. `interaction_request` 是**可选、显式 opt-in** 的演示能力,不是 agent 自治的默认;
+   不传它时框架行为不变(agent 仍自己决定是否/与谁/谈什么)。
+2. 它的职权只到"**话题由外部定**";对话**内容仍由 LLM 生成**,外部不替换 agent 的话。
+3. 不能把这条扩展到"直接改 agent 的状态/决定/后果"——那是被禁止的另一类。
+4. 正式 Run 记录(`orchestrator` 产出)不含导演操作;演示记录(`bridge` 产出)
+   在 `interactions` 里可见是否由节点 `require_interaction` 触发,看记录的人可区分。
 
 ## 一、原则
 
@@ -34,9 +60,9 @@ mavis 保持纯洁(零业务词汇、新增能力默认关闭、不改既有语�
 调度层
 
 - `Simulator(...)` 全部构造参数,其中 case01 实际用到:
-  `external_state=`、`interaction_request=`、`on_agent=`、`on_step=`、`on_story=`、
-  `max_workers=`、`export_decisions=`、`plugins=`(插件面存在时,把 `VizForwarder`
-  适配器挂进 Simulator 插件管理)
+  `external_state=`、`interaction_request=`(**演示/编排层,见 §〇语义边界**)、`on_agent=`、
+  `on_step=`、`on_story=`、`max_workers=`、`export_decisions=`、`plugins=`(插件面存在时,把
+  `VizForwarder` 适配器挂进 Simulator 插件管理)
 - `Simulator.plugin_teardown()`(插件面路径的收尾:`close()` 用它退订对话订阅并 teardown)
 - `Simulator.simulate(game, config, step, stride=, start_step=)`
 - `Simulator.story`(写:只放当前节点事件)、`Simulator.interactions`(读:交互审计)

@@ -109,7 +109,20 @@ def test_experiment_eval_run_produces_result(tmp_path):
     assert "artifact" in res and res["artifact"].endswith("case01_stock_exp.json")
 
 
-def test_experiment_eval_run_requires_input():
+def test_experiment_eval_run_falls_back_to_scenario_inputs():
+    """场景已声明 inputs.sample_answers 时,空输入自动取缺省样本自检,不再抛错。
+
+    空输入能跑通本身就证明兜底生效(无其他输入来源),分支落在三者之一即可。
+    """
     s = _load("case01_stock")
+    res = ExperimentEval().run(s, input_text="   ")
+    assert res["run_type"] == "rule-dryrun"
+    assert res["branch"] in {"A", "B", "C"}
+
+
+def test_experiment_eval_run_requires_input_without_samples():
+    """场景未声明 inputs 样本时,空输入仍报错(避免凭空跑造假)。"""
+    s = _load("case01_stock")
+    s.inputs = {}   # 抹掉样本,模拟无数据兜底的场景
     with pytest.raises(ValueError):
         ExperimentEval().run(s, input_text="   ")

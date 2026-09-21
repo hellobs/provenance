@@ -201,6 +201,21 @@ class TestOpenApi:
         assert "/api/runs/{run_id}" in paths
         assert "/api/runs/{run_id}/full-context" in paths
 
+    def test_static_yaml_documents_quality_and_exclusion(self):
+        """契约 YAML 必须**字段级**跟上新增的质检口径(平台读的就是这份)。
+
+        旧守卫只比 paths(2026-09-18 的写法),于是 `/api/runs` 新增默认过滤与
+        quality/debug 字段时,YAML 会静默落后 —— 平台照 YAML 实现就不知道"记录会少给"。
+        """
+        yaml_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "docs", "case01_api.openapi.yaml")
+        with open(yaml_path, encoding="utf-8") as f:
+            spec = f.read()
+        for token in ("quality:", "consistency:", "branch_source:", "debug:",
+                      "excluded:", "include_questionable", "questionable"):
+            assert token in spec, token
+
 
 YAML_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

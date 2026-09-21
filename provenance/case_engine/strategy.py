@@ -25,6 +25,15 @@ class EngineStrategy:
     def describe(self) -> Dict[str, str]:
         raise NotImplementedError
 
+    def panels(self, scenario) -> List[str]:
+        """该引擎在给定场景下激活的组件 id 清单(驱动前端面板)。
+
+        base 默认从注册表读取本引擎的 `components`;子类若需按场景微调可覆盖。
+        渲染成具体面板(如 governance 布尔 / extra_panels 列表)由各服务折叠。
+        """
+        from case_engine.engines import components as _engine_components
+        return list(_engine_components(self.engine_id))
+
     def run(self, scenario, **kw: Any) -> Any:
         raise NotImplementedError("引擎 {!r} 的运行尚未接线;目前仅 supports/describe 可用".format(
             self.engine_id))
@@ -51,13 +60,24 @@ class ExperimentEval(EngineStrategy):
         故绝不伪装成完整 `run.json`。返回结果 dict,`out_dir` 给出则落盘 JSON。
         """
         from case_engine.branch import RuleBranchRouter
-        from case_engine.config import branch_args, consistency_signals
+        from case_engine.config import branch_args, consistency_signals, eval_inputs
         from case_engine.consistency import quick_scan
         from case_engine.world import EntityState
 
         input_text = (input_text or "").strip()
         if not input_text:
-            raise ValueError("experiment-eval.run 需要 input_text(受判的对象回答)")
+            # 场景已声明受判对象样本(inputs.sample_answers)→ 自动取缺省样本自检,
+            # 人工不必在配置工具里填写;index 越界/不存在回退 0。
+            inp = eval_inputs(scenario)
+            answers = inp["sample_answers"]
+            if answers:
+                idx = inp["default_index"]
+                if not 0 <= idx < len(answers):
+                    idx = 0
+                input_text = answers[idx]["text"].strip()
+        if not input_text:
+            raise ValueError("experiment-eval.run 需要 input_text(受判的对象回答)" +
+                             ";场景 inputs.sample_answers 也未声明任何样本")
         bargs = branch_args(scenario)
         router = RuleBranchRouter(default=bargs["default_branch"],
                                   rules=bargs["rules"],

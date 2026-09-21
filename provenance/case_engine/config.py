@@ -51,6 +51,8 @@ class Config:
     # sandbox_params,从 custom 提升为 world 标准段;彻底废除 custom 逃生舱)。
     assets: dict = field(default_factory=dict)
     params: dict = field(default_factory=dict)
+    # inputs:场景自带的受判对象回答样本(experiment-eval 无外部输入时自检兜底)。
+    inputs: dict = field(default_factory=dict)
 
     @property
     def case_id(self) -> str:
@@ -109,6 +111,7 @@ def _coerce(proto) -> Config:
         retrieval=dict(proto.get("retrieval") or {}),
         branch=dict(proto.get("branch") or {}),
         timeline=dict(proto.get("timeline") or {}),
+        inputs=dict(proto.get("inputs") or {}),
     )
 
 
@@ -242,6 +245,25 @@ def branch_args(cfg: Config) -> Dict[str, Any]:
         "judge_prompt": str(b.get("judge_prompt") or ""),
         "fallback_map": dict(b.get("fallback_map") or {}),
     }
+
+
+def eval_inputs(cfg: Config) -> Dict[str, Any]:
+    """从 scenario.inputs 取受判对象回答样本,供 experiment-eval 无外部输入时自检兜底。
+
+    返回 {sample_answers: [{branch, text}], default_index: int};样本为空返回空列表,
+    index 越界/缺失由调用方回退 index 0(EngineStrategy 侧兜底)。
+    """
+    inp = cfg.inputs or {}
+    answers: List[Dict[str, str]] = []
+    for item in inp.get("sample_answers") or []:
+        text = str(item.get("text") or "").strip()
+        if text:
+            answers.append({"branch": str(item.get("branch") or ""), "text": text})
+    try:
+        default = int(inp.get("default_index") or 0)
+    except (TypeError, ValueError):
+        default = 0
+    return {"sample_answers": answers, "default_index": default}
 
 
 def select_timeline(cfg: Config, branch: str):

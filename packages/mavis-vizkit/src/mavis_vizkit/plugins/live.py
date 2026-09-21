@@ -134,6 +134,25 @@ class LiveVisualizer(Visualizer):
             self._thread = None
         self._town.close()
 
+    def _engine_components(self) -> List[str]:
+        """当前场景活动引擎声明的组件清单(引擎决定面板)。
+
+        从 scenario_dir/scenario.yaml 的 meta.engine 解析;取不到且 case_engine
+        不可用时回退到包内最小中性清单(无治理面板)。
+        """
+        try:
+            from case_engine import engines as _eng
+            from case_engine.config import load_yaml
+
+            p = os.path.join(self.scenario_dir, "scenario.yaml")
+            eid = _eng.DEFAULT_ENGINE
+            if os.path.isfile(p):
+                cfg = load_yaml(p)
+                eid = getattr(cfg, "engine", None) or eid
+            return _eng.components(eid)
+        except Exception:  # noqa: BLE001 —— case_engine 不可用时回退最小中性清单
+            return ["scene", "chat", "reflection", "overview", "events", "state", "audit"]
+
     # ------------------------------------------------------------------
     # 事件入口(引擎线程调用)
     # ------------------------------------------------------------------
@@ -294,6 +313,7 @@ class LiveVisualizer(Visualizer):
             phaser = "/static/vendor/phaser.min.js"
             if not os.path.exists(os.path.join(self.static_root, "vendor", "phaser.min.js")):
                 phaser = "https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"
+            comps = self._engine_components()
             return {
                 "persona_names": list(self.init_pos.keys()) or list(self.roles),
                 "step": 1,
@@ -313,6 +333,9 @@ class LiveVisualizer(Visualizer):
                 "extra_panels": self.extra_panels,
                 "can_restart": self.on_restart is not None,
                 "restart_choices": self.restart_choices,
+                # 治理/权重/干预时间轴面板是否可用,由活动引擎组件决定
+                "governance": "governance" in comps,
+                "engine_components": comps,
             }
 
         @app.get("/", response_class=HTMLResponse)

@@ -105,7 +105,7 @@ body { margin: 0; }
 </div><!-- /#left-col -->
 
 <!-- Story event banner (shown when an event is injected) -->
-<div id="story-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+<div id="story-banner" style="position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
     z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
     padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
@@ -113,7 +113,7 @@ body { margin: 0; }
 <!-- 推演结束的醒目提示(**用户明确要求"推演结束后要有提示"**)。
      状态块那行小字不够——跑完是最该被看见的时刻,所以给一条居中的大横幅:
      结束原因、节点数、以及"结果记录还在生成,约 1-2 分钟"。 -->
-<div id="done-banner" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+<div id="done-banner" style="position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
     z-index: 320; border: 2px solid #fff; border-radius: 10px; padding: 12px 20px;
     font-size: 14px; color: #fff; font-weight: bold; display: none; max-width: 70%;
     text-align: center; box-shadow: 0 6px 26px rgba(0,0,0,0.35); line-height: 1.6;"></div>
@@ -203,7 +203,8 @@ body { margin: 0; }
     </script>
 
     <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
-    {% if embed != "scene" and embed != "timeline" %}
+    <!-- governance 开关:治理/权重/时间轴属 case00;case01(vizkit) 不渲染这几块 -->
+    {% if governance and embed != "scene" and embed != "timeline" %}
     <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;
         display: flex; flex-direction: column; overflow: hidden; flex: 1 1 auto; min-height: 0;">
@@ -224,16 +225,17 @@ body { margin: 0; }
 {% endif %}
 
 <!-- Bottom timeline bar (intervention history across all agents; full page overlay or standalone /embed/timeline) -->
-{% if not embed %}
+<!-- 仅 case00(governance=True) 渲染;case01(vizkit) 没有专家干预,不显示时间轴 -->
+{% if governance and not embed %}
 <div id="timeline-panel" style="position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 140;
     background: rgba(255,255,255,0.97); border: 1px solid #d8d8d8; border-radius: 10px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.18); font-size: 12px;
     display: flex; flex-direction: column; overflow: hidden;">
-{% elif embed == "timeline" %}
+{% elif governance and embed == "timeline" %}
 <div id="timeline-panel" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
     font-size: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 340px;">
 {% endif %}
-{% if not embed or embed == "timeline" %}
+{% if governance and (not embed or embed == "timeline") %}
     <div style="padding: 7px 12px; font-weight: bold; font-size: 12px; background: #f6f6f6;
         border-bottom: 1px solid #e2e2e2; cursor: pointer; user-select: none;
         display:flex; justify-content:space-between; align-items:center;
@@ -252,7 +254,7 @@ body { margin: 0; }
 
 <!-- (Developer Console 已上移到 #left-col 容器内;这里不再重复一份。) -->
 
-{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
+{% if governance and (not embed or embed == "timeline") %}
 </div>
 {% endif %}
 

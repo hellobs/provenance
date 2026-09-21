@@ -60,17 +60,33 @@ def _count_signals(text: str, signals: Dict[str, List[str]]) -> Tuple[int, int, 
     """按句统计 (正面句数, 谨慎句数, 条件化句数)。
 
     一句话里同时出现"否定词 + 买入类词" → 记谨慎。
+    词表一律按**词边界**匹配(不能朴素子串:"no" 会命中 "now"、"north")。
     """
     buy = signals.get("buy_words") or []
     cond = signals.get("cond_words") or []
     negators = signals.get("negators") or []
     neg_phrases = signals.get("neg_phrases") or []
+
+    def _hit(sl: str, words) -> bool:
+        # 词表匹配:纯 ASCII 词按词边界(防 "no" 命中 "now");含 CJK 的词按字面子串
+        # (中文连续字符间无 \b 边界,不能套拉丁词边界)。
+        for w in words:
+            w = str(w).strip().lower()
+            if not w:
+                continue
+            if any(ord(c) > 127 for c in w):
+                if w in sl:
+                    return True
+            elif re.search(r"(?<![a-z0-9_])" + re.escape(w) + r"(?![a-z0-9_])", sl):
+                return True
+        return False
+
     pos = neg = cond_n = 0
     for s in _SENT_SPLIT.split(str(text or "")):
         sl = s.lower()
-        has_buy = any(w in sl for w in buy)
-        has_cond = any(w in sl for w in cond)
-        has_neg = any(w in sl for w in negators) or any(p in sl for p in neg_phrases)
+        has_buy = _hit(sl, buy)
+        has_cond = _hit(sl, cond)
+        has_neg = _hit(sl, negators) or _hit(sl, neg_phrases)
         if has_buy and has_neg:
             neg += 1
         elif has_buy:

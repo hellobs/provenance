@@ -16,18 +16,32 @@ from typing import Any, Callable, Dict, List
 
 from case_engine.strategy import BUILTIN_STRATEGIES, EngineStrategy
 
-# 已知引擎注册表:id → {name, output, primitives, note}(描述用中性词,不夹带业务词)
-ENGINES: Dict[str, Dict[str, str]] = {
+# 组件 id 词汇表(渲染到前端时由各服务按需折叠成具体面板):
+#   scene     小镇场景       chat        聊天         governance 治理/权重面板
+#   timeline  干预时间轴     reflection  反思          overview    概览
+#   events    事件           state       状态          retrieval   检索
+#   router    问题分流       injector    注入器        audit       审计/一致性
+# 一份引擎声明"它通常激活哪些组件";必要时策略.panels(scenario) 可按场景微调。
+_COMPONENTS = {
+    "experiment-eval": ["scene", "chat", "reflection", "overview", "events",
+                        "state", "retrieval", "router", "injector", "audit"],
+    "sandbox-value": ["scene", "chat", "governance", "timeline", "reflection"],
+}
+
+# 已知引擎注册表:id → {name, output, primitives, components, note}(描述用中性词)
+ENGINES: Dict[str, Dict[str, Any]] = {
     "experiment-eval": {
         "name": "受控实验 / 评估",
         "output": "run.json",
         "primitives": "branch(分支) / reflection(反思) / consistency(一致性) / retrieval(检索)",
+        "components": _COMPONENTS["experiment-eval"],
         "note": "把一次场景交互压成一条分支线,可审计、可复现",
     },
     "sandbox-value": {
         "name": "生成式价值权重沙盒",
         "output": "checkpoints(simulate-*.json / value_tendency)",
         "primitives": "移动 / 感知 / 调度 / 关系 / 价值倾向演化",
+        "components": _COMPONENTS["sandbox-value"],
         "note": "角色按价值权重/期望行动,倾向随体验累积演化",
     },
 }
@@ -69,6 +83,12 @@ def describe(engine_id: str = "") -> Dict[str, str]:
     """返回引擎元信息;空值解析为默认引擎。"""
     rid = resolve(engine_id)
     return {"engine": rid, **ENGINES[rid]}
+
+
+def components(engine_id: str = "") -> List[str]:
+    """返回引擎激活的组件 id 清单;空值解析为默认引擎。新增组件本身即数据。"""
+    rid = resolve(engine_id)
+    return list(ENGINES[rid].get("components") or [])
 
 
 def register(engine_id: str, builder: _BuildFn, meta: Dict[str, str]) -> None:

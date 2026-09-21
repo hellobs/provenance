@@ -1,0 +1,23 @@
+fix(case01)!: 专家全文去掉实验元信息 + 契约 YAML 字段级同步(对接前必改的两处)
+
+用户要求分析"能不能跟仝牧平台对接了"。按《Governance平台对接说明》§2.3 / 0904doc 04 六.3
+逐条对了一遍,发现**两处必须先改**,都已修:
+
+1. **专家全文泄露实验元信息(我 9-19 引入的回归)**。`full_context` 里我加过一段
+   "一.1 本 Run 的分支来源"(写明"分支为实验设计预设"/"由 AI 在 T0 的判定"/"一致性校验…"),
+   本意是诚实标注 A 线那条矛盾记录;但 §2.3 的信息边界写得很死:**专家全文不得出现
+   Branch 标签、判定方式、是否预设**。旧守卫只禁 `Branch A`/`branch_action`/`Timeline`
+   这些字面量,中文口径绕过去了。
+   → 删掉该段;信息只走结构化字段(`/api/runs/{id}` 的 quality/consistency/branch_source)
+   与右栏面板两行。守卫测试改成中文口径一起禁(分支来源/预设分支/实验设计预设/判定方式/
+   T0 立场/一致性校验/…),并断言"删掉 ≠ 不记录"(结构化字段仍照实带出)。
+
+2. **契约 YAML 落后于代码**。`/api/runs` 现在默认排除 `quality=questionable`/`debug`
+   并在 `excluded` 里报明、另有 `?include_questionable=1`,但 `case01_api.openapi.yaml`
+   是平台直接读的机器可读契约,里面一个字段都没写 —— 平台照 YAML 实现就不会知道"记录会少给"。
+   → YAML 补:RunSummary 的 quality/consistency/branch_source/debug、`/api/runs` 的
+   include_questionable 参数与 excluded/filter 响应字段、顶部口径说明(含"这些是引擎侧附加键,
+   平台内部用,不得给专家看")。
+   → 守卫从"只比 paths"升级为**字段级**:YAML 必须出现这些 token,防止再次静默漂移。
+
+测试:case01 318(+1 字段级守卫)/ case_engine 145 / vizkit 27 / 外层 28。
