@@ -27,10 +27,15 @@ function run(engineValue) {
   const roles = mkEl('roles-section', 'experiment-eval');
   const evalSec = mkEl('eval-only-section', 'experiment-eval');
   const sbx = mkEl('sandbox-world-section', 'sandbox-value');
+  // 引擎专属 **标题** 也是被标记的元素:标题不在容器里的话,没选引擎时它会漏出来
+  //(用户实测:未选引擎时仍看到「沙盒内容与运行(sandbox-value)…」这一行)
+  const hRoles = mkEl('h-roles', 'experiment-eval');
+  const hEval = mkEl('h-eval', 'experiment-eval');
+  const hSbx = mkEl('h-sbx', 'sandbox-value');
   const hint = { textContent: '' };
   const engine = { value: engineValue };
   const btns = [{ disabled: false, title: '' }, { disabled: false, title: '' }];
-  const withEngines = [roles, evalSec, sbx];
+  const withEngines = [roles, evalSec, sbx, hRoles, hEval, hSbx];
   withEngines.forEach((el) => { el.getAttribute = (k) => (k === 'data-engines' ? el._engines : null); });
 
   const document = {
@@ -41,6 +46,7 @@ function run(engineValue) {
   new Function('document', fn + '\ntoggleSandboxWorld();')(document);
   return {
     roles: roles.style.display, evalSec: evalSec.style.display, sbx: sbx.style.display,
+    headings: [hRoles.style.display, hEval.style.display, hSbx.style.display],
     hint: hint.textContent, disabled: btns.map((b) => b.disabled),
   };
 }
@@ -56,11 +62,15 @@ console.log(`空首项: ${hasEmptyOption ? '有' : '缺'} | data-engines 标记:
 for (const [engine, want, desc, wantDisabled] of cases) {
   const got = run(engine);
   const ok = got.roles === want.roles && got.evalSec === want.evalSec && got.sbx === want.sbx;
+  // 标题必须跟容器同命运:该显示时显示,该藏时藏(否则就是"标题漏出来")
+  const wantHead = [want.roles, want.evalSec, want.sbx];
+  const headOk = got.headings.every((d, i) => d === wantHead[i]);
   const btnOk = got.disabled.every((d) => d === wantDisabled);
   const hintOk = engine === '' ? got.hint.includes('请先选择引擎') : got.hint.includes(engine);
-  const pass = ok && btnOk && hintOk;
+  const pass = ok && btnOk && hintOk && headOk;
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${desc}  engine='${engine || '(空)'}'  ` +
     `roles=${got.roles || '""'} eval=${got.evalSec || '""'} sbx=${got.sbx || '""'} ` +
+    `标题=${JSON.stringify(got.headings.map((d) => d || '""'))} ` +
     `按钮禁用=${JSON.stringify(got.disabled)} hint=${hintOk ? '对' : '不对'}`);
   if (!pass) { bad++; console.log('        hint 实际:', got.hint); }
 }

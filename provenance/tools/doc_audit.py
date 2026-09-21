@@ -22,7 +22,9 @@ ROOTS = (
 # 说明:mavis 仓的 md **不在这里管** —— 那是另一个仓(有自己的 README/教程节奏),
 # 本轮只给本仓的文档打状态,避免把自动状态块写进别人的仓库。
 
-BANNER_RE = re.compile(r"^>\s*\*\*(状态|Status)\*\*.*?(?=\n(?!>)|$)", re.M | re.S)
+# 状态块 = 连续的若干 "> **…**" 行(可能因为历史 bug 叠了多份);
+# 归一化时必须把**所有**这种行都删掉再插一条,否则越跑越多(2026-09-21 修)
+BANNER_RE = re.compile(r"^>\s*\*\*(状态|Status|最后核对|说明)\*\*.*$", re.M)
 
 # 人工判断过的状态表(2026-09-21 核对)。key = 相对 here 的路径。
 # 值 = (状态, 一句话说明)。没列到的按文件名模式兜底。
@@ -90,24 +92,27 @@ def banner_text(rel, date):
 
 
 def apply_banner(path, rel, date):
-    """把状态块插在第一个标题行之后;已有状态块则整块替换(幂等)。"""
+    """把状态块插在第一个标题行之后;已有状态行**全部**清掉再插(幂等)。"""
     with io.open(path, encoding="utf-8", errors="replace") as f:
         txt = f.read()
-    block = banner_text(rel, date)
-    if BANNER_RE.search(txt):
-        txt2 = BANNER_RE.sub(block.rstrip("\n"), txt, count=1)
-    else:
-        lines = txt.split("\n")
-        ins = 0
-        for i, line in enumerate(lines[:12]):
-            if line.strip().startswith("#"):
-                ins = i + 1
-                break
-        lines[ins:ins] = [""] + block.rstrip("\n").split("\n")
-        txt2 = "\n".join(lines)
-    if txt2 != txt:
+    block = banner_text(rel, date).rstrip("\n")
+    had = bool(BANNER_RE.search(txt))
+    txt2 = BANNER_RE.sub("", txt)                       # 旧的(可能叠了好几份)全删
+    txt2 = re.sub(r"\n{3,}", "\n\n", txt2)            # 别留下大片空行
+    lines = txt2.split("\n")
+    ins = 0
+    for i, line in enumerate(lines[:12]):
+        if line.strip().startswith("#"):
+            ins = i + 1
+            break
+    # 标题后面紧跟的空行也算进来,保证只留一个空行
+    while ins < len(lines) and not lines[ins].strip():
+        lines.pop(ins)
+    lines[ins:ins] = [""] + block.split("\n")
+    txt3 = "\n".join(lines)
+    if txt3 != txt:
         with io.open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(txt2)
+            f.write(txt3)
         return True
     return False
 

@@ -3,13 +3,6 @@
 > **状态**:历史存档
 > **最后核对**:2026-09-21
 > **说明**:任务派发单:任务已完成,留作过程记录
-> **最后核对**:2026-09-21
-> **说明**:任务派发单:任务已完成,留作过程记录
-> **最后核对**:2026-09-21
-> **说明**:任务派发单:任务已完成,留作过程记录
-> **最后核对**:2026-09-21
-> **说明**:任务派发单:任务已完成,留作过程记录
-
 > 2026-09-18 · 依据已拍板材料执行：`mavis_插件面合并决策_20260918.md`（动作与版本结论）、
 > `mavis合并bump预演_20260918.md`（链路已在临时克隆走通，含产物哈希与断言方法）。
 > 本任务**执行**这两份材料里的动作，不是再出预演。
@@ -198,7 +191,6 @@ import mavisframework.plugin as plugin_mod
 from mavisframework.core import agent_core
 from mavisframework.runtime.simulator import Simulator
 
-
 def main() -> int:
     problems = []
     if not hasattr(plugin_mod, "Plugin"):
@@ -220,7 +212,6 @@ def main() -> int:
         return 1
     print("插件面基线断言通过。")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
