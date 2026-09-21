@@ -204,6 +204,11 @@ body { margin: 0; }
 
     <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
     <!-- governance 开关:治理/权重/时间轴属 case00;case01(vizkit) 不渲染这几块 -->
+<script>
+  // 时间轴"撤销(回滚)"入口是否可用:沙盒场景由服务端置 false(后果不可倒带)。
+  // 只影响前端渲染;真发 POST /api/undo-intervention 也会被 403 拒绝。
+  window.__UNDO_ALLOWED__ = {{ 'true' if undo_allowed|default(true) else 'false' }};
+</script>
     {% if governance and embed != "scene" and embed != "timeline" %}
     <div id="goals-panel" style="background: rgba(255,255,255,0.96); border: 1px solid #d8d8d8; border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 12px;

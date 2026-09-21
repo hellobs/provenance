@@ -98,13 +98,36 @@ async def _active_components() -> list:
         from case_engine.config import load_yaml
 
         p = os.path.join(state.BASE_DIR, "cases", "case00_village", "scenario.yaml")
-        eid = "sandbox-value"
+        eid = _case00_engine_id()
         if os.path.isfile(p):
             cfg = load_yaml(p)
             eid = getattr(cfg, "engine", None) or eid
         return _eng.components(eid)
     except Exception:  # noqa: BLE001 —— 派生失败回退 sandbox-value 组件,不缺治理
         return ["scene", "chat", "governance", "timeline", "reflection"]
+
+
+def _case00_engine_id() -> str:
+    """case00 场景声明的引擎 id(读不到就按 sandbox-value 处理)。"""
+    try:
+        from case_engine.config import load_yaml
+
+        p = os.path.join(state.BASE_DIR, "cases", "case00_village", "scenario.yaml")
+        if os.path.isfile(p):
+            return getattr(load_yaml(p), "engine", None) or "sandbox-value"
+    except Exception:  # noqa: BLE001
+        pass
+    return "sandbox-value"
+
+
+def sandbox_rollback_blocked() -> bool:
+    """**沙盒场景不允许时间轴回滚**(2026-09-21 用户要求)。
+
+    沙盒(生成式价值权重)跑的正是"决策→后果→反思→内化":后果一旦发生就成了经历。
+    回滚干预等于把后果从经历里抹掉,与这条线的前提直接冲突 —— 所以服务端拒绝,
+    前端也不渲染撤销入口(见 `undo_allowed` 上下文 + main_script 的按钮渲染)。
+    """
+    return _case00_engine_id() == "sandbox-value"
 
 
 async def _render_index(request: Request, embed: str = ""):
@@ -139,6 +162,8 @@ async def _render_index(request: Request, embed: str = ""):
             # 治理/权重/干预时间轴面板是否可用的唯一判断:由活动引擎组件决定
             "governance": "governance" in comps,
             "engine_components": comps,
+            # 时间轴"撤销(回滚)"入口是否渲染:沙盒场景不给(见 sandbox_rollback_blocked)
+            "undo_allowed": not sandbox_rollback_blocked(),
             **payload,
         },
     )
@@ -354,7 +379,14 @@ async def undo_intervention(request: Request):
     (governance.json)+ 追加 operator=undo 审计记录(撤销本身可审计,
     不抹除历史:interventions.json 保留原记录,另记一条撤销)。
     匹配键:agent + sim_time + 记录写入真实时间(time),避免跨模拟/同名混淆。
+
+    **沙盒场景一律拒绝**(2026-09-21 用户要求):见 sandbox_rollback_blocked()。
     """
+    if sandbox_rollback_blocked():
+        return JSONResponse({"ok": False, "errors": [
+            "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
+            "(决策→后果→反思→内化这条线不允许倒带)。如确需修正,请在治理面板重新干预。"
+        ]}, status_code=403)
     body = await request.json()
     agent = str(body.get("agent", "")).strip()
     sim_time = str(body.get("sim_time", "")).strip()

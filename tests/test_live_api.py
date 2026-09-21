@@ -255,6 +255,13 @@ class TestTimeline:
 # POST /api/undo-intervention(撤销干预)
 # ---------------------------------------------------------------------------
 class TestUndo:
+    # 沙盒(case00 的默认引擎 sandbox-value)**不提供时间轴回滚**(2026-09-21 用户要求)。
+    # 所以要测"回滚能力"本身,必须显式切到非沙盒引擎;沙盒的拒绝行为另有一条测试。
+    @pytest.fixture(autouse=True)
+    def _non_sandbox_engine(self, monkeypatch):
+        from live import routes as _routes
+        monkeypatch.setattr(_routes, "_case00_engine_id", lambda: "experiment-eval")
+
     def _seed_intervention(self, tmp_path):
         iv_path = tmp_path / "results" / "checkpoints" / "interventions.json"
         iv_path.write_text(json.dumps([{
@@ -302,6 +309,26 @@ class TestUndo:
 # ---------------------------------------------------------------------------
 # WebSocket:跑完之后才连进来的人必须被告知
 # ---------------------------------------------------------------------------
+
+    def test_sandbox_refuses_timeline_rollback(self, client, tmp_path, monkeypatch):
+        """沙盒场景必须拒绝回滚:后果属于角色的经历,不允许倒带。"""
+        from live import routes as _routes
+        monkeypatch.setattr(_routes, "_case00_engine_id", lambda: "sandbox-value")
+        self._seed_intervention(tmp_path)
+        # 拒绝必须"什么都没动":对比请求前后的 governance.json 原文
+        gov_path = tmp_path / "governance.json"
+        gov_before = gov_path.read_text(encoding="utf-8") if gov_path.exists() else ""
+        r = client.post("/api/undo-intervention", json={
+            "agent": "AI Advisor", "sim_time": "20250213-12:00", "time": "2026-08-30 10:00:00",
+        })
+        assert r.status_code == 403, r.text
+        assert "沙盒" in r.json()["errors"][0]
+        gov_after = gov_path.read_text(encoding="utf-8") if gov_path.exists() else ""
+        assert gov_after == gov_before, "被拒绝的请求不该改治理文件"
+        ivs = json.loads((tmp_path / "results" / "checkpoints" / "interventions.json")
+                         .read_text(encoding="utf-8"))
+        assert len(ivs) == 1 and ivs[0]["operator"] == "expert", "不该追加 undo 审计"
+
 class TestWsLateJoiner:
     """**不允许静默**:推演已结束/已出错后才打开页面的人,必须立刻收到 done/error。
 
