@@ -125,7 +125,12 @@ def _brief_checkpoint(name: str) -> dict:
 
 
 def _brief_review(run_id: str) -> dict:
-    """归一化一个 case01 成品 run(读 run.json,与 review_app._brief 同口径)。"""
+    """归一化一个 case01 成品 run(读 run.json,与 review_app._brief 同口径)。
+
+    2026-09-21 加质检口径(`quality`/`consistency`/`branch_source`/`debug`),
+    **与 5002 契约同源** —— 直接复用 `case01.full_context.quality_of`,
+    避免"两处各判一套"漂移。平台按 5010 取数时,看到的集合必须与 5002 一致。
+    """
     p = os.path.join(BASE_DIR, "case01", "runs", run_id, "run.json")
     data = {}
     try:
@@ -135,9 +140,12 @@ def _brief_review(run_id: str) -> dict:
         return {"source": "review", "run_id": run_id, "case_id": "case01_mavis",
                 "engine_id": "", "branch": "", "start_date": "", "end_date": "",
                 "n_turns": 0, "n_reflections": 0, "has_graph": False,
+                "quality": "unverified", "consistency": "unverified",
+                "branch_source": "", "debug": "",
                 "error": "读 run.json 失败: {}".format(exc)}
     router_data = data.get("router") or {}
     n_runs = len(data.get("turns") or [])
+    q = _quality_of(data)
     return {
         "source": "review",
         "run_id": run_id,
@@ -149,7 +157,52 @@ def _brief_review(run_id: str) -> dict:
         "n_turns": n_runs,
         "n_reflections": 1 if ((data.get("reflection") or {}).get("text")) else 0,
         "has_graph": bool(router_data.get("issues") or n_runs),
+        **q,
     }
+
+
+def _quality_of(rec: dict) -> dict:
+    """质检标记:优先用 case01 的判定(单一来源);拿不到就 unverified。
+
+    case00 的痕迹/压缩成品不是 case01 成品记录,没有一致性戳 —— 那是"判不了",
+    不是"有问题",所以给 unverified 而不是过滤掉。
+    """
+    try:
+        from case01.full_context import quality_of
+        q = quality_of(rec)
+        return {"quality": q.get("quality", "unverified"),
+                "consistency": q.get("consistency", "unverified"),
+                "branch_source": q.get("branch_source", ""),
+                "debug": q.get("debug", "")}
+    except Exception:  # noqa: BLE001 - 引擎侧缺席时不能假装"没问题"
+        return {"quality": "unverified", "consistency": "unverified",
+                "branch_source": "", "debug": ""}
+
+
+# 默认不给平台的质检类别(与 5002 `serve.list_runs` 同口径):
+#   questionable = 预设分支与 AI 的 T0 立场自相矛盾;debug = 调试跑(内容不完整)
+_HIDDEN_QUALITY = ("questionable", "debug")
+
+
+def expert_safe_record(rec: dict) -> dict:
+    """从 case01 成品记录里挑出**可以给专家看**的部分(白名单)。
+
+    为什么必须白名单:原始 `run.json` 里含 `injector`(Branch 实验元信息 + 逐节点
+    dialogue 原文)、`branch_action`、`consistency`、`debug`/`quality` —— 按
+    《Governance平台对接说明》§2.2/§2.3 与 0904doc 04 六.3,**这些不得进专家视图**。
+    以前 `/api/run-detail` 直接回整个 run.json,等于把实验底牌一起递出去。
+
+    白名单 = 平台契约 §2.2 明确要读的那些键。
+    """
+    keep = ("run_id", "start_date", "end_date", "turns", "retrievals", "events",
+            "state_history", "final_feedback", "audit", "condition_monitor",
+            "reflection", "router", "summary", "compat")
+    out = {k: rec.get(k) for k in keep if k in rec}
+    # reflection/router 是专家审核的核心,缺了就补空结构(前端不必判 None)
+    out.setdefault("reflection", {})
+    out.setdefault("router", {"issues": []})
+    out["_view"] = "expert-safe"
+    return out
 
 
 def _brief_compressed(name: str) -> dict:
@@ -160,8 +213,13 @@ def _brief_compressed(name: str) -> dict:
 
 
 @router.get("/api/runs")
-async def list_all_runs() -> JSONResponse:
-    """统一历史数据:case00 checkpoints + case01 成品 run + 压缩成品,合而为一。"""
+async def list_all_runs(include_questionable: bool = False) -> JSONResponse:
+    """统一历史数据:case00 checkpoints + case01 成品 run + 压缩成品,合而为一。
+
+    默认**不给** `quality=questionable`/`debug` 的记录(与 5002 契约同口径),
+    但**不静默**:响应里的 `excluded` 给出计数、run_id 与原因;
+    `?include_questionable=1` 取全量。
+    """
     runs = []
 
     ck_root = os.path.join(BASE_DIR, "results/checkpoints")
@@ -184,13 +242,31 @@ async def list_all_runs() -> JSONResponse:
 
     _decorate(runs)
 
+    hidden = []
+    if not include_questionable:
+        keep = []
+        for r in runs:
+            if str(r.get("quality") or "unverified") in _HIDDEN_QUALITY:
+                hidden.append({"run_id": r.get("run_id"), "quality": r.get("quality")})
+            else:
+                keep.append(r)
+        runs = keep
+
     # 倒序:结束时间最新在前;无时间的归到最后。
     runs.sort(key=lambda r: (str(r.get("end_date", "") or ""), str(r.get("run_id", "") or "")),
               reverse=True)
     # 把场景发现层也带给前端,供菜单分层(而非前端写死 case01)
     meta = _scenario_meta_cached()
     scenarios = [{"case_id": cid, **m} for cid, m in sorted(meta.items())]
-    return JSONResponse({"count": len(runs), "runs": runs, "scenarios": scenarios})
+    body = {"count": len(runs), "runs": runs, "scenarios": scenarios,
+            "filter": {"include_questionable": bool(include_questionable)}}
+    if hidden:
+        body["excluded"] = {
+            "count": len(hidden), "runs": hidden,
+            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾;"
+                      "debug=调试跑(内容不完整)。加 ?include_questionable=1 取全量",
+        }
+    return JSONResponse(body)
 
 
 @router.get("/embed/explore", response_class=HTMLResponse)
@@ -201,13 +277,18 @@ async def explore_page(request: Request) -> HTMLResponse:
 
 
 @router.get("/api/run-detail/{source}/{run_id}")
-async def run_detail(source: str, run_id: str) -> JSONResponse:
-    """共享只读详情:按 source 返回该 run 的原始数据,供前端自渲染。
+async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONResponse:
+    """共享只读详情:按 source 返回该 run 的数据,供前端自渲染。
 
     刻意不调用 case01 实时面的 `/embed/review`——那路由只挂在 case01 侧,
     case00 跑起来会 404(实测踩过)。历史界面应该**自含**详情渲染,
     与"当前跑哪个 case"无关,任何实时面都能打开所有 run 的详情。
     source ∈ {review, checkpoint, compressed};路径白名单,杜绝穿越。
+
+    **默认给"专家安全视图"**(2026-09-21):case01 成品只回
+    `expert_safe_record()` 白名单里的键 —— 原始 run.json 里的 `injector`(Branch
+    实验元信息 + 逐节点 dialogue 原文)、`branch_action`、`consistency`、`debug`/`quality`
+    按契约不得进专家视图。要原始全文(内部排查/引擎侧)加 `?raw=1`。
     """
     if not run_id or run_id in (".", "..") or "/" in run_id or "\\" in run_id:
         return JSONResponse({"ok": False, "errors": ["非法 run_id: {}".format(run_id)]},
@@ -219,11 +300,16 @@ async def run_detail(source: str, run_id: str) -> JSONResponse:
                                 status_code=404)
         try:
             with open(p, "r", encoding="utf-8") as f:
-                return JSONResponse({"ok": True, "source": "review", "run_id": run_id,
-                                     "data": json.load(f)})
+                rec = json.load(f)
         except Exception as exc:  # noqa: BLE001
             return JSONResponse({"ok": False, "errors": ["读 run.json 失败: {}".format(exc)]},
                                 status_code=500)
+        if raw:
+            return JSONResponse({"ok": True, "source": "review", "run_id": run_id,
+                                 "view": "raw", "data": rec})
+        return JSONResponse({"ok": True, "source": "review", "run_id": run_id,
+                             "view": "expert-safe",
+                             "data": expert_safe_record(rec)})
     if source == "checkpoint":
         ck_root = os.path.join(BASE_DIR, "results/checkpoints", run_id)
         if not os.path.isdir(ck_root):
