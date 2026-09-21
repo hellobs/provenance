@@ -386,6 +386,9 @@ class TestPageRender:
             assert "game-container" in r.text
             # 实时页必须有可见的运行状态指示(连接中/进行中/已结束/出错)
             assert 'id="sim-status"' in r.text and "setSimStatus" in r.text
+            # 顶栏要挂"配置工具"外链(mavis 的 config_tool 独立进程;地址可用
+            # MAVIS_CONFIG_TOOL_URL 覆盖)—— 别让它悄悄消失
+            assert "配置工具" in r.text and "8060" in r.text, "顶栏缺少配置工具外链"
 
 
 # ---------------------------------------------------------------------------

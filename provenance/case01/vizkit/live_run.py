@@ -70,7 +70,14 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         restart_choices=[{"id": "branch",
                           "label": "分支",
                           "options": ["auto", "A", "B", "C"],
-                          "value": "auto" if branch_mode == "judge" else branch}])
+                          "value": "auto" if branch_mode == "judge" else branch}],
+        # 顶栏外部工具链接:mavis 的角色/场景配置工具是**独立进程**(默认 8060),
+        # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)
+        extra_nav_links=[{"label": "配置工具 ↗",
+                          "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
+                                                "http://127.0.0.1:8060/"),
+                          "title": "mavis 的角色/场景配置工具(独立进程;"
+                                   "地址可用 MAVIS_CONFIG_TOOL_URL 覆盖)"}])
     if with_review:
         from ..review_app import attach_to
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。

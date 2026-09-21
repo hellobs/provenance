@@ -25,6 +25,12 @@
         <li{% if nav_embed == '' %} class="active"{% endif %}><a href="/">运行场景(小镇)</a></li>
         <li{% if nav_embed == 'scene' %} class="active"{% endif %}><a href="/embed/scene">当前场景</a></li>
         <li{% if nav_embed == 'explore' %} class="active"{% endif %}><a href="/embed/explore">数据界面</a></li>
+        {# 外部工具链接(如 mavis 的 config_tool,独立进程):由调用方经 extra_nav_links
+           传 {label,url};没有就不渲染 —— 模板不认识具体是哪个工具。 #}
+        {% for l in extra_nav_links or [] %}
+        <li><a href="{{ l.url }}" target="_blank" rel="noopener"
+               title="{{ l.title|default(l.label) }}">{{ l.label }}</a></li>
+        {% endfor %}
       </ul>
     </div>
   </nav>

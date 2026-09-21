@@ -24,6 +24,13 @@ from starlette.requests import Request
 # 统一根:本文件位于 <root>/live/history.py,向上两级即 provenance/provenance。
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend/templates"))
+# 顶栏外部工具链接:mavis 仓的 config_tool 是**独立进程**(默认 8060),
+# 地址可用环境变量 MAVIS_CONFIG_TOOL_URL 覆盖(换机/换端口)。
+templates.env.globals["extra_nav_links"] = [
+    {"label": "配置工具 ↗", "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
+                                                 "http://127.0.0.1:8060/"),
+     "title": "mavis 的角色/场景配置工具(独立进程;地址用 MAVIS_CONFIG_TOOL_URL 覆盖)"},
+]
 
 router = APIRouter()
 

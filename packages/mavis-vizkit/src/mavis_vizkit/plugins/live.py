@@ -46,7 +46,8 @@ class LiveVisualizer(Visualizer):
                  start_datetime: str = "",
                  nodes_key: str = "nodes", meta_key: Optional[str] = None,
                  extra_panels: Optional[List[dict]] = None,
-                 on_restart=None, restart_choices: Optional[List[dict]] = None):
+                 on_restart=None, restart_choices: Optional[List[dict]] = None,
+                 extra_nav_links: Optional[List[dict]] = None):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -77,6 +78,8 @@ class LiveVisualizer(Visualizer):
         # 本包不知道 A/B/C 是什么,只知道"重开时可以带一组选择给回调"。
         self.on_restart = on_restart
         self.restart_choices = [dict(c) for c in (restart_choices or []) if c.get("id")]
+        # 顶栏外部工具链接({label,url} 列表):本包只透传,不知道它们是什么
+        self.extra_nav_links = [dict(x) for x in (extra_nav_links or []) if x.get("url")]
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -299,6 +302,9 @@ class LiveVisualizer(Visualizer):
 
         app = FastAPI(title="mavis-vizkit 实时可视化(小镇风格)")
         templates = Jinja2Templates(directory=self.template_dir)
+        # 顶栏可挂**外部工具链接**(本包不认识它们是什么,只透传 {label,url} 列表):
+        # 由调用方经 ctor 的 extra_nav_links 传进来,保持本包零业务词。
+        templates.env.globals["extra_nav_links"] = list(self.extra_nav_links or [])
 
         # 角色贴图别名:先挂具体路径,再挂整个 /static
         for role, alias in self.alias.items():
