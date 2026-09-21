@@ -26,6 +26,38 @@ def _rec(answer="I would not recommend buying now."):
         ["Ethan Lin", "值得买吗?"], ["Investment AI", answer]]}]}
 
 
+def test_judge_mode_does_not_claim_preset_before_t0():
+    """judge 模式下,T0 跑完之前不能自称 preset(否则面板显示"实验设计预设")。
+
+    2026-09-21 用户实测:judge 模式跑的时候,结果记录卡显示"判定方式 judge(待 T0 判定)"
+    但"分支来源 实验设计预设" —— 因为 bridge 初始化直接把 branch_source 设成了 "preset"。
+    """
+    from case01.injector.nodes import NodeSpec
+
+    b = _bridge(branch="B", mode="judge")
+    assert b.run_record()["branch_source"] == "", "T0 之前应为空(待判定)"
+
+    raw = {"schema_version": "injector-0.1", "run_id": "r-pending", "mode": "mavis",
+           "branch": "B", "branch_mode": "judge", "branch_source": "",
+           "roles": list(ROLES), "scenario_dir": "",
+           "nodes": [{"node_id": "node-1", "date": "2026-08-27", "step": 1,
+                      "released_events": [], "events": [],
+                      "dialogue": [{"x": [["Investment AI", "unclear"]]}],
+                      "world_state": {"date": "2026-08-27", "branch": "B"}}],
+           "world_audit": [], "summary": {"node_count": 1}, "c_plan": {}}
+    ba = run_pipeline(branch="B", raw_record=raw, dry_run=True)["branch_action"]
+    assert ba["source"] == "judge" and ba["pending"] is True
+    assert "待 T0 判定" in ba["judge"]
+
+    b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
+    assert b.branch_source == "judge" and b.judge_info.get("detected") == "B"
+    after = run_pipeline(branch="B",
+                         raw_record=dict(raw, branch_source="judge",
+                                         judge_info=b.judge_info), dry_run=True)
+    assert after["branch_action"]["pending"] is False
+    assert after["branch_action"]["source"] == "judge"
+
+
 def test_default_mode_is_preset():
     assert MavisBridge(nodes=[], roles=ROLES, scenario_dir="", dry_run=True).branch_mode == "preset"
 

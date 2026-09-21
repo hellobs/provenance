@@ -80,7 +80,9 @@ class MavisBridge:
         if branch_mode not in ("preset", "judge"):
             raise ValueError("branch_mode 只能是 preset 或 judge,收到 {!r}".format(branch_mode))
         self.branch_mode = branch_mode
-        self.branch_source = "preset"
+        # judge 模式下 T0 跑完之前**不能**自称 preset —— 否则映射出来的记录会显示
+        # "分支来源=实验设计预设",看着像 preset 跑(用户实测反馈)。空串 = 待判定。
+        self.branch_source = "preset" if branch_mode == "preset" else ""
         self.judge_info: Dict[str, str] = {}
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
