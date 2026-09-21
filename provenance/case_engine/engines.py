@@ -68,6 +68,16 @@ def known(engine_id: str) -> bool:
     return engine_id in ENGINES
 
 
+def all_ids() -> List[str]:
+    """全部已注册引擎 id(排序)。
+
+    2026-09-21 加:配置工具的「引擎」页要列**全部**引擎,而 `describe()` 无参只给默认引擎
+    (默认 experiment-eval),照它列会漏掉 sandbox-value。CLI 的 `engines` 子命令一直是
+    直接读 `ENGINES`,这里把它提成公开函数,免得各调用方各读各的私有表。
+    """
+    return sorted(ENGINES)
+
+
 def resolve(engine_id: str = "") -> str:
     """空值回退到默认引擎;非法 id 抛 ValueError 以阻止错误启动。"""
     engine_id = engine_id or ""
