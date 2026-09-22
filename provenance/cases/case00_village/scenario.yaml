@@ -17,9 +17,13 @@ meta:
   name: "6 角色投资咨询中心"
   description: "provenance 原生的 6 角色多 agent 投资咨询沙盒:角色在投资咨询中心按制度约束与剧情事件连续仿真,价值倾向(value_tendency)随交互演化"
   engine: sandbox-value             # 推荐/默认引擎(价值权重沙盒);运行时可 --engine 覆盖
+  protocol: sandbox                 # 值演化/干预型(区别于 case01 的受控实验 experiment)
   simulation: "investment"          # 取自 story/relationships 的 simulation 字段
   start_date: "2025-02-13"          # live_fastapi 的 --start(沙盒墙钟起始)
   runtime: "live_fastapi.py(5001) + live/"   # 过渡:沙盒语义仍由旧引擎持有
+  audit_target: ai_advisor          # 专家审核链只监控 AI 助手(2026-09-22 已定):
+                                    # 六角色仅 ai_advisor 为 ai_tool,其余 user 不产生
+                                    # "AI 自主判断"可审。调用方经 kw 传 evolution+llm 触发。
 
 # ---- 角色(引擎 Validate:非空唯一 id;role_type 复刻 agent.json) ----
 roles:

@@ -143,6 +143,13 @@ REFLECTION_SYSTEM = (
     "Respond in Chinese."
 )
 
+# 采样温度提到模块常量(2026-09-22):**行为不变**,只是让记录里的 manifest 能引用
+# 同一来源 —— 运行清单要写"判定/反思各自的 temperature",值若在别处复制一份,
+# 改了调用处清单就会说谎。判定侧的同名常量在 case01/injector/manifest.py。
+REFLECTION_TEMPERATURE = 0.4
+ROUTER_TEMPERATURE = 0.2
+ROUTER_REWRITE_TEMPERATURE = 0.2
+
 
 # 客套开场白(用户 2026-09-19 反馈:10 条反思全部以此开头)。提示词里已禁,这里兜底剥掉。
 _BOILERPLATE_OPENERS = (
@@ -274,10 +281,11 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
     ]
     # 长 prompt 走原生端点(支持 num_ctx);OpenAI 兼容端默认上下文小会 400
     if hasattr(llm, "native_chat"):
-        text = llm.native_chat(messages, temperature=0.4,
+        text = llm.native_chat(messages, temperature=REFLECTION_TEMPERATURE,
                                max_tokens=max_tokens, num_ctx=32768)
     else:
-        text = llm.chat(messages, temperature=0.4, max_tokens=max_tokens)
+        text = llm.chat(messages, temperature=REFLECTION_TEMPERATURE,
+                        max_tokens=max_tokens)
     raw = text or ""
     cleaned = _strip_boilerplate(raw)
     return {"material": material, "text": cleaned,
@@ -454,7 +462,7 @@ def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
         text = llm.chat([
             {"role": "system", "content": "You are the Reflection Router. Respond in Chinese."},
             {"role": "user", "content": ROUTER_REWRITE_HINT + "\n" + payload},
-        ], temperature=0.2, max_tokens=max_tokens)
+        ], temperature=ROUTER_REWRITE_TEMPERATURE, max_tokens=max_tokens)
         fixed = {str(it.get("id", "")): it for it in _parse_rewrite_json(text or "")}
     except Exception:  # noqa: BLE001 - 改写失败不该让整条记录没了;原样保留 + 标注
         return issues
@@ -494,7 +502,7 @@ def run_router(llm, reflection_text: str, material: str = "",
         {"role": "system",
          "content": "You are the Reflection Router. Respond in Chinese."},
         {"role": "user", "content": prompt},
-    ], temperature=0.2, max_tokens=max_tokens)
+    ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
     issues = _parse_router_json(raw)
     return {"raw": raw, "issues": _rewrite_question_issues(llm, issues)}

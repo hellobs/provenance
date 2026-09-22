@@ -198,6 +198,60 @@ def _strip_boilerplate(text: str) -> str:
 
 
 # ---- 反思材料组装 ----
+
+
+def assemble_evolution_material(agent: str, checkpoints: list,
+                                interventions: list = None,
+                                tendency_keys: list = None) -> str:
+    """把值演化型 agent 的记录整理成可反思的"经历自述"材料(引擎通用,零业务词)。
+
+    区别于 `assemble_reflection_material`(对话型,消费 turns):本函数面向
+    **倾向演化 / 专家干预型**记录(如沙盒按 checkpoint 演化的角色)。
+    - checkpoints:按时间升序的轨迹,每条含 sim_time 与该 agent 的价值倾向分量;
+    - interventions:专家干预记录(可选),每条含 target(sim_time) / kind / change
+      等;只挑作用到本 agent 的干预;
+    - tendency_keys:该 agent 的价值维度键清单;缺省则取所有出现的键。
+    只使用记录中实际存在的分量,不作虚构;返回按时间线组织的文本。
+    """
+    parts = []
+    parts.append("以下是你在过去一段时间里的一次连续经历过程。")
+    if not checkpoints:
+        parts.append("\n(没有可用的演化轨迹记录)")
+        return "\n".join(parts)
+    # 汇总全部出现的倾向分量键(取并集,保证轨迹内键一致)
+    keys: List[str] = []
+    if tendency_keys:
+        keys = [k for k in tendency_keys]
+    else:
+        seen = []
+        for cp in checkpoints:
+            vt = (cp.get("value_tendency") or cp.get("tendency") or {})
+            for k in vt.keys():
+                if k not in seen:
+                    seen.append(k)
+        keys = seen
+    parts.append("\n【你的价值倾向随时间的演化轨迹】")
+    for cp in checkpoints:
+        st = cp.get("sim_time") or cp.get("time") or cp.get("date") or ""
+        vt = (cp.get("value_tendency") or cp.get("tendency") or {})
+        if not vt and not st:
+            continue
+        comps = ["{0}={1}".format(k, vt.get(k)) for k in keys if k in vt]
+        head = "时间 {}:".format(st) if st else "节点:"
+        parts.append("- " + head + (" " + ", ".join(comps) if comps else "(无分量)"))
+    if interventions:
+        mine = [iv for iv in interventions
+                if not iv.get("agent") or iv.get("agent") == agent]
+        if mine:
+            parts.append("\n【外部专家对你的干预记录】")
+            for iv in mine:
+                st = iv.get("sim_time") or iv.get("time") or iv.get("date") or ""
+                kind = iv.get("kind") or iv.get("action") or "干预"
+                change = iv.get("change") or iv.get("effect") or iv.get("note") or ""
+                parts.append("- 时间 {} · {}: {}".format(st, kind, change))
+    return "\n".join(parts)
+
+
 def assemble_reflection_material(rec: dict, speaker_labels: Dict = None,
                                  asker_speaker: tuple = ("user",),
                                  fb_asker_key: str = "client") -> str:
@@ -250,14 +304,18 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096,
                    reflection_system: str = REFLECTION_SYSTEM,
                    speaker_labels: Dict = None,
                    asker_speaker: tuple = ("user",),
-                   fb_asker_key: str = "client") -> dict:
+                   fb_asker_key: str = "client",
+                   material: str = None) -> dict:
     """生成多维 Reflection。
     llm: 本地 Ollama client(0904 要求与判断同源;不使用外部模型)
+    material: 可选外部经历自述(演化型记录用 `assemble_evolution_material` 生成,
+      由调用方注入,不再从此 rec 组装);缺省则按 rec 组装对话型材料。
     返回 {"material", "text", "stripped_opener"}
     """
-    material = assemble_reflection_material(rec, speaker_labels,
-                                            asker_speaker=asker_speaker,
-                                            fb_asker_key=fb_asker_key)
+    if material is None:
+        material = assemble_reflection_material(rec, speaker_labels,
+                                                asker_speaker=asker_speaker,
+                                                fb_asker_key=fb_asker_key)
     prompt = reflection_prompt + "\n\n以下是你刚刚经历的过程:\n\n" + material
     messages = [
         {"role": "system", "content": reflection_system},

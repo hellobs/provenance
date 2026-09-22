@@ -53,10 +53,23 @@ python -m case01.injector.pipeline --branch A --out /tmp/A.json
 ## 记录与兼容
 
 `record.py` 输出 case01 `run.json` 的顶层键（`turns` / `events` / `retrievals` /
-`final_feedback` / `audit` 等），并新增两段：
+`final_feedback` / `audit` 等），并新增三段：
 
 - `injector`：原始节点记录（含对话、临时状态、交互与重试）。
+- `manifest`：**运行清单**（2026-09-22 新增，见 `manifest.py`）—— 记"这次到底用什么跑的":
+  `created_at`（真实时间）、`git_commit`（当前仓 HEAD；取不到写 `unknown` + 原因）、
+  `engine_id`、`branch_mode`（preset/judge）、`judge`（`local`/`api`/`rules`）、`judge_model`、
+  `judge_prompt_version`、`temperature`（判定/反思/路由各自）、`scenario_sha256`、
+  `financial_data_version`（检索资料目录内容哈希；目录不存在写 `"absent"`）、`prompt_versions`。
+  缺项**不静默**：写 `null` 并在 `manifest_warnings` 里写清缺什么、为什么缺。
 - `compat`：`level`（当前为 `schema`）、`missing_keys`、`gaps`（哪些字段是留空而非真值）、
   `reflection_attached`。
 
 取不到真值的字段一律留空并写进 `gaps`，不伪造。
+
+## 落盘：原子写
+
+记录(`run.json` / 原始 `raw.json` / `<case>_exp.json`)一律走
+`case_engine/atomicio.py` 的"同目录临时文件 → `os.replace`"（case01 侧转发见
+`case01/atomicio.py`）：写失败时目标文件保持旧内容、目录里不留 `.tmp`，异常原样抛出。
+半截 JSON 比"没写"更危险 —— 文件存在、大小正常，读的人会当成一条完整记录。

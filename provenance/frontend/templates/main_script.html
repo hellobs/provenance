@@ -24,7 +24,11 @@
 	let colLayer = null;
 	function tileWall(px, py) {
 		if (!colLayer) return false;
-		let t = colLayer.getTileAt(Math.floor(px / tile_width), Math.floor(py / tile_width), true);
+		let tx = Math.floor(px / tile_width);
+		let ty = Math.floor(py / tile_width);
+		// 越界保护:超出地图边缘一律视为墙(不越界移动)
+		if (tx < 0 || ty < 0 || tx >= colLayer.width || ty >= colLayer.height) return true;
+		let t = colLayer.getTileAt(tx, ty, true);
 		return !!(t && t.collide);
 	}
 	let sim_finished = false;
@@ -806,9 +810,14 @@
 
 		// ---- unified movement: all agents with targets move smoothly along waypoints ----
 		// speed is constant per delta time, avoiding too-fast sliding on high-refresh screens (120/144Hz)
+		// 2026-09-22 修复三件事:
+		//  1) 轴对齐走法(先横到格、再竖到格,绝不斜对角直线)  —— 消除"不横平竖直";
+		//  2) 逐轴单点撞墙检测 + tileWall 越界即墙 —— 杜绝斜擦墙角外沿的穿墙;
+		//  3) agent hitbox 之间的分离 —— 移动前检查目标格被他角色占据则不推进。
 		let step_px = 0.8 * (delta || 16.67) / 16.67;   // constant ~48px/s ≈ 1.5 tiles/s
-		for (let i = 0; i < Object.keys(personas).length; i++) {
-			let curr_persona_name = Object.keys(personas)[i];
+		let agents = Object.keys(personas);
+		for (let i = 0; i < agents.length; i++) {
+			let curr_persona_name = agents[i];
 			let curr_persona = personas[curr_persona_name];
 			let curr_pronunciatio = pronunciatios[curr_persona_name];
 			let waypoints = movement_target[curr_persona_name];
@@ -826,6 +835,8 @@
 				curr_persona.body.y = target[1];
 				curr_pronunciatio.x = target[0] - 15;
 				curr_pronunciatio.y = target[1] - 15 - 25;
+				waypoints.shift();
+				if (waypoints.length === 0) delete movement_target[curr_persona_name];
 				continue;
 			}
 
@@ -845,25 +856,69 @@
 					curr_persona.anims.stop();
 				}
 			} else {
-				// move smoothly toward the current waypoint, but never clip through walls:
-				// walk into an obstacle tile is rejected (X already try Y, slide along the wall).
-				// 修穿墙:此前直接 body.x/y += vx/vy 直线冲向单一目标点,完全无视 Collisions 图层;
-				// 而后端每次只推"终点"(path 恒为单点,无路径规划),直线必然穿墙/穿家具。
-				let vx = dx / dist * step_px;
-				let vy = dy / dist * step_px;
-				// 用角色 hitbox 中心判碰撞(body 30x40, offset 0,0)
-				let cx = curr_persona.body.x + 15;
+				// ---轴对齐:一次只推进一个轴。先横(把 x 走齐到 target[0]),再竖(把 y 走齐)---
+				// 这样每个 waypoint 之间的运动是"先平移一行、再竖移一格"的直角折线,
+				// 视觉上完全横平竖直(4 向格走);且每轴推进只检测该轴方向的碰撞点,不斜插。
+				let cx = curr_persona.body.x + 15;   // hitbox 中心 (body 30x40, offset 0,0)
 				let cy = curr_persona.body.y + 20;
-				if (!tileWall(cx + vx, cy)) curr_persona.body.x += vx;      // X 轴上没墙才走
-				if (!tileWall(cx, cy + vy)) curr_persona.body.y += vy;      // Y 轴同理(与 X 正交,不产生斜穿)
-				// 若一下没走到(某轴被墙挡),下一帧仍会继续朝目标试;撞墙即止,绝不硬穿。
+				let move_x = Math.abs(dx) > 0 ? (dx > 0 ? 1 : -1) : 0;
+				let move_y = Math.abs(dy) > 0 ? (dy > 0 ? 1 : -1) : 0;
+				// 先走主导轴:横向未齐则优先横向;横齐后再纵向
+				let axis_first_x = Math.abs(dx) >= Math.abs(dy);
+				let moved = false;
+				if (axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
+				    !tileWall(cx + move_x * step_px, cy)) {
+					curr_persona.body.x += move_x * step_px;
+					moved = true;
+				} else if (move_y !== 0 && Math.abs(dy) >= step_px &&
+				           !tileWall(cx, cy + move_y * step_px)) {
+					curr_persona.body.y += move_y * step_px;
+					moved = true;
+				} else if (!axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
+				           !tileWall(cx + move_x * step_px, cy)) {
+					curr_persona.body.x += move_x * step_px;
+					moved = true;
+				}
 
-				// walking animation (by movement direction)
-				let dir = Math.abs(dx) > Math.abs(dy) ? (vx > 0 ? "r" : "l") : (vy > 0 ? "d" : "u");
+				// walking animation (by movement axis this frame)
+				let dir = "d";
+				if (move_x !== 0 && (moved ? (Math.abs(dx) >= Math.abs(dy)) : false)) {
+					dir = move_x > 0 ? "r" : "l";
+				} else if (move_y !== 0) {
+					dir = move_y > 0 ? "d" : "u";
+				} else if (move_x !== 0) {
+					dir = move_x > 0 ? "r" : "l";
+				}
 				pre_anims_direction_dict[curr_persona_name] = dir;
-				// animation key uses full words (down/up/left/right), consistent with the create phase
 				let dir_word = dir == "d" ? "down" : dir == "u" ? "up" : dir == "l" ? "left" : "right";
 				curr_persona.anims.play(curr_persona_name + "-" + dir_word + "-walk", true);
+			}
+		}
+
+		// ---- agent 间分离:hitbox 重叠时,把后到者沿最短轴推开,避免两角色叠在同一格 ----
+		// (persona body 30x40;两角色中心到中心的最小水平/垂直避让,只推"没被墙挡住"的方向)
+		for (let a = 0; a < agents.length; a++) {
+			let A = personas[agents[a]];
+			for (let b = a + 1; b < agents.length; b++) {
+				let B = personas[agents[b]];
+				// 水平重叠量
+				let hx = 30, hy = 40;   // 假定两角色等尺寸 hitbox
+				let overX = hx - Math.abs(A.body.x - B.body.x);
+				let overY = hy - Math.abs(A.body.y - B.body.y);
+				if (overX > 0 && overY > 0) {
+					// 选择要分离的轴:重叠侵入更小者优先推开(最少位移)
+					if (overX <= overY) {
+						let sx = A.body.x < B.body.x ? -overX : overX;
+						let nx = A.body.x + sx;
+						if (!tileWall(nx + 15, A.body.y + 20)) A.body.x = nx;
+						else { let nx2 = A.body.x - sx; if (!tileWall(nx2 + 15, A.body.y + 20)) A.body.x = nx2; }
+					} else {
+						let sy = A.body.y < B.body.y ? -overY : overY;
+						let ny = A.body.y + sy;
+						if (!tileWall(A.body.x + 15, ny + 20)) A.body.y = ny;
+						else { let ny2 = A.body.y - sy; if (!tileWall(A.body.x + 15, ny2 + 20)) A.body.y = ny2; }
+					}
+				}
 			}
 		}
 
