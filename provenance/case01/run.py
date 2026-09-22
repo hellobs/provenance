@@ -75,8 +75,9 @@ def main():
         print("issues:", len(rout["issues"]))
         for i in rout["issues"]:
             print(" -", i)
-        with open(p, "w", encoding="utf-8") as f:
-            _json.dump(rec_data, f, ensure_ascii=False, indent=2)
+        # 原子写:这里是**就地更新已有成品记录**的路径,半截 JSON 等于把原记录毁掉。
+        from case01.atomicio import write_json_atomic
+        write_json_atomic(p, rec_data)
         print("updated ->", p)
         return
 

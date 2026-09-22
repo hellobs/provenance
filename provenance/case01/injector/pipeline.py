@@ -13,7 +13,10 @@ import sys
 import time
 from typing import Optional, Tuple
 
+from ..atomicio import write_json_atomic
+
 from .bridge import DEFAULT_ROLES, MavisBridge
+from .manifest import attach_manifest, collect_run_meta
 from .nodes import default_nodes
 from .record import to_case01_record
 
@@ -72,11 +75,18 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                  external_router: bool = False, llm=None, router_llm=None,
                  out_path: str = "", raw_record: Optional[dict] = None,
                  fill_facts: bool = False, branch_source: str = "preset",
-                 require_consistent: bool = False, branch_mode: str = "preset") -> dict:
+                 require_consistent: bool = False, branch_mode: str = "preset",
+                 judge_llm=None, judge_backend_kind: str = "",
+                 scenario_path: str = "", financial_dir: str = "") -> dict:
     """跑一条完整流水线,返回 case01 兼容记录。
 
     raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
     fill_facts: 对不含 world_state 的旧记录,用纯逻辑重算事实层快照。
+    judge_llm / judge_backend_kind: 判定后端(**只用于运行清单**,不改变判定行为)。
+        传 judge_llm 时,清单里的 judge/judge_model/temperature.judge 从该客户端探测;
+        传 judge_backend_kind 则直接指定 local/api/rules。两者都不传时按本地 Ollama
+        的默认配置如实记录(见 manifest.collect_run_meta)。
+    scenario_path / financial_dir: 覆盖清单里两处内容哈希的来源(默认真实路径)。
     """
     scenario_dir = scenario_dir or DEFAULT_SCENARIO
     branch = branch or (raw_record or {}).get("branch", "B")
@@ -92,7 +102,9 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
         nodes = default_nodes(branch, roles=list(roles))
         bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
                              run_id=run_id, max_retries=max_retries, dry_run=dry_run,
-                             branch=branch, branch_mode=branch_mode)
+                             branch=branch, branch_mode=branch_mode,
+                             judge_llm=judge_llm,
+                             backend_kind=judge_backend_kind)
         raw = bridge.run()
 
     # 原始记录里的分支才是**实际跑出来的**分支(judge 模式:跑完 T0 才判定;
@@ -107,6 +119,14 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
     record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
     record.setdefault("compat", {})["reflection_attached"] = False
+
+    # 运行清单一律在**写盘之前**挂上(manifest 段本身就是这次运行的证据;
+    # 事后补挂等于把"跑完才知道的"当成"跑之前就有的")。
+    run_meta = collect_run_meta(raw, branch=branch, branch_mode=branch_mode,
+                                judge_llm=judge_llm,
+                                backend_kind=judge_backend_kind)
+    attach_manifest(record, run_meta, scenario_path=scenario_path,
+                    financial_dir=financial_dir)
 
     if reflect:
         _attach_reflection(record, llm=llm, router_llm=router_llm,
@@ -123,8 +143,9 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
 
     if out_path:
         os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(record, f, ensure_ascii=False, indent=2)
+        # 原子写:同目录临时文件 → os.replace。写坏了原文件仍是旧内容,不留半截记录;
+        # 失败异常直接抛出(调用方/_map_run 会把它打出来,不静默)。
+        write_json_atomic(out_path, record)
     return record
 
 
@@ -163,9 +184,10 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
             str(i.get("summary"))[:44]))
     if write:
         import shutil
-        shutil.copy2(path, path + "." + time.strftime("%Y%m%d-%H%M") + ".bak")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(rec, f, ensure_ascii=False, indent=2)
+        shutil.copy2(path, path + "." + time.strftime("%Y%m%d-%H%M%S") + ".bak")
+        # 原样原子写回:半截 JSON 会把**已有的**成品记录毁掉,比不写还糟。
+        # 记录里已有的 manifest 段保持不动(它记的是原始那次运行,不是这次重跑)。
+        write_json_atomic(path, rec)
         print("已写回:", path)
     return rec
 

@@ -22,6 +22,7 @@ import os
 import re
 import time
 
+from .atomicio import write_json_atomic, write_text_atomic
 from .world.state import World, WorldConfig
 from .world.timelines import build_timeline
 from .world.branch import (LLMBranchJudge, RuleBranchRouter,
@@ -128,22 +129,22 @@ class RunRecorder:
             {"date": date, "state": s})
 
     def save(self):
+        """落盘一次 run 的全部制品(原子写:写坏不留半截文件)。"""
         p = os.path.join(self.out_dir, "run.json")
-        with open(p, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
-        with open(os.path.join(self.out_dir, "turns.jsonl"), "w",
-                  encoding="utf-8") as f:
-            for t in self.data["turns"]:
-                f.write(json.dumps(t, ensure_ascii=False) + "\n")
-        with open(os.path.join(self.out_dir, "retrievals.jsonl"), "w",
-                  encoding="utf-8") as f:
-            for r in self.data["retrievals"]:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        with open(os.path.join(self.out_dir, "branch.json"), "w",
-                  encoding="utf-8") as f:
-            json.dump({"branch": self.data["branch"],
-                       "action": self.data["branch_action"]},
-                      f, ensure_ascii=False, indent=2)
+        # 四个文件都走"同目录临时文件 → os.replace":半截 run.json/turns.jsonl 会被
+        # 读取方(5002 契约、结果面板、复查同学)当成一条完整记录,比"没写"更坏。
+        write_json_atomic(p, self.data)
+        write_text_atomic(
+            os.path.join(self.out_dir, "turns.jsonl"),
+            "".join(json.dumps(t, ensure_ascii=False) + "\n"
+                    for t in self.data["turns"]))
+        write_text_atomic(
+            os.path.join(self.out_dir, "retrievals.jsonl"),
+            "".join(json.dumps(r, ensure_ascii=False) + "\n"
+                    for r in self.data["retrievals"]))
+        write_json_atomic(
+            os.path.join(self.out_dir, "branch.json"),
+            {"branch": self.data["branch"], "action": self.data["branch_action"]})
         return p
 
 

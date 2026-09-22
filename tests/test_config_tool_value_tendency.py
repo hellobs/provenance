@@ -19,6 +19,10 @@ _REPO = os.path.dirname(_HERE)                              # D:\zzr\provenance
 _PKG = os.path.join(_REPO, "provenance")                    # provenance/provenance
 _MAVIS_TOOL = os.path.join(os.path.dirname(_REPO), "mavis", "config_tool")
 
+# 引擎目录自 2026-09-22 起**只认显式声明**(config_tool 不再探测兄弟目录):
+# 本测试显式声明引擎包所在目录,走工具的唯一入口。
+os.environ.setdefault("CASE_ENGINE_DIR", _PKG)
+
 for p in (_PKG, os.path.dirname(_REPO)):
     if p not in sys.path:
         sys.path.insert(0, p)

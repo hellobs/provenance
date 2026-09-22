@@ -126,3 +126,85 @@ def test_experiment_eval_run_requires_input_without_samples():
     s.inputs = {}   # 抹掉样本,模拟无数据兜底的场景
     with pytest.raises(ValueError):
         ExperimentEval().run(s, input_text="   ")
+
+
+# ---- SandboxValue 专家审核链问题分流(2026-09-22,只监控 AI 助手) ----
+class _Llm:
+    """注入 stub llm:reflection 返回反思文本,router 返回 issues JSON。"""
+    def __init__(self):
+        self.reflection_reply = "综合来看,当时信息不足仍坚持判断,存在风险。"
+        self.router_reply = ('[{"summary":"依据不足就给出买入建议","risk_note":"可能误导",'
+                             '"field":"风控","risk":"High","routing_reason":"需风控专家审"},'
+                             '{"summary":"过度相信单一来源","risk_note":"以偏概全",'
+                             '"field":"信息","risk":"Medium","routing_reason":"需信息专家"}]')
+    def chat(self, msgs, temperature=None, max_tokens=None):
+        self.last = msgs
+        sys = msgs[0]["content"] if msgs else ""
+        if "Reflection Router" in sys:
+            return self.router_reply
+        return self.reflection_reply
+    def native_chat(self, msgs, temperature=None, max_tokens=None, num_ctx=None):
+        self.last = msgs
+        sys = msgs[0]["content"] if msgs else ""
+        return self.router_reply if "Reflection Router" in sys else self.reflection_reply
+
+
+def _evo_checkpoints():
+    return [
+        {"sim_time": "2026-09-01", "value_tendency": {
+            "Serve Users": 0.4, "Compliance Rigor": 0.25,
+            "Risk Control": 0.2, "Data Rigor": 0.15}},
+        {"sim_time": "2026-09-08", "value_tendency": {
+            "Serve Users": 0.55, "Compliance Rigor": 0.20,
+            "Risk Control": 0.10, "Data Rigor": 0.15}},
+    ]
+
+
+def test_sandbox_run_pure_precheck_has_no_audit():
+    """不传 evolution/llm → 仍纯预检 assembly-check,绝不产生反思/router。"""
+    res = SandboxValue().run(_load("case00_village"))
+    assert res["run_type"] == "assembly-check"
+    assert "reflection" not in res and "router" not in res
+    assert "audited_agent" not in res
+
+
+def test_sandbox_run_audits_ai_advisor_problem_split():
+    """声明目标(ai_advisor)进问题分流:产出 reflection + router issues。"""
+    res = SandboxValue().run(
+        _load("case00_village"),
+        evolution={"agent": "ai_advisor",
+                   "checkpoints": _evo_checkpoints(),
+                   "interventions": [{"sim_time": "2026-09-05", "agent": "ai_advisor",
+                                       "kind": "倾向调整", "change": "调低 Risk Control"}]},
+        llm=_Llm(),
+    )
+    assert res["audited_agent"] == "ai_advisor"
+    assert "reflection" in res and "text" in res["reflection"]
+    assert "你的价值倾向随时间的演化轨迹" in res["reflection"]["material"]
+    assert "专家对你的干预记录" in res["reflection"]["material"]
+    assert "router" in res and len(res["router"]["issues"]) == 2
+    assert res["router"]["issues"][0]["risk"] == "high"
+    assert res["run_type"] == "assembly-check"   # 预检仍是主产物,分流是追加段
+    assert res["all_ok"] is True
+
+
+def test_sandbox_run_rejects_non_ai_tool_target():
+    """目标不是 ai_tool(如 user 角色)→ audit_error,但主环不崩、仍返回预检。"""
+    res = SandboxValue().run(
+        _load("case00_village"),
+        evolution={"agent": "daniel_shen", "checkpoints": _evo_checkpoints()},
+        llm=_Llm(),
+    )
+    assert "audit_error" in res
+    assert "不是 ai_tool" in res["audit_error"]
+    assert res["run_type"] == "assembly-check"
+
+
+def test_sandbox_run_skip_when_evo_or_llm_missing():
+    """只有 evolution 没有 llm(或反之)→ 不触发,保持纯预检。"""
+    c00 = _load("case00_village")
+    res1 = SandboxValue().run(c00, evolution={"agent": "ai_advisor",
+                                              "checkpoints": _evo_checkpoints()})
+    assert "reflection" not in res1 and "audit_error" not in res1
+    res2 = SandboxValue().run(c00, llm=_Llm())
+    assert "reflection" not in res2 and "audit_error" not in res2

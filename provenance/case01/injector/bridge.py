@@ -67,6 +67,8 @@ class MavisBridge:
         branch_mode: str = "preset",
         c_plan_file: str = "",
         debug_note: str = "",
+        judge_llm: Optional[object] = None,
+        backend_kind: str = "",
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
@@ -80,6 +82,12 @@ class MavisBridge:
         if branch_mode not in ("preset", "judge"):
             raise ValueError("branch_mode 只能是 preset 或 judge,收到 {!r}".format(branch_mode))
         self.branch_mode = branch_mode
+        # 判定后端(**只用于运行清单,不改变判定行为**):真跑时 judge 走本地 Ollama;
+        # 显式传 judge_llm/backend_kind 时按它记(测试替身、外部 API、规则判定都能如实落账)。
+        self.judge_llm = judge_llm
+        self.backend_kind = backend_kind or ""
+        # 运行清单轻量部分的缓存(键 = 决定它的那四个量),避免每步重算
+        self._manifest_meta_cache: Optional[tuple] = None
         # judge 模式下 T0 跑完之前**不能**自称 preset —— 否则映射出来的记录会显示
         # "分支来源=实验设计预设",看着像 preset 跑(用户实测反馈)。空串 = 待判定。
         self.branch_source = "preset" if branch_mode == "preset" else ""
@@ -223,6 +231,21 @@ class MavisBridge:
                 self._install_c_plan(self.records[-1], node)
         return self.run_record()
 
+    def _judge_client(self):
+        """分支判定用的 LLM 客户端。
+
+        优先级:显式注入的 judge_llm → c_plan_llm(引擎侧权重客户端/测试替身)
+        → 本地 OllamaClient。**行为与既有实现等价**(原来就是 c_plan_llm or OllamaClient);
+        多出来的 judge_llm 是给"运行清单要如实记判定后端"用的。
+        """
+        if self.judge_llm is not None:
+            return self.judge_llm
+        if self.c_plan_llm is not None:
+            return self.c_plan_llm
+        from ..agents.llm import OllamaClient
+
+        return OllamaClient()
+
     def _decide_branch_from_t0(self, rec: dict, t0_node: NodeSpec) -> str:
         """用 Investment AI 在 T0 的实际回答判定分支(01 §六),并据此重排后续节点与事实层。
 
@@ -236,9 +259,8 @@ class MavisBridge:
             self._warn("judge: T0 没有 Investment AI 的回答,分支退回预设 {}".format(self.branch))
             return self.branch
         from ..world.branch import LLMBranchJudge
-        from ..agents.llm import OllamaClient
 
-        llm = self.c_plan_llm or OllamaClient()
+        llm = self._judge_client()
         try:
             detected, info = LLMBranchJudge(llm).judge(answer)
         except Exception as e:  # noqa: BLE001 - 判定失败也要留痕,不静默
@@ -280,6 +302,34 @@ class MavisBridge:
         else:
             print("[bridge] " + msg, flush=True)
 
+    def _manifest_meta(self) -> dict:
+        """运行清单里"这次运行是什么"的**轻量**部分(不含哈希/时间/git)。
+
+        直接用自身状态构造,不经过 `run_record()` —— 而 `run_record()` 会调本方法,
+        走 `run_record()` 会自引用递归。
+        结果按"决定它的四个量"缓存:`run_record()` 在实时面是每 2 秒被拉一次的
+        (见 vizkit/live_run.set_live_provider),不该每拉一次就重算一遍。
+        """
+        from .manifest import collect_run_meta
+
+        key = (self.branch, self.branch_mode, self.branch_source,
+               repr(self.judge_info))
+        cached = self._manifest_meta_cache
+        if cached and cached[0] == key:
+            return dict(cached[1])
+        raw = {"branch": self.branch, "branch_mode": self.branch_mode,
+               "branch_source": self.branch_source, "judge_info": dict(self.judge_info),
+               "mode": "dry-run" if self.dry_run else "mavis"}
+        meta = collect_run_meta(raw, branch_mode=self.branch_mode,
+                                judge_llm=self.judge_llm,
+                                backend_kind=self.backend_kind)
+        self._manifest_meta_cache = (key, dict(meta))
+        return meta
+
+    def manifest_meta(self) -> dict:
+        """给映射路径(pipeline)用的同一份轻量元信息(单一来源)。"""
+        return self._manifest_meta()
+
     def run_record(self) -> dict:
         """本次运行的记录（schema 版本化,便于与 case01 run.json 对齐）。"""
         return {
@@ -294,6 +344,10 @@ class MavisBridge:
             "judge_info": dict(self.judge_info),
             # 调试跑标记(空串=正式跑);映射进成品记录的 debug 字段
             "debug": self.debug_note,
+            # 运行清单的"轻量"一半(判定后端/分支方式/模型/温度):给映射路径做单一来源,
+            # 免得映射器重新猜一遍这次判定到底走的是哪个后端。完整 manifest(含 git/
+            # 内容哈希/时间)在落盘时由 manifest.build_manifest 现算,不在这里做。
+            "manifest_meta": self.manifest_meta(),
             "roles": list(self.roles),
             "scenario_dir": self.scenario_dir,
             "nodes": list(self.records),
@@ -311,9 +365,19 @@ class MavisBridge:
         }
 
     def save(self, path: str) -> str:
+        """落盘本次运行的原始记录(含完整运行清单),原子写。
+
+        原子写的原因:原始记录是成品记录的输入,半截 raw.json 会被后续映射当成
+        一条完整记录读进去(见 case01/atomicio.py 的模块说明)。
+        """
+        from ..atomicio import write_json_atomic
+        from .manifest import attach_manifest
+
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.run_record(), f, ensure_ascii=False, indent=2)
+        rec = self.run_record()
+        meta = rec.get("manifest_meta") or self._manifest_meta()
+        attach_manifest(rec, meta)
+        write_json_atomic(path, rec)
         return path
 
     # ------------------------------------------------------------------

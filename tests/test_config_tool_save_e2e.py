@@ -18,6 +18,10 @@ _REPO = os.path.dirname(_HERE)
 _PKG = os.path.join(_REPO, "provenance")
 _MAVIS_TOOL = os.path.join(os.path.dirname(_REPO), "mavis", "config_tool")
 
+# 引擎目录自 2026-09-22 起**只认显式声明**(config_tool 不再探测兄弟目录,也不再拿平台根顶替):
+# 本测试显式声明引擎包所在目录;资产落盘目录仍由用例另行重定向到 tmp。
+os.environ.setdefault("CASE_ENGINE_DIR", _PKG)
+
 for p in (_PKG, os.path.dirname(_REPO)):
     if p not in sys.path:
         sys.path.insert(0, p)

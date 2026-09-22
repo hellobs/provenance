@@ -14,6 +14,8 @@
 """
 from typing import Any, Dict, List
 
+from case_engine.atomicio import write_json_atomic
+
 
 class EngineStrategy:
     """引擎策略抽象接口。场景经鸭子类型访问,不 import 具体 config 类型。"""
@@ -108,12 +110,12 @@ class ExperimentEval(EngineStrategy):
         if timeline:
             result["timeline"] = timeline
         if out_dir:
-            import json
             import os
+
             os.makedirs(out_dir, exist_ok=True)
             fn = os.path.join(out_dir, "{}_exp.json".format(scenario.case_id))
-            with open(fn, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
+            # 原子写:半截 `<case>_exp.json` 会被当成一次有效真跑读进去。
+            write_json_atomic(fn, result)
             result["artifact"] = fn
         return result
 
@@ -235,13 +237,78 @@ class SandboxValue(EngineStrategy):
             "all_ok": all_ok,
             "note": "可装配" if all_ok else "存在缺失,需先补齐后再进 mavis 实跑",
         }
+        # 可选阶段:专家审核链问题分流(2026-09-22,已定"只监控 AI 助手")。
+        # 仅当 scenario 声明了 reflection(有反思/路由原文) 且调用方经 kw 传入
+        # evolution 数据(该 agent 的 checkpoint 轨迹 + interventions)→ 追加
+        # reflection + router 段。复用 case_engine.reflection(引擎通用、零业务词);
+        # 不传 evolution 则保持纯预检,绝不假装产出反思(尊重旧行为)。
+        audit = self._reflection_audit(scenario, kw)
+        if audit:
+            result.update(audit)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
             fn = os.path.join(out_dir, "{}_sandbox.json".format(scenario.case_id))
-            with open(fn, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
+            # 与 experiment-eval 同口径:原子写,不留半截制品。
+            write_json_atomic(fn, result)
             result["artifact"] = fn
         return result
+
+    # -- 专家审核链问题分流(可选阶段,复用引擎通用 reflection/router) --
+    def _reflection_audit(self, scenario, kw: Dict[str, Any]) -> Dict[str, Any]:
+        """对声明目标角色(只一个)生成反思 → router 问题分流。
+
+        触发条件(三者缺一即跳过,保持纯预检):
+          - `kw["evolution"]`: {agent, checkpoints:[...], interventions:[...]|None,
+            tendency_keys:[...]|None} —— 调用方提供的演化数据;
+          - `kw["llm"]`:具备 .chat 的 llm 客户端(本阶段才需要,预检不要求);
+          - scenario 声明了 `reflection`(router/反思原文)且有 ai_tool 目标角色。
+        返回 {"reflection":{material,text}, "router":{raw,issues}, "audited_agent":agent};
+        任何一步失败 → 返回 {"audit_error": msg}(不让主环崩),而非假装成功。
+        """
+        from case_engine.config import reflection_args
+        from case_engine.reflection import (
+            assemble_evolution_material, run_reflection, run_router)
+
+        evo = kw.get("evolution") if isinstance(kw.get("evolution"), dict) else None
+        llm = kw.get("llm")
+        if not evo or not llm:
+            return {}
+        target = str(evo.get("agent") or "")
+        cps = evo.get("checkpoints") or []
+        if not target or not cps:
+            return {}
+        # 校验目标确实声明为 ai_tool(只监控 AI 助手的前提)
+        roles = {r.id: r for r in getattr(scenario, "roles", [])}
+        role = roles.get(target)
+        if not role or role.type != "ai_tool":
+            return {"audit_error": "reflection_target 不是 ai_tool 角色;只监控 AI 助手"}
+        try:
+            from case_engine.reflection import REFLECTION_PROMPT_CN, REFLECTION_SYSTEM
+            args = reflection_args(scenario)
+            material = assemble_evolution_material(
+                target, cps,
+                interventions=evo.get("interventions"),
+                tendency_keys=evo.get("tendency_keys"),
+            )
+            # 空声明回退引擎默认(中性原文),保证"不声明也能进链,声明则用业务原文"
+            rp = (args.get("reflection_prompt") or REFLECTION_PROMPT_CN)
+            rs = (args.get("reflection_system") or REFLECTION_SYSTEM)
+            ref = run_reflection(
+                llm, {"turns": []}, max_tokens=2048,
+                reflection_prompt=rp,
+                reflection_system=rs,
+                asker_speaker=tuple(args.get("asker_speaker") or ()),
+                fb_asker_key=args.get("fb_asker_key"),
+                material=material,
+            )
+            rout = run_router(llm, ref["text"], material=material)
+            return {
+                "audited_agent": target,
+                "reflection": {"material": material, "text": ref["text"]},
+                "router": {"raw": rout["raw"], "issues": rout["issues"]},
+            }
+        except Exception as exc:  # noqa: BLE001 —— 问题分流失败不该让预检线崩
+            return {"audit_error": "{}: {}".format(type(exc).__name__, exc)}
 
 
 # 默认内置：engine_id → 无状态策略构造器。场景运行所选引擎可从注册表工厂产出。
