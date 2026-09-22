@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Case 01 只读数据服务(FastAPI)。
 
-供 Governance Platform(Tongmu 团队)接入 Reflection → Expert Review 链路:
+供 Governance Platform(平台侧 团队)接入 Reflection → Expert Review 链路:
   1. GET /api/runs                     运行索引(简短,含 Branch 元信息供平台内部用)
   2. GET /api/runs/{run_id}            单个 Run 详情(含 Reflection 原文 / Router
                                        拆分结果 / Audit 链,结构化,供平台建 Expert

@@ -1,7 +1,7 @@
 # case01 侧触点白名单(mavis 接入面)
 
 > **状态**:现行
-> **最后核对**:2026-09-21
+> **最后核对**:2026-09-22
 > **说明**:case01 侧触碰 mavis 半公开面的白名单,越界要有登记
 > 2026-09-18 建立。目的:把"case01 允许碰 mavis 的哪些东西"写死,
 > 让越界在 review 时可见,而不是靠记忆。
@@ -16,7 +16,7 @@
 指定"哪些节点需要发生一段交互、话题是什么(focus)",不能替代 agent 的决定或台词。
 
 **为什么立这条**:case01 有一个正式 Run 路径(`case01/orchestrator.py`,纯流程编排,
-零 mavis、零 interaction_request——陈总场景说明要的结构化边界节点 T0/最终反馈 就落在
+零 mavis、零 interaction_request——需求方场景说明要的结构化边界节点 T0/最终反馈 就落在
 这里)和一个实时可视化演示路径(`case01/injector/bridge.py`,复现正式 Run 的样子)。
 只有**演示路径**为了让"节点时刻有段对话"好看,借用了 mavis 的
 `Simulator(interaction_request=)` 触发交互——它是一个**迷你导演器**。

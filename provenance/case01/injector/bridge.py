@@ -87,7 +87,7 @@ class MavisBridge:
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
-        # Branch C 方案解析用的 LLM:可注入(如 Leo 的 HF 权重客户端),缺省回退本地 Ollama
+        # Branch C 方案解析用的 LLM:可注入(如 引擎侧 的 HF 权重客户端),缺省回退本地 Ollama
         self.c_plan_llm = c_plan_llm
         # C 线方案也可以来自文件(演示/联调:模型在传闻级证据下总是"等正式确认",
         # 而 A 线市场根本没有订单确认事件 → 条件永不触发。用文件能稳定演示

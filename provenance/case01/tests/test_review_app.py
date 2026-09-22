@@ -329,7 +329,7 @@ def test_brief_carries_derived_branch_summary():
 
 
 def test_embed_surface_is_served_and_iframe_allowed():
-    """嵌入面:仝牧平台用 iframe 引它。同一页,靠前端识别 /embed/ 路径切压缩版式。"""
+    """嵌入面:平台侧平台用 iframe 引它。同一页,靠前端识别 /embed/ 路径切压缩版式。"""
     c = _client()
     for path in ("/review", "/embed/review", "/review?embed=1",
                  "/review?run={}&tab=router".format(MAVIS_RUN)):

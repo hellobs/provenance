@@ -1,13 +1,13 @@
 # Expert Review 数据结构草案 v0(平台侧,待审改)
 
 > **状态**:历史依据
-> **最后核对**:2026-09-21
+> **最后核对**:2026-09-22
 > **说明**:平台侧 Expert Review 数据结构草案;流程依据仍有效
 > 范围:Governance Platform 中 Expert Review Task、专家意见、冲突处理、
 > 训练材料归集与追溯审计的数据结构。引擎侧(5002)只读,不参与本结构。
 > 对齐:04 §四(优先复用 Role/Task/Decision/Audit 结构、最小扩展)、
 > 04 §七/八(审核操作、冲突规则)、04 §九(归集)、04 §十(审计可追溯)。
-> 状态:草案,由 ZZR 定稿;供 Tongmu 与 Leo 复核。
+> 状态:草案,由研究侧定稿;供平台侧与引擎侧实现者复核。
 
 ## 0. 设计约束
 
@@ -41,7 +41,7 @@
 | summary | text | 快照自 router.issues[].summary |
 | routing_reason | text | 快照自 router.issues[].routing_reason |
 | reflection_text | text | 原始 Reflection 全文快照(平台保存,永不覆盖) |
-| reflection_anchor | string | 可选:引擎侧定位片段(待 Leo 确认#4;未定前可空) |
+| reflection_anchor | string | 可选:引擎侧定位片段(待引擎侧实现者确认#4;未定前可空) |
 | status | enum(见 2) | |
 | round | int | 当前审核轮(1=首轮 2 人;2=冲突追加 3 人) |
 | final_verdict | enum(approved/edited/rejected) | 定稿后写入 |
@@ -124,7 +124,7 @@ approve 与 reject 互斥;approve 与 edit、edit 与 reject 是否视为冲突�
 | router.issues[].summary | expert_task.summary | 队列卡片主文本 |
 | router.issues[].routing_reason | expert_task.routing_reason | |
 | reflection.text | expert_task.reflection_text | 原文快照,永不覆盖 |
-| reflection.text 片段定位 | reflection_anchor | 待 Leo 确认(见待定项 4) |
+| reflection.text 片段定位 | reflection_anchor | 待引擎侧实现者确认(见待定项 4) |
 | audit[] | (追溯展示素材) | 平台不落,展示时调 5002 |
 
 ## 4. 冲突处理的数据表达
@@ -142,13 +142,13 @@ approve 与 reject 互斥;approve 与 edit、edit 与 reject 是否视为冲突�
 edited_segment、冲突过程与多数/少数结论、governance_audit 摘要;
 各来源字段带来源标签(original/edited/final),不混同。
 
-## 6. 待定项(需 ZZR 定稿或 Leo 回复)
+## 6. 待定项(需研究侧定稿或引擎侧实现者回复)
 
 1. ID 策略:expert_task.id 用平台自增,还是 run_id+issue_key 复合?
    (复合可省映射,但冲突追加/历史重审会改键,建议平台自增 + 复合唯一约束)
 2. edit 的存储:edited_segment 放 review_opinion 内联列,还是独立 edit 表?
 3. 专家实体:复用平台现有账号表,还是本结构内独立 expert?
-4. reflection_anchor:引擎是否提供片段定位(Leo 待确认 #4);未定前留空,
+4. reflection_anchor:引擎是否提供片段定位(引擎侧实现者待确认 #4);未定前留空,
    详情页按 summary 就近截取展示。
 5. 状态字段是否保留 history 展开表(governance_audit 是否足以回溯)?
 6. 归池触发:该 run 全部 task 达到 finalized 后由系统聚合(建议),或人工。

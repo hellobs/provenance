@@ -670,7 +670,7 @@
 			pronunciatios[persona_name].alpha = 0.7;
 
 			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
-			// (宿主(如仝牧治理平台)可通过 window.addEventListener("message") 接收,
+			// (宿主(如平台侧治理平台)可通过 window.addEventListener("message") 接收,
 			//  事件 data = {type:"provenance.agentClick", name, time})
 			new_sprite.setInteractive({ useHandCursor: true });
 			new_sprite.on("pointerdown", (function (pname) {

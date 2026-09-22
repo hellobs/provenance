@@ -1,21 +1,21 @@
 # GTC Case 01 → Governance Platform 对接说明(Platform / HCI 侧与引擎侧共用)
 
 > **状态**:参考(5002 面)
-> **最后核对**:2026-09-21
+> **最后核对**:2026-09-22
 > **说明**:5002 冻结契约的说明;数据口径/信息边界/平台侧状态机三节仍有效。**唯一对接入口已改为 5010** —— 见 `docs/平台对接契约_5010唯一入口.md`
 > 配套文件:`case01_api.openapi.yaml`(机器可读接口契约)。
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
-> 与 `05_GTC_HCI_增量需求说明_仝牧老师.txt`。本文只讲"Leo 这边提供什么、
-> Tongmu 这边需要实现什么、两边怎么对数据",不重复全文。
-> 维护:ZZR;引擎侧职责对接:Leo;
-> Platform / HCI 侧实现:Tongmu 团队(含 ZZR)。
+> 与 `05_GTC_HCI_增量需求说明_平台侧.txt`。本文只讲"引擎侧 这边提供什么、
+> 平台侧 这边需要实现什么、两边怎么对数据",不重复全文。
+> 维护:研究侧;引擎侧职责对接:引擎侧;
+> Platform / HCI 侧实现:平台侧 团队(含 研究侧)。
 
 ## 0. 一句话分工
 
-**Leo(case01)提供只读数据:** 已完成 Run 的索引、结构化治理数据
+**引擎侧(case01)提供只读数据:** 已完成 Run 的索引、结构化治理数据
 (Raw Reflection / Router 拆分 / Audit 链)、以及给专家看的 **Full Context
 自然语言全文**。
-**Tongmu(Governance Platform)负责:** Expert Review Task 的建单、专家池与
+**平台侧(Governance Platform)负责:** Expert Review Task 的建单、专家池与
 动态分配、2 人首轮 → 冲突追加 3 人 → 5 人多数决、Approve / Edit / Reject、
 状态机与持久化、HCI 展示、训练材料池归集、Audit Log。
 case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取数。
@@ -189,5 +189,5 @@ case01 侧每完成一个完整 Run(含 Reflection / Router)才落盘,且为只�
 - [ ] 关键节点有时间、责任人、动作、结果,可按 Run / Reflection 回溯;
 - [ ] 最终结论与材料池状态可查询。
 
-有任何字段/语义问题,请同步引擎侧职责对接人(Leo)或文档维护人(ZZR);
+有任何字段/语义问题,请同步引擎侧职责对接人(引擎侧)或文档维护人(研究侧);
 平台实现请勿自行补剧情或改动 case01 产物。

@@ -750,7 +750,7 @@ def index():
 def embed_review():
     """嵌入面:与面板页同一份 HTML,靠前端识别 /embed/ 路径切到压缩版式。
 
-    给仝牧平台 iframe 用:只要结果、不要小镇时引这一个地址即可。
+    给平台侧平台 iframe 用:只要结果、不要小镇时引这一个地址即可。
     """
     return HTMLResponse(_PAGE)
 

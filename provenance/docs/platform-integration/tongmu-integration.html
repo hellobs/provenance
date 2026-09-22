@@ -203,8 +203,8 @@
             </p>
             <div class="report-intro__meta">
               <span>版本 v1.0 · 2026-09-21</span>
-              <span>维护：ZZR · 引擎侧对接：Leo</span>
-              <span>对接方：Tongmu 治理平台 / HCI 团队</span>
+              <span>维护：研究侧 · 引擎侧对接：引擎侧</span>
+              <span>对接方：平台侧 治理平台 / HCI 团队</span>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@
               5010 上的所有嵌入面板与数据接口均返回 200。
             </p>
             <p>
-              本文面向 <strong>Tongmu 治理平台的实现方</strong>，回答三个问题：可视化界面如何嵌入、
+              本文面向 <strong>平台侧 治理平台的实现方</strong>，回答三个问题：可视化界面如何嵌入、
               已完成运行的治理数据从哪个接口取、平台需要自己实现哪些部分。文档只讲"对方提供什么、
               另一方实现什么、两边怎么对数据"，不重复引擎内部设计。
             </p>
@@ -243,7 +243,7 @@
               <div class="fig-card__figure">
                 <div class="mermaid">
 flowchart TB
-  subgraph PLATFORM["治理平台（对接方，Tongmu 实现）"]
+  subgraph PLATFORM["治理平台（对接方，平台侧 实现）"]
     EXPERT["Expert Review 流程<br/>建单 · 状态机 · 冲突处理<br/>训练材料池"]
     VIEW["可视化嵌入页<br/>iframe 引用 /embed/*"]
   end
@@ -455,7 +455,7 @@ flowchart LR
             <div class="callout">
               <span class="callout__label">部署提示</span>
               5010 默认绑定 <code>127.0.0.1</code>。若平台与引擎不在同一主机，请把部署环境
-              （服务器 / 内网穿透 / 容器）告知引擎侧（Leo），由引擎侧确认开放或部署方案后再联调。
+              （服务器 / 内网穿透 / 容器）告知引擎侧（引擎侧），由引擎侧确认开放或部署方案后再联调。
             </div>
           </section>
 
