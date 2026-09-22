@@ -29,8 +29,11 @@ REVERSE = re.compile(r"^\s*(from|import)\s+(case01|case_engine|mavis_vizkit|live
 
 pytestmark = pytest.mark.skipif(not os.path.isdir(_FW), reason="mavis 仓不在预期位置")
 
-# 反向依赖基线(2026-09-21 实测):只准降不准升
-REVERSE_BASELINE = {"files": 5, "hits": 60}
+# 反向依赖基线:只准降不准升
+# 2026-09-21 实测:5 个文件 / 60 处(接触点散在 app/scenario_builder/engine_runner/compositions)
+# 2026-09-22 收口:1 个文件 / 4 处(全部收进 config_tool/engine_bridge.py;mavis 侧
+#   tests/test_engine_bridge.py 另有一条同口径的严格棘轮)
+REVERSE_BASELINE = {"files": 1, "hits": 4}
 
 
 def _py_files(root):
