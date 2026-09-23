@@ -285,12 +285,15 @@ def main(argv=None):
                 print("记录已保存 ->", out)
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
-                live.finish("run_finished")
+                live.finish(record.get("finish_reason") or "run_finished")
                 # 用户要求:结果出完了才给"重开一局"按钮 —— 所以映射(结果落盘)之后
                 # 才把 restart_ready 置位;映射失败也要置位(否则人卡在这里没法重开),
                 # 但失败原因会在 stdout 与页面提示里写明。
                 try:
-                    if not args.no_map:
+                    if record.get("branch") == "undetermined":
+                        print("  Judge could not determine A/B/C; mapping skipped. "
+                              "Select a branch in the UI and restart.")
+                    elif not args.no_map:
                         # 用**判定后的**真实分支做映射(judge 模式下 branch 参数只是兜底)
                         _map_run(run_id, record.get("branch") or branch, out)
                     else:

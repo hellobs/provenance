@@ -9,6 +9,7 @@
 chat(): 文本补全,支持 temperature/max_tokens;重试 + 超时(指数退避)。
 """
 import json
+import os
 import time
 import urllib.request
 import urllib.error
@@ -119,7 +120,8 @@ class OllamaClient(_ChatMixin):
         body = {
             "model": self.chat_model,
             "messages": messages,
-            "options": {"num_ctx": num_ctx, "temperature": temperature},
+            "options": {"num_ctx": num_ctx, "temperature": temperature,
+                        "num_predict": max_tokens},
             "stream": False,
         }
         data = json.dumps(body).encode("utf-8")
@@ -137,6 +139,97 @@ class OllamaClient(_ChatMixin):
                 time.sleep(2 * (attempt + 1))
         raise RuntimeError("Ollama native_chat failed after {} retries: {}".format(
             self.retries, last_err))
+
+
+class VLLMClient(_ChatMixin):
+    """OpenAI-compatible vLLM client with the same API as OllamaClient."""
+
+    def __init__(self, base_url: str, chat_model: str,
+                 embed_base_url: str = "", embed_model: str = "",
+                 api_key: str = "", timeout: float = 120.0, retries: int = 3):
+        self.base_url = base_url.rstrip("/")
+        self.chat_model = chat_model
+        self.embed_base_url = (embed_base_url or base_url).rstrip("/")
+        self.embed_model = embed_model
+        self.api_key = api_key
+        self.timeout = timeout
+        self.retries = retries
+
+    def _chat_url(self) -> str:
+        return self.base_url + "/chat/completions"
+
+    def _headers(self) -> dict:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = "Bearer " + self.api_key
+        return headers
+
+    def native_chat(self, messages: List[dict], temperature: float = 0.4,
+                    max_tokens: int = 2048, num_ctx: int = 32768,
+                    timeout: float = 120.0) -> Optional[str]:
+        # vLLM context length is controlled by server startup options.
+        old_timeout = self.timeout
+        self.timeout = timeout
+        try:
+            return self.chat(messages, temperature=temperature, max_tokens=max_tokens)
+        finally:
+            self.timeout = old_timeout
+
+    def embed(self, text: str) -> Optional[List[float]]:
+        if not self.embed_model:
+            return None
+        body = {"model": self.embed_model, "input": text}
+        data = json.dumps(body).encode("utf-8")
+        last_err = None
+        for attempt in range(self.retries):
+            try:
+                req = urllib.request.Request(
+                    self.embed_base_url + "/embeddings", data=data,
+                    headers=self._headers())
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    obj = json.loads(resp.read().decode("utf-8"))
+                return obj["data"][0]["embedding"]
+            except (urllib.error.URLError, KeyError, IndexError,
+                    json.JSONDecodeError) as exc:
+                last_err = exc
+                time.sleep(2 * (attempt + 1))
+        raise RuntimeError("VLLM embed failed after {} retries: {}".format(
+            self.retries, last_err))
+
+    def is_available(self) -> bool:
+        try:
+            req = urllib.request.Request(self.base_url + "/models", headers=self._headers())
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+
+def local_client_from_env(retries: int = 3):
+    """Select a local backend from environment variables; default to Ollama."""
+    provider = os.environ.get("CASE01_LLM_PROVIDER", "ollama").strip().lower()
+    chat_model = os.environ.get(
+        "CASE01_LLM_MODEL", "qwen3:4b-instruct-2507-q4_K_M").strip()
+    embed_model = os.environ.get(
+        "CASE01_EMBED_MODEL", "qwen3-embedding:0.6b-q8_0").strip()
+    if provider == "ollama":
+        base_url = os.environ.get(
+            "CASE01_LLM_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
+        return OllamaClient(
+            base_url=base_url,
+            chat_model=chat_model, embed_model=embed_model, retries=retries)
+    if provider == "vllm":
+        base_url = os.environ.get("CASE01_LLM_BASE_URL", "").strip()
+        if not base_url:
+            raise ValueError("vLLM requires CASE01_LLM_BASE_URL including /v1")
+        return VLLMClient(
+            base_url=base_url, chat_model=chat_model,
+            embed_base_url=os.environ.get("CASE01_EMBED_BASE_URL", "").strip(),
+            embed_model=embed_model,
+            api_key=os.environ.get("CASE01_LLM_API_KEY", "").strip(), retries=retries)
+    raise ValueError("CASE01_LLM_PROVIDER must be ollama or vllm")
 
 
 class LocalHFClient:

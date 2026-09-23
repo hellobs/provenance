@@ -91,7 +91,8 @@ class MavisBridge:
         # judge 模式下 T0 跑完之前**不能**自称 preset —— 否则映射出来的记录会显示
         # "分支来源=实验设计预设",看着像 preset 跑(用户实测反馈)。空串 = 待判定。
         self.branch_source = "preset" if branch_mode == "preset" else ""
-        self.judge_info: Dict[str, str] = {}
+        self.judge_info: Dict[str, object] = {}
+        self.finish_reason = ""
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
         self.meeting_coord = list(meeting_coord) if meeting_coord else None
@@ -224,6 +225,9 @@ class MavisBridge:
             if (self.branch_mode == "judge" and step_index == 0 and not self.dry_run):
                 self._decide_branch_from_t0(self.records[-1], t0_node=node)
                 nodes = list(self.nodes)
+                if self.branch == "undetermined":
+                    self.finish_reason = "branch_undetermined"
+                    break
             # Branch C:分支确定后,用 Investment AI 的 T0 答案解析条件化方案并注入事实层
             # (buy_now 立即建仓 / wait 留待后续节点监测触发)。
             if self.branch == "C" and not self.dry_run \
@@ -242,21 +246,26 @@ class MavisBridge:
             return self.judge_llm
         if self.c_plan_llm is not None:
             return self.c_plan_llm
-        from ..agents.llm import OllamaClient
+        from ..agents.llm import local_client_from_env
 
-        return OllamaClient()
+        # LLMBranchJudge owns all three attempts; avoid multiplying retries
+        # inside the transport client.
+        return local_client_from_env(retries=1)
 
     def _decide_branch_from_t0(self, rec: dict, t0_node: NodeSpec) -> str:
         """用 Investment AI 在 T0 的实际回答判定分支(01 §六),并据此重排后续节点与事实层。
 
-        判不出来(没有 T0 对话)时**不静默**:记一条警告、保留原分支,并把
-        `branch_source` 标成 `preset-fallback` —— 记录里能看出来这次没判成。
+        If classification fails, stop after T0 and require manual selection or rerun.
         """
         answer = self._extract_role_answer(rec, self.roles[0])
         if not answer:
-            self.branch_source = "preset-fallback"
-            self.judge_info = {"detected": "", "reason": "T0 没有 AI 回答,无法判定"}
-            self._warn("judge: T0 没有 Investment AI 的回答,分支退回预设 {}".format(self.branch))
+            self.branch = "undetermined"
+            self.branch_source = "judge-failed"
+            self.judge_info = {"detected": "undetermined",
+                               "reason": "T0 has no Investment AI answer",
+                               "attempts": 0, "raw_outputs": []}
+            self.nodes = [t0_node]
+            self._warn("judge: T0 has no Investment AI answer; timeline stopped")
             return self.branch
         from ..world.branch import LLMBranchJudge
 
@@ -264,9 +273,16 @@ class MavisBridge:
         try:
             detected, info = LLMBranchJudge(llm).judge(answer)
         except Exception as e:  # noqa: BLE001 - 判定失败也要留痕,不静默
-            self.branch_source = "preset-fallback"
-            self.judge_info = {"detected": "", "reason": "judge 失败: {}".format(e)}
-            self._warn("judge 调用失败({}),分支退回预设 {}".format(e, self.branch))
+            detected = "undetermined"
+            info = {"branch": detected, "reason": "judge failed: {}".format(e),
+                    "attempts": 3, "raw_outputs": []}
+        if detected == "undetermined":
+            self.branch = detected
+            self.branch_source = "judge-failed"
+            self.judge_info = dict(info, detected=detected)
+            self.nodes = [t0_node]
+            self._warn("judge: {}; timeline stopped for manual selection or rerun".format(
+                info.get("reason", "undetermined")))
             return self.branch
         self.branch = detected
         self.branch_source = "judge"
@@ -342,6 +358,7 @@ class MavisBridge:
             "branch_mode": self.branch_mode,
             "branch_source": self.branch_source,
             "judge_info": dict(self.judge_info),
+            "finish_reason": self.finish_reason,
             # 调试跑标记(空串=正式跑);映射进成品记录的 debug 字段
             "debug": self.debug_note,
             # 运行清单的"轻量"一半(判定后端/分支方式/模型/温度):给映射路径做单一来源,
@@ -409,6 +426,7 @@ class MavisBridge:
             start_time=self._start_time(), stride=0, agents=list(self.roles),
             config_path=config_path, assets_root="",
         )
+        self._apply_local_provider(config)
         self._apply_ethan_provider(config)
         # 存档目录默认落在场景内,避免污染仓库根目录
         os.environ.setdefault("MAVIS_CHECKPOINTS_ROOT", os.path.join(scenario, "checkpoints"))
@@ -759,9 +777,9 @@ class MavisBridge:
 
             llm = self.c_plan_llm
             if llm is None:
-                from ..agents.llm import OllamaClient
+                from ..agents.llm import local_client_from_env
 
-                llm = OllamaClient()
+                llm = local_client_from_env()
             try:
                 plan = ConditionPlanParser(llm).parse(ai_answer)
                 plan.setdefault("source", "T0")
@@ -865,3 +883,21 @@ class MavisBridge:
             "base_url": base_url,
             "api_key": os.environ.get("CASE01_ETHAN_API_KEY", "").strip(),
         }
+
+    def _apply_local_provider(self, config: dict) -> None:
+        """Optionally switch the local backend; preserve scenario defaults otherwise."""
+        provider = os.environ.get("CASE01_LLM_PROVIDER", "").strip().lower()
+        if not provider:
+            return
+        if provider not in ("ollama", "vllm"):
+            raise ValueError("CASE01_LLM_PROVIDER must be ollama or vllm")
+        base_url = os.environ.get("CASE01_LLM_BASE_URL", "").strip()
+        model = os.environ.get("CASE01_LLM_MODEL", "").strip()
+        if not (base_url and model):
+            raise ValueError("CASE01_LLM_BASE_URL and CASE01_LLM_MODEL are required")
+        if provider == "ollama" and not base_url.rstrip("/").endswith("/v1"):
+            base_url = base_url.rstrip("/") + "/v1"
+        llm = dict(config.get("agent_base", {}).get("think", {}).get("llm", {}))
+        llm.update({"provider": provider, "base_url": base_url, "model": model,
+                    "api_key": os.environ.get("CASE01_LLM_API_KEY", "").strip()})
+        config.setdefault("agent_base", {}).setdefault("think", {})["llm"] = llm

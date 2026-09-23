@@ -26,10 +26,10 @@ DEFAULT_SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sce
 def _attach_reflection(record: dict, llm=None, router_llm=None,
                        external_router: bool = False) -> dict:
     """在映射后的记录上补 Reflection 与 Router（复用 case01 现有实现）。"""
-    from ..agents.llm import OllamaClient, OpenRouterClient
+    from ..agents.llm import OpenRouterClient, local_client_from_env
     from ..reflection import run_reflection, run_router
 
-    local = llm or OllamaClient()
+    local = llm or local_client_from_env()
     router = router_llm or (OpenRouterClient() if external_router else local)
     ref = run_reflection(local, record)
     record["reflection"] = {"material": ref["material"], "text": ref["text"],

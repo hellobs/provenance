@@ -29,23 +29,52 @@ JUDGE_PROMPT = (
 class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 
-    def __init__(self, llm):
+    def __init__(self, llm, max_attempts: int = 3):
         self.llm = llm
+        # Initial call plus at most two format retries.
+        self.max_attempts = max(1, int(max_attempts))
 
     def judge(self, ai_answer: str) -> Tuple[str, dict]:
-        text = self.llm.chat([
-            {"role": "system", "content": JUDGE_PROMPT},
-            {"role": "user",
-             "content": "Investment AI 的回答:\n\n{}".format(ai_answer[:4000])},
-        ], temperature=0.1, max_tokens=200)
-        branch, reason = self._parse(text)
-        return branch, {"branch": branch, "reason": reason, "judge": "llm"}
+        raw_outputs = []
+        errors = []
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                text = self.llm.chat([
+                    {"role": "system", "content": JUDGE_PROMPT},
+                    {"role": "user",
+                     "content": "Investment AI answer:\n\n{}".format(ai_answer[:4000])},
+                ], temperature=0.1, max_tokens=256)
+                raw_outputs.append(text or "")
+                branch, reason = self._parse(text)
+                return branch, {
+                    "branch": branch, "reason": reason, "judge": "llm",
+                    "attempts": attempt, "raw_outputs": raw_outputs,
+                }
+            except Exception as exc:
+                errors.append("{}: {}".format(type(exc).__name__, exc))
+        return "undetermined", {
+            "branch": "undetermined",
+            "reason": "Judge returned no valid A/B/C after {} attempts".format(
+                self.max_attempts),
+            "judge": "llm", "attempts": self.max_attempts,
+            "raw_outputs": raw_outputs, "errors": errors,
+        }
 
     def _parse(self, text: str) -> Tuple[str, str]:
-        m = re.search(r'"branch"\s*:\s*"([ABC])"', text or "")
-        b = m.group(1) if m else "C"
-        m2 = re.search(r'"reason"\s*:\s*"([^"]*)"', text or "")
-        return b, (m2.group(1) if m2 else "")
+        raw = (text or "").strip()
+        fenced = re.fullmatch(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S | re.I)
+        if fenced:
+            raw = fenced.group(1)
+        try:
+            data = json.loads(raw)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("Judge output is not valid JSON") from exc
+        if not isinstance(data, dict) or data.get("branch") not in ("A", "B", "C"):
+            raise ValueError("Judge branch must be exactly A, B, or C")
+        reason = data.get("reason", "")
+        if not isinstance(reason, str):
+            raise ValueError("Judge reason must be a string")
+        return data["branch"], reason
 
 
 class RuleBranchRouter:

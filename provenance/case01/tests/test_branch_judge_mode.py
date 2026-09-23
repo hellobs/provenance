@@ -83,29 +83,53 @@ def test_judge_sets_branch_and_source():
     assert "2026-09-03" in [n.date for n in b.nodes]
 
 
-def test_judge_without_t0_answer_falls_back_loudly():
-    """T0 没产出回答时不能硬判:退回预设,并把来源标成 preset-fallback。"""
+def test_judge_without_t0_answer_stops_as_undetermined():
+    """A missing T0 answer must stop before any branch timeline starts."""
     b = _bridge(branch="A")
     from case01.injector.nodes import NodeSpec
 
     t0 = NodeSpec(node_id="node-1", date="2026-08-27")
     detected = b._decide_branch_from_t0({"dialogue": []}, t0)
-    assert detected == "A" and b.branch == "A"
-    assert b.branch_source == "preset-fallback"
-    assert "无法判定" in b.judge_info["reason"]
+    assert detected == "undetermined" and b.branch == "undetermined"
+    assert b.branch_source == "judge-failed"
+    assert "no Investment AI answer" in b.judge_info["reason"]
+    assert b.nodes == [t0]
 
 
-def test_judge_llm_failure_falls_back_loudly():
+def test_judge_llm_failure_retries_then_stops():
     class _Boom:
-        def chat(self, *a, **kw):
-            raise RuntimeError("ollama 挂了")
+        calls = 0
 
-    b = _bridge(branch="B", llm=_Boom())
+        def chat(self, *a, **kw):
+            self.calls += 1
+            raise RuntimeError("ollama unavailable")
+
+    llm = _Boom()
+    b = _bridge(branch="B", llm=llm)
     from case01.injector.nodes import NodeSpec
 
     b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
-    assert b.branch == "B" and b.branch_source == "preset-fallback"
-    assert "judge 失败" in b.judge_info["reason"]
+    assert llm.calls == 3
+    assert b.branch == "undetermined" and b.branch_source == "judge-failed"
+    assert b.judge_info["attempts"] == 3
+
+
+def test_judge_invalid_text_never_silently_becomes_c():
+    class _Bad:
+        calls = 0
+
+        def chat(self, *a, **kw):
+            self.calls += 1
+            return 'Analysis without valid JSON; perhaps "branch":"C"'
+
+    llm = _Bad()
+    b = _bridge(branch="A", llm=llm)
+    from case01.injector.nodes import NodeSpec
+
+    b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
+    assert llm.calls == 3
+    assert b.branch == "undetermined"
+    assert len(b.judge_info["raw_outputs"]) == 3
 
 
 def test_run_record_carries_branch_source_and_judge_info():

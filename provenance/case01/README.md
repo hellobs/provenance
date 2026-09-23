@@ -117,6 +117,22 @@ python -m case01.vizkit.live_run --branch B --port 5010 --hold 1800 \
     --out case01\runs_injector\live-B\raw.json
 ```
 
+### Local LLM backends
+
+Ollama remains the default. To connect directly to a vLLM OpenAI-compatible API:
+
+```bash
+export CASE01_LLM_PROVIDER=vllm
+export CASE01_LLM_BASE_URL=http://127.0.0.1:8101/v1
+export CASE01_LLM_MODEL=qwen3:4b-instruct-2507-q4_K_M
+export CASE01_EMBED_BASE_URL=http://127.0.0.1:8102/v1
+export CASE01_EMBED_MODEL=qwen3-embedding:0.6b-q8_0
+```
+
+To switch back, set `CASE01_LLM_PROVIDER=ollama` and use
+`http://127.0.0.1:11434`. Without these variables, the scenario's existing
+Ollama configuration is used.
+
 包契约、四种插件与协议键见 `packages/mavis-vizkit/README.md`。
 
 ## 完成度(2026-09)

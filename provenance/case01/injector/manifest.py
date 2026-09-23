@@ -65,6 +65,7 @@ JUDGE_TEMPERATURE = 0.1
 # case01.agents.llm(会读 secrets)拖进 manifest 的导入路径。
 _BACKEND_BY_CLASSNAME = {
     "OllamaClient": "local",
+    "VLLMClient": "local",
     "LocalHFClient": "local",
     "OpenRouterClient": "api",
     "RuleBranchRouter": "rules",

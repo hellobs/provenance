@@ -175,8 +175,9 @@ def to_case01_record(record: dict, branch: str = "",
                             and not record.get("branch_source")),
             "judge_info": dict(record.get("judge_info") or {}),
             "judge": ("llm(T0 回答判定)" if (record.get("branch_source") == "judge")
-                      else ("judge(待 T0 判定)" if record.get("branch_mode") == "judge"
-                            else "preset(mavis 路径不调 LLM judge)")),
+                      else ("judge(failed/manual review required)" if record.get("branch_source") == "judge-failed"
+                            else ("judge(待 T0 判定)" if record.get("branch_mode") == "judge"
+                                  else "preset(mavis 路径不调 LLM judge)"))),
             "c_plan": dict(c_plan or {}),
             "t0_rounds": int(t0_rounds or 0),
         },
