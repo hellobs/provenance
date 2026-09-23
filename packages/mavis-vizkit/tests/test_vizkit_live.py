@@ -100,3 +100,33 @@ def test_embed_scene_routes_serve_bare_scene(frontend, scenario_dir):
         r = client.get(path)
         assert r.status_code == 200, path
         assert ROLE_A in r.text and ROLE_B in r.text, path
+
+
+def test_cors_default_is_loopback_only(frontend, scenario_dir, monkeypatch):
+    """安全体检 2026-09-23:本插件的默认跨源白名单**只给本机来源**。
+
+    为什么这条测试必须在本包里:实测踩过 —— 只改了平台侧 `live/routes.py`,
+    而 case01 这条实时面根本不 import 它,跑起来照样回 `ACAO=*`。
+    两处默认值同一口径(`live/netguard.py::resolve_embed_origins`),改一处要改两处。
+    """
+    from fastapi.testclient import TestClient
+
+    monkeypatch.delenv("EMBED_ALLOW_ORIGINS", raising=False)
+    live = _live(frontend, scenario_dir, port=5094)
+    client = TestClient(live.app)
+    evil = client.get("/", headers={"Origin": "https://evil.example"})
+    assert evil.headers.get("access-control-allow-origin") is None, \
+        "默认白名单下外站不该拿到 ACAO"
+    ok = client.get("/", headers={"Origin": "http://127.0.0.1:5010"})
+    assert ok.headers.get("access-control-allow-origin") == "http://127.0.0.1:5010"
+
+
+def test_cors_allowlist_can_be_widened_explicitly(frontend, scenario_dir, monkeypatch):
+    """给了域名就按给的来(平台侧跨源取数靠它),不是把它一起禁掉。"""
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("EMBED_ALLOW_ORIGINS", "https://gov.example")
+    live = _live(frontend, scenario_dir, port=5093)
+    client = TestClient(live.app)
+    r = client.get("/", headers={"Origin": "https://gov.example"})
+    assert r.headers.get("access-control-allow-origin") == "https://gov.example"

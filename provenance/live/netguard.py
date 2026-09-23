@@ -48,7 +48,7 @@ def require_explicit_remote(host: str, where: str = "该服务") -> None:
     if os.environ.get(REMOTE_ENV) == "1":
         return
     raise SystemExit(
-        "拒绝绑定 {host}:{where}没有任何鉴权(5010 还有写端点),默认只允许本机。\n"
+        "拒绝把「{where}」绑到 {host}:这些面没有任何鉴权(5010 还有写端点),默认只允许本机。\n"
         "  确实要给外部机器连(平台侧对接),先读《给平台侧_嵌入与数据接入》的安全一节,再显式声明:\n"
         "    PowerShell: $env:{env}='1'\n"
         "    然后重新起(命令里的 host 仍写 {host})\n"

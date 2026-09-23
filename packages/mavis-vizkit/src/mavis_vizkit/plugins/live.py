@@ -302,15 +302,21 @@ class LiveVisualizer(Visualizer):
 
         app = FastAPI(title="mavis-vizkit 实时可视化(小镇风格)")
 
-        # 被平台嵌入时需要跨源取数:白名单用环境变量给(缺省 * 供开发),并把取值打出来(不静默)
+        # 被平台嵌入时需要跨源取数:白名单用环境变量给,并把取值打出来(不静默)。
+        # 2026-09-23 安全体检:默认**不再是** `*` —— 这些面没有鉴权,`*` 等于让任意网页
+        # 一个 fetch 就能把记录读走。默认只给本机来源;平台侧跨源取数请显式设域名。
+        # (iframe 嵌入不走 CORS,不受影响。)
 
         import os as _os
 
         from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
 
-        _EMBED_ORIGINS = [o.strip() for o in _os.environ.get("EMBED_ALLOW_ORIGINS", "*").split(",")
+        # 本包不认识平台代码(依赖方向:插件包不得反向依赖应用),所以这里的默认值与
+        # 平台侧 `live/netguard.py::resolve_embed_origins` 保持**同一口径**,改一处要改两处。
+        _EMBED_ENV = _os.environ.get("EMBED_ALLOW_ORIGINS", "")
 
-                          if o.strip()]
+        _EMBED_ORIGINS = [o.strip() for o in _EMBED_ENV.split(",") if o.strip()] or [
+            "http://127.0.0.1:5010", "http://localhost:5010"]
 
         app.add_middleware(_CORSMiddleware, allow_origins=_EMBED_ORIGINS,
 
@@ -318,7 +324,9 @@ class LiveVisualizer(Visualizer):
 
                            allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"])
 
-        print("[embed] CORS allow_origins = {}".format(_EMBED_ORIGINS))
+        print("[embed] CORS allow_origins = {}{}".format(
+            _EMBED_ORIGINS,
+            "" if _EMBED_ENV.strip() else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源)"))
 
         templates = Jinja2Templates(directory=self.template_dir)
         # 顶栏可挂**外部工具链接**(本包不认识它们是什么,只透传 {label,url} 列表):

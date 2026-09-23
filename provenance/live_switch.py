@@ -242,6 +242,10 @@ def _start_mapper(run_id, args, raw_out):
 def start(case, args):
     other = "case01" if case == "case00" else "case00"
     review_only = bool(getattr(args, "review_only", False))
+    # 绑非本机必须先声明,而且要**先于停旧实例**判断:否则用户敲错一个 host,
+    # 旧服务先被杀掉、然后才报"拒绝绑定",等于把在跑的面弄没了(安全体检 2026-09-23)。
+    from live.netguard import require_explicit_remote
+    require_explicit_remote(args.host, where="5010 实时面")
     if review_only:
         print("仅审阅模式(--review-only):不跑推演,只服务界面。")
     else:
@@ -258,6 +262,7 @@ def start(case, args):
         return 1
 
     # 绑非本机地址必须显式声明(安全体检 2026-09-23):5010 有 3 个写端点、全栈无鉴权。
+    # (上面 start() 里已经判过,这里再判一次只是防有人直接调这个函数。)
     from live.netguard import exposure_lines, require_explicit_remote
     require_explicit_remote(args.host, where="5010 实时面")
 
