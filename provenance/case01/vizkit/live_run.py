@@ -148,6 +148,10 @@ def main(argv=None):
                     help="跑完不自动映射成成品记录(默认自动映射,由本进程顺序做)")
     args = ap.parse_args(argv)
 
+    # 绑非本机地址必须显式声明:这些面没有任何鉴权(安全体检 2026-09-23)。
+    from live.netguard import require_explicit_remote
+    require_explicit_remote(args.host, where="5010 实时面")
+
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
     if len(roles) != 2:
         print("--roles 需要正好两个角色名")

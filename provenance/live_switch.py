@@ -257,6 +257,10 @@ def start(case, args):
             print("    {}: {}".format(c, sorted(live_pids(c))))
         return 1
 
+    # 绑非本机地址必须显式声明(安全体检 2026-09-23):5010 有 3 个写端点、全栈无鉴权。
+    from live.netguard import exposure_lines, require_explicit_remote
+    require_explicit_remote(args.host, where="5010 实时面")
+
     os.makedirs(LOG_DIR, exist_ok=True)
     run_id, out = "", ""
     if case == "case01":
@@ -296,6 +300,8 @@ def start(case, args):
     print("  日志:{}".format(log))
     if args.host not in ("127.0.0.1", "localhost", ""):
         # 跨机对接:把所有候选地址印出来(别只印路由那一个,也别让人手抄)
+        for line in exposure_lines(args.host, LIVE[case]):
+            print("  " + line)
         ips = _all_lan_ips()
         print("  绑定 {} → 平台侧跨机可用地址(本机所有非回环 IPv4):".format(args.host))
         if ips:

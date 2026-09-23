@@ -126,7 +126,7 @@ cd ../mavis/config_tool
 python app.py
 ```
 
-浏览器打开 http://127.0.0.1:5002/
+浏览器打开 http://127.0.0.1:8060/
 
 - `/` — 角色配置表单:填写角色信息,生成标准 JSON(自动校验,成功后清除草稿)
 - `/relationships` — 关系录入(追加到 relationships.json)
@@ -245,7 +245,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
 - **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;引擎测试在 mavis 仓库 `tests/`
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
-- **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(端口 5002,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)
+- **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(独立进程,端口 **8060**,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)
 
 ## 10. 修改地图
 
@@ -257,4 +257,22 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
 
 - 论文:[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - 代码:[mavisframework(自研框架)](https://github.com/hellobs/mavis) / [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
+
+## 12. 安全与暴露面(2026-09-23)
+
+**这些服务没有任何鉴权**:能连上端口的人可以读走全部成品记录;5010 还能改治理约束、
+撤销干预、标记反思;8060(配置工具)还能改场景、删角色、执行一次运行。所以:
+
+- **默认只绑本机**(`127.0.0.1`)。要绑非本机地址必须显式声明 `LIVE_ALLOW_REMOTE=1`,
+  否则进程**拒绝启动**并把暴露面逐条列出来(不是打一句 warning 就放行)。
+- **跨源白名单默认只给本机来源**(未设 `EMBED_ALLOW_ORIGINS` 时)。平台侧跨源取数请显式设
+  `EMBED_ALLOW_ORIGINS=https://<平台域名>`;**iframe 嵌入本身不走 CORS,不受影响**。
+- **跨机对接优先"不要暴露端口"**:同机部署、只读反向代理(只代理 `/embed/*` 与 `GET /api/*`)、
+  或 SSH 隧道把 5010 转给对方。确需直连时至少做到:白名单 + 防火墙按来源 IP 放行,
+  并且**绝不要把 8060 放出去**。
+- 密钥:OpenRouter key 在 `case01/.secrets.json`(已 gitignore,未入库);实测 5000+ 产物与日志文件里
+  没有密钥痕迹。路径穿越守卫见 `live/netguard.py` 与 mavis 的 `config_tool/_safe_agent_name()`。
+
+代码位置:`live/netguard.py`(绑定与白名单策略)、`tests/test_netguard.py`(行为断言)。
+对接细节见 `provenance/docs/给平台侧_嵌入与数据接入.md`,体检结论见 `provenance/docs/0923_体检报告.md`。
 

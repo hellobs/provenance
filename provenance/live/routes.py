@@ -27,13 +27,18 @@ from live.reflections import (
 
 app = FastAPI(title="Provenance Live (FastAPI)")
 
-# 被平台嵌入时需要跨源取数:白名单用环境变量给(缺省 * 供开发),并把取值打出来(不静默)
+# 被平台嵌入时需要跨源取数:白名单用环境变量给,并把取值打出来(不静默)。
+# 2026-09-23 安全体检:默认**不再是** `*` —— 本服务没有鉴权,`*` 等于让任意网页都能
+# 一个 fetch 把成品记录读走。默认只给本机来源;平台侧跨源取数请显式设域名。
+# (iframe 嵌入本身不走 CORS,不受影响。)
 import os as _os
 
 from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
 
-_EMBED_ORIGINS = [o.strip() for o in _os.environ.get("EMBED_ALLOW_ORIGINS", "*").split(",")
-                  if o.strip()]
+from live.netguard import resolve_embed_origins as _resolve_embed_origins
+
+_EMBED_ENV = _os.environ.get("EMBED_ALLOW_ORIGINS", "")
+_EMBED_ORIGINS = _resolve_embed_origins(_EMBED_ENV)
 app.add_middleware(
     _CORSMiddleware,
     allow_origins=_EMBED_ORIGINS,
@@ -41,7 +46,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
-print("[embed] CORS allow_origins = {}".format(_EMBED_ORIGINS))
+print("[embed] CORS allow_origins = {}{}".format(
+    _EMBED_ORIGINS,
+    "" if _EMBED_ENV.strip() else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源;平台侧跨源取数请显式设域名)"))
 
 app.mount(
     "/static",

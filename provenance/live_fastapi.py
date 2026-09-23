@@ -44,6 +44,9 @@ def main():
     parser.add_argument("--no-sim", action="store_true",
                         help="Only serve the Web layer (pages/API/embed), do not start the simulation thread")
     args = parser.parse_args()
+    # 绑非本机地址必须显式声明:5010 有写端点且全栈无鉴权(安全体检 2026-09-23)。
+    from live.netguard import require_explicit_remote
+    require_explicit_remote(args.host, where="5010 实时面")
 
     name = args.name
     if len(name) < 1:

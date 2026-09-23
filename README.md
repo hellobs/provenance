@@ -139,7 +139,7 @@ cd ../mavis/config_tool
 python app.py
 ```
 
-Open http://127.0.0.1:5002/
+Open http://127.0.0.1:8060/
 
 - `/` — role configuration form (generates validated JSON)
 - `/relationships` — relation input (appended to relationships.json)
@@ -326,7 +326,7 @@ live simulation.
 - Localization: modify the engine's `mavisframework/prompt/scratch.py` and
   frontend copy; no logic changes required
 - **Role/scenario config tool**: agents, relationships and story events are
-  generated via the form-based tool `config_tool` (port 5002, lives in the
+  generated via the form-based tool `config_tool` (standalone process, port **8060**, lives in the
   [mavis](https://github.com/hellobs/mavis) repo, `config_tool/`); it writes
   directly into this platform's `agents/` and `scenarios/` directories (see
   `config_tool/README.md`).
@@ -347,4 +347,23 @@ live simulation.
 - Paper: [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
 - Map tool: `tools/tilemap_to_maze.py` (bundled) / [tiled_to_maze (legacy GUI)](https://github.com/jiejieje/tiled_to_maze.json)
+
+## 12. Security & exposure (2026-09-23)
+
+**None of these services has authentication.** Anyone who can reach a port can read every
+run record; 5010 additionally lets them rewrite governance weights, undo interventions and
+mark reflections; 8060 (config tool) can edit scenarios, delete roles and launch a run.
+
+- **Loopback-only by default.** Binding a non-loopback address requires an explicit
+  `LIVE_ALLOW_REMOTE=1`; otherwise the process **refuses to start** and prints exactly what
+  would be exposed (a one-line warning is not enough — the port would already be open).
+- **CORS defaults to loopback origins only** (when `EMBED_ALLOW_ORIGINS` is unset). For
+  cross-origin data access from the platform, set `EMBED_ALLOW_ORIGINS=https://<platform-host>`.
+  Plain `<iframe>` embedding does not use CORS and is unaffected.
+- **Prefer not exposing ports at all** for cross-machine integration: same-host deployment,
+  a read-only reverse proxy (only `/embed/*` and `GET /api/*`), or an SSH tunnel to 5010.
+  If you must expose it, use the origin allowlist plus a firewall rule per source IP — and
+  **never expose 8060**.
+- Secrets: the OpenRouter key lives in `case01/.secrets.json` (gitignored, not in git); a scan
+  of 5000+ artifacts and logs found no key material.
 
