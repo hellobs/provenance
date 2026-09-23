@@ -377,3 +377,20 @@ def test_empty_root_reports_zero_runs_instead_of_crashing(monkeypatch, tmp_path)
     assert c.get("/api/review/runs").json()["count"] == 0
     assert c.get("/review").status_code == 200
     assert c.get("/api/review/run/{}".format(MAVIS_RUN)).status_code == 404
+
+
+def test_embed_demo_parent_ships_the_host_protocol():
+    """宿主侧参考实现必须真挂上(平台侧就是照它抄的),且用的是同一套协议常量。"""
+    r = _client().get("/embed/demo-parent")
+    assert r.status_code == 200
+    for kw in ("mavis-case01-review", "mavis:select-run", "mavis:set-tab",
+               "ev.source !== frame.contentWindow"):
+        assert kw in r.text, kw
+
+
+def test_embed_review_has_protocol_and_deeplink_failure_states():
+    """嵌入面:双向协议 + 深链失败态文案(2026-09-23:不许静默回落到另一条记录)。"""
+    page = _client().get("/embed/review").text
+    for kw in ("mavis-case01-review", "mavis:select-run", "mavis:set-tab",
+               "深链指定的 run 不存在", "深链页签"):
+        assert kw in page, kw

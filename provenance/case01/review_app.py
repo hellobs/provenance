@@ -368,11 +368,49 @@ const EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") ===
 if (EMBED) { document.body.classList.add("embed"); }
 const WANT_RUN = Q.get("run") || "";
 const WANT_TAB = Q.get("tab") || "";
+// 深链参数没对上时的**可见**提示:嵌进来的人会以为看的就是自己要的那条,不能静默回落。
+let PARAM_NOTE = "";
 if (WANT_TAB && TABS.some(t => t[0] === WANT_TAB)) { TAB = WANT_TAB; }
 
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;");
+
+if (WANT_TAB && !TABS.some(t => t[0] === WANT_TAB)) {
+  PARAM_NOTE = `<div class="note">深链页签 tab=${esc(WANT_TAB)} 不存在,已用默认页签。</div>`;
+}
+
+// ---- 与宿主(平台侧治理平台)的通信 ----
+// 协议见《给平台侧_嵌入与数据接入》:
+//   页面 → 宿主  {source:"mavis-case01-review", type:"ready"|"run-selected", ...}
+//   宿主 → 页面  {type:"mavis:select-run", run_id} / {type:"mavis:set-tab", tab}
+const HOST_MSG_SOURCE = "mavis-case01-review";
+
+function notifyHost(type, payload) {
+  if (!EMBED || window.parent === window) { return; }
+  try {
+    window.parent.postMessage(
+      Object.assign({ source: HOST_MSG_SOURCE, type: type }, payload || {}), "*");
+  } catch (e) { /* 宿主不收也不该影响页面本身 */ }
+}
+
+window.addEventListener("message", (ev) => {
+  const m = ev.data || {};
+  if (m.type === "mavis:select-run" && m.run_id) {
+    const sel = document.getElementById("pick");
+    const has = sel && Array.from(sel.options).some(o => o.value === m.run_id);
+    if (has) { sel.value = m.run_id; IGNORED_LIVE = ""; MAPPED_NOTE = ""; pick(m.run_id); }
+    else {
+      PARAM_NOTE = `<div class="note" style="color:#d93025;border-color:#fecaca">` +
+        `宿主指定的 run 不存在:${esc(m.run_id)}</div>`;
+      LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
+      render();
+    }
+  }
+  if (m.type === "mavis:set-tab" && m.tab && TABS.some(t => t[0] === m.tab)) {
+    TAB = m.tab; render();
+  }
+});
 
 function badges(o) {
   return Object.entries(o || {}).map(([k, v]) =>
@@ -587,6 +625,9 @@ function render() {
     ? PANES[TAB](DATA)
     : '<div class="card"><div class="empty">选择一次运行</div></div>');
   if (sc) sc.scrollTop = y;
+  // 宿主(平台侧)对"现在展示哪条、哪个页签"知情:每次重渲染同步一次(选中/切页签都会走到这)。
+  notifyHost("run-selected", { run_id: (DATA || {}).run_id || "", tab: TAB,
+                               live: !!((DATA || {}).live) });
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA);
@@ -683,7 +724,7 @@ async function boot() {
   // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
   const cur = String(d.current_run_id || "").trim();
   const curInList = cur && (d.runs || []).some(x => x.run_id === cur);
-  LIVE_HINT = MAPPED_NOTE;
+  LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
   if (!LIVE_HINT && cur && !curInList && !live.live) {
     LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
   }
@@ -704,6 +745,8 @@ async function boot() {
     ((BRANCH_ORDER[a.branch] ?? 9) - (BRANCH_ORDER[b.branch] ?? 9)) ||
     String(a.run_id).localeCompare(String(b.run_id)));
   sel.innerHTML = liveOpt + sorted.map(optHtml).join("");
+  notifyHost("ready", { runs: sorted.map(x => x.run_id), live: !!live.live,
+                        current: live.live ? live.run_id : (cur || "") });
   sel.onchange = () => {
     if (sel.value !== LIVE_ID) {
       // 手动挑旧记录:记下当前这一局,看门狗别再把它拉回去(新的一局仍会自动切)
@@ -720,6 +763,10 @@ async function boot() {
     const hit = d.runs.find(x => x.run_id === WANT_RUN);
     if (hit) { sel.value = WANT_RUN; await pick(WANT_RUN); return; }
     if (live.live && live.run_id === WANT_RUN) { sel.value = LIVE_ID; await loadLive(true); return; }
+    // 深链指定的记录不存在:**页面上说出来**,不许静默回落到另一条
+    PARAM_NOTE = `<div class="note" style="color:#d93025;border-color:#fecaca">` +
+      `深链指定的 run 不存在:${esc(WANT_RUN)};下面是回落的记录。</div>`;
+    LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
   }
   if (live.live) { sel.value = LIVE_ID; await loadLive(true); return; }
   const first = d.runs.find(x => x.engine === "mavis") || d.runs[0];
@@ -753,6 +800,87 @@ def embed_review():
     给平台侧平台 iframe 用:只要结果、不要小镇时引这一个地址即可。
     """
     return HTMLResponse(_PAGE)
+
+
+# 宿主侧(平台侧)参考实现:一个 iframe + 一段 message 监听,就是"接入"的全部代码。
+# 为什么放我们这边:对接说明书里的协议必须是**能跑起来看的**,不是纸上约定;
+# 平台侧照抄这 40 行,再换成自己的布局即可。
+_DEMO_PARENT = r"""<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>嵌入示例(宿主侧 · 平台侧参考实现)</title>
+<style>
+  body { font: 14px/1.6 system-ui, "Microsoft YaHei", sans-serif; margin: 0; display: flex; height: 100vh; }
+  #left { width: 340px; box-sizing: border-box; border-right: 1px solid #e5e7eb; padding: 14px; overflow: auto; }
+  #right { flex: 1; min-width: 0; }
+  iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .log { font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+         background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; max-height: 220px; overflow: auto; }
+  button { display: block; width: 100%; margin: 6px 0; padding: 6px 8px; text-align: left;
+           border: 1px solid #d0d7de; background: #fff; border-radius: 8px; cursor: pointer; }
+  button:hover { background: #f3f4f6; }
+  h3 { margin: 0 0 8px; font-size: 15px; }
+  p { color: #57606a; }
+</style>
+</head>
+<body>
+<div id="left">
+  <h3>宿主侧参考实现</h3>
+  <p>平台侧要写的就是这一小块:一个 <code>iframe</code> + 一个 <code>message</code> 监听。
+     协议见《给平台侧_嵌入与数据接入》。</p>
+  <div>收到的消息(最近 12 条):</div>
+  <div class="log" id="log">(等 iframe 就绪…)</div>
+  <div id="picks"></div>
+  <div>
+    <button data-tab="overview">→ 让 iframe 切到「概览」</button>
+    <button data-tab="reflection">→ 让 iframe 切到「反思」</button>
+    <button data-tab="router">→ 让 iframe 切到「问题分流」</button>
+  </div>
+</div>
+<div id="right">
+  <iframe id="f" src="/embed/review?embed=1" title="case01 结果记录(嵌入面)"></iframe>
+</div>
+<script>
+var frame = document.getElementById("f");
+var logEl = document.getElementById("log");
+var lines = [];
+function add(s) { lines.push(s); logEl.textContent = lines.slice(-12).join("\n"); logEl.scrollTop = 1e6; }
+function send(msg) {
+  frame.contentWindow.postMessage(msg, "*");
+  add("\u2192 " + JSON.stringify(msg));
+}
+window.addEventListener("message", function (ev) {
+  // 生产里必须同时校验 ev.origin(这里只认这一个嵌入面,示例从简):
+  //   if (ev.origin !== "http://<你的引擎地址>") { return; }
+  if (ev.source !== frame.contentWindow) { return; }   // 只收这个 iframe 发来的
+  var m = ev.data || {};
+  if (m.source !== "mavis-case01-review") { return; }
+  add("\u2190 " + JSON.stringify(m));
+  if (m.type === "ready") {
+    var picks = document.getElementById("picks");
+    picks.innerHTML = "";
+    (m.runs || []).slice(0, 5).forEach(function (id) {
+      var b = document.createElement("button");
+      b.textContent = "\u2192 让 iframe 切到 " + id;
+      b.onclick = function () { send({ type: "mavis:select-run", run_id: id }); };
+      picks.appendChild(b);
+    });
+    add("(共 " + (m.runs || []).length + " 条记录,上面只列前 5 条)");
+  }
+});
+Array.prototype.forEach.call(document.querySelectorAll("button[data-tab]"), function (b) {
+  b.onclick = function () { send({ type: "mavis:set-tab", tab: b.dataset.tab }); };
+});
+</script>
+</body>
+</html>"""
+
+
+@router.get("/embed/demo-parent", response_class=HTMLResponse)
+def embed_demo_parent():
+    """宿主侧参考实现(平台侧照抄):iframe + message 监听,证明协议真的能跑。"""
+    return HTMLResponse(_DEMO_PARENT)
 
 
 def attach_to(target, current_run_id="", note=""):

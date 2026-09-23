@@ -38,6 +38,9 @@ def main():
     parser.add_argument("--step", type=int, default=0, help="The simulate step (<=0 means run forever)")
     parser.add_argument("--stride", type=int, default=2, help="The step stride in minute")
     parser.add_argument("--port", type=int, default=5010, help="The server port")
+    # 绑定地址:默认只绑本机(安全);平台侧跨机对接时给 0.0.0.0 或用 LIVE_HOST。
+    parser.add_argument("--host", type=str, default=os.environ.get("LIVE_HOST", "127.0.0.1"),
+                        help="Bind address (use 0.0.0.0 to let the platform reach it)")
     parser.add_argument("--no-sim", action="store_true",
                         help="Only serve the Web layer (pages/API/embed), do not start the simulation thread")
     args = parser.parse_args()
@@ -94,8 +97,8 @@ def main():
         print("Simulation thread disabled (--no-sim): serving Web layer only.")
     else:
         _start_simulation(name, sim_config, start_step, args.step, args.stride)
-        print(f"Live simulation '{name}' started (FastAPI). Open http://127.0.0.1:{args.port}/")
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="info")
+        print(f"Live simulation '{name}' started (FastAPI). Open http://{args.host}:{args.port}/")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

@@ -239,12 +239,19 @@ def _brief_compressed(name: str) -> dict:
 
 
 @router.get("/api/runs")
-async def list_all_runs(include_questionable: bool = False) -> JSONResponse:
+async def list_all_runs(request: Request = None, include_questionable: bool = False,
+                        limit: int = 0, offset: int = 0,
+                        source: str = "") -> JSONResponse:
     """统一历史数据:case00 checkpoints + case01 成品 run + 压缩成品,合而为一。
 
     默认**不给** `quality=questionable`/`debug` 的记录(与 5002 契约同口径),
     但**不静默**:响应里的 `excluded` 给出计数、run_id 与原因;
     `?include_questionable=1` 取全量。
+
+    分页/过滤(2026-09-23,平台侧嵌入面在记录攒到几百条时需要):
+    `?limit=`/`?offset=`/`?source=review|checkpoint|compressed`;
+    `count` 是本页条数,`total` 是过滤后总数。**不认识的参数不静默吞掉** ——
+    回在 `ignored_params` 里,免得平台以为 `?quality=ok` 生效了。
     """
     runs = []
 
@@ -281,11 +288,26 @@ async def list_all_runs(include_questionable: bool = False) -> JSONResponse:
     # 倒序:结束时间最新在前;无时间的归到最后。
     runs.sort(key=lambda r: (str(r.get("end_date", "") or ""), str(r.get("run_id", "") or "")),
               reverse=True)
+    # 认识的查询参数就这几个;别的(比如 ?quality=ok)不许静默吞掉 → ignored_params
+    known = {"include_questionable", "limit", "offset", "source"}
+    ignored = sorted({k for k in (request.query_params.keys() if request is not None else [])
+                      if k not in known})
+    if source:
+        runs = [r for r in runs if str(r.get("source") or "") == source]
+    total = len(runs)
+    if offset > 0:
+        runs = runs[offset:]
+    if limit > 0:
+        runs = runs[:limit]
     # 把场景发现层也带给前端,供菜单分层(而非前端写死 case01)
     meta = _scenario_meta_cached()
     scenarios = [{"case_id": cid, **m} for cid, m in sorted(meta.items())]
-    body = {"count": len(runs), "runs": runs, "scenarios": scenarios,
-            "filter": {"include_questionable": bool(include_questionable)}}
+    body = {"count": len(runs), "total": total, "runs": runs, "scenarios": scenarios,
+            "filter": {"include_questionable": bool(include_questionable),
+                       "source": source, "limit": limit, "offset": offset}}
+    if ignored:
+        body["ignored_params"] = ignored
+        body["ignored_note"] = "这些参数本接口不认(没生效):{}".format(",".join(ignored))
     if hidden:
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,

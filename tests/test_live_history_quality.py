@@ -175,6 +175,32 @@ def test_non_case01_sources_are_unverified_not_hidden(monkeypatch):
             assert r["consistency"] == "unverified", r
 
 
+def test_pagination_and_unknown_params(monkeypatch):
+    """分页要真生效;不认识的参数不许静默吞掉(回 ignored_params)。
+
+    2026-09-23 实测:加参数之前 `?limit=`/`?quality=` 传了全部无效且**没有任何提示**,
+    平台侧会以为过滤生效了。
+    """
+    class _Req:
+        def __init__(self, params):
+            self.query_params = params
+
+    for k, v in FIXTURE.items():
+        monkeypatch.setenv({"runs": "CASE01_RUNS_ROOT",
+                            "checkpoint": "CASE00_CHECKPOINTS_ROOT",
+                            "compressed": "RESULTS_COMPRESSED_ROOT"}[k], v)
+    full = _call(H.list_all_runs(_Req({}), include_questionable=True))
+    page = _call(H.list_all_runs(_Req({}), include_questionable=True, limit=2, offset=1))
+    assert page["count"] == 2 and page["total"] == full["total"] == 6, (page["count"],
+                                                                       page["total"])
+    assert [r["run_id"] for r in page["runs"]] == [r["run_id"] for r in full["runs"][1:3]]
+    only = _call(H.list_all_runs(_Req({}), include_questionable=True, source="review"))
+    assert {r["source"] for r in only["runs"]} == {"review"} and only["total"] == 4
+    warn = _call(H.list_all_runs(_Req({"quality": "ok", "foo": "1"})))
+    assert warn["ignored_params"] == ["foo", "quality"], warn.get("ignored_params")
+    assert "quality" in warn["ignored_note"]
+
+
 def test_expert_safe_record_keeps_contract_keys():
     """白名单要覆盖平台契约 §2.2 明确要读的那些键。"""
     rec = {"run_id": "r", "start_date": "d", "end_date": "e", "turns": [1],

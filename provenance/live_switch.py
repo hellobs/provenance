@@ -262,6 +262,7 @@ def start(case, args):
     if case == "case01":
         if review_only:
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--review-only",
+                   "--host", args.host,
                    "--port", str(LIVE["case01"])]
             run_id = ""
         else:
@@ -274,13 +275,15 @@ def start(case, args):
             out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                    "--branch-mode", args.branch_mode,
+                   "--host", args.host,
                    "--port", str(LIVE["case01"]), "--hold", str(args.hold),
                    "--run-id", run_id, "--out", out]
             if args.nodes:
                 cmd += ["--nodes", str(args.nodes)]
     else:
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
-               "--stride", str(args.stride), "--port", str(LIVE["case00"])]
+               "--stride", str(args.stride), "--port", str(LIVE["case00"]),
+               "--host", args.host]
         cmd += ["--no-sim"] if args.no_sim else ["--step", "0"]
 
     log = os.path.join(LOG_DIR, "live_%s.out" % case)
@@ -291,6 +294,13 @@ def start(case, args):
                          creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
+    if args.host not in ("127.0.0.1", "localhost", ""):
+        # 跨机对接:把平台侧该用的地址直接印出来(别让人去猜本机 LAN IP)。
+        ip = _lan_ip()
+        print("  绑定 {} → 平台侧跨机可用: http://{}:{}/".format(
+            args.host, ip or "<本机LAN地址>", LIVE[case]))
+        if not ip:
+            print("    (取不到本机 LAN 地址:用 ipconfig 自己看一眼)")
     mapper_log = ""
     if run_id:
         print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
@@ -335,12 +345,29 @@ def start(case, args):
     return 0
 
 
+def _lan_ip() -> str:
+    """本机 LAN 地址:跨机对接时印给用户看,免得手抄错。取不到返回空。"""
+    import socket
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description="实时面开关:保证同时只有一个实时可视化在跑")
     ap.add_argument("--status", action="store_true", help="只看现状,不动任何进程")
     ap.add_argument("--start", choices=["case00", "case01"], help="起某个 case 的实时面(先停另一个与本 case 旧实例)")
     ap.add_argument("--stop", choices=["case00", "case01", "all"], help="停实时面(不碰只读面)")
     ap.add_argument("--nodes", type=int, default=0, help="case01:只跑前 N 个节点(0=全部)")
+    # 平台侧对接要用:默认只绑本机;给 0.0.0.0(或 LIVE_HOST=0.0.0.0)才允许跨机访问。
+    ap.add_argument("--host", default=os.environ.get("LIVE_HOST", "127.0.0.1"),
+                    help="实时面绑定地址:默认 127.0.0.1(只本机);平台侧跨机对接给 0.0.0.0")
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
     ap.add_argument("--branch", default="B", help="case01:分支 A/B/C(judge 模式下仅作兜底)")
     ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
