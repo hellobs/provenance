@@ -1,0 +1,46 @@
+{
+  "run_id": "fx-debug-truncated",
+  "start_date": "2026-01-10",
+  "end_date": "",
+  "branch": "",
+  "branch_action": {"timeline": "", "source": "preset", "pending": true},
+  "consistency": {
+    "verdict": "unknown",
+    "reason": "调试跑未判一致性(夹具)",
+    "method": "none",
+    "branch_source": "preset"
+  },
+  "debug": "--nodes 截断的调试跑:T0 可能被当成最终反馈节点,内容不完整(夹具)",
+  "turns": [
+    {"date": "2026-01-10", "speaker": "ethan", "text": "T0 事件:客户传闻(夹具,--nodes 1 截断)"}
+  ],
+  "retrievals": [],
+  "events": [
+    {"date": "2026-01-10", "kind": "story", "summary": "剧情节点(夹具)"}
+  ],
+  "state_history": [],
+  "final_feedback": {},
+  "audit": [],
+  "condition_monitor": [],
+  "reflection": {
+    "material": "本案的判断依据(夹具)",
+    "stripped_opener": "反思开场(夹具)",
+    "text": "反思正文(夹具):调试跑也要留下反思,否则专家看不到这轮到底想了什么。"
+  },
+  "router": {"issues": []},
+  "injector": {"nodes": [], "branch_mode": "debug"},
+  "manifest": {
+    "manifest_version": 1,
+    "created_at": "2026-01-10 10:00:00",
+    "engine_id": "mavis",
+    "branch_mode": "debug",
+    "branch_source": "preset",
+    "branch": "",
+    "judge": null,
+    "judge_model": null,
+    "temperature": {"judge": 0.1, "reflection": 0.4, "router": 0.2},
+    "manifest_warnings": ["--nodes 截断:内容不完整"]
+  },
+  "compat": {"level": "schema", "gaps": ["debug_run"], "missing_keys": [], "reflection_attached": true},
+  "summary": "夹具摘要:调试跑,内容不完整,默认不该给平台。"
+}

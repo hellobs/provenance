@@ -23,6 +23,18 @@ from starlette.requests import Request
 
 # 统一根:本文件位于 <root>/live/history.py,向上两级即 provenance/provenance。
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _data_root(env_var: str, *parts: str) -> str:
+    """数据根目录:环境变量优先,否则用仓库内默认位置。
+
+    为什么必须可覆盖(2026-09-22):`case01/runs` 按约定**不入库**(只入约定与代码),
+    所以"成品记录在哪"不能在代码里写死 —— 写死的后果是 CI 上没有记录可读,而
+    `tests/test_live_history_quality.py` 又要断言"至少有一条",于是 CI 必红。
+    现在:CI 用 `CASE01_RUNS_ROOT` 指向签入的夹具(`tests/fixtures/case01_runs`),
+    真实代码路径照样跑;异地部署换数据盘也不用改代码。
+    """
+    return os.environ.get(env_var) or os.path.join(BASE_DIR, *parts)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend/templates"))
 # 顶栏外部工具链接:mavis 仓的 config_tool 是**独立进程**(默认 8060),
 # 地址可用环境变量 MAVIS_CONFIG_TOOL_URL 覆盖(换机/换端口)。
@@ -103,7 +115,7 @@ def _decorate(rows: list) -> list:
 
 def _brief_checkpoint(name: str) -> dict:
     """归一化一个 case00 checkpoint 目录(对话+决策+倾向序列快照)为统一摘要。"""
-    ck_root = os.path.join(BASE_DIR, "results/checkpoints", name)
+    ck_root = os.path.join(_data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints"), name)
     shots = sorted(
         f for f in os.listdir(ck_root)
         if f.startswith("simulate-") and f.endswith(".json")
@@ -141,7 +153,7 @@ def _brief_review(run_id: str) -> dict:
     **与 5002 契约同源** —— 直接复用 `case01.full_context.quality_of`,
     避免"两处各判一套"漂移。平台按 5010 取数时,看到的集合必须与 5002 一致。
     """
-    p = os.path.join(BASE_DIR, "case01", "runs", run_id, "run.json")
+    p = os.path.join(_data_root("CASE01_RUNS_ROOT", "case01", "runs"), run_id, "run.json")
     data = {}
     try:
         with open(p, "r", encoding="utf-8") as f:
@@ -235,19 +247,19 @@ async def list_all_runs(include_questionable: bool = False) -> JSONResponse:
     """
     runs = []
 
-    ck_root = os.path.join(BASE_DIR, "results/checkpoints")
+    ck_root = _data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints")
     if os.path.isdir(ck_root):
         for n in sorted(os.listdir(ck_root)):
             if os.path.isdir(os.path.join(ck_root, n)):
                 runs.append(_brief_checkpoint(n))
 
-    c1_root = os.path.join(BASE_DIR, "case01", "runs")
+    c1_root = _data_root("CASE01_RUNS_ROOT", "case01", "runs")
     if os.path.isdir(c1_root):
         for n in sorted(os.listdir(c1_root)):
             if os.path.isfile(os.path.join(c1_root, n, "run.json")):
                 runs.append(_brief_review(n))
 
-    comp_root = os.path.join(BASE_DIR, "results", "compressed")
+    comp_root = _data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed")
     if os.path.isdir(comp_root):
         for n in sorted(os.listdir(comp_root)):
             if os.path.isdir(os.path.join(comp_root, n)):
@@ -307,7 +319,7 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
         return JSONResponse({"ok": False, "errors": ["非法 run_id: {}".format(run_id)]},
                             status_code=404)
     if source == "review":
-        p = os.path.join(BASE_DIR, "case01", "runs", run_id, "run.json")
+        p = os.path.join(_data_root("CASE01_RUNS_ROOT", "case01", "runs"), run_id, "run.json")
         if not os.path.isfile(p):
             return JSONResponse({"ok": False, "errors": ["没有该 case01 成品: {}".format(run_id)]},
                                 status_code=404)
@@ -324,7 +336,8 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                              "view": "expert-safe",
                              "data": expert_safe_record(rec)})
     if source == "checkpoint":
-        ck_root = os.path.join(BASE_DIR, "results/checkpoints", run_id)
+        ck_root = os.path.join(_data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints"),
+                               run_id)
         if not os.path.isdir(ck_root):
             return JSONResponse({"ok": False, "errors": ["没有该 case00 痕迹: {}".format(run_id)]},
                                 status_code=404)
@@ -342,7 +355,8 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                                           f for f in os.listdir(ck_root)
                                           if f.startswith("simulate-") and f.endswith(".json"))}})
     if source == "compressed":
-        comp_root = os.path.join(BASE_DIR, "results", "compressed", run_id)
+        comp_root = os.path.join(_data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed"),
+                                 run_id)
         if not os.path.isdir(comp_root):
             return JSONResponse({"ok": False, "errors": ["没有该压缩成品: {}".format(run_id)]},
                                 status_code=404)

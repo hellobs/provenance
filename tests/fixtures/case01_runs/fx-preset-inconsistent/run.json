@@ -1,0 +1,55 @@
+{
+  "run_id": "fx-preset-inconsistent",
+  "start_date": "2026-01-08",
+  "end_date": "2026-01-09",
+  "branch": "C",
+  "branch_action": {
+    "timeline": "A",
+    "source": "preset",
+    "pending": false,
+    "reason": "预设分支,不看 AI 说了什么(夹具)"
+  },
+  "consistency": {
+    "verdict": "inconsistent",
+    "reason": "预设分支 C,而 AI 的 T0 立场为谨慎(正面 0 / 谨慎 3 / 条件化 2)(夹具)",
+    "method": "quick_scan",
+    "branch_source": "preset"
+  },
+  "turns": [
+    {"date": "2026-01-08", "speaker": "ethan", "text": "T0 事件:客户传闻(夹具)"},
+    {"date": "2026-01-08", "speaker": "investment_ai", "text": "这件事我无法确认值得买入(夹具)"}
+  ],
+  "retrievals": [
+    {"date": "2026-01-08", "injected": true, "mode": "associate", "query": "供应安排(夹具)"}
+  ],
+  "events": [
+    {"date": "2026-01-08", "kind": "story", "summary": "已释放的剧情节点(夹具)"}
+  ],
+  "state_history": [
+    {"date": "2026-01-08", "state": {"cash": 100, "position": 0}}
+  ],
+  "final_feedback": {"date": "2026-01-09", "ethan": "仓促入场(夹具)", "ai": "记录完毕(夹具)"},
+  "audit": [],
+  "condition_monitor": [],
+  "reflection": {
+    "material": "本案的判断依据(夹具)",
+    "stripped_opener": "反思开场(夹具)",
+    "text": "反思正文(夹具):预设分支与我的判断不一致时,我该留下什么。"
+  },
+  "router": {"issues": []},
+  "injector": {"nodes": [], "branch_mode": "preset"},
+  "manifest": {
+    "manifest_version": 1,
+    "created_at": "2026-01-09 10:00:00",
+    "engine_id": "mavis",
+    "branch_mode": "preset",
+    "branch_source": "preset",
+    "branch": "C",
+    "judge": null,
+    "judge_model": null,
+    "temperature": {"judge": 0.1, "reflection": 0.4, "router": 0.2},
+    "manifest_warnings": ["branch_source=preset:分支不看 AI 的 T0 回答"]
+  },
+  "compat": {"level": "schema", "gaps": [], "missing_keys": [], "reflection_attached": true},
+  "summary": "夹具摘要:预设分支与 AI 立场矛盾的记录,默认不该给平台。"
+}

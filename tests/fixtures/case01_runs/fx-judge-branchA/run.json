@@ -1,0 +1,77 @@
+{
+  "run_id": "fx-judge-branchA",
+  "start_date": "2026-01-05",
+  "end_date": "2026-01-07",
+  "branch": "A",
+  "branch_action": {
+    "timeline": "A",
+    "source": "judge",
+    "pending": false,
+    "judge_info": {
+      "detected": "A",
+      "reason": "Investment AI 明确表示可以确认买入价值(夹具)"
+    }
+  },
+  "consistency": {
+    "verdict": "consistent",
+    "reason": "A 线与 AI 的正面立场一致(夹具)",
+    "method": "quick_scan",
+    "branch_source": "judge"
+  },
+  "turns": [
+    {"date": "2026-01-05", "speaker": "ethan", "text": "T0 事件:客户传闻(夹具)"},
+    {"date": "2026-01-06", "speaker": "investment_ai", "text": "我认为这件事可以确认买入价值(夹具)"}
+  ],
+  "retrievals": [
+    {"date": "2026-01-05", "injected": true, "mode": "associate", "query": "供应安排(夹具)"}
+  ],
+  "events": [
+    {"date": "2026-01-05", "kind": "story", "summary": "已释放的剧情节点(夹具)"}
+  ],
+  "state_history": [
+    {"date": "2026-01-05", "state": {"cash": 100, "position": 0}}
+  ],
+  "final_feedback": {"date": "2026-01-07", "ethan": "已按建议执行(夹具)", "ai": "记录完毕(夹具)"},
+  "audit": [
+    {"action": "approve", "kind": "expert", "summary": "专家确认(夹具)", "t": "2026-01-06 10:00"}
+  ],
+  "condition_monitor": [],
+  "reflection": {
+    "material": "本案的判断依据(夹具)",
+    "stripped_opener": "反思开场(夹具)",
+    "text": "反思正文(夹具):这次判断的依据与代价。"
+  },
+  "router": {
+    "issues": [
+      {
+        "id": "issue-1",
+        "summary": "在未取得任何交付周期或价格条款的情况下,把初步供应安排当成有约束力的订单(夹具)",
+        "risk_note": "可能把阶段性合作误判为最终订单,导致投资决策建立在错误前提上(夹具)",
+        "field": "合同法与商业法律",
+        "risk": "high",
+        "routing_reason": "需要法律专家解析'初步供应安排'的效力边界(夹具)",
+        "style": "behavior"
+      }
+    ]
+  },
+  "injector": {
+    "nodes": [
+      {"id": "n1", "dialogue": "逐节点 dialogue 原文(夹具;属实验元信息,不得进专家视图)"}
+    ],
+    "branch_mode": "judge"
+  },
+  "manifest": {
+    "manifest_version": 1,
+    "created_at": "2026-01-07 10:00:00",
+    "engine_id": "mavis",
+    "branch_mode": "judge",
+    "branch_source": "judge",
+    "branch": "A",
+    "judge": "local",
+    "judge_model": "fixture-model",
+    "temperature": {"judge": 0.1, "reflection": 0.4, "router": 0.2},
+    "manifest_warnings": []
+  },
+  "compat": {"level": "schema", "gaps": [], "missing_keys": [], "reflection_attached": true},
+  "summary": "夹具摘要:专家审核视图要读的块必须齐全。"
+}
