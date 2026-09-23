@@ -140,6 +140,9 @@ def quick_scan(run_record: Dict) -> Tuple[str, str]:
         if pos and not cond:
             return "inconsistent", "C 线但 AI 在 T0 明确支持买入、无条件化方案(" + detail + ")"
         return "unknown", "C 线但 AI 的 T0 方案混合或不明确(" + detail + ")"
+    if branch == "UNDETERMINED":
+        # judge 三次都没给出 A/B/C:不是"立场不明确",是这次没判出来(bridge 停 T0)
+        return "unknown", "分支未判定(judge 失败):run 停在 T0,没有时间线"
     return "unknown", "未知分支 {!r}".format(branch)
 
 

@@ -36,6 +36,15 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
                             "stripped_opener": bool(ref.get("stripped_opener"))}
     rout = run_router(router, ref["text"])
     record["router"] = {"raw": rout["raw"], "issues": rout["issues"]}
+    # 截断不许静默:反思/路由的答案被 max_tokens 截断时,记录本身要带这一条
+    # (manifest 段是"这次跑有什么不对"的既有落点)。工具:case01/tools/reflection_audit.py
+    truncated = int(getattr(local, "truncations", 0) or 0)
+    if router is not local:
+        truncated += int(getattr(router, "truncations", 0) or 0)
+    if truncated:
+        warnings = record.setdefault("manifest", {}).setdefault("manifest_warnings", [])
+        warnings.append("LLM 输出被 max_tokens 截断 {} 次(反思/路由可能不完整)".format(truncated))
+        print("[!] 反思/路由有 {} 次输出被截断,已记进 manifest_warnings".format(truncated))
     # 这两个字段已补齐,从 gaps 里移除
     gaps = [g for g in record.get("compat", {}).get("gaps", [])
             if not g.startswith("reflection/router")]

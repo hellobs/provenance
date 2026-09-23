@@ -68,6 +68,18 @@ def test_sentence_level_mix_needs_judgement():
     assert quick_scan(rec)[0] == "unknown"
 
 
+def test_undetermined_branch_reason_names_the_real_cause():
+    """judge 失败(分支 undetermined)必须说出"停在 T0",不是"未知分支"。
+
+    2026-09-23:原来这里回 `未知分支 'UNDETERMINED'`,读起来像数据脏;
+    实际是 judge 三次没判出 A/B/C,run 就停在 T0 了。
+    """
+    rec = _rec("undetermined", "I cannot confirm the rumour.")
+    verdict, reason = quick_scan(rec)
+    assert verdict == "unknown"
+    assert "T0" in reason and "judge" in reason, reason
+
+
 def test_only_t0_day_is_used_not_the_first_ai_turn():
     """T0 没发生交互时,第一条 AI turn 其实是最终反馈 —— 不能拿它判分支。"""
     rec = {

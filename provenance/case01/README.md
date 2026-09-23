@@ -124,14 +124,17 @@ Ollama remains the default. To connect directly to a vLLM OpenAI-compatible API:
 ```bash
 export CASE01_LLM_PROVIDER=vllm
 export CASE01_LLM_BASE_URL=http://127.0.0.1:8101/v1
-export CASE01_LLM_MODEL=qwen3:4b-instruct-2507-q4_K_M
-export CASE01_EMBED_BASE_URL=http://127.0.0.1:8102/v1
-export CASE01_EMBED_MODEL=qwen3-embedding:0.6b-q8_0
+export CASE01_LLM_MODEL=<vLLM 上实际部署的模型名>
 ```
 
 To switch back, set `CASE01_LLM_PROVIDER=ollama` and use
 `http://127.0.0.1:11434`. Without these variables, the scenario's existing
 Ollama configuration is used.
+
+只切**推理**后端。记忆检索不走 embedding 服务(场景里 `embedding.provider: simple`,
+纯 stdlib),所以没有 embedding 相关的环境变量可设 —— `case01/agents/llm.py`
+里的 `embed()` 与 `CASE01_EMBED_*` 目前**没有任何调用方**,别照着设了以为生效。
+另:路径外的旧入口(`orchestrator.py` / `run.py`,已归档)仍直连 Ollama。
 
 包契约、四种插件与协议键见 `packages/mavis-vizkit/README.md`。
 

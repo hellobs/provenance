@@ -1,0 +1,57 @@
+{
+  "run_id": "fx-judge-failed",
+  "start_date": "2026-01-11",
+  "end_date": "2026-01-11",
+  "branch": "undetermined",
+  "branch_action": {
+    "timeline": "",
+    "source": "judge-failed",
+    "pending": true,
+    "judge_info": {
+      "detected": "undetermined",
+      "reason": "Judge returned no valid A/B/C after 3 attempts",
+      "attempts": 3,
+      "raw_outputs": ["我倾向于 A 线,因为", "A"]
+    },
+    "judge": "judge(failed/manual review required)"
+  },
+  "consistency": {
+    "verdict": "unknown",
+    "reason": "分支未判定(judge 失败):run 停在 T0,没有时间线",
+    "method": "quick_scan",
+    "branch_source": "judge-failed"
+  },
+  "turns": [
+    {"date": "2026-01-11", "speaker": "ethan", "text": "T0 事件:客户传闻(夹具)"},
+    {"date": "2026-01-11", "speaker": "investment_ai", "text": "我倾向于 A 线,因为(夹具:输出被截断)"}
+  ],
+  "retrievals": [],
+  "events": [
+    {"date": "2026-01-11", "kind": "story", "summary": "T0 节点(夹具)"}
+  ],
+  "state_history": [],
+  "final_feedback": {},
+  "audit": [],
+  "condition_monitor": [],
+  "reflection": {
+    "material": "本案的判断依据(夹具)",
+    "stripped_opener": "反思开场(夹具)",
+    "text": "反思正文(夹具):这次判定没给出来,时间线停在 T0。"
+  },
+  "router": {"issues": []},
+  "injector": {"nodes": [], "branch_mode": "judge"},
+  "manifest": {
+    "manifest_version": 1,
+    "created_at": "2026-01-11 10:00:00",
+    "engine_id": "mavis",
+    "branch_mode": "judge",
+    "branch_source": "judge-failed",
+    "branch": "undetermined",
+    "judge": "local",
+    "judge_model": "fixture-model",
+    "temperature": {"judge": 0.1, "reflection": 0.4, "router": 0.2},
+    "manifest_warnings": ["judge: Judge returned no valid A/B/C after 3 attempts; timeline stopped for manual selection or rerun"]
+  },
+  "compat": {"level": "schema", "gaps": [], "missing_keys": [], "reflection_attached": true},
+  "summary": "夹具摘要:judge 失败、run 停在 T0 的记录,默认不该给平台。"
+}

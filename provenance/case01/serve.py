@@ -94,8 +94,9 @@ def list_runs(include_questionable: bool = False) -> dict:
     """全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
 
     每条记录带 `quality` / `consistency` / `branch_source`(加法字段)。默认**不返回**
-    `quality="questionable"` 的记录 —— 那是"预设分支且与 AI 的 T0 立场矛盾"的记录
-    (例:`A-1720` 里 AI 说"不能确认值得买"、当事人却满仓),给专家看会直接暴露矛盾内容。
+    `quality="questionable"` 的记录 —— 那是"预设分支且与 AI 的 T0 立场矛盾"或
+    **判定失败(run 停在 T0)**的记录(例:`A-1720` 里 AI 说"不能确认值得买"、
+    当事人却满仓),给专家看会直接暴露矛盾内容 / 给平台等于让一条废记录去建单。
     这个"不返回"**不静默**:响应里给 `excluded` 计数与原因,平台也可以
     `?include_questionable=1` 全量取。
     `quality="unverified"`(旧记录没有一致性戳)**照常返回** —— 判不了 ≠ 有问题。
@@ -112,7 +113,7 @@ def list_runs(include_questionable: bool = False) -> dict:
             by_kind.setdefault(r["quality"], []).append(r["run_id"])
         out["excluded"] = {
             "count": len(dropped), "by_kind": by_kind,
-            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾;"
+            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
                       "debug=调试跑(--nodes 截断等,内容不完整)。"
                       "加 ?include_questionable=1 可取全量",
         }

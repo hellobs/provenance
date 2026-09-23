@@ -70,8 +70,8 @@ def _is_fixture(root):
     return os.path.abspath(root) == os.path.abspath(FIXTURE["runs"])
 
 
-def test_fixture_pins_all_three_quality_verdicts(monkeypatch):
-    """夹具把 `quality_of` 的三条口径各钉在一条记录上:ok / questionable / debug。
+def test_fixture_pins_every_quality_verdict(monkeypatch):
+    """夹具把 `quality_of` 的口径逐条钉住:ok / questionable(两种)/ debug。
 
     夹具一旦被换成"随手造的数据",这条会先红 —— 免得其它用例的严格性悄悄失效。
     """
@@ -80,6 +80,7 @@ def test_fixture_pins_all_three_quality_verdicts(monkeypatch):
     got = {r["run_id"]: r["quality"] for r in body["runs"] if r.get("source") == "review"}
     assert got == {"fx-judge-branchA": "ok",
                    "fx-preset-inconsistent": "questionable",
+                   "fx-judge-failed": "questionable",
                    "fx-debug-truncated": "debug"}, got
 
 

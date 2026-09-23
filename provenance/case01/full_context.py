@@ -232,7 +232,8 @@ def quality_of(rec: dict) -> dict:
     记录建 Expert Review Task 时,专家会直接看到矛盾内容。这里的约定是:
 
     - ``quality="ok"``          分支由 AI 的 T0 回答判定(judge),或预设但与 AI 立场一致;
-    - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致(记录里自带这是为什么);
+    - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致;或**判定失败**
+      (judge 三次都没给出 A/B/C → run 停在 T0,没有时间线,不能直接建专家任务);
     - ``quality="unverified"``  判不了(没有 T0 对话 / 旧记录没有一致性戳)。
     """
     cs = rec.get("consistency") or {}
@@ -242,6 +243,12 @@ def quality_of(rec: dict) -> dict:
     if rec.get("debug"):
         # 调试跑(--nodes 截断等):T0 可能被当成最终反馈节点,内容不完整
         q = "debug"
+    elif source == "judge-failed" or str(rec.get("branch") or "").lower() == "undetermined":
+        # 判定失败 → run 停在 T0。**必须与"判不了"区分开**:unverified 是默认照给
+        # 平台的(见 `_HIDDEN_QUALITY`),而这条是"这次跑废了",给了平台就会拿一条
+        # 停在 T0 的记录去建专家任务。reason 里写明是判定失败,别和
+        # "预设分支与 AI 立场矛盾"混成同一类(2026-09-23)。
+        q = "questionable"
     elif verdict == "consistent":
         q = "ok"
     elif verdict == "inconsistent":

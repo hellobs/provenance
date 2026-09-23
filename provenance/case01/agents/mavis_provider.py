@@ -11,6 +11,30 @@ import time
 
 import requests
 
+# mavis 的 `Agent.completion` **不传 caller**(见 mavisframework/core/agent_core.py:
+# `res = func(...)._asdict()` 只有 prompt/callback/failsafe/return_type 四个键),
+# 所以走到这里 caller 恒为默认的 "llm_normal" —— 分档必须按 `return_type` 判,
+# 否则每次调用都掉进最小档。
+# 2026-09-23 实测的后果:镇内**所有**调用都被钉在 256 token,而 `auto-1820` 里
+# Investment AI 的 T0 回答实测 536 汉字(≈320-380 token)—— 判定者读的正是这段
+# 被截断的文字,于是 judge 判不出来、run 停在 T0。原来的 2048/1024 两档永远走不到。
+_LONG_OUTPUT_TYPES = frozenset([
+    "generate_chat",             # 角色对话正文(1-3 句)
+    "schedule_initResponse",     # 一天的活动列表
+    "schedule_dailyResponse",    # 24 小时日程表
+    "schedule_decomposeResponse",
+    "schedule_reviseResponse",
+    "reflect_focusResponse",
+    "reflect_insightsResponse",  # 洞察列表
+    "describe_eventResponse",    # 动作三元组列表
+])
+
+
+def _res_annotation(return_type):
+    """取 `res` 字段的类型标注:整数/布尔类回答(打分、起床点、是非)给最小档就够。"""
+    field = getattr(return_type, "model_fields", {}).get("res")
+    return getattr(field, "annotation", None)
+
 
 class Case01SafeProvider:
     _semaphore = threading.Semaphore(4)
@@ -25,6 +49,10 @@ class Case01SafeProvider:
         self.retry_delay = max(0.0, float(self.config.get("retry_delay", 1) or 0))
         self.enabled = True
         self.summary = {"total": [0, 0, 0]}
+        # 截断计数(finish_reason == "length"):截断的输出与完整输出长得一模一样,
+        # 记进 summary 才会出现在 mavis 的角色日志/state 里,而不是只有天知道。
+        self.truncations = 0
+        self.last_truncation = None
 
     def completion(self, prompt, retry=10, callback=None, failsafe=None,
                    return_type=None, caller="llm_normal", **kwargs):
@@ -75,11 +103,13 @@ class Case01SafeProvider:
             temperature=temperature,
             response_format=response_format,
             max_tokens=int(max_tokens or self._token_limit(caller, return_type)),
+            caller=caller,
         )
         content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         return self._parse(content, return_type) if return_type is not None else content
 
-    def _chat(self, messages, temperature, response_format, max_tokens):
+    def _chat(self, messages, temperature, response_format, max_tokens,
+              caller="llm_normal"):
         body = {
             "model": self.model,
             "messages": messages,
@@ -100,22 +130,41 @@ class Case01SafeProvider:
         )
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            self.truncations += 1
+            self.last_truncation = {"caller": caller, "max_tokens": int(max_tokens)}
+            print("[case01.llm] 输出被 max_tokens 截断: caller={} max_tokens={} "
+                  "累计={} 次".format(caller, max_tokens, self.truncations), flush=True)
+        return choice["message"]["content"]
 
     def _token_limit(self, caller, return_type):
+        """这一次调用的 max_tokens。
+
+        优先级:配置(`think.llm.max_tokens`,整数或 {"structured"/"conversation"/"long"})
+        → 调用方显式传的 caller(只有外部调用方会传)→ `return_type`(mavis 实际
+        传得出来的唯一信号)。原实现只按 caller 分档,而 caller 恒为默认值,
+        于是 int 打分和整段对话正文拿的是同一个 256。
+        """
         configured = self.config.get("max_tokens", {})
         if isinstance(configured, int):
             return configured
-        limits = {"structured": 256, "conversation": 1024,
-                  "long": 2048, "default": 1024}
+        limits = {"structured": 256, "conversation": 1024, "long": 2048, "default": 1024}
         if isinstance(configured, dict):
             limits.update({k: int(v) for k, v in configured.items() if v is not None})
-        if caller.startswith("reflect_") or caller in {
-                "schedule_daily", "schedule_revise", "schedule_decompose"}:
+        if caller and caller != "llm_normal":
+            if caller.startswith("reflect_") or caller in {
+                    "schedule_daily", "schedule_revise", "schedule_decompose"}:
+                return limits["long"]
+            if caller in {"generate_chat", "summarize_chats", "summarize_relation"}:
+                return limits["conversation"]
+        if return_type is None:
+            return limits["default"]
+        if getattr(return_type, "__name__", "") in _LONG_OUTPUT_TYPES:
             return limits["long"]
-        if caller in {"generate_chat", "summarize_chats", "summarize_relation"}:
-            return limits["conversation"]
-        return limits["structured"] if return_type is not None else limits["default"]
+        if _res_annotation(return_type) in (int, bool):
+            return limits["structured"]
+        return limits["conversation"]
 
     @classmethod
     def _parse(cls, text, return_type):
@@ -162,7 +211,11 @@ class Case01SafeProvider:
             key: "S:{},F:{}/R:{}".format(value[1], value[2], value[0])
             for key, value in self.summary.items()
         }
-        return {"model": self.model, "summary": values}
+        out = {"model": self.model, "summary": values}
+        if self.truncations:  # 只在真发生时出现,平时不占位
+            out["truncated"] = self.truncations
+            out["last_truncation"] = dict(self.last_truncation or {})
+        return out
 
     def disable(self):
         self.enabled = False

@@ -23,6 +23,19 @@ class _ChatMixin:
 
     timeout = 120.0
     retries = 3
+    # 截断计数:OpenAI 兼容端点用 `choices[0].finish_reason == "length"` 表态输出被
+    # max_tokens 截断。**必须数出来** —— 截断的答案看起来和完整答案一模一样
+    # (尤其结构化调用的 res:str 兜底会照收),不数就没人知道。
+    truncations = 0
+
+    def _note_truncation(self, finish_reason, max_tokens: int) -> bool:
+        """截断出声:谁、上限多少、累计几次。返回是否截断。"""
+        if finish_reason != "length":
+            return False
+        self.truncations += 1
+        print("[case01.llm] 输出被 max_tokens 截断: {} max_tokens={} 累计={} 次".format(
+            type(self).__name__, max_tokens, self.truncations), flush=True)
+        return True
 
     def chat(self, messages: List[dict], temperature: float = 0.7,
              max_tokens: int = 1024, num_ctx: Optional[int] = None) -> Optional[str]:
@@ -48,7 +61,9 @@ class _ChatMixin:
                     headers=self._headers())
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     obj = json.loads(resp.read().decode("utf-8"))
-                return obj["choices"][0]["message"]["content"]
+                choice = obj["choices"][0]
+                self._note_truncation(choice.get("finish_reason"), max_tokens)
+                return choice["message"]["content"]
             except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
                 last_err = e
                 time.sleep(2 * (attempt + 1))

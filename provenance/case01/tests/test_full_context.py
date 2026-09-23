@@ -175,6 +175,22 @@ class TestNoExperimentMetaInExpertText:
         assert q["quality"] == "questionable" and q["branch_source"] == "preset"
         assert "谨慎" in q["reason"]
 
+    def test_judge_failed_is_not_unverified(self):
+        """judge 失败(run 停在 T0)不许落成 unverified。
+
+        2026-09-23:原来 `quick_scan("undetermined")` → unknown → quality=unverified,
+        而 unverified 是**默认照给平台**的(见 live/history.py `_HIDDEN_QUALITY`),
+        于是平台会拿一条停在 T0、没有时间线的记录去建专家任务。
+        """
+        from case01.full_context import quality_of
+        rec = {"branch": "undetermined",
+               "branch_action": {"source": "judge-failed", "timeline": ""},
+               "consistency": {"verdict": "unknown",
+                               "reason": "分支未判定(judge 失败):run 停在 T0,没有时间线"}}
+        q = quality_of(rec)
+        assert q["quality"] == "questionable", q
+        assert "T0" in q["reason"]
+
 
 class TestListAndLoad:
     def test_list_runs_missing_root(self, tmp_path):

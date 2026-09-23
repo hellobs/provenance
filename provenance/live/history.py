@@ -202,7 +202,8 @@ def _quality_of(rec: dict) -> dict:
 
 
 # 默认不给平台的质检类别(与 5002 `serve.list_runs` 同口径):
-#   questionable = 预设分支与 AI 的 T0 立场自相矛盾;debug = 调试跑(内容不完整)
+#   questionable = 预设分支与 AI 的 T0 立场自相矛盾,或判定失败(run 停在 T0)
+#   debug        = 调试跑(内容不完整)
 _HIDDEN_QUALITY = ("questionable", "debug")
 
 
@@ -288,7 +289,7 @@ async def list_all_runs(include_questionable: bool = False) -> JSONResponse:
     if hidden:
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,
-            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾;"
+            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
                       "debug=调试跑(内容不完整)。加 ?include_questionable=1 取全量",
         }
     return JSONResponse(body)
