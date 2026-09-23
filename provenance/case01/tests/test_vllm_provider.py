@@ -27,6 +27,6 @@ def test_bridge_injects_vllm_into_mavis_config(monkeypatch):
     config = {"agent_base": {"think": {"llm": {"provider": "ollama"}}}}
     bridge._apply_local_provider(config)
     assert config["agent_base"]["think"]["llm"] == {
-        "provider": "vllm", "base_url": "http://127.0.0.1:8101/v1",
+        "provider": "openai", "base_url": "http://127.0.0.1:8101/v1",
         "model": "chat-local", "api_key": "",
     }

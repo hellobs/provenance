@@ -442,6 +442,7 @@ class MavisBridge:
         # mavis 的 LLM provider 在 Agent.reset() 里惰性创建,必须显式初始化一次
         # (已知行为,见 mavis docs/tutorial-extension.md §5;不是绕框架)
         self.game.reset_game()
+        self._install_safe_mavis_providers()
         self._plugin_mode = _plugin_surface_available()
         # mavis 插件面存在时,可视化事件经薄适配器(case01 侧的 Plugin 子类)转发给
         # vizkit Fanout;对话逐句也不再用"覆盖全局 chat_callback"的方式接入
@@ -898,6 +899,18 @@ class MavisBridge:
         if provider == "ollama" and not base_url.rstrip("/").endswith("/v1"):
             base_url = base_url.rstrip("/") + "/v1"
         llm = dict(config.get("agent_base", {}).get("think", {}).get("llm", {}))
-        llm.update({"provider": provider, "base_url": base_url, "model": model,
+        # vLLM is OpenAI-compatible, so upstream Mavis needs no vLLM-specific provider.
+        mavis_provider = "openai" if provider == "vllm" else "ollama"
+        llm.update({"provider": mavis_provider, "base_url": base_url, "model": model,
                     "api_key": os.environ.get("CASE01_LLM_API_KEY", "").strip()})
         config.setdefault("agent_base", {}).setdefault("think", {})["llm"] = llm
+
+    def _install_safe_mavis_providers(self) -> None:
+        """Install case-local validation without modifying upstream Mavis."""
+        from ..agents.mavis_provider import Case01SafeProvider
+
+        for agent in self.game.agents.values():
+            # Preserve explicitly injected providers used by tests or extensions.
+            if type(agent._llm).__module__ != "mavisframework.runtime.llm_providers":
+                continue
+            agent._llm = Case01SafeProvider(agent.think_config["llm"])
