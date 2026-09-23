@@ -52,3 +52,35 @@ def test_two_live_faces_share_single_live_entry():
     assert set(CMD_NEEDLE) == {"case00", "case01"}
     assert CMD_NEEDLE["case00"] != CMD_NEEDLE["case01"]
     assert all(CMD_NEEDLE[c] for c in CMD_NEEDLE)
+
+
+def test_reachable_reports_the_truth_for_open_and_closed_ports():
+    """跨机提示里的"本机自测通/不通"必须真测:开着 → 通,没人听 → 不通。
+
+    2026-09-23:一开始只把候选地址列出来就当"平台侧可用",而实测这台机器上
+    以太网那块网卡是 Disconnected(地址还在、连不上),于是列表里第二个地址是假的。
+    """
+    import socket
+
+    from live_switch import _reachable
+
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    try:
+        assert "通" in _reachable("127.0.0.1", port)
+    finally:
+        srv.close()
+    assert "不通" in _reachable("127.0.0.1", port), "端口关了还说通,就是在骗人"
+
+
+def test_lan_ip_list_never_advertises_loopback_or_link_local():
+    """候选地址不许把回环/169.254 当"跨机可用"报出去(那是编的)。"""
+    from live_switch import _all_lan_ips
+
+    ips = _all_lan_ips()
+    assert isinstance(ips, list)
+    for ip in ips:
+        assert not ip.startswith("127.") and not ip.startswith("169.254."), ip
+    assert len(ips) == len(set(ips)), "候选地址不该重复"

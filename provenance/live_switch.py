@@ -295,12 +295,17 @@ def start(case, args):
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
     if args.host not in ("127.0.0.1", "localhost", ""):
-        # 跨机对接:把平台侧该用的地址直接印出来(别让人去猜本机 LAN IP)。
-        ip = _lan_ip()
-        print("  绑定 {} → 平台侧跨机可用: http://{}:{}/".format(
-            args.host, ip or "<本机LAN地址>", LIVE[case]))
-        if not ip:
-            print("    (取不到本机 LAN 地址:用 ipconfig 自己看一眼)")
+        # 跨机对接:把所有候选地址印出来(别只印路由那一个,也别让人手抄)
+        ips = _all_lan_ips()
+        print("  绑定 {} → 平台侧跨机可用地址(本机所有非回环 IPv4):".format(args.host))
+        if ips:
+            for i, ip in enumerate(ips):
+                tail = "   ← 默认路由走这张" if i == 0 else ""
+                print("    http://{}:{}/{}{}".format(
+                    ip, LIVE[case], tail, _reachable(ip, LIVE[case])))
+        else:
+            print("    (一个都没取到:用 ipconfig 自己看一眼)")
+        print("  对方连不上时先查防火墙是否放行该端口(Windows 常把新网络判成 Public)。")
     mapper_log = ""
     if run_id:
         print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
@@ -346,7 +351,10 @@ def start(case, args):
 
 
 def _lan_ip() -> str:
-    """本机 LAN 地址:跨机对接时印给用户看,免得手抄错。取不到返回空。"""
+    """**默认路由会用的**本机地址。做法:UDP socket 连一个不可路由地址,再读
+    `getsockname()` —— 只问内核路由表,一个包都不发(不会真的去连 10.255.255.255)。
+    注意它只给出"出门走哪张网卡"的那一个地址,机器上其它地址它看不见。
+    """
     import socket
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -357,6 +365,51 @@ def _lan_ip() -> str:
         return ""
     finally:
         s.close()
+
+
+def _reachable(ip: str, port: int) -> str:
+    """本机自测:这个地址的这个端口,从本机连得上吗。
+
+    网卡没插/没连上、或被防火墙拦,都会不通 —— 所以不能只把地址列出来就当成"能用"。
+    """
+    import socket
+
+    s = socket.socket()
+    s.settimeout(2)
+    try:
+        s.connect((ip, port))
+        return " · 本机自测通"
+    except OSError:
+        return " · 本机自测不通(网卡没连上或被防火墙拦)"
+    finally:
+        s.close()
+
+
+def _all_lan_ips() -> list:
+    """本机所有非回环 IPv4,**尽力而为**;第一个是默认路由那个。
+
+    为什么不能只印一个:stdlib 的 `getaddrinfo(gethostname())` 与 UDP 技巧都只给
+    "主机名/路由表对应的那一个"。实测这台机器上有两个可用地址
+    (WLAN 的 10.195.104.175、以太网手配的 116.56.156.64),只印路由那个,可能刚好
+    不是平台侧能到的那一个。Windows 上用 `Get-NetIPAddress` 补齐;取不到就只回一个,
+    绝不因为"列不全"而报错。
+    """
+    ips = []
+    routed = _lan_ip()
+    if routed:
+        ips.append(routed)
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "(Get-NetIPAddress -AddressFamily IPv4).IPAddress"],
+            capture_output=True, text=True, timeout=10)
+        for line in (out.stdout or "").splitlines():
+            ip = line.strip()
+            if ip and ip not in ips and not ip.startswith(("127.", "169.254.")):
+                ips.append(ip)
+    except Exception:  # noqa: BLE001 —— 列不全只影响提示,不该让起服务失败
+        pass
+    return ips
 
 
 def main():
