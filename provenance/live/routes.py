@@ -50,6 +50,16 @@ print("[embed] CORS allow_origins = {}{}".format(
     _EMBED_ORIGINS,
     "" if _EMBED_ENV.strip() else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源;平台侧跨源取数请显式设域名)"))
 
+# 响应压缩(2026-09-24 体检):此前 5010 **完全不压** —— 实测带 `Accept-Encoding: gzip`
+# 取最大的一条 case00 痕迹详情,仍是 954 223 bytes 原样返回。这些响应是 JSON,
+# 键名重复度极高,压缩后通常降一个数量级;平台侧即便走内网,单页近 1 MB 也要等。
+# minimum_size=1024:小响应(/health、单条计数)保持原样,不给小包加 20 字节头。
+# 只影响 HTTP;WebSocket(推演实时帧)不走这里。
+from fastapi.middleware.gzip import GZipMiddleware as _GZipMiddleware  # noqa: E402
+
+app.add_middleware(_GZipMiddleware, minimum_size=1024)
+print("[http] 响应压缩 = gzip(minimum_size=1024)")
+
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(state.BASE_DIR, "frontend/static")),

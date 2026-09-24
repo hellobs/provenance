@@ -167,3 +167,39 @@ def test_health_reports_the_run_id(frontend, scenario_dir):
     # 没给 run_id 时也要有这个字段(空串),别让对接方去猜字段是否存在
     live2 = _live(frontend, scenario_dir, port=5090)
     assert TestClient(live2.app).get("/health").json()["run_id"] == ""
+
+
+def test_big_responses_are_gzipped_small_ones_are_not(frontend, scenario_dir):
+    """响应压缩(2026-09-24 体检补):真实前端下整页 HTML ~120 KB,此前带
+    `Accept-Encoding: gzip` 也是原样返回。平台侧嵌一个画布要先下 120 KB
+    (其中大半是重复的标签/键名)。
+
+    这里用夹具静态目录里自造的大文件来断言,不依赖真实前端体积;
+    同时钉住下界:小于 minimum_size 的响应**不该**被压 —— 否则每次 `/health`
+    探活都白带 20 字节头 + 一次压缩开销。
+    """
+    import os
+
+    from fastapi.testclient import TestClient
+
+    gz = {"Accept-Encoding": "gzip"}
+    live = _live(frontend, scenario_dir, port=5089)
+    client = TestClient(live.app)
+
+    big_text = "x" * 8192
+    with open(os.path.join(frontend["static"], "big.txt"), "w", encoding="utf-8") as f:
+        f.write(big_text)
+
+    big = client.get("/static/big.txt", headers=gz)
+    assert big.status_code == 200 and len(big.content) == 8192
+    assert big.headers.get("content-encoding") == "gzip"
+
+    small = client.get("/health", headers=gz)
+    assert len(small.content) < 1024
+    assert small.headers.get("content-encoding") is None
+
+    # 客户端不声明支持 gzip 时,必须给它原样的响应(别把不能解压的客户端弄坏)
+    # 注意:不能靠"不传头"来测 —— httpx 自己会补 Accept-Encoding;要显式说 identity。
+    plain = client.get("/static/big.txt", headers={"Accept-Encoding": "identity"})
+    assert plain.headers.get("content-encoding") is None
+    assert plain.text == big_text

@@ -332,6 +332,15 @@ class LiveVisualizer(Visualizer):
             _EMBED_ORIGINS,
             "" if _EMBED_ENV.strip() else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源)"))
 
+        # 响应压缩(2026-09-24 体检):本插件此前不压任何响应,而挂在它上面的整页
+        # HTML 与记录 JSON 实测可达 ~1 MB(键名重复度高,压缩比很好)。调用方若要
+        # 自行接管压缩,可在这里之后按 FastAPI 常规方式再调 add_middleware —— 重复
+        # 压缩由 Starlette 的 GZipMiddleware 自己挡掉(已带 Content-Encoding 的不再压)。
+        from fastapi.middleware.gzip import GZipMiddleware as _GZipMiddleware
+
+        app.add_middleware(_GZipMiddleware, minimum_size=1024)
+        print("[http] 响应压缩 = gzip(minimum_size=1024)")
+
         templates = Jinja2Templates(directory=self.template_dir)
         # 顶栏可挂**外部工具链接**(本包不认识它们是什么,只透传 {label,url} 列表):
         # 由调用方经 ctor 的 extra_nav_links 传进来,保持本包零业务词。
