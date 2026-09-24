@@ -23,7 +23,8 @@ from live import netguard as NG  # noqa: E402
 def test_loopback_is_recognised():
     for host in ("127.0.0.1", "localhost", "::1", "", " 127.0.0.1 "):
         assert NG.is_loopback(host), host
-    for host in ("0.0.0.0", "10.195.104.175", "::", "example.com"):
+    # 用 192.0.2.7(TEST-NET-1,保留给文档用),不把本机内网地址写进仓库
+    for host in ("0.0.0.0", "192.0.2.7", "::", "example.com"):
         assert not NG.is_loopback(host), host
 
 
@@ -44,9 +45,14 @@ def test_remote_bind_allowed_after_optin(monkeypatch):
 
 
 def test_exposure_lines_name_the_write_endpoints():
-    """开放端口前把"暴露了什么"列出来:5010 的三个写端点必须在清单里。"""
+    """开放端口前把"暴露了什么"列出来:5010 的**四个**写端点必须在清单里。
+
+    第四个(`/control/restart`)此前漏登记:它不在 `live/routes.py` 里,而在
+    `packages/mavis-vizkit` 的 live 插件里 —— 只扫 routes.py 会漏掉。
+    """
     text = "\n".join(NG.exposure_lines("0.0.0.0", 5010))
-    for ep in ("/api/goals", "/api/undo-intervention", "/api/reflections/mark"):
+    for ep in ("/api/goals", "/api/undo-intervention", "/api/reflections/mark",
+               "/control/restart"):
         assert ep in text, ep
     assert "8060" in text, "配置工具的写端点也必须点名"
 
