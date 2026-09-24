@@ -905,8 +905,8 @@ async def mark_reflection(request: Request):
                     st = ag.get("status") or {}
                     context["value_tendency"] = st.get("value_tendency") or {}
                     context["goal_alignment"] = st.get("goal_alignment") or {}
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - 取不到就留空,但必须留痕(不静默)
+                log.warning("[reflections] 读 checkpoint 快照失败,倾向/对齐留空: %s", exc)
     if ckpt_dir and os.path.exists(dec_path):
         try:
             dec = json.load(open(dec_path, encoding="utf-8"))
@@ -918,8 +918,8 @@ async def mark_reflection(request: Request):
                     context["location"] = ev.get("location", "")
                     context["goal_score"] = ev.get("goal_score")
                     break
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 - 取不到就留空,但必须留痕(不静默)
+            log.warning("[reflections] 读 decisions.json 失败,action 留空: %s", exc)
 
     record = new_mark(agent=agent, simulation=state.current_sim_name(),
                       sim_time=sim_time, node_id=node_id, thought=text,

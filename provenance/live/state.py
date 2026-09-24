@@ -119,7 +119,8 @@ def _backfill_window_times(ckpt_dir: str, agent: str, window: list) -> None:
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     c = json.load(f)
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - 坏文件跳过,但必须留痕(不静默)
+                log.warning("[state] 读 checkpoint 失败,跳过 %s: %s", p, exc)
                 continue
             ag = (c.get("agents") or {}).get(agent)
             if not ag:
