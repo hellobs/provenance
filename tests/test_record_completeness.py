@@ -38,7 +38,7 @@ def test_fixture_records_are_present():
     """夹具必须在 —— 夹具是这些契约在 CI 上唯一的样本,丢了就是静默空转。"""
     ids = {os.path.basename(os.path.dirname(p)) for p in RUNS_FIXTURE}
     assert ids == {"fx-judge-branchA", "fx-preset-inconsistent", "fx-judge-failed",
-                   "fx-debug-truncated"}, ids
+                   "fx-debug-truncated", "fx-deprecated"}, ids
 
 
 def test_every_record_has_the_nine_blocks():
@@ -59,7 +59,7 @@ def test_every_record_carries_reflection_and_valid_quality():
     """
     from case01.full_context import quality_of
 
-    allowed = {"ok", "questionable", "debug", "unverified"}
+    allowed = {"ok", "questionable", "debug", "deprecated", "unverified"}
     bad = []
     for p in RUNS:
         d = _load(p)

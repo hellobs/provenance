@@ -38,7 +38,7 @@ REAL_RUNS = os.path.join(_PKG, "case01", "runs")
 REAL_CKPTS = os.path.join(_PKG, "results", "checkpoints")
 REAL_COMPRESSED = os.path.join(_PKG, "results", "compressed")
 
-HIDDEN = ("questionable", "debug")
+HIDDEN = ("questionable", "debug", "deprecated")
 _STRIPPED = ("injector", "branch_action", "consistency", "debug", "quality", "branch")
 
 
@@ -71,7 +71,7 @@ def _is_fixture(root):
 
 
 def test_fixture_pins_every_quality_verdict(monkeypatch):
-    """夹具把 `quality_of` 的口径逐条钉住:ok / questionable(两种)/ debug。
+    """夹具把 `quality_of` 的口径逐条钉住:ok / questionable(两种)/ debug / deprecated。
 
     夹具一旦被换成"随手造的数据",这条会先红 —— 免得其它用例的严格性悄悄失效。
     """
@@ -81,7 +81,35 @@ def test_fixture_pins_every_quality_verdict(monkeypatch):
     assert got == {"fx-judge-branchA": "ok",
                    "fx-preset-inconsistent": "questionable",
                    "fx-judge-failed": "questionable",
-                   "fx-debug-truncated": "debug"}, got
+                   "fx-debug-truncated": "debug",
+                   "fx-deprecated": "deprecated"}, got
+
+
+def test_deprecated_wins_over_ok_and_is_hidden_by_default(monkeypatch):
+    """废弃样本必须**优先于**"自洽"判定:一条 quality 本来是 ok 的废弃记录,
+    以前会静默发给平台(2026-09-24 体检)。
+
+    同时钉三件事:①quality=deprecated ②默认视图滤掉它,并在 excluded 里报明原因
+    ③索引行带 `deprecated` 与 `deprecated_reason`(平台要能自己筛)。
+    """
+    for k, v in FIXTURE.items():
+        monkeypatch.setenv({"runs": "CASE01_RUNS_ROOT",
+                            "checkpoint": "CASE00_CHECKPOINTS_ROOT",
+                            "compressed": "RESULTS_COMPRESSED_ROOT"}[k], v)
+    full = _call(H.list_all_runs(include_questionable=True))
+    row = [r for r in full["runs"] if r["run_id"] == "fx-deprecated"]
+    assert row, "夹具里应有这条废弃记录"
+    assert row[0]["quality"] == "deprecated", row[0]
+    assert row[0]["deprecated"] is True
+    assert "B 判据" in row[0]["deprecated_reason"]
+    # 它的一致性戳是 consistent —— 正是"以前会被判 ok"的那种
+    assert row[0]["consistency"] == "consistent"
+
+    dflt = _call(H.list_all_runs())
+    assert "fx-deprecated" not in {r["run_id"] for r in dflt["runs"]}
+    assert {x["run_id"]: x["quality"]
+            for x in dflt["excluded"]["runs"]}["fx-deprecated"] == "deprecated"
+    assert "deprecated" in dflt["excluded"]["reason"]
 
 
 def test_aggregate_reports_quality_on_every_case01_run(monkeypatch):
@@ -92,7 +120,7 @@ def test_aggregate_reports_quality_on_every_case01_run(monkeypatch):
         rows = [r for r in body["runs"] if r.get("source") == "review"]
         assert rows, "{} 下没有 case01 成品记录".format(root)
         for r in rows:
-            assert r["quality"] in ("ok", "questionable", "debug", "unverified"), r
+            assert r["quality"] in ("ok", "questionable", "debug", "deprecated", "unverified"), r
             assert "consistency" in r and "branch_source" in r and "debug" in r
 
 
@@ -191,11 +219,11 @@ def test_pagination_and_unknown_params(monkeypatch):
                             "compressed": "RESULTS_COMPRESSED_ROOT"}[k], v)
     full = _call(H.list_all_runs(_Req({}), include_questionable=True))
     page = _call(H.list_all_runs(_Req({}), include_questionable=True, limit=2, offset=1))
-    assert page["count"] == 2 and page["total"] == full["total"] == 6, (page["count"],
+    assert page["count"] == 2 and page["total"] == full["total"] == 7, (page["count"],
                                                                        page["total"])
     assert [r["run_id"] for r in page["runs"]] == [r["run_id"] for r in full["runs"][1:3]]
     only = _call(H.list_all_runs(_Req({}), include_questionable=True, source="review"))
-    assert {r["source"] for r in only["runs"]} == {"review"} and only["total"] == 4
+    assert {r["source"] for r in only["runs"]} == {"review"} and only["total"] == 5
     warn = _call(H.list_all_runs(_Req({"quality": "ok", "foo": "1"})))
     assert warn["ignored_params"] == ["foo", "quality"], warn.get("ignored_params")
     assert "quality" in warn["ignored_note"]

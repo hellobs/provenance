@@ -191,6 +191,25 @@ class TestNoExperimentMetaInExpertText:
         assert q["quality"] == "questionable", q
         assert "T0" in q["reason"]
 
+    def test_deprecated_beats_a_consistent_verdict(self):
+        """废弃样本优先于"自洽":一条 verdict=consistent 的废弃记录以前会判成 ok,
+        于是被默认发给平台(2026-09-24 体检)。
+
+        真实例子:`260919-live-case01-mavis-A-1720`(deprecated_reason 写着
+        "标 A 的原文实为 B 判据")。索引里也要带 deprecated,平台才能自己筛。
+        """
+        from case01.full_context import quality_of
+        rec = {"branch": "A", "deprecated": True,
+               "deprecated_reason": "样本作废:标 A 的原文实为 B 判据",
+               "branch_action": {"source": "judge"},
+               "consistency": {"verdict": "consistent", "reason": "一致"}}
+        q = quality_of(rec)
+        assert q["quality"] == "deprecated", q
+        assert q["deprecated"] is True and "B 判据" in q["deprecated_reason"]
+        # 不废弃的同一条,仍然是 ok(证明优先级是"废弃"带来的,不是把口径改坏了)
+        rec.pop("deprecated")
+        assert quality_of(rec)["quality"] == "ok"
+
 
 class TestListAndLoad:
     def test_list_runs_missing_root(self, tmp_path):

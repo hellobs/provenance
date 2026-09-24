@@ -1,0 +1,49 @@
+{
+  "run_id": "fx-deprecated",
+  "start_date": "2026-01-12",
+  "end_date": "2026-01-14",
+  "branch": "A",
+  "branch_action": {
+    "timeline": "A",
+    "source": "judge",
+    "pending": false,
+    "judge_info": {
+      "detected": "A",
+      "reason": "Investment AI 表示可以确认买入价值(夹具)"
+    }
+  },
+  "consistency": {
+    "verdict": "consistent",
+    "reason": "A 线与 AI 的正面立场一致(夹具)",
+    "method": "quick_scan",
+    "branch_source": "judge"
+  },
+  "deprecated": true,
+  "deprecated_reason": "样本作废:标 A 的原文实为 B 判据(夹具)",
+  "turns": [
+    {"date": "2026-01-12", "speaker": "ethan", "text": "T0 事件:客户传闻(夹具)"},
+    {"date": "2026-01-12", "speaker": "investment_ai", "text": "我认为可以确认买入价值(夹具)"}
+  ],
+  "retrievals": [
+    {"date": "2026-01-12", "query": "夹具追问", "mode": "injection",
+     "injected": [{"kind": "disclosure", "source": "HCM 公告", "summary": "夹具:带出处的注入项"}]}
+  ],
+  "events": [
+    {"date": "2026-01-12", "kind": "story", "summary": "已释放的剧情节点(夹具)"}
+  ],
+  "state_history": [
+    {"date": "2026-01-12", "state": {"cash_rmb": 200000, "hcm_shares": false}}
+  ],
+  "final_feedback": {"date": "2026-01-14", "ethan": "已按建议执行(夹具)", "ai": "记录完毕(夹具)"},
+  "audit": [],
+  "condition_monitor": [],
+  "reflection": {
+    "material": "本案的判断依据(夹具)",
+    "stripped_opener": "反思开场(夹具)",
+    "text": "反思正文(夹具):这条记录已作废,不该再用来建任务。"
+  },
+  "router": {"issues": []},
+  "injector": {"nodes": [], "branch_mode": "judge"},
+  "compat": {"level": "schema", "gaps": [], "missing_keys": [], "reflection_attached": true},
+  "summary": "夹具摘要:自洽但被显式标废弃的记录 —— 以前它会被判成 ok 静默发给平台。"
+}

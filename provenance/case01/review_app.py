@@ -157,14 +157,14 @@ def list_runs(safe: int = 0):
     """面板的 run 清单。
 
     `?safe=1`(嵌入面用):不给 branch/branch_summary,并且**默认滤掉质检不合格的记录**
-    (questionable/debug)——但**不静默**:响应里给 `hidden_count` 与被隐藏的 run_id。
+    (questionable/debug/deprecated)——但**不静默**:响应里给 `hidden_count` 与被隐藏的 run_id。
     """
     items = [_brief(r, safe=bool(safe)) for r in _discover_runs()]
     hidden = []
     if safe:
         keep = []
         for it in items:
-            if str(it.get("quality") or "unverified") in ("questionable", "debug"):
+            if str(it.get("quality") or "unverified") in ("questionable", "debug", "deprecated"):
                 hidden.append({"run_id": it.get("run_id"), "quality": it.get("quality")})
             else:
                 keep.append(it)

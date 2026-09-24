@@ -102,7 +102,7 @@ def list_runs(include_questionable: bool = False) -> dict:
     `quality="unverified"`(旧记录没有一致性戳)**照常返回** —— 判不了 ≠ 有问题。
     """
     all_runs = fc.list_runs(RUNS_ROOT)
-    hidden = ("questionable", "debug")
+    hidden = ("questionable", "debug", "deprecated")
     runs = all_runs if include_questionable else [r for r in all_runs if r["quality"] not in hidden]
     dropped = [r for r in all_runs if r["quality"] in hidden]
     out = {"runs": runs, "count": len(runs),
@@ -114,7 +114,8 @@ def list_runs(include_questionable: bool = False) -> dict:
         out["excluded"] = {
             "count": len(dropped), "by_kind": by_kind,
             "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
-                      "debug=调试跑(--nodes 截断等,内容不完整)。"
+                      "debug=调试跑(--nodes 截断等,内容不完整);"
+                      "deprecated=记录已被显式标废弃(样本作废)。"
                       "加 ?include_questionable=1 可取全量",
         }
     return out

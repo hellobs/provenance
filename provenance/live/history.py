@@ -195,16 +195,23 @@ def _quality_of(rec: dict) -> dict:
         return {"quality": q.get("quality", "unverified"),
                 "consistency": q.get("consistency", "unverified"),
                 "branch_source": q.get("branch_source", ""),
-                "debug": q.get("debug", "")}
+                "debug": q.get("debug", ""),
+                # 废弃标记(2026-09-24):索引行里必须带,平台才能自己筛;
+                # 只靠"默认隐藏"是不够的(一条自洽的废弃样本以前会被判 ok 发出去)。
+                "deprecated": bool(q.get("deprecated")),
+                "deprecated_reason": q.get("deprecated_reason", "")}
     except Exception:  # noqa: BLE001 - 引擎侧缺席时不能假装"没问题"
         return {"quality": "unverified", "consistency": "unverified",
-                "branch_source": "", "debug": ""}
+                "branch_source": "", "debug": "",
+                "deprecated": False, "deprecated_reason": ""}
 
 
 # 默认不给平台的质检类别(与 5002 `serve.list_runs` 同口径):
 #   questionable = 预设分支与 AI 的 T0 立场自相矛盾,或判定失败(run 停在 T0)
 #   debug        = 调试跑(内容不完整)
-_HIDDEN_QUALITY = ("questionable", "debug")
+#   deprecated   = 记录被显式标废弃(样本作废;2026-09-24 加 —— 一条自洽的废弃样本同样是废的,
+#                  以前它只要恰好判成 ok 就会被静默发给平台)
+_HIDDEN_QUALITY = ("questionable", "debug", "deprecated")
 
 
 def expert_safe_record(rec: dict) -> dict:
@@ -312,7 +319,8 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,
             "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
-                      "debug=调试跑(内容不完整)。加 ?include_questionable=1 取全量",
+                      "debug=调试跑(内容不完整);deprecated=记录已被显式标废弃(样本作废)。"
+                      "加 ?include_questionable=1 取全量",
         }
     return JSONResponse(body)
 

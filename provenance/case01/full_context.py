@@ -225,22 +225,29 @@ def load_run(runs_root: str, run_id: str) -> Optional[dict]:
 
 
 def quality_of(rec: dict) -> dict:
-    """记录质量标记:分支来源 + T0 立场一致性 → 一个给平台看的 `quality` 字段。
+    """记录质量标记:分支来源 + T0 立场一致性 + 废弃标记 → 一个给平台看的 `quality` 字段。
 
     为什么要有它(2026-09-19,另一个 AI 的体检清单问题 1/5):`preset` 分支不看 AI 说了什么,
     于是可能出现"AI 说不能确认值得买、当事人却满仓买入"这种自相矛盾的记录。平台拿这些
     记录建 Expert Review Task 时,专家会直接看到矛盾内容。这里的约定是:
 
     - ``quality="ok"``          分支由 AI 的 T0 回答判定(judge),或预设但与 AI 立场一致;
+    - ``quality="deprecated"``  记录被显式标了 ``deprecated``(样本作废,如
+      "标 A 的原文实为 B 判据")。**它优先于其它判断**:一条自洽的废弃样本同样是废的
+      (2026-09-24 体检:此前它只被 `excluded` 之外的口径漏过 —— 只要恰好判成 ok 就会发给平台);
     - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致;或**判定失败**
       (judge 三次都没给出 A/B/C → run 停在 T0,没有时间线,不能直接建专家任务);
+    - ``quality="debug"``       调试跑(内容不完整);
     - ``quality="unverified"``  判不了(没有 T0 对话 / 旧记录没有一致性戳)。
     """
     cs = rec.get("consistency") or {}
     verdict = cs.get("verdict") or ("unverified" if not cs else "unverified")
     source = ((rec.get("branch_action") or {}).get("source")
               or cs.get("branch_source") or "")
-    if rec.get("debug"):
+    if rec.get("deprecated"):
+        # 废弃优先于一切:这条样本不该再被用来建任务,也不该拿去训练
+        q = "deprecated"
+    elif rec.get("debug"):
         # 调试跑(--nodes 截断等):T0 可能被当成最终反馈节点,内容不完整
         q = "debug"
     elif source == "judge-failed" or str(rec.get("branch") or "").lower() == "undetermined":
@@ -257,7 +264,10 @@ def quality_of(rec: dict) -> dict:
         q = "unverified"
     return {"quality": q, "consistency": verdict or "unverified",
             "branch_source": source, "reason": cs.get("reason", ""),
-            "debug": rec.get("debug", "")}
+            "debug": rec.get("debug", ""),
+            # 废弃标记也进索引:平台侧要能自己筛,而不是只靠默认隐藏(2026-09-24)
+            "deprecated": bool(rec.get("deprecated")),
+            "deprecated_reason": str(rec.get("deprecated_reason") or "")}
 
 
 def list_runs(runs_root: str, exclude_questionable: bool = False) -> list:
