@@ -97,7 +97,7 @@
 <div class="explore-wrap">
   <div class="explore-title">历史数据一览</div>
   <div class="explore-sub">
-    来源 <span class="mono">/api/runs</span>(所有场景 × 引擎的历史运行,按场景分层)。
+    来源 <span class="mono">/api/runs</span>(所有场景 × 运行方式的历史运行,按场景分层)。
     左侧点场景展开,点单条 run 看详情;详情由本页自渲染,不依赖当前跑的是哪个实时面。
   </div>
 
@@ -165,7 +165,7 @@
       '<span class="tag">' + esc(r.case_name || r.case_id || "—") + '</span>' +
       '<div class="card-id">' + esc(r.run_id) + '</div>' + extra +
       row("场景", esc(r.case_name || r.case_id || "—")) +
-      row("引擎", esc(r.engine_name || r.engine_id || "—")) +
+      row("运行方式", esc(r.engine_name || r.engine_id || "—")) +
       row("分支", esc(r.branch || "—")) +
       row("开始时间", esc(r.start_date || "—")) +
       row("结束时间", esc(r.end_date || "—")) +
@@ -314,7 +314,7 @@
       '<div class="explore-title" style="font-size:17px;">汇总</div>' +
       '<div class="stat-row">' + stat("成品 run", by.review) +
         stat("运行时痕迹", by.checkpoint) + stat("压缩成品", by.compressed) + '</div>' +
-      '<div class="hint" style="margin-top:10px;">左侧按【场景 · 引擎】列出全部历史运行:' +
+      '<div class="hint" style="margin-top:10px;">左侧按【场景 · 运行方式】列出全部历史运行:' +
       '点场景标题展开,点单条 run 看详情。详情由本页自渲染,不依赖当前跑的是哪个实时面。</div>' +
       '</div>';
   }
@@ -363,7 +363,7 @@
     // 场景顺序:发现层顺序 + 未归档兜底
     G.order.forEach(function (cid) {
       var g = G.groups[cid];
-      var title = sectionTitle(g.name, g.engine_name || "引擎", g.items.length);
+      var title = sectionTitle(g.name, g.engine_name || "运行方式", g.items.length);
       var body = document.createElement("div");
       body.style.display = "none";
       g.items.forEach(function (r) { body.appendChild(runLink(r)); });

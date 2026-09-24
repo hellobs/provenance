@@ -74,7 +74,7 @@ def _do_run(root: str, case_id: str, engine_id: str, input_text: str) -> int:
     ok = strat.supports(scenario)
     print("case_id:  {}".format(case_id))
     print("engine:   {} (显式覆盖: {})".format(strat.engine_id, bool(engine_id)))
-    print("supports: {}".format("✔ 可跑" if ok else "✘ 缺本引擎所需输入"))
+    print("supports: {}".format("✔ 可跑" if ok else "✘ 缺本运行方式所需输入"))
     try:
         out = strat.run(scenario, input_text=input_text)
         print("run:      完成 ({})".format(out.get("run_type", "?")))
@@ -116,11 +116,11 @@ def _do_engines(root: str, case_id: str) -> int:
         if scenario is None:
             return rc
         ok_ids = set(supported_by(scenario))
-        print("\n场景 {} 的引擎兼容矩阵:".format(case_id))
+        print("\n场景 {} 的运行方式兼容矩阵:".format(case_id))
         for eid, meta in sorted(eng.ENGINES.items()):
             tag = "✔" if eid in ok_ids else "✘"
             print("  {}  {}  {}".format(eid, tag, meta["name"]))
-    print("\n共 {} 个引擎;用 run --engine 可自由搭配".format(len(eng.ENGINES)))
+    print("\n共 {} 种运行方式;用 run --engine 可自由搭配".format(len(eng.ENGINES)))
     return 0
 
 
@@ -157,7 +157,7 @@ def _do_materialize(root: str, case_id: str, apply: bool, base: str,
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m case_engine",
-        description="场景引擎 CLI:发现与查看声明式场景(scenario.yaml)",
+        description="场景运行方式 CLI:发现与查看声明式场景(scenario.yaml)",
     )
     parser.add_argument("--cases-dir", default=None,
                         help="cases 根目录(默认自动定位 provenance/provenance/cases)")
@@ -165,12 +165,12 @@ def main(argv=None) -> int:
     sub.add_parser("list", help="列出所有已发现场景")
     ps = sub.add_parser("show", help="查看单场景声明")
     ps.add_argument("case_id", help="场景 id(即 case 目录名)")
-    pr = sub.add_parser("run", help="用选定引擎跑一份场景(可 --engine/--input)")
+    pr = sub.add_parser("run", help="用选定运行方式跑一份场景(可 --engine/--input)")
     pr.add_argument("case_id", help="场景 id(即 case 目录名)")
-    pr.add_argument("--engine", default="", help="指定引擎(默认用场景推荐的 meta.engine)")
+    pr.add_argument("--engine", default="", help="指定运行方式(默认用场景推荐的 meta.engine)")
     pr.add_argument("--input", default="", help="受判的对象回答(experiment-eval;缺省取场景 inputs 样本)")
-    pe = sub.add_parser("engines", help="列出全部已注册引擎(及可选兼容矩阵)")
-    pe.add_argument("--case-id", default="", help="若给,显示该场景的引擎兼容矩阵")
+    pe = sub.add_parser("engines", help="列出全部已注册运行方式(及可选兼容矩阵)")
+    pe.add_argument("--case-id", default="", help="若给,显示该场景的运行方式兼容矩阵")
     pm = sub.add_parser("materialize-value-tendency",
                         help="把声明里的价值权重落到资产(默认 dry-run,加 --apply 才写)")
     pm.add_argument("case_id", help="场景 id(即 case 目录名)")
