@@ -347,6 +347,25 @@ def test_combined_page_is_retired():
     assert _client().get("/combined").status_code == 404
 
 
+def test_expert_face_ships_no_experiment_prose():
+    """专家面(/embed/review)的**页面源码**里不许再出现讲实验设计的句子。
+
+    2026-09-24 第九轮体检:安全视图把行藏起来了,但"为什么藏、藏了哪几个维度"
+    却写在随页面发出去的 JS 注释里 —— devtools 一开就全读到,等于自己拆自己的盲。
+    所以注释只留中性表述,维护说明写在 Python 侧(_PAGE 上方)。
+
+    另有棘轮:机制名(字段名/维度名)今天还留在页面的 JS 里(目标是 0,
+    见《0924 下一步方向》第九轮 P0 —— 那需要把实验相关的 JS 从专家面真正拆出去)。
+    这只允许往下走,涨了就是又往页面里写了新的实验词。
+    """
+    html = _client().get("/embed/review").text
+    for phrase in ("契约 §3.2 规定", "预设分支不看", "那是实验定义",
+                   "不该出现在别人的页面上", "现在只有分支"):
+        assert phrase not in html, "专家面源码里出现实验说明: {}".format(phrase)
+    assert html.count("branch") <= 14, html.count("branch")
+    assert html.count("injector") <= 12, html.count("injector")
+
+
 def test_index_page_is_self_contained():
     html = _client().get("/review").text
     assert "<script>" in html

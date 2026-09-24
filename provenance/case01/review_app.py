@@ -249,6 +249,14 @@ def get_run(run_id: str, safe: int = 0):
     return JSONResponse(rec)
 
 
+# 页面源码维护须知(2026-09-24 第九轮体检):
+#   这一整块 HTML/JS 会**原样发到专家浏览器**(平台侧 iframe 引的就是 /embed/review),
+#   而"专家不该看到哪些东西"是内部口径 —— 所以:
+#     ① 不要在 <script> 里写"为什么隐藏 X / X 是实验设计"这类解释:隐藏动作在运行期,
+#        说明文字却会随源码一起发出去(用 devtools 就能读到)。
+#     ② 维护说明写在这里(Python 侧),不写进 _PAGE。
+#     ③ 专家视图剥掉的字段见 live/history.expert_safe_record(唯一实现处);运行期
+#        隐藏哪些行见下面的 SAFE / SAFE_HIDDEN_ROWS。
 _PAGE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -394,9 +402,9 @@ const TABS = [
   ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
 ];
 let DATA = null, TAB = "overview";
-// 记录 → 引擎归属。安全视图**剥掉了 injector**(实验定义),所以不能再靠 "injector" in DATA
-// 判断引擎 —— 否则 mavis 记录会被误标成"旧引擎 · 对照记录"(2026-09-24 实测踩到)。
-// 清单里每条都带 engine(那是索引字段,不算实验元信息),这里记住它。
+// 记录 → 引擎归属:靠近端拿到的清单里每条都带 engine(索引字段)。
+// 为什么不用记录里的分段判断:专家视图会把这些分段剥掉,那时 mavis 记录会被误标成
+// "旧引擎 · 对照记录"(2026-09-24 实测踩到)。
 const ENGINE_OF = {};
 let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见 boot())
 // 实时同步(用户要"小镇与结果同步看全程"):有实跑时下拉里多一条"● 正在跑",
@@ -414,18 +422,16 @@ let IGNORED_LIVE = "";
 //   ?embed=1       压缩版式(去大标题与页边距),供外部平台 iframe 引用
 //   /embed/review  等价于 ?embed=1
 //   ?run=<run_id>  指定默认记录(不填则落在第一条 mavis 记录)
-//   ?tab=<id>      指定默认页签(overview/turns/retrievals/events/states/reflection/router/injector/audit)
+//   ?tab=<id>      指定默认页签(见 TABS 里的 id;嵌入面少几个页签)
 const Q = new URLSearchParams(location.search);
 const EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") === 0;
 if (EMBED) { document.body.classList.add("embed"); }
-// 安全模式(2026-09-24 边界修复):
-//   嵌入面(/embed/review,平台侧引的就是它)= 专家视图,契约 §3.2 规定 branch / 分支来源 /
-//   T0 立场一致性 / 注入器 都不得出现;我们自己的复核面(/review)保持全量。
-//   所以 SAFE 由"是不是嵌入面"决定,并可用 ?safe=0/1 显式覆盖(排障用)。
+// 安全模式:嵌入面(/embed/review)按专家视图渲染,SAFE 由"是不是嵌入面"决定,
+// 可用 ?safe=0/1 显式覆盖(排障用)。为什么这么定见 Python 侧 _PAGE 上方的说明。
 const SAFE = Q.has("safe") ? (Q.get("safe") === "1") : EMBED;
 const SAFE_HIDDEN_ROWS = ["branch", "判定方式", "分支来源", "T0 立场一致性"];
 if (SAFE) { document.title = "GTC Case 01 · 结果记录"; }
-// 安全模式下连"注入器"页签都不给:那是实验定义(mode/schema/节点/角色),同属实验元信息。
+// 安全模式下这个页签不给(原因见 Python 侧说明)。
 if (SAFE && TAB === "injector") { TAB = "overview"; }
 const WANT_RUN = Q.get("run") || "";
 const WANT_TAB = Q.get("tab") || "";
@@ -490,9 +496,9 @@ function renderNav() {
 }
 
 function paneOverview(d) {
-  // 旧引擎记录(archive d41cdec)没有 injector / summary / compat 段。
-  // 之前这里无条件读它们,于是把"没有这一段"渲染成 mode= · schema= 与"节点 0 个"——
-  // 那是谎报。现在按有没有 injector 分段渲染,并明说旧引擎缺哪一段。
+  // 旧引擎记录(archive d41cdec)缺若干分段。以前这里无条件读它们,于是把"没有这一段"
+  // 渲染成 mode= · schema= 与"节点 0 个"——那是谎报。现在按分段的实际有无渲染,
+  // 并明说旧引擎缺哪一段。
   const hasInj = ("injector" in d) || ENGINE_OF[d.run_id] === "mavis";
   const s = d.summary || {}, inj = d.injector || {}, ba = d.branch_action || {}, cp = d.compat || {};
   const fb = d.final_feedback || {};
@@ -511,8 +517,6 @@ function paneOverview(d) {
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
     ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
-    // 分支来源与 T0 一致性:预设分支不看 AI 说了什么,自相矛盾的记录必须自己说出来
-    // (实测 A-1720:AI 说"不能确认值得买",A 线却让当事人满仓买入)
     ["分支来源", ba.pending
       ? '<span class="chip">judge(待 T0 判定)</span> 本次由 AI 的 T0 回答决定,现在还没跑到'
       : (ba.source === "preset"
@@ -522,8 +526,6 @@ function paneOverview(d) {
       ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
       : '<span class="chip">未校验</span>'],
   ].filter(([k]) => !SAFE || SAFE_HIDDEN_ROWS.indexOf(k) < 0);
-  // 安全模式(嵌入面)不显示上面那几行:契约 §3.2 规定 branch/分支来源/T0 一致性/注入器
-  // 不得进专家视图 —— 我们自己复核用 `/review`(非安全模式),平台侧嵌 `/embed/review`。
   if (hasInj && !SAFE) {
     rows.push(["注入器", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / ")) || "—"}`]);
     rows.push(["节点", `<span class="num">${dash(s.node_count)} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</span>`]);
@@ -696,7 +698,7 @@ function render() {
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA) || ENGINE_OF[DATA.run_id] === "mavis";
-    // 引擎只用两个字,不写"（成品三线）""（无注入器段）"这种括注(用户嫌啰嗦)。
+    // 引擎只用两个字,不加括注(用户嫌啰嗦)。
     const eng = isMavis ? "mavis" : "旧引擎";
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
     const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
@@ -784,7 +786,7 @@ async function loadLive(first) {
 async function boot() {
   const r = await fetch("/api/review/runs" + (SAFE ? "?safe=1" : ""));
   const d = await r.json();
-  // 记住每条记录属于哪个引擎(安全视图剥掉了 injector,不能再靠它判断;见 ENGINE_OF)
+  // 记住每条记录属于哪个引擎(记录分段在专家视图里不可靠,见 ENGINE_OF 处的说明)
   (d.runs || []).forEach(x => { if (x.engine) { ENGINE_OF[x.run_id] = x.engine; } });
   // 嵌入视图滤掉了质检不合格的记录 —— **说出来**,别让人以为记录就这么多。
   if (SAFE && d.hidden_count) {
@@ -805,12 +807,11 @@ async function boot() {
   const sel = document.getElementById("pick");
   // 下拉就是一条条记录:**不要分组标题**(用户说过那种分组标题是"奇怪的无用的话";
   // 测试 test_dropdown_has_no_group_titles 会盯住页面里不出现分组元素)。
-  // 记录名里已经带了引擎(branch 前那段),标签只保留"哪条线(含义) ｜ run_id"。
+  // 标签只保留短形式"哪条线(含义) ｜ run_id"。
   const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
   const ENG_ORDER = { mavis: 0, legacy: 1 };
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
-  // 安全模式(嵌入面)没有 branch/branch_summary → 标签只写 run_id,别显示"? 线 · —"
-  // (那既难看,又暗示"存在一个分支概念",等于漏了口径)。
+  // 安全模式下标签只写 run_id,别显示"? 线 · —"(既难看,又暗示存在分组概念)。
   const optLabel = x => SAFE ? String(x.run_id)
     : `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
   const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
@@ -834,7 +835,7 @@ async function boot() {
     pick(sel.value);
   };
   // 有实跑就默认看实时(用户要"同步看全程");否则落在 mavis 记录上,
-  // 不要落在旧引擎对照记录上——那条一打开就是"注入器:无注入器记录",最像坏了。
+  // 不要落在旧引擎对照记录上——那条一打开就缺好几段,最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
   if (WANT_RUN) {
     const hit = d.runs.find(x => x.run_id === WANT_RUN);

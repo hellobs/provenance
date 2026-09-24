@@ -28,11 +28,13 @@ body { margin: 0; }
 </style>
 <div id="game-container" style="text-align: center"></div>
 
-<!-- 左栏(时钟 / 运行状态 / Developer Console):三块放在**同一个竖排容器**里,
-     而不是各自写死 fixed top —— 状态块会随"重开一局"按钮出现而变高,写死 top 就会压住
-     console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。
-     chrome=0(平台侧只嵌画布)时整块不渲染:连时钟、状态浮层与"重开一局"一起去掉 ——
-     那一块里带着 POST /control/restart 的按钮与分支下拉,不该出现在别人的页面上。 -->
+{# 左栏(时钟 / 运行状态 / Developer Console):三块放在**同一个竖排容器**里,
+   而不是各自写死 fixed top —— 状态块会随"重开一局"按钮出现而变高,写死 top 就会压住
+   console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。
+   chrome=0(平台侧只嵌画布)时整块不渲染:连时钟、状态浮层与"重开一局"一起去掉。
+
+   写成 Jinja 注释而不是 HTML 注释(2026-09-24 第九轮体检):HTML 注释会随页面发到
+   专家浏览器,devtools 一开就能读到"这一块里有什么、为什么拿掉";Jinja 注释只在模板里。 #}
 {% if embed != "goals" and embed != "explain" and embed != "timeline" and chrome|default('1') != "0" %}
 <div id="left-col" style="position: fixed; left: 16px; top: calc(var(--top-offset, 0px) + 16px); z-index: 150; width: 320px;
     display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
@@ -204,8 +206,9 @@ body { margin: 0; }
     });
     </script>
 
-    <!-- Goal adjustment panel (live-tune each agent's goal weights; expert intervenes while watching) -->
-    <!-- governance 开关:治理/权重/时间轴属 case00;case01(vizkit) 不渲染这几块 -->
+    {# Goal adjustment panel(实时调每个角色的目标权重;治理沙盒在场时由治理方边看边干预)。
+       这里两块开关说明用 Jinja 注释:HTML 注释会随页面发到浏览器(见文件上方说明)。 #}
+    {# 治理/权重/时间轴只在带治理的那一套运行方式下渲染;另一套不渲染这几块。 #}
 <script>
   // 时间轴"撤销(回滚)"入口是否可用:沙盒场景由服务端置 false(后果不可倒带)。
   // 只影响前端渲染;真发 POST /api/undo-intervention 也会被 403 拒绝。

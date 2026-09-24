@@ -465,3 +465,24 @@ def test_single_interface_service_hosts_town_and_review_panel():
     # 正在实跑的那条还没成品记录时,面板要能说清楚
     assert runs.json()["current_run_id"] == "260919-live-case01-mavis-B-0001"
     live.close()
+
+
+def test_canvas_face_ships_no_experiment_vocabulary():
+    """平台侧"只嵌一个画布"时,画布页的**源码**里不该出现实验相关的词。
+
+    2026-09-24 第九轮体检实测:画布面发出去的 HTML 里有 HTML 注释
+    "…那一块里带着 POST /control/restart 的按钮与分支下拉,不该出现在别人的页面上",
+    main_script 里还有 JS 注释"把 restart_choices 里选中的值(现在只有分支)一起交给服务端"。
+    DOM 藏起来不等于口径藏起来 —— 平台侧专家打开 devtools 就能读到"这实验有分支"。
+    注释改成 Jinja 注释(只在模板里)之后,这里钉住它不再回来。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(port=5086)
+    html = TestClient(live.app).get("/embed/canvas",
+                                    headers={"Accept-Encoding": "identity"}).text
+    for w in ("分支", "branch", "注入器", "injector", "实验", "预设", "判定方式"):
+        assert w not in html, "画布面源码里出现实验词: {}".format(w)
+    # 注:case00 专有的那几块 JS(治理/时间轴/重开)仍会随整块模板发出 ——
+    # 那是模板共用的结构问题,按 chrome=0 摘 script 需要浏览器复核,
+    # 已记在《0924 下一步方向》第九轮 P2。
