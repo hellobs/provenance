@@ -85,3 +85,62 @@ def test_correct_verdict_has_no_dpo_pair(tmp_path, monkeypatch):
 def test_invalid_verdict_is_rejected():
     """verdict 只允许 correct/incorrect/partial(面板与 API 共用这一份口径)。"""
     assert R.VALID_VERDICTS == ("correct", "incorrect", "partial")
+
+
+def test_mark_is_written_atomically(tmp_path, monkeypatch):
+    """写一半崩掉不许毁掉已有标记(2026-09-24 体检:原来是整文件重写、非原子)。"""
+    import json as _json
+
+    marks = tmp_path / "reflection_marks.json"
+    monkeypatch.setattr(R, "MARKS_PATH", str(marks))
+    R.append_mark(R.new_mark(agent="a", simulation="s", sim_time="t", node_id="n1",
+                             thought="第一条", verdict="correct", correction="", context={}))
+    before = marks.read_text(encoding="utf-8")
+
+    def boom(*_a, **_k):
+        raise OSError("磁盘炸了")
+
+    monkeypatch.setattr(_json, "dump", boom)
+    try:
+        R.append_mark(R.new_mark(agent="a", simulation="s", sim_time="t", node_id="n2",
+                                 thought="第二条", verdict="correct", correction="", context={}))
+    except OSError:
+        pass
+    else:
+        raise AssertionError("写入失败应当抛出来,不许静默")
+    assert marks.read_text(encoding="utf-8") == before, "失败后原文件必须仍是完整的旧内容"
+    assert [m["node_id"] for m in R.load_marks()] == ["n1"]
+
+
+def test_concurrent_marks_do_not_lose_updates(tmp_path, monkeypatch):
+    """并发标记不许丢更新(读-改-写必须串行化)。"""
+    import threading
+
+    marks = tmp_path / "reflection_marks.json"
+    monkeypatch.setattr(R, "MARKS_PATH", str(marks))
+    n = 12
+    start = threading.Barrier(n)
+
+    def work(i):
+        start.wait()
+        R.append_mark(R.new_mark(agent="a", simulation="s", sim_time="t", node_id="n%d" % i,
+                                 thought="x", verdict="correct", correction="", context={}))
+
+    ts = [threading.Thread(target=work, args=(i,)) for i in range(n)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    got = sorted(m["node_id"] for m in R.load_marks())
+    assert got == sorted("n%d" % i for i in range(n)), got
+
+
+def test_mark_carries_a_timezone_aware_timestamp(tmp_path, monkeypatch):
+    """标记时间要有带时区的一份:marked_time 是本地墙钟,跨机不可比。"""
+    marks = tmp_path / "reflection_marks.json"
+    monkeypatch.setattr(R, "MARKS_PATH", str(marks))
+    rec = R.new_mark(agent="a", simulation="s", sim_time="t", node_id="n1",
+                     thought="x", verdict="correct", correction="", context={})
+    assert rec["marked_time"]                              # 旧字段保留(LoRA 侧在用)
+    assert rec["marked_at"] != rec["marked_time"]
+    assert ("+" in rec["marked_at"] or rec["marked_at"].endswith("Z")), rec["marked_at"]

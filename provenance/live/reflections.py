@@ -9,10 +9,14 @@
 import datetime
 import json
 import os
+import threading
 
-from live.state import checkpoint_file, log, read_json
+from live.state import checkpoint_file, log, read_json, write_json_atomic
 
 MARKS_PATH = None  # 延迟解析(state.BASE_DIR 运行期不变,首次调用取)
+# 专家标记是"读-改-写",必须串起来(2026-09-24 体检):两个专家同时标记时,
+# 各自读到旧数组再写回 → 后写的覆盖先写的,丢一条标记。
+_MARKS_LOCK = threading.Lock()
 
 
 def marks_path() -> str:
@@ -30,12 +34,16 @@ def load_marks() -> list:
 
 
 def append_mark(record: dict) -> None:
+    """追加一条专家标记。**加锁 + 原子写**(2026-09-24 体检)。
+
+    原来:读旧数组 → append → `open(path, "w")` 整文件重写。两个后果:
+    ①并发标记丢更新(读-改-写没有串行化);②写一半崩掉 = **已有标记全丢**。
+    """
     path = marks_path()
-    marks = load_marks()
-    marks.append(record)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(marks, f, ensure_ascii=False, indent=2)
+    with _MARKS_LOCK:
+        marks = load_marks()
+        marks.append(record)
+        write_json_atomic(path, marks)
 
 
 def jsonl_row(mark: dict) -> str:
@@ -81,6 +89,9 @@ def new_mark(agent: str, simulation: str, sim_time: str, node_id: str,
         "correction": correction,    # 专家纠正文本(incorrect/partial 时非空)
         "context": context,          # 行为上下文(action/tendency/alignment/location/role)
         "marked_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # 同一条时间再给一份**带时区**的(2026-09-24 体检):marked_time 是本地墙钟,
+        # 跨机不可比;新增字段而不是改旧格式,免得 LoRA 侧解析被改坏。
+        "marked_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "operator": "expert",
     }
 

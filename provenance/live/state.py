@@ -233,3 +233,29 @@ def read_json(path: str, default=None):
     except Exception as e:
         log.warning("读取 json 失败(p={}): {}".format(path, e))
         return default
+
+
+def write_json_atomic(path: str, obj) -> None:
+    """原子写 JSON:同目录临时文件 → os.replace。
+
+    2026-09-24 体检补:专家标记原来是"读-改-整文件重写"且**非原子** ——
+    写一半崩掉会把**已有标记全丢**(不是丢一条)。这里与 `case01/atomicio.py` 同一手法
+    (那边是运行记录的单一实现;这里是共享层,给 `live/` 自己用)。
+    """
+    import tempfile
+
+    d = os.path.dirname(path) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".tmp-", suffix=".json", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
