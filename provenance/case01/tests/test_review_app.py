@@ -394,3 +394,79 @@ def test_embed_review_has_protocol_and_deeplink_failure_states():
     for kw in ("mavis-case01-review", "mavis:select-run", "mavis:set-tab",
                "深链指定的 run 不存在", "深链页签"):
         assert kw in page, kw
+
+
+# ---------------------------------------------------------------- 边界:安全模式(2026-09-24)
+
+SAFE_BANNED = ("injector", "branch", "branch_action", "consistency", "debug", "quality",
+               "manifest")
+
+
+def test_safe_run_view_is_the_expert_whitelist():
+    """`?safe=1` = 专家安全视图:实验元信息一个都不许带(契约 §3.2)。"""
+    d = _client().get("/api/review/run/{}?safe=1".format(MAVIS_RUN)).json()
+    for bad in SAFE_BANNED:
+        assert bad not in d, bad
+    for k in ("turns", "retrievals", "events", "state_history", "reflection", "router"):
+        assert k in d, k
+    assert d["reflection"]["text"]
+
+
+def test_unsafe_run_view_keeps_the_internal_fields():
+    """`/review`(我们自己复核)保持全量 —— 安全模式不是把内部面也一起砍了。
+
+    (夹具 `260917-demo-...` 早于一致性戳,没有 `consistency`;只钉它真有的那几个。)
+    """
+    d = _client().get("/api/review/run/{}".format(MAVIS_RUN)).json()
+    for k in ("injector", "branch_action", "branch"):
+        assert k in d, k
+
+
+def test_safe_list_drops_branch_and_reports_hidden(monkeypatch):
+    """嵌入面下拉不许出现"A 线 · 建议买入…"(等于把分支说出来了);
+    被滤掉的质检不合格记录要**报出来**,不许静默少给。"""
+    from case01 import review_app
+
+    real = review_app._brief
+
+    def fake(rid, safe=False):
+        out = real(rid, safe=safe)
+        if rid == MAVIS_RUN:
+            out["quality"] = "questionable"
+        return out
+
+    monkeypatch.setattr(review_app, "_brief", fake)
+    c = _client()
+    safe_body = c.get("/api/review/runs?safe=1").json()
+    ids = {r["run_id"] for r in safe_body["runs"]}
+    assert MAVIS_RUN not in ids, "questionable 记录不该出现在嵌入面清单里"
+    assert safe_body["hidden_count"] == 1
+    assert safe_body["hidden"][0]["quality"] == "questionable"
+    for r in safe_body["runs"]:
+        assert "branch" not in r and "branch_summary" not in r, r
+        assert "quality" in r, "质检字段要留(平台内部过滤用)"
+
+    full_body = c.get("/api/review/runs").json()
+    assert MAVIS_RUN in {r["run_id"] for r in full_body["runs"]}, "内部复核面必须还能看到这条"
+    assert any("branch" in r for r in full_body["runs"]), "内部面保留 branch"
+
+
+def test_safe_live_view_is_also_stripped(monkeypatch):
+    """实时轮询那条路也必须走安全视图 —— 否则它就是一个绕过边界的口子。"""
+    from case01 import review_app
+
+    raw = {"run_id": "live-x", "branch": "A", "branch_action": {"source": "preset"},
+           "injector": {"nodes": []}, "consistency": {"verdict": "consistent"},
+           "turns": [{"speaker": "ai", "date": "2026-08-27", "text": "x"}],
+           "reflection": {"text": "反思"}, "router": {"issues": []}, "nodes": []}
+    monkeypatch.setitem(review_app._LIVE, "provider", lambda: raw)
+    monkeypatch.setitem(review_app._LIVE, "run_id", "live-x")
+    monkeypatch.setitem(review_app._LIVE, "total_nodes", 1)
+    c = _client()
+    safe = c.get("/api/review/live?safe=1").json()
+    rec = safe["record"]
+    for bad in ("injector", "branch", "branch_action", "consistency"):
+        assert bad not in rec, bad
+    assert rec.get("live") is True, "面板靠 live 标'● 实时',这个不能剥掉"
+    inner = c.get("/api/review/live").json()["record"]
+    assert "injector" in inner, "内部面看实时仍要全量"

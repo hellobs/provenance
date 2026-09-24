@@ -107,8 +107,13 @@ def _discover_runs():
     return out
 
 
-def _brief(run_id):
-    """列表用的轻量摘要(只读该 run.json,不做全量返回)。"""
+def _brief(run_id, safe=False):
+    """列表用的轻量摘要(只读该 run.json,不做全量返回)。
+
+    safe=True(嵌入面/平台侧)时**去掉 branch 与 branch_summary**:
+    契约 §3.2 规定分支信息不得进专家视图,而下拉标签正是最容易漏的一处
+    ("A 线 · 建议买入…" 等于把实验分支说出来了)。2026-09-24 边界修复。
+    """
     path = os.path.join(_runs_dir(), run_id, "run.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -120,13 +125,11 @@ def _brief(run_id):
     # 用 5002 契约(serve.py -> full_context._branch_summary)的同一个函数,两边口径就不会分叉。
     # (之前这里直接 data.get("branch_summary") 拿到 None,下拉标签里就成了 "—"。)
     from . import full_context as fc
-    return {
+    out = {
         "run_id": run_id,
         # 引擎归属:mavis 路径的记录有 injector 段;旧引擎(archive d41cdec)没有。
         # 面板要靠它分组与选默认值,不能只靠 run_id 猜。
         "engine": "mavis" if "injector" in data else "legacy",
-        "branch": data.get("branch", ""),
-        "branch_summary": fc._branch_summary(data.get("branch", ""), data.get("branch_action") or {}),
         "start_date": data.get("start_date", ""),
         "end_date": data.get("end_date", ""),
         "n_turns": len(data.get("turns") or []),
@@ -134,7 +137,14 @@ def _brief(run_id):
         "n_events": len(data.get("events") or []),
         "n_issues": len(router.get("issues") or []),
         "has_reflection": bool((data.get("reflection") or {}).get("text")),
+        # 质检口径(与 5010 聚合/5002 同源;索引字段,给平台内部过滤用,不进专家视图正文)
+        "quality": fc.quality_of(data).get("quality", "unverified"),
     }
+    if not safe:
+        out["branch"] = data.get("branch", "")
+        out["branch_summary"] = fc._branch_summary(data.get("branch", ""),
+                                                   data.get("branch_action") or {})
+    return out
 
 
 @router.get("/api/review/health")
@@ -143,20 +153,42 @@ def health():
 
 
 @router.get("/api/review/runs")
-def list_runs():
-    return JSONResponse({"count": len(_discover_runs()),
-                         "current_run_id": _CURRENT["run_id"],
-                         "current_note": _CURRENT["note"],
-                         "runs": [_brief(r) for r in _discover_runs()]})
+def list_runs(safe: int = 0):
+    """面板的 run 清单。
+
+    `?safe=1`(嵌入面用):不给 branch/branch_summary,并且**默认滤掉质检不合格的记录**
+    (questionable/debug)——但**不静默**:响应里给 `hidden_count` 与被隐藏的 run_id。
+    """
+    items = [_brief(r, safe=bool(safe)) for r in _discover_runs()]
+    hidden = []
+    if safe:
+        keep = []
+        for it in items:
+            if str(it.get("quality") or "unverified") in ("questionable", "debug"):
+                hidden.append({"run_id": it.get("run_id"), "quality": it.get("quality")})
+            else:
+                keep.append(it)
+        items = keep
+    body = {"count": len(items),
+            "current_run_id": _CURRENT["run_id"],
+            "current_note": _CURRENT["note"],
+            "runs": items}
+    if hidden:
+        body["hidden_count"] = len(hidden)
+        body["hidden"] = hidden
+    return JSONResponse(body)
 
 
 @router.get("/api/review/live")
-def live_record():
+def live_record(safe: int = 0):
     """实跑期间的**实时记录**(与成品记录同一套映射,所以九块能直接渲染)。
 
     面板每 2 秒来取一次;没有在实跑就返回 live=false,让面板切回成品记录。
     跑完但还没映射出成品记录时,这里仍然给得出(provider 还活着),
     面板会继续显示完整过程,并标注"反思/问题分流跑完才有"——不留空白。
+
+    `?safe=1`(嵌入面用):按契约 §3.2 剥掉实验元信息 —— 与单条记录同一个白名单。
+    不这么做的话,嵌入面的实时轮询就成了绕过边界的第二个口子(2026-09-24)。
     """
     provider = _LIVE["provider"]
     if provider is None:
@@ -178,12 +210,17 @@ def live_record():
     rec["live"] = True
     # 表头要显示"哪条剧情线(含义)"。branch_summary 不在记录里,是服务端推导的
     # (与 5002 契约同源),成品记录那边由 _brief 补,实时这条在这里补。
-    try:
-        from . import full_context as fc
-        rec["branch_summary"] = fc._branch_summary(rec.get("branch", ""),
-                                                   rec.get("branch_action") or {})
-    except Exception:  # noqa: BLE001 - 推导失败不该让实时记录整体取不到
-        rec["branch_summary"] = ""
+    if not safe:
+        try:
+            from . import full_context as fc
+            rec["branch_summary"] = fc._branch_summary(rec.get("branch", ""),
+                                                       rec.get("branch_action") or {})
+        except Exception:  # noqa: BLE001 - 推导失败不该让实时记录整体取不到
+            rec["branch_summary"] = ""
+    else:
+        from live.history import expert_safe_record  # 契约层是白名单唯一实现处
+        rec = expert_safe_record(rec)
+        rec["live"] = True          # 面板靠它标"● 实时",不属于实验元信息
     done_nodes = len(raw.get("nodes") or [])
     total = _LIVE["total_nodes"] or done_nodes
     return JSONResponse({"ok": True, "live": True, "run_id": rec.get("run_id", ""),
@@ -192,13 +229,24 @@ def live_record():
 
 
 @router.get("/api/review/run/{run_id}")
-def get_run(run_id: str):
+def get_run(run_id: str, safe: int = 0):
+    """单条记录。
+
+    `?safe=1`(嵌入面用)= **专家安全视图**:按契约 §3.2 剥掉
+    `injector`(实验定义 + 逐节点对话原文)、`branch`、`branch_action`、`consistency`、
+    `debug`、`quality`、`manifest`。白名单实现在 `live.history.expert_safe_record`
+    (**唯一一处**),免得两边各写一份又漂移。
+    """
     # 白名单校验:run_id 只能来自已发现的 run,杜绝路径穿越
     if run_id not in _discover_runs():
         return JSONResponse({"ok": False, "errors": ["没有这个 run: {}".format(run_id)]},
                             status_code=404)
     with open(os.path.join(_runs_dir(), run_id, "run.json"), "r", encoding="utf-8") as f:
-        return JSONResponse(json.load(f))
+        rec = json.load(f)
+    if safe:
+        from live.history import expert_safe_record  # 懒导入:契约层是唯一实现处
+        return JSONResponse(expert_safe_record(rec))
+    return JSONResponse(rec)
 
 
 _PAGE = r"""<!DOCTYPE html>
@@ -346,6 +394,10 @@ const TABS = [
   ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
 ];
 let DATA = null, TAB = "overview";
+// 记录 → 引擎归属。安全视图**剥掉了 injector**(实验定义),所以不能再靠 "injector" in DATA
+// 判断引擎 —— 否则 mavis 记录会被误标成"旧引擎 · 对照记录"(2026-09-24 实测踩到)。
+// 清单里每条都带 engine(那是索引字段,不算实验元信息),这里记住它。
+const ENGINE_OF = {};
 let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见 boot())
 // 实时同步(用户要"小镇与结果同步看全程"):有实跑时下拉里多一条"● 正在跑",
 // 选中它就按 2 秒拉 /api/review/live 刷新九块;跑完映射出成品记录后自动切过去。
@@ -366,6 +418,15 @@ let IGNORED_LIVE = "";
 const Q = new URLSearchParams(location.search);
 const EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") === 0;
 if (EMBED) { document.body.classList.add("embed"); }
+// 安全模式(2026-09-24 边界修复):
+//   嵌入面(/embed/review,平台侧引的就是它)= 专家视图,契约 §3.2 规定 branch / 分支来源 /
+//   T0 立场一致性 / 注入器 都不得出现;我们自己的复核面(/review)保持全量。
+//   所以 SAFE 由"是不是嵌入面"决定,并可用 ?safe=0/1 显式覆盖(排障用)。
+const SAFE = Q.has("safe") ? (Q.get("safe") === "1") : EMBED;
+const SAFE_HIDDEN_ROWS = ["branch", "判定方式", "分支来源", "T0 立场一致性"];
+if (SAFE) { document.title = "GTC Case 01 · 结果记录"; }
+// 安全模式下连"注入器"页签都不给:那是实验定义(mode/schema/节点/角色),同属实验元信息。
+if (SAFE && TAB === "injector") { TAB = "overview"; }
 const WANT_RUN = Q.get("run") || "";
 const WANT_TAB = Q.get("tab") || "";
 // 深链参数没对上时的**可见**提示:嵌进来的人会以为看的就是自己要的那条,不能静默回落。
@@ -407,7 +468,8 @@ window.addEventListener("message", (ev) => {
       render();
     }
   }
-  if (m.type === "mavis:set-tab" && m.tab && TABS.some(t => t[0] === m.tab)) {
+  if (m.type === "mavis:set-tab" && m.tab && TABS.some(t => t[0] === m.tab)
+      && !(SAFE && m.tab === "injector")) {
     TAB = m.tab; render();
   }
 });
@@ -418,7 +480,8 @@ function badges(o) {
 }
 
 function renderNav() {
-  document.getElementById("nav").innerHTML = TABS.map(([id, label, count, tip]) => {
+  const tabs = TABS.filter(t => !SAFE || t[0] !== "injector");
+  document.getElementById("nav").innerHTML = tabs.map(([id, label, count, tip]) => {
     let n = "";
     if (DATA) { const c = count(DATA); n = (c === null || c === undefined) ? "" : `<span class="n">${c}</span>`; }
     return `<button class="${id === TAB ? "on" : ""}" data-t="${id}" title="${esc(tip || "")}">${label}${n}</button>`;
@@ -430,7 +493,7 @@ function paneOverview(d) {
   // 旧引擎记录(archive d41cdec)没有 injector / summary / compat 段。
   // 之前这里无条件读它们,于是把"没有这一段"渲染成 mode= · schema= 与"节点 0 个"——
   // 那是谎报。现在按有没有 injector 分段渲染,并明说旧引擎缺哪一段。
-  const hasInj = ("injector" in d);
+  const hasInj = ("injector" in d) || ENGINE_OF[d.run_id] === "mavis";
   const s = d.summary || {}, inj = d.injector || {}, ba = d.branch_action || {}, cp = d.compat || {};
   const fb = d.final_feedback || {};
   const nodes = inj.nodes || [];
@@ -458,12 +521,14 @@ function paneOverview(d) {
     ["T0 立场一致性", badge
       ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
       : '<span class="chip">未校验</span>'],
-  ];
-  if (hasInj) {
+  ].filter(([k]) => !SAFE || SAFE_HIDDEN_ROWS.indexOf(k) < 0);
+  // 安全模式(嵌入面)不显示上面那几行:契约 §3.2 规定 branch/分支来源/T0 一致性/注入器
+  // 不得进专家视图 —— 我们自己复核用 `/review`(非安全模式),平台侧嵌 `/embed/review`。
+  if (hasInj && !SAFE) {
     rows.push(["注入器", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / ")) || "—"}`]);
     rows.push(["节点", `<span class="num">${dash(s.node_count)} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</span>`]);
     rows.push(["交互", `<span class="num">interaction_started ${dash(s.interaction_started)} · 重试 ${dash(s.retries)} · 耗时 ${dash(s.elapsed_s)} 秒</span>`]);
-  } else {
+  } else if (!SAFE) {
     rows.push(["节点 / 注入器", '该记录早于 mavis 路径，<b>没有 <code>injector</code> 与 <code>summary</code> 段</b>；不是"0 个节点"']);
   }
   if ("compat" in d) {
@@ -630,7 +695,7 @@ function render() {
                                live: !!((DATA || {}).live) });
   if (DATA) {
     const s = DATA.summary || {};
-    const isMavis = ("injector" in DATA);
+    const isMavis = ("injector" in DATA) || ENGINE_OF[DATA.run_id] === "mavis";
     // 引擎只用两个字,不写"（成品三线）""（无注入器段）"这种括注(用户嫌啰嗦)。
     const eng = isMavis ? "mavis" : "旧引擎";
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
@@ -640,20 +705,22 @@ function render() {
       const prog = LIVE_META ? `${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点` : "";
       document.getElementById("hmeta").innerHTML =
         `<span style="color:#0f9d58;font-weight:600">● 实时</span> ${esc(DATA.run_id)} · ` +
-        `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${esc(prog)}　` +
-        `<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
-        `target="_blank">单独看这条 ↗</a>`;
+        (SAFE ? "" : `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · `) +
+        `${esc(prog)}　` +
+        (SAFE ? "" : `<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
+          `target="_blank">单独看这条 ↗</a>`);
       return;
     }
     document.getElementById("hmeta").innerHTML =
-      `${esc(DATA.run_id)} · ${esc(eng)} · ${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · ${tail}　` +
-      `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`;
+      `${esc(DATA.run_id)} · ${esc(eng)} · ` +
+      (SAFE ? "" : `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · `) + `${tail}　` +
+      (SAFE ? "" : `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`);
   }
 }
 
 async function pick(id) {
   if (id === LIVE_ID) { await loadLive(true); return; }
-  const r = await fetch(`/api/review/run/${encodeURIComponent(id)}`);
+  const r = await fetch(`/api/review/run/${encodeURIComponent(id)}` + (SAFE ? "?safe=1" : ""));
   DATA = await r.json();
   render();
 }
@@ -668,7 +735,7 @@ function startWatch() {
   if (liveTimer) return;
   liveTimer = setInterval(async () => {
     try {
-      const d = await (await fetch("/api/review/live")).json();
+      const d = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json();
       if (d && d.ok && d.live && d.run_id && d.run_id !== IGNORED_LIVE
           && (!DATA || DATA.run_id !== d.run_id)) {
         MAPPED_NOTE = `<div class="note ok">新的一局已开始(${esc(d.run_id)}),已切到实时。</div>`;
@@ -681,7 +748,7 @@ function startWatch() {
 async function loadLive(first) {
   let d;
   try {
-    d = await (await fetch("/api/review/live")).json();
+    d = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json();
   } catch (e) {
     document.getElementById("hmeta").innerHTML = `<span style="color:#d93025">实时记录取不到(${esc(e.message)})</span>`;
     stopLive();
@@ -715,11 +782,18 @@ async function loadLive(first) {
 }
 
 async function boot() {
-  const r = await fetch("/api/review/runs");
+  const r = await fetch("/api/review/runs" + (SAFE ? "?safe=1" : ""));
   const d = await r.json();
+  // 记住每条记录属于哪个引擎(安全视图剥掉了 injector,不能再靠它判断;见 ENGINE_OF)
+  (d.runs || []).forEach(x => { if (x.engine) { ENGINE_OF[x.run_id] = x.engine; } });
+  // 嵌入视图滤掉了质检不合格的记录 —— **说出来**,别让人以为记录就这么多。
+  if (SAFE && d.hidden_count) {
+    MAPPED_NOTE = `<div class="note">嵌入视图已隐藏 ${d.hidden_count} 条质检不合格的记录` +
+      `(questionable / debug);完整清单见 /api/runs?include_questionable=1。</div>`;
+  }
   // 正在实跑时,下拉最上面先给一条"● 正在跑" —— 用户要的就是小镇与结果同步看全程。
   let live = { live: false };
-  try { live = await (await fetch("/api/review/live")).json(); } catch (e) { live = { live: false }; }
+  try { live = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json(); } catch (e) { live = { live: false }; }
   // 正在实跑、但还没有成品记录时,面板上明确写出来(**不允许静默**):
   // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
   const cur = String(d.current_run_id || "").trim();
@@ -735,7 +809,10 @@ async function boot() {
   const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
   const ENG_ORDER = { mavis: 0, legacy: 1 };
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
-  const optLabel = x => `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
+  // 安全模式(嵌入面)没有 branch/branch_summary → 标签只写 run_id,别显示"? 线 · —"
+  // (那既难看,又暗示"存在一个分支概念",等于漏了口径)。
+  const optLabel = x => SAFE ? String(x.run_id)
+    : `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
   const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
   const liveOpt = live.live
     ? `<option value="${LIVE_ID}">● 实时 ｜ ${esc(live.run_id)}（${live.done_nodes}/${live.total_nodes} 节点）</option>`
