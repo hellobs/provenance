@@ -69,6 +69,36 @@ def test_turns_events_and_final_feedback_mapping():
     assert any("state_history" in g for g in mapped["compat"]["gaps"])
 
 
+def test_injected_items_keep_their_source_and_story_events_do_not():
+    """信息出处必须进记录,但**不许**因此进 AI 可见的信息环境(2026-09-24 体检)。
+
+    背景:timeline 数据里一直有 `source`("HCM 公告" / "Battery Industry Daily" / "盘面"),
+    但节点事件只搬了 kind 与 content → 实测 28 条记录的 358 条注入项 source **全空**。
+    这里两头都钉住:①节点事件与记录里的注入项带出处;②喂给 mavis 的 story 事件仍不带
+    (带不带是口径,要研究侧定,实现侧不擅自改)。
+    """
+    from case01.injector.nodes import nodes_from_timeline
+    from case01.injector.bridge import MavisBridge
+
+    timeline = {"2026-08-27": [
+        {"kind": "disclosure", "summary": "HCM 公告:正开展产品验证。", "source": "HCM 公告"},
+        {"kind": "price", "summary": "收盘 $45.80。", "source": "盘面", "price_usd": 45.8},
+    ]}
+    nodes = nodes_from_timeline(timeline, roles=["Investment AI", "Ethan Lin"],
+                                final_date="2026-08-27", append_final=False)
+    ev = nodes[0].events[0]
+    assert ev["source"] == "HCM 公告"
+    assert nodes[0].events[1]["source"] == "盘面"
+
+    mapped = to_case01_record({"nodes": [{"node_id": nodes[0].node_id, "date": nodes[0].date,
+                                          "events": nodes[0].events}]}, branch="A")
+    injected = mapped["retrievals"][0]["injected"]
+    assert [d["source"] for d in injected] == ["HCM 公告", "盘面"]
+
+    story = MavisBridge._as_story_event(ev, nodes[0])
+    assert "source" not in story, "AI 可见的 story 事件不该带出处(那是口径,不是补漏)"
+
+
 def test_branch_action_timeline_matches_frozen_engine():
     """branch_action.timeline 必须与已冻结的旧引擎记录一致:C 走 Timeline A。
 

@@ -71,6 +71,13 @@ def nodes_from_timeline(timeline: Dict[str, List[dict]],
                 "time": str(ev.get("time", "09:30")),
                 "event_type": kind,
                 "content": summary,
+                # 出处(2026-09-24 体检补回):timeline 数据里一直有 `source`
+                # (如 "HCM 公告" / "Battery Industry Daily" / "盘面"),但这里只搬了
+                # kind 与 content —— 记录里 358/358 条注入项的 source 因此全是空,
+                # "这条消息是谁放的"在链路上被丢掉了。
+                # 注意:`_as_story_event()` 是**白名单映射**,不带 source,所以补这个字段
+                # **不改变 AI 可见的信息环境**(AI 该不该看出处,属于口径,要研究侧定)。
+                "source": str(ev.get("source", "") or "").strip(),
                 "targets": roles or ["all"],
                 "importance": int(ev.get("importance", _IMPORTANCE.get(kind, 6)) or 6),
             })
