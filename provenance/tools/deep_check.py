@@ -81,12 +81,10 @@ for name, paths, cwd in suites:
         say("tests", False, "{}: junit 解析失败 {}: {}".format(name, type(exc).__name__, exc))
 
 print("=" * 88)
-print("C. 六面服务")
+print("C. 服务面(5004 已退役、5020 无启动脚本,不再探活)")
 faces = [("5010 实时面", "http://127.0.0.1:5010/health"),
          ("5002 契约", "http://127.0.0.1:5002/api/runs"),
          ("5003 case00 存档", "http://127.0.0.1:5003/api/runs"),
-         ("5004 多场景", "http://127.0.0.1:5004/api/scenarios"),
-         ("5020 布景", "http://127.0.0.1:5020/health"),
          ("8060 配置工具", "http://127.0.0.1:8060/engines")]
 for name, url in faces:
     code, body = http(url)
