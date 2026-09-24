@@ -175,6 +175,34 @@ def test_restart_button_only_when_caller_registers_it():
     assert c.get("/health").json()["can_restart"] is True
 
 
+def test_restart_rejects_form_posts():
+    """表单/纯文本 POST 必须被拒:那是跨站可发的简单请求(不需要预检)。
+
+    2026-09-24 体检实测:用 `Content-Type: text/plain` 打 /control/restart 竟然**受理了** ——
+    也就是说浏览器里一个 <form> 就能替我们把一局重开掉。这里钉住 415,并且证明回调**没被调用**。
+    """
+    from fastapi.testclient import TestClient
+
+    seen = []
+
+    def on_restart(payload):
+        seen.append(payload)
+        return {"ok": True, "detail": "已受理"}
+
+    live = _live(port=5080, on_restart=on_restart)
+    c = TestClient(live.app)
+    for ctype, body in (("text/plain", "branch=A"),
+                        ("application/x-www-form-urlencoded", "branch=A"),
+                        ("multipart/form-data; boundary=x", "branch=A")):
+        r = c.post("/control/restart", content=body, headers={"Content-Type": ctype})
+        assert r.status_code == 415, (ctype, r.status_code)
+        assert "application/json" in r.json()["errors"][0]
+    assert seen == [], "被拒的请求不许触发重开回调"
+    # 正常 JSON 仍然通(别把自家页面一起挡了)
+    assert c.post("/control/restart", json={"branch": "A"}).json()["ok"] is True
+    assert seen == [{"branch": "A"}]
+
+
 def test_restart_button_waits_until_results_are_ready():
     """用户要求:结果出完了才给"再来一次"的按钮。
 

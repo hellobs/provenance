@@ -50,6 +50,19 @@ def main() -> int:
         params = None
 
     print(f"mavisframework {mavisframework.__version__} @ {mavisframework.__file__}")
+    # 元数据版本也要露出来(2026-09-24 体检):editable 装的 dist-info 不会随代码升版本,
+    # 实测本机是「代码 1.3.0 / pip 元数据 1.2.1」—— 只看 __version__ 会把这件事藏起来,
+    # 而"装的到底是哪一版"在排查依赖与对接问题时天天要用。
+    try:
+        import importlib.metadata as _md
+        installed = _md.version("mavisframework")
+    except Exception as exc:  # noqa: BLE001
+        installed = "(读不到: {})".format(exc.__class__.__name__)
+    if installed != mavisframework.__version__:
+        print("  [!] 已安装元数据版本 = {},与代码版本不一致 —— editable 安装的元数据"
+              "不会自动跟随;要消除请重装(在 mavis 仓:pip install -e .)".format(installed))
+    else:
+        print("  (已安装元数据版本 = {})".format(installed))
     if params is not None:
         print("Simulator.__init__ 参数: " + ", ".join(params))
 

@@ -300,7 +300,7 @@ class LiveVisualizer(Visualizer):
 
     def _build_app(self):
         from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-        from fastapi.responses import HTMLResponse
+        from fastapi.responses import HTMLResponse, JSONResponse
         from fastapi.staticfiles import StaticFiles
         from fastapi.templating import Jinja2Templates
 
@@ -434,7 +434,18 @@ class LiveVisualizer(Visualizer):
                 (形如 {"branch": "A"},来自 restart_choices 里的下拉),
                 原样作为参数交给回调。回调跑在**线程池**里,免得重开这种重活堵住事件循环;
                 它返回的 dict 原样回给页面。
+
+                只认 JSON(2026-09-24 体检):这是会**改变运行状态**的口子,而浏览器里
+                一个 `<form>` 就能发出 `application/x-www-form-urlencoded` / `text/plain`
+                的跨站简单请求(不需要预检)——实测当时用 text/plain 打它就受理了。
+                没有 Content-Type 的空 body POST(老页面 / curl)仍放行:表单发不出这种请求。
                 """
+                ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+                if ctype and ctype != "application/json":
+                    return JSONResponse(
+                        {"ok": False,
+                         "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+                        status_code=415)
                 payload = {}
                 try:
                     payload = await request.json()
