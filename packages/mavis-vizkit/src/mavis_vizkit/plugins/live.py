@@ -47,7 +47,8 @@ class LiveVisualizer(Visualizer):
                  nodes_key: str = "nodes", meta_key: Optional[str] = None,
                  extra_panels: Optional[List[dict]] = None,
                  on_restart=None, restart_choices: Optional[List[dict]] = None,
-                 extra_nav_links: Optional[List[dict]] = None):
+                 extra_nav_links: Optional[List[dict]] = None,
+                 run_id: str = ""):
         if not alias:
             raise ValueError(
                 "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
@@ -80,6 +81,9 @@ class LiveVisualizer(Visualizer):
         self.restart_choices = [dict(c) for c in (restart_choices or []) if c.get("id")]
         # 顶栏外部工具链接({label,url} 列表):本包只透传,不知道它们是什么
         self.extra_nav_links = [dict(x) for x in (extra_nav_links or []) if x.get("url")]
+        # 这一局叫什么(由调用方给;本包不认识它的命名规则)。
+        # `/health` 会把它报出去:平台侧只嵌画布时,靠它把画布与自己渲染的记录对上。
+        self.run_id = str(run_id or "")
 
         self.init_pos = scenario_coords(scenario_dir, self.roles)
         self._clients: List[asyncio.Queue] = []
@@ -341,8 +345,13 @@ class LiveVisualizer(Visualizer):
                           StaticFiles(directory=alias_dir), name="alias-" + alias)
         app.mount("/static", StaticFiles(directory=self.static_root), name="static")
 
-        def _ctx(embed: str) -> dict:
-            """页面上下文。embed 非空时模板隐藏浮动面板——供外部平台 iframe 只取场景。"""
+        def _ctx(embed: str, chrome: str = "1") -> dict:
+            """页面上下文。embed 非空时模板隐藏浮动面板——供外部平台 iframe 只取场景。
+
+            `chrome=0`(画布模式,2026-09-24):连**顶栏、重开一局卡片、状态浮层**一起去掉。
+            为什么要有:平台侧"只嵌一个画布、其余自己重写"时,带 `chrome` 的页面等于把我们的
+            导航和"重开一局"(POST /control/restart,还带分支下拉)摆到他们页面上。
+            """
             phaser = "/static/vendor/phaser.min.js"
             if not os.path.exists(os.path.join(self.static_root, "vendor", "phaser.min.js")):
                 phaser = "https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"
@@ -355,6 +364,7 @@ class LiveVisualizer(Visualizer):
                 "live_mode": True,
                 "phaser_src": phaser,
                 "embed": embed,
+                "chrome": chrome,
                 "stride": self.stride,
                 "sec_per_step": self.stride,
                 "persona_init_pos": dict(self.init_pos),
@@ -374,8 +384,9 @@ class LiveVisualizer(Visualizer):
         @app.get("/", response_class=HTMLResponse)
         async def index(request: Request):
             # ?embed=scene 与 /embed/scene 等价:嵌入方不改路径也能只取场景
+            q = request.query_params
             return templates.TemplateResponse(
-                request, "index.html", _ctx(request.query_params.get("embed", "")))
+                request, "index.html", _ctx(q.get("embed", ""), q.get("chrome", "1")))
 
         @app.get("/embed", response_class=HTMLResponse)
         @app.get("/embed/scene", response_class=HTMLResponse)
@@ -384,15 +395,31 @@ class LiveVisualizer(Visualizer):
 
             此前本插件只暴露 `/`,而模板里的 `embed` 变量被写死成 "",
             外部平台因此无法只嵌场景。这里补上嵌入面,并让 `/?embed=scene` 等价。
+
+            `?chrome=0` 再去掉顶栏与"重开一局"卡片(平台侧只嵌画布时用)。
             """
-            return templates.TemplateResponse(request, "index.html", _ctx("scene"))
+            q = request.query_params
+            return templates.TemplateResponse(
+                request, "index.html", _ctx("scene", q.get("chrome", "1")))
+
+        @app.get("/embed/canvas", response_class=HTMLResponse)
+        async def embed_canvas(request: Request):
+            """**只给画布**:平台侧"只嵌一个画布、其余自己重写"时的最小面。
+
+            与 `/embed/scene?chrome=0` 等价,单独立一条路径是为了让对接文档能写一个不会
+            被 query 拼错的地址。不含顶栏、不含重开一局卡片、不含状态浮层。
+            """
+            return templates.TemplateResponse(request, "index.html", _ctx("scene", "0"))
 
         @app.get("/health")
         async def health():
             # finished / finish_reason 也报出去:外部(运维脚本、平台)靠它区分
             # "还在推演" / "已跑完在保持" / "只服务不推演",不必猜。
+            # run_id(2026-09-24):平台侧只嵌画布时,得知道"画布上现在跑的是哪一条",
+            # 才能把它和自己渲染的记录对上;以前这个信息只在内部口 API 里。
             return {"status": "ok", "clients": len(self._clients),
                     "pending": len(self._pending), "roles": self.roles,
+                    "run_id": self.run_id or "",
                     "finished": self._finished, "finish_reason": self._finish_reason,
                     "can_restart": self.on_restart is not None,
                     "restart_ready": self._restart_ready,

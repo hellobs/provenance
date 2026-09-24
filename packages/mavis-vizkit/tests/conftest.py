@@ -32,6 +32,10 @@ def frontend(tmp_path):
     (static / "vendor").mkdir(parents=True, exist_ok=True)  # 无本地 phaser → CDN 兜底
     tpl.mkdir(parents=True, exist_ok=True)
     (tpl / "index.html").write_text(
-        "<html><body>{%- for p in persona_names -%}{{ p }};{%- endfor -%}</body></html>",
+        # 夹具模板顺便把上下文里的 embed / chrome 回显出来 —— 插件"有没有把这两个传给模板"
+        # 是可断言的行为(2026-09-24 画布模式:chrome=0 由平台侧"只嵌画布"用)。
+        "<html><body data-embed=\"{{ embed|default('') }}\""
+        " data-chrome=\"{{ chrome|default('1') }}\">"
+        "{%- for p in persona_names -%}{{ p }};{%- endfor -%}</body></html>",
         encoding="utf-8")
     return {"root": str(tmp_path), "static": str(static), "template": str(tpl)}

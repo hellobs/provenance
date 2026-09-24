@@ -9,12 +9,12 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
 </head>
 
-<body class="top-navigation" data-embed="{{ embed|default('') }}" style="background-color: white{% if not embed or embed in ("scene", "explore") %}; padding-top: 56px{% endif %}">
+<body class="top-navigation" data-embed="{{ embed|default('') }}" data-chrome="{{ chrome|default('1') }}" style="background-color: white{% if not embed or embed in ("scene", "explore") %}; padding-top: 56px{% endif %}">
   {# 顶栏导航:仅顶层独立视图(完整小镇 /embed/scene 场景视图 /embed/explore 数据界面)
      渲染;goals/explain/timeline/reflections 是嵌入面板(iframe 里),不挂导航。
      若 scene 视图被第三方 iframe 嵌入,则卸载导航并收回 padding(嵌入要纯场景)。
      当前项由 data-embed 在服务端算好,高亮与既有 embed 路由保持一致。 #}
-  {% if not embed or embed in ("scene", "explore") %}
+  {% if (not embed or embed in ("scene", "explore")) and chrome|default('1') != "0" %}
   {% set nav_embed = embed|default('') %}
   <nav id="top-nav" class="navbar navbar-default navbar-fixed-top" style="z-index: 400;">
     <div class="container-fluid">

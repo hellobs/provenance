@@ -130,3 +130,40 @@ def test_cors_allowlist_can_be_widened_explicitly(frontend, scenario_dir, monkey
     client = TestClient(live.app)
     r = client.get("/", headers={"Origin": "https://gov.example"})
     assert r.headers.get("access-control-allow-origin") == "https://gov.example"
+
+
+def test_canvas_face_is_the_bare_canvas(frontend, scenario_dir):
+    """`/embed/canvas`(平台侧"只嵌一个画布"用的最小面)= embed=scene + chrome=0。
+
+    为什么单独立一条路径:对接文档里要能写一个不会被 query 拼错的地址;
+    而 chrome=0 让模板**根本不渲染**顶栏、时钟、状态浮层与"重开一局"卡片
+    (那一块带着 POST /control/restart 的按钮与分支下拉)。
+    """
+    from fastapi.testclient import TestClient
+
+    live = _live(frontend, scenario_dir, port=5092)
+    client = TestClient(live.app)
+    canvas = client.get("/embed/canvas")
+    assert canvas.status_code == 200
+    assert 'data-embed="scene"' in canvas.text
+    assert 'data-chrome="0"' in canvas.text
+    for path in ("/embed/scene?chrome=0", "/?embed=scene&chrome=0"):
+        r = client.get(path)
+        assert r.status_code == 200 and 'data-chrome="0"' in r.text, path
+    # 默认仍是带 chrome 的嵌入面(别把原有行为一起改了)
+    assert 'data-chrome="1"' in client.get("/embed/scene").text
+
+
+def test_health_reports_the_run_id(frontend, scenario_dir):
+    """`/health` 要报这一局叫什么:平台侧只嵌画布时,靠它把画布与记录对上。"""
+    from fastapi.testclient import TestClient
+
+    live = create("live", port=5091, roles=[ROLE_A, ROLE_B], alias=ALIAS,
+                  scenario_dir=scenario_dir, static_root=frontend["static"],
+                  template_dir=frontend["template"], ping_interval=30.0,
+                  run_id="260924-live-case01-mavis-B-1200")
+    h = TestClient(live.app).get("/health").json()
+    assert h["run_id"] == "260924-live-case01-mavis-B-1200"
+    # 没给 run_id 时也要有这个字段(空串),别让对接方去猜字段是否存在
+    live2 = _live(frontend, scenario_dir, port=5090)
+    assert TestClient(live2.app).get("/health").json()["run_id"] == ""

@@ -61,6 +61,8 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         alias=ROLE_TEXTURE_ALIAS, scenario_dir=scenario_dir or SCENARIO,
         static_root=os.path.join(_FRONTEND, "static"),
         template_dir=os.path.join(_FRONTEND, "templates"),
+        # 这一局的名字报给 /health:平台侧只嵌画布时靠它把画布与记录对上(2026-09-24)
+        run_id=run_id,
         # ?embed=1:卡片里的 iframe 用压缩版式(去掉大标题与页边距),贴合 380px 宽的卡片
         extra_panels=[{"id": "review", "label": "结果记录",
                        "url": "/review?embed=1"}],

@@ -30,8 +30,10 @@ body { margin: 0; }
 
 <!-- 左栏(时钟 / 运行状态 / Developer Console):三块放在**同一个竖排容器**里,
      而不是各自写死 fixed top —— 状态块会随"重开一局"按钮出现而变高,写死 top 就会压住
-     console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。 -->
-{% if embed != "goals" and embed != "explain" and embed != "timeline" %}
+     console(用户两次反馈"往下降一点")。容器高度自适应,谁都不用再调魔法数字。
+     chrome=0(平台侧只嵌画布)时整块不渲染:连时钟、状态浮层与"重开一局"一起去掉 ——
+     那一块里带着 POST /control/restart 的按钮与分支下拉,不该出现在别人的页面上。 -->
+{% if embed != "goals" and embed != "explain" and embed != "timeline" and chrome|default('1') != "0" %}
 <div id="left-col" style="position: fixed; left: 16px; top: calc(var(--top-offset, 0px) + 16px); z-index: 150; width: 320px;
     display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
 
