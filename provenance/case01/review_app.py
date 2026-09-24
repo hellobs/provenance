@@ -395,7 +395,7 @@ const TABS = [
   ["retrievals", "检索",     d => (d.retrievals || []).length,            "当轮查到了哪些资料（以及那天有没有注入新事实）"],
   ["events",     "事件",     d => (d.events || []).length,                "剧情事件按日期释放的流水"],
   ["states",     "状态",     d => (d.state_history || []).length,         "资金、持仓、买卖价逐日快照"],
-  ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0),    "运行后的 8 维结构化反思全文"],
+  ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0),    "运行后的反思全文（八项内容;是否带小标题随批次而异,见第十轮体检)"],
   ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的带风险的行为/判断（含风险等级）"],
   ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
                                                                           "注入器的节点、释放了哪些事件、事件怎么定义"],

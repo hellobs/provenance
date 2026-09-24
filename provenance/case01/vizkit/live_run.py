@@ -42,6 +42,23 @@ SCENARIO = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "injector", "scenario")
 
 
+def resolve_restart_choice(raw, current_branch="B"):
+    """把 `POST /control/restart` 里的取值翻成 (分支, 模式);不认识的取值抛 ValueError。
+
+    为什么单独一个函数而不是写死在回调里:取值口径要能被单测钉住(回调在 main() 的闭包里,
+    起真服务才能测)。口径:
+      - `A` / `B` / `C` → 预设分支(可控对照),mode=preset
+      - 空 / `auto`     → 交给 AI 的 T0 回答判定,mode=judge(分支参数只作兜底)
+      - 其它            → 拒绝。**不能**当 auto:调用方以为选了别的,实际跑的是 AI 判定。
+    """
+    choice = str(raw or "").strip().upper()
+    if choice in ("A", "B", "C"):
+        return choice, "preset"
+    if choice in ("", "AUTO"):
+        return current_branch, "judge"
+    raise ValueError("不认识的 branch 取值 {!r}:只能是 A / B / C / auto".format(raw))
+
+
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
                   scenario_dir="", with_review=True, on_restart=None, branch="B",
                   branch_mode="judge"):
@@ -169,13 +186,15 @@ def main(argv=None):
     branch_now = [args.branch]
 
     def request_restart(payload=None):
-        choice = str((payload or {}).get("branch") or "").strip().upper()
-        if choice in ("A", "B", "C"):
-            branch = choice
-            mode = "preset"
-        else:
-            branch = branch_now[0]      # auto:分支交给 T0 判定,分支参数只作兜底
-            mode = "judge"
+        try:
+            branch, mode = resolve_restart_choice((payload or {}).get("branch"),
+                                                  current_branch=branch_now[0])
+        except ValueError as exc:
+            # 不认识的取值**不再静默当成 judge**(2026-09-24 第十轮体检):以前 {"branch":"D"}
+            # 会被当成 auto,回一句"已受理:下一局由 AI 的 T0 回答判定分支" —— 调用方以为
+            # 自己选了 D,实际跑的是 AI 判定,谁都不知道。现在明确拒绝并说明合法取值。
+            print("重开请求被拒:{}".format(exc))
+            return {"ok": False, "error": str(exc)}
         restart_req["branch"] = branch
         restart_req["mode"] = mode
         restart_flag.set()

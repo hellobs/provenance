@@ -176,6 +176,52 @@ class TestPostGoals:
         body = r.json()
         assert body["ok"] is False  # 清洗后只剩 0.5,sum≠1
 
+    def test_rejects_nan_weight_without_writing(self, client, tmp_path):
+        """NaN 权重必须**在写之前**被拒(2026-09-24 第十轮体检)。
+
+        以前:`float("NaN")` 躲过 `<= 0` 那道、又躲过"总和=1"那道
+        (`abs(nan-1) > 1e-6` 是 False)→ 写进 governance.json(落成非标准 JSON 字面量 NaN),
+        然后序列化响应时 500 —— 状态改了、调用方收到"内部错误",两边都不知道写没写。
+        这里连"文件没被改"一起钉住。
+        """
+        gov_path = tmp_path / "governance.json"
+        before = gov_path.read_text(encoding="utf-8")
+        # 注意:JSON 标准不允许 NaN,但 Python 的 json.loads 默认收 —— 所以这条请求真能进来
+        r = client.post("/api/goals",
+                        content='{"name": "AI Advisor", "goals": {"Serve Users": NaN, "Risk Control": 0.5}}',
+                        headers={"Content-Type": "application/json"})
+        assert r.status_code == 200, "应当是可读的拒绝,不是 500"
+        body = r.json()
+        assert body["ok"] is False and any("有限数" in e for e in body["errors"]), body
+        assert gov_path.read_text(encoding="utf-8") == before, "被拒的请求不许改 governance.json"
+        assert "NaN" not in gov_path.read_text(encoding="utf-8")
+
+    def test_rejects_infinity_weight(self, client):
+        r = client.post("/api/goals",
+                        content='{"name": "AI Advisor", "goals": {"Serve Users": Infinity}}',
+                        headers={"Content-Type": "application/json"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is False
+        assert any("有限数" in e for e in r.json()["errors"])
+
+    def test_rejects_unknown_role_instead_of_creating_it(self, client, tmp_path):
+        """角色名必须是本局真实角色(2026-09-24 第十轮体检)。
+
+        以前 {"name": "查无此人"} 会静默在 governance.json 里多出一个角色,
+        干预审计也跟着攒垃圾 —— 而这是个无鉴权的写端点,拼错一个名字就留一条。
+        """
+        r = client.post("/api/goals", json={
+            "name": "查无此人",
+            "goals": {"Serve Users": 0.5, "Risk Control": 0.5},
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is False and any("没有这个角色" in e for e in body["errors"]), body
+        # 错误里要带上合法角色,省得调用方去猜
+        assert "AI Advisor" in body["errors"][0]
+        gov = json.loads((tmp_path / "governance.json").read_text(encoding="utf-8"))
+        assert "查无此人" not in gov["roles"]
+
 
 # ---------------------------------------------------------------------------
 # GET /api/explain

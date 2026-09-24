@@ -114,7 +114,13 @@ def _decorate(rows: list) -> list:
 
 
 def _brief_checkpoint(name: str) -> dict:
-    """归一化一个 case00 checkpoint 目录(对话+决策+倾向序列快照)为统一摘要。"""
+    """归一化一个 case00 checkpoint 目录(对话+决策+倾向序列快照)为统一摘要。
+
+    `incomplete`(2026-09-24 第十轮体检):54 个痕迹目录里有 13 个**没有 conversation.json**
+    (测试/冒烟残留:`_test_storage`、`hc`、`mazecheck`、`stage`…),它们在列表里和真痕迹
+    长得一样、点开是空页。以前这条信息只体现在"n_turns=0",平台分不出
+    "这条是空的"和"这条还没跑完" —— 现在缺什么就写在 `incomplete` 里(不静默)。
+    """
     ck_root = os.path.join(_data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints"), name)
     shots = sorted(
         f for f in os.listdir(ck_root)
@@ -124,12 +130,18 @@ def _brief_checkpoint(name: str) -> dict:
     end_date = _fmt_ckpt_dt(shots[-1][len("simulate-"):-len(".json")]) if shots else ""
     n_turns = 0
     conv = os.path.join(ck_root, "conversation.json")
-    if os.path.isfile(conv):
+    has_conv = os.path.isfile(conv)
+    if has_conv:
         try:
             n_turns = len(json.load(open(conv, encoding="utf-8")) or [])
         except Exception:  # noqa: BLE001 —— 单条损坏不影响列表
             n_turns = 0
-    return {
+    missing = []
+    if not has_conv:
+        missing.append("缺 conversation.json(没有对话记录)")
+    if not shots:
+        missing.append("没有任何快照")
+    out = {
         "source": "checkpoint",
         "run_id": name,
         "case_id": "case00_village",
@@ -144,6 +156,9 @@ def _brief_checkpoint(name: str) -> dict:
         "quality": "unverified", "consistency": "unverified",
         "branch_source": "", "debug": "",
     }
+    if missing:
+        out["incomplete"] = ";".join(missing)
+    return out
 
 
 def _brief_review(run_id: str) -> dict:
@@ -236,13 +251,19 @@ def expert_safe_record(rec: dict) -> dict:
 
 
 def _brief_compressed(name: str) -> dict:
-    """归一化一个压缩成品目录(仅列目录,无详情)。"""
+    """归一化一个压缩成品目录(只提供文件清单,没有逐轮/逐日结构)。
+
+    `incomplete`(2026-09-24 第十轮体检):这些行除 run_id 外**什么元信息都没有**
+    (日期/轮次/一致性全是空),平台拿它没法建单也没法展示。以前列表里看不出来,
+    只有点进详情才发现"只有一个文件清单"。现在明说了。
+    """
     return {"source": "compressed", "run_id": name, "case_id": "", "engine_id": "",
             "branch": "", "start_date": "", "end_date": "", "n_turns": 0,
             "n_reflections": 0, "has_graph": False,
             # 统一字段:不是 case01 成品就没有一致性戳 → unverified(判不了 ≠ 有问题)
             "quality": "unverified", "consistency": "unverified",
-            "branch_source": "", "debug": ""}
+            "branch_source": "", "debug": "",
+            "incomplete": "压缩成品只给文件清单(无逐轮/逐日结构,不要当成品记录用)"}
 
 
 @router.get("/api/runs")
@@ -374,20 +395,30 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                                 status_code=404)
         conv = {}
         cpath = os.path.join(ck_root, "conversation.json")
+        missing = []
         if os.path.isfile(cpath):
             try:
                 with open(cpath, "r", encoding="utf-8") as f:
                     conv = json.load(f) or {}
             except Exception:  # noqa: BLE001
                 conv = {"error": "conversation.json 不可读"}
-        return JSONResponse({"ok": True, "source": "checkpoint", "run_id": run_id,
-                             # view(2026-09-24):三种 source 的 data 形状**完全不同**,
-                             # 客户端得有一个字段能判断自己在渲染哪一套;以前只有 review 带 view。
-                             "view": "case00-archive",
-                             "data": {"conversation": conv,
-                                      "shots": sorted(
-                                          f for f in os.listdir(ck_root)
-                                          if f.startswith("simulate-") and f.endswith(".json"))}})
+                missing.append("conversation.json 存在但读不出(已损坏?)")
+        else:
+            # 不静默(2026-09-24 第十轮体检):以前这里回 `conversation: {}` + `shots: []`,
+            # 200 正常响应 —— 平台点开一条测试残留痕迹只会看到空白,不知道是"没有"还是"坏了"。
+            missing.append("缺 conversation.json(没有对话记录)")
+        shots = sorted(f for f in os.listdir(ck_root)
+                       if f.startswith("simulate-") and f.endswith(".json"))
+        if not shots:
+            missing.append("没有任何快照")
+        body = {"ok": True, "source": "checkpoint", "run_id": run_id,
+                # view(2026-09-24):三种 source 的 data 形状**完全不同**,
+                # 客户端得有一个字段能判断自己在渲染哪一套;以前只有 review 带 view。
+                "view": "case00-archive",
+                "data": {"conversation": conv, "shots": shots}}
+        if missing:
+            body["incomplete"] = ";".join(missing)
+        return JSONResponse(body)
     if source == "compressed":
         comp_root = os.path.join(_data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed"),
                                  run_id)
@@ -397,6 +428,7 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
         files = sorted(f for f in os.listdir(comp_root))
         return JSONResponse({"ok": True, "source": "compressed", "run_id": run_id,
                              "view": "compressed-index",
+                             "incomplete": "压缩成品只给文件清单(无逐轮/逐日结构,不要当成品记录用)",
                              "data": {"files": files}})
     return JSONResponse({"ok": False, "errors": ["未知 source: {}".format(source)]},
                         status_code=404)

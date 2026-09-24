@@ -4,6 +4,7 @@
 """
 import datetime as _dt
 import json
+import math
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -333,6 +334,17 @@ async def update_goals(request: Request):
         return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
     if not isinstance(goals, dict) or not goals:
         return JSONResponse({"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]})
+    # 角色名必须是这一局真实存在的角色(2026-09-24 第十轮体检):
+    # 以前 {"name": "查无此人"} 会**静默写进** governance.json,多出一个谁也用不到的角色,
+    # 干预审计里也跟着攒垃圾。角色清单与 GET /api/goals 同源(运行中 Agent),
+    # 拿不到清单时(没在跑)不拦 —— 那时无法判断,不能凭猜拒绝。
+    known_roles = []
+    _server = state.server
+    if _server is not None and getattr(_server, "game", None) is not None:
+        known_roles = list(getattr(_server.game, "agents", {}) or {})
+    if known_roles and name not in known_roles:
+        return JSONResponse({"ok": False, "errors": [
+            "没有这个角色: {!r};本局角色: {}".format(name, " / ".join(sorted(known_roles)))]})
     # 清洗:拒绝非目标名(如数字 "1")与 0 权重项(前端拖动/添加产生的垃圾)
     import re as _re
     cleaned = {}
@@ -344,6 +356,13 @@ async def update_goals(request: Request):
             fv = float(v)
         except (TypeError, ValueError):
             continue
+        # NaN/Infinity 必须在这里挡住(2026-09-24 第十轮体检):NaN 能骗过下面那道
+        # "总和=1"的校验(`abs(nan-1) > 1e-6` 是 False),然后被**写进 governance.json**
+        # (落成非标准 JSON 字面量 NaN),最后在序列化响应时 500 —— 状态改了、调用方却
+        # 收到"内部错误",两边都不知道到底写没写。
+        if not math.isfinite(fv):
+            return JSONResponse({"ok": False, "errors": [
+                "权重必须是有限数:目标 {!r} 收到 {}".format(gs, v)]})
         if fv <= 0:
             continue  # 0 权重目标无治理意义,丢弃
         cleaned[gs] = fv

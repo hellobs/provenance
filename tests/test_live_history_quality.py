@@ -258,6 +258,52 @@ def test_every_source_has_a_view_marker(monkeypatch):
                 "{} 不该有九块(它不是 case01 成品记录)".format(src)
 
 
+def test_empty_checkpoint_is_not_silently_served_as_a_normal_record(monkeypatch, tmp_path):
+    """空壳痕迹要**自己说出来**(2026-09-24 第十轮体检)。
+
+    实测:54 个 case00 痕迹目录里 13 个没有 conversation.json(测试/冒烟残留:
+    `_test_storage`、`hc`、`mazecheck`、`stage`…)。它们在 `/api/runs` 里和真痕迹
+    长得一样,点开是 200 + `{conversation: {}, shots: []}` —— 平台分不出
+    "这条是空的"与"这条坏了/还没跑完"。现在:索引行与详情都带 `incomplete`。
+    """
+    empty = tmp_path / "ck-empty"
+    empty.mkdir()
+    (empty / "simulate-20260901-0900.json").write_text("{}", encoding="utf-8")
+    good = tmp_path / "ck-good"
+    good.mkdir()
+    (good / "conversation.json").write_text('[{"a": 1}]', encoding="utf-8")
+    (good / "simulate-20260901-0900.json").write_text("{}", encoding="utf-8")
+    (good / "simulate-20260901-1000.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("CASE00_CHECKPOINTS_ROOT", str(tmp_path))
+
+    body = _call(H.list_all_runs(include_questionable=True))
+    rows = {r["run_id"]: r for r in body["runs"] if r.get("source") == "checkpoint"}
+    assert "incomplete" in rows["ck-empty"], rows["ck-empty"]
+    assert "conversation.json" in rows["ck-empty"]["incomplete"]
+    assert "incomplete" not in rows["ck-good"], "正常痕迹不该被标成不完整"
+
+    d = _call(H.run_detail("checkpoint", "ck-empty"))
+    assert d["ok"] is True and d["view"] == "case00-archive"
+    assert "incomplete" in d, "详情也要说明为什么是空的"
+    assert d["data"]["conversation"] == {}
+
+    # 快照与对话都没有 → 两条原因都要报出来
+    bare = tmp_path / "ck-bare"
+    bare.mkdir()
+    d2 = _call(H.run_detail("checkpoint", "ck-bare"))
+    assert "快照" in d2["incomplete"] and "conversation.json" in d2["incomplete"], d2["incomplete"]
+
+
+def test_compressed_rows_say_they_are_index_only(monkeypatch):
+    """压缩成品行除 run_id 外没有元信息:列表与详情都要明说,别让平台拿它当成品记录建单。"""
+    monkeypatch.setenv("RESULTS_COMPRESSED_ROOT", FIXTURE["compressed"])
+    body = _call(H.list_all_runs(include_questionable=True))
+    comp = [r for r in body["runs"] if r.get("source") == "compressed"]
+    assert comp and all("incomplete" in r for r in comp), comp
+    d = _call(H.run_detail("compressed", comp[0]["run_id"]))
+    assert d["view"] == "compressed-index" and "incomplete" in d
+
+
 def test_expert_safe_record_keeps_contract_keys():
     """白名单要覆盖平台契约 §2.2 明确要读的那些键。"""
     rec = {"run_id": "r", "start_date": "d", "end_date": "e", "turns": [1],

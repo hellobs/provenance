@@ -265,6 +265,46 @@ def test_restart_callback_failure_is_reported_to_the_page():
     assert body["ok"] is False and "桥接挂了" in body["error"]
 
 
+def test_restart_choice_unknown_value_is_refused_not_treated_as_judge():
+    """`POST /control/restart` 的取值不认识时必须**拒绝**,不能静默降级成 judge。
+
+    2026-09-24 第十轮体检:以前回调里 `choice in ("A","B","C")` 之外一律走 else →
+    发 `{"branch": "D"}` 会得到"已受理:下一局由 AI 的 T0 回答判定分支"。调用方以为选了 D,
+    实际跑的是 AI 判定,两边都不知道 (页面上的下拉只有 A/B/C/auto,所以这只会来自脚本或手打,
+    但write端点不能靠"调用方应该不会这么发"来保证正确)。
+    """
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from case01.vizkit.live_run import resolve_restart_choice
+
+    assert resolve_restart_choice("A") == ("A", "preset")
+    assert resolve_restart_choice("b") == ("B", "preset")
+    assert resolve_restart_choice(" C ") == ("C", "preset")
+    assert resolve_restart_choice("") == ("B", "judge")
+    assert resolve_restart_choice("auto") == ("B", "judge")
+    assert resolve_restart_choice(None) == ("B", "judge")
+    assert resolve_restart_choice("auto", current_branch="C") == ("C", "judge")
+    for bad in ("D", "1", "a b", "预设"):
+        with pytest.raises(ValueError) as exc:
+            resolve_restart_choice(bad)
+        assert "A / B / C / auto" in str(exc.value)
+
+    # 端到端:回调把拒绝原样回给页面(vizkit 的 ok:False 通道)
+    def on_restart(payload):
+        try:
+            branch, mode = resolve_restart_choice((payload or {}).get("branch"))
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "branch": branch, "mode": mode}
+
+    c = TestClient(_live(port=5078, on_restart=on_restart).app)
+    r = c.post("/control/restart", json={"branch": "D"}).json()
+    assert r["ok"] is False and "不认识的 branch 取值" in r["error"], r
+    ok = c.post("/control/restart", json={"branch": "A"}).json()
+    assert ok["ok"] is True and ok["branch"] == "A" and ok["mode"] == "preset", ok
+
+
 def test_begin_run_clears_finished_state_for_the_next_round():
     """重开一局时插件必须被"重置":否则第二局从第一秒起就告诉页面"已结束",
     或者把上一局积压的 done 补发给刚刷新连上来的页面(实测:重开后又突然说推演结束)。"""
