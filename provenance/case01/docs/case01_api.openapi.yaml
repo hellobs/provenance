@@ -2,14 +2,14 @@
 #
 # 本文件只覆盖【平台对接端点】;/api/runs、/api/runs/{run_id}、
 # /api/runs/{run_id}/full-context 是平台侧的正式对接面。
-# 不含 /viewer:它是引擎侧调试挂载(serve.app.mount("/viewer", StaticFiles),
+# 不含 /viewer:它是实现侧调试挂载(serve.app.mount("/viewer", StaticFiles),
 # 依赖 gitignored 的 runs_html/ 目录,且 FastAPI 自身的 /openapi.json 也不含它,
 # 不是 API 操作端点、不是平台对接面)。详见 prose 契约 Governance平台对接说明.md §1.1。
 #
 # 顶层键读/写约定(对应 run.json;页面 prose 契约 §2.2):
 #   平台要读:run_id / 日期 / turns / retrievals / events / state_history /
 #            final_feedback / audit / condition_monitor / reflection / router。
-#   引擎侧附加键、平台不读:summary / injector / compat / quality / debug。
+#   实现侧附加键、平台不读:summary / injector / compat / quality / debug。
 #            其中 injector 含 Branch 实验元信息与逐节点 dialogue 原文,不得进专家视图
 #            (与 full-context 同一信息边界);quality/debug 供平台**内部**决定要不要建单,
 #            同样不得展示给专家。
@@ -108,7 +108,7 @@ paths:
         服务端返回的是聚合 meta(n_turns 等为计数);若平台需要 turns/retrievals/
 
 
-        events/state_history/condition_monitor 全文,另行约定。此处绝不含引擎侧
+        events/state_history/condition_monitor 全文,另行约定。此处绝不含实现侧
 
 
         附加键 summary/injector/compat——它们只在 run.json 落盘,平台不读,

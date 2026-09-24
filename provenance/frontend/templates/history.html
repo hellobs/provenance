@@ -3,7 +3,7 @@
 {% block content %}
 {# ======================================================================
    统一数据界面(embed=explore):由 live/history.py 的 /embed/explore 渲染。
-   - 左侧:按【场景 · 引擎】分组的树形菜单(覆盖所有场景,不只 case01),
+   - 左侧:按【场景 · 运行方式】分组的树形菜单(覆盖所有场景,不只 case01),
      数据来自 /api/runs 的 scenarios 发现层。
    - 右侧:点任意 run → fetch /api/run-detail/<source>/<run_id> 自渲染详情。
      刻意不用 /embed/review —— 它只挂 case01 实时面,别的 case 跑会 404。

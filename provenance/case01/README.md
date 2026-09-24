@@ -1,24 +1,24 @@
 # case01 — GTC Case 01(provenance 仓内子包)
 
 > **状态**:现行
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:case01 子包说明(端口/入口/契约见文档索引)
-> **归档注记(2026-09-17)**：本目录原有的**独立执行引擎**(节点驱动的受控实验:
+> **归档注记(2026-09-17)**：本目录原有的**独立执行运行方式**(节点驱动的受控实验:
 > `orchestrator.py` / `run.py` / `serve.py` / `render.py` 等)已作为
-> **旧引擎归档**,标记 `archive/case01-old-engine`(基线 `d41cdec`,
+> **旧运行方式归档**,标记 `archive/case01-old-engine`(基线 `d41cdec`,
 > demo-1/2/3 与对接契约均冻结于该点)。当前 case01 的运行架构迁移到
 > **mavis 体系**:case01 定位为"作用于 mavis 的一套事件参数约束",
 > 由 `case01/injector/` 作为注入与驱动层,世界事实由 injector 复用
 > case01 `world/` 决定,mavis 只负责角色表达与交互。
 > 迁移依据与验收见 `case01/docs/case01_over_mavis_*.md`。
-> 下方旧引擎介绍保留供回溯。
+> 下方旧运行方式介绍保留供回溯。
 >
 > **与 case00 的关系**：case00 = 仓库原有的 6 角色投资咨询场景（Provenance 原生,
 > 由 `live_fastapi.py` 在 5001 驱动），与 case01 并存且互不依赖；同一时刻只让一个案例
 > 跑模拟线程。两个案例的构成、启动命令、产物位置与组件化现状见
 > `../docs/case00_case01_并列说明.md`。
 
-<旧引擎>GTC Case 01(0904doc)的运行引擎:节点驱动的受控实验,
+<旧运行方式>GTC Case 01(0904doc)的运行运行方式:节点驱动的受控实验,
 非 MAVIS 连续仿真。Ethan Lin(普通投资者)× Investment AI(本地 Ollama
 + Financial Data 检索)→ Branch(A/B/C)→ Timeline 推进 → 最终反馈
 → Reflection → Router → 专家审核(后置里程碑,平台侧)。
@@ -26,7 +26,7 @@
 ## 角色与联系人
 
 - **维护与实现**:研究侧。
-- **引擎侧职责对接**:引擎侧实现者(0904 文档名义任务对象;接口语义问题由其确认)。
+- **实现侧职责对接**:实现侧实现者(0904 文档名义任务对象;接口语义问题由其确认)。
 - **Platform / HCI 侧**:平台侧团队(研究侧亦参与;负责 Expert Review Task、
   专家审核界面、Full Context 展示与平台持久化)。
 - **研究设计基准**:0904doc(01/03/04/05/06,2026-09-04)。
@@ -161,7 +161,7 @@ Ollama configuration is used.
       09-07 与 A 同规则退出;`condition_monitor` 与 `condition_check`
       audit 落盘;C 最终反馈按实际执行结果生成
 - [x] **③ Branch C 个人后果(方案 A)**:见文末《设计决策》第 1 条
-- [x] **只读数据服务 + Full Context**(M4 中引擎职责部分):serve.py 三端点
+- [x] **只读数据服务 + Full Context**(M4 中运行方式职责部分):serve.py 三端点
       (/api/runs、/api/runs/{run_id}、/api/runs/{run_id}/full-context);
       full_context.py 自然语言全文,不含实验元信息;OpenAPI 契约与
       对接文档见 docs/
@@ -173,7 +173,7 @@ Ollama configuration is used.
 
 ## 与 0904 文档的设计决策与假设(2026-09-05)
 
-以下为 03/06 文档未明确处,case01 引擎实现所采用的设计(实现与仓库
+以下为 03/06 文档未明确处,case01 运行方式实现所采用的设计(实现与仓库
 维护:研究侧),需研究侧确认或后续文档化:
 
 1. **Branch C 个人后果 = 方案 A(复用 A 线资金用途背景,按结果派生)**。

@@ -1,8 +1,8 @@
 # ============================================================
 # scenario.yaml — Case 02 最小场景(通用性验证)
-# case_id = case02_minimal ; 运行引擎 case_engine(experiment-eval)。
+# case_id = case02_minimal ; 运行运行方式 case_engine(experiment-eval)。
 # 用途:证明「新增场景 = 写一份 YAML」零代码 —— 与股票/沙盒完全无关的
-# 中性主题(新业务立项审批),同样被引擎发现、分支路由、一致性判定。
+# 中性主题(新业务立项审批),同样被运行方式发现、分支路由、一致性判定。
 # 一致性信号词用中文,证明 quick_scan 的子串判定对中文同样成立。
 # ============================================================
 
@@ -10,7 +10,7 @@ meta:
   case_id: case02_minimal
   name: "最小立项审批场景"
   description: "通用性验证:中立主题(是否批准一项新业务计划),零代码新增场景"
-  engine: experiment-eval          # 推荐/默认引擎(受控实验);运行时可 --engine 覆盖
+  engine: experiment-eval          # 推荐/默认运行方式(受控实验);运行时可 --engine 覆盖
   start_date: "2026-09-01"
   end_date: "2026-09-30"
 

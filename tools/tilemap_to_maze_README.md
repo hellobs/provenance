@@ -3,7 +3,7 @@
 ## 摘要
 
 `tilemap_to_maze.py` 是一个纯命令行工具,将 Tiled 地图编辑器产生的
-地图文件(`.tmx` 或导出的 `.json`)转换为 provenance 平台运行时引擎
+地图文件(`.tmx` 或导出的 `.json`)转换为 provenance 平台运行时内核
 (`mavisframework.scene.maze`)可直接消费的 `maze.json` 语义地图。
 
 本工具设计目标是替代旧有工具 `tiled_to_maze.py`(GUI 图形界面、假设
@@ -18,7 +18,7 @@
 3. [总体流程](#3-总体流程)
 4. [命令行用法](#4-命令行用法)
 5. [两种语义标注模式](#5-两种语义标注模式)
-6. [输出格式与引擎契约](#6-输出格式与引擎契约)
+6. [输出格式与内核契约](#6-输出格式与内核契约)
 7. [gid 映射表](#7-gid-映射表)
 8. [验证方法](#8-验证方法)
 9. [已知局限](#9-已知局限)
@@ -32,7 +32,7 @@ provenance 平台的场景由两类文件描述:
 
 - `tilemap.json`:Phaser 前端渲染使用的完整地图(图层、贴图、碰撞),
   由 Tiled 导出;
-- `maze.json`:引擎逻辑层使用的语义地图(各格子的空间地址层级),
+- `maze.json`:内核逻辑层使用的语义地图(各格子的空间地址层级),
   驱动 BFS 寻路与空间检索。
 
 `maze.json` 与 `tilemap.json` 是同一场景的两个视图:前者描述"哪些格子
@@ -45,7 +45,7 @@ Tiled 的语义标注生成 `maze.json`。
 |---|---|
 | GUI 界面(tkinter),手动点选文件 | 无法脚本化、难以纳入 CI/交接流程 |
 | 假设旧版 generative_agents 目录结构 | 与 provenance + mavis 的路径布局不兼容 |
-| 只输出数据层,无 provenance 特定契约 | 输出需二次加工才能被引擎消费 |
+| 只输出数据层,无 provenance 特定契约 | 输出需二次加工才能被内核消费 |
 | 无房间级语义标注手段 | 生成的地址停留在区域类型粒度 |
 
 本工具逐一解决上述问题。
@@ -69,7 +69,7 @@ Tiled 编辑地图(.tmx)
 tilemap_to_maze.py 地图.tmx -o maze.json --tiled <Tiled路径>
         |  (内部: tiled --export-map json → .exported.json)
         v
-maze.json(引擎消费)
+maze.json(内核消费)
 ```
 
 流程要点:编辑阶段使用 Tiled 原生格式 `.tmx`,转换阶段工具自动调用
@@ -118,7 +118,7 @@ python tilemap_to_maze.py tilemap.json -o maze.json --gid-map gid_map.json
 | `input` | 必填 | 输入地图文件(`.tmx` 或 `.json`) |
 | `-o, --output` | `maze.json` | 输出文件路径 |
 | `--tiled` | `tiled` | Tiled 可执行文件路径(仅 `.tmx` 输入时需要) |
-| `--world` | `the Ville` | 世界名(引擎地址层级的第一层) |
+| `--world` | `the Ville` | 世界名(内核地址层级的第一层) |
 | `--sector-layers` | `Sector Blocks` | gid 模式:区域标注图层名 |
 | `--arena-layers` | `Arena Blocks` | gid 模式:场所标注图层名 |
 | `--object-layers` | `Object Interaction Blocks` | gid 模式:对象标注图层名 |
@@ -163,7 +163,7 @@ Tiled 提供两种语义标注手段,本工具分别对应两种生成模式。
 局限:gid 粒度由标注决定。当多个相邻房间共用同一 gid 时(例如走廊与
 休息室),gid 模式无法自动细分,需要对象层模式或人工补充。
 
-## 6. 输出格式与引擎契约
+## 6. 输出格式与内核契约
 
 `maze.json` 顶层结构:
 
@@ -183,12 +183,12 @@ Tiled 提供两种语义标注手段,本工具分别对应两种生成模式。
 }
 ```
 
-与引擎的契约要点:
+与内核的契约要点:
 
-- `world`:世界名,引擎构造 Tile 时作为地址首项;
+- `world`:世界名,内核构造 Tile 时作为地址首项;
 - `size`:`[height, width]`,与 `Maze(config["size"])` 的预期一致;
 - `tiles[].coord`:`[x, y]`,与 `size` 的宽高对应;
-- `tiles[].address`:语义地址,**不含 world 前缀**——引擎在
+- `tiles[].address`:语义地址,**不含 world 前缀**——内核在
   `Tile.__init__` 中自动执行 `[world] + address`。若 address 含 world
   会导致世界名重复,地址层级错乱;
 - `tile_address_keys`:地址层级键名,默认
@@ -250,7 +250,7 @@ Tiled 提供两种语义标注手段,本工具分别对应两种生成模式。
    ```
 
 3. 运行验证:在 provenance 中启动 `/embed/scene`,确认角色能从出生点
-   移动到各房间(引擎 BFS 寻路依赖地址连通)。
+   移动到各房间(内核 BFS 寻路依赖地址连通)。
 
 ## 9. 已知局限
 
@@ -265,12 +265,12 @@ Tiled 提供两种语义标注手段,本工具分别对应两种生成模式。
 ## 10. 参考
 
 - Tiled 官方文档:https://doc.mapeditor.org/
-- 引擎消费点:`mavisframework/scene/maze.py`(寻路与空间检索),引擎仓库
+- 内核消费点:`mavisframework/scene/maze.py`(寻路与空间检索),内核仓库
   [hellobs/mavis](https://github.com/hellobs/mavis)
 - 平台仓库:[hellobs/provenance](https://github.com/hellobs/provenance)
   (本工具随平台 `tools/` 目录分发)
 - 前端渲染:`provenance/frontend/templates/main_script.html`(preload/create)
-- 角色/场景配置工具:引擎仓库 `config_tool/`(端口 5002,表单生成
+- 角色/场景配置工具:内核仓库 `config_tool/`(端口 5002,表单生成
   agent.json/relationships.json/story.json)
 - Unity 版前端(已冻结):[hellobs/Multi-Model-AI-Visualization-and-Interactive-Simulation-Platform](https://github.com/hellobs/Multi-Model-AI-Visualization-and-Interactive-Simulation-Platform)
 - 旧工具(参考):https://github.com/jiejieje/tiled_to_maze

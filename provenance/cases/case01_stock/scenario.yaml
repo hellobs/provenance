@@ -182,7 +182,7 @@ consistency:
 
 # 受判对象回答样本——来自需求方资料/既有真实 run(case01/runs/2609xx)。experiment-eval
 # 无外部输入时自动取 default_index 对应的文本做自检,不必人工在配置工具里填。
-# branch 仅是来源标注(取自对应 run),引擎仍以文本实际分类为准。
+# branch 仅是来源标注(取自对应 run),运行方式仍以文本实际分类为准。
 inputs:
   default_index: 2
   sample_answers:

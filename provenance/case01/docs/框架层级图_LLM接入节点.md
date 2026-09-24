@@ -1,12 +1,12 @@
 # Case 01 · 框架层级图（LLM 接入节点与不确定性来源）
 
 > **状态**:参考
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:框架层级与 LLM 接入节点;仍有效
-> 对象：GTC Case 01 受控单案例实验执行引擎（`case01/`）。
+> 对象：GTC Case 01 受控单案例实验执行运行方式（`case01/`）。
 > 目的：对照 2026-09-08 会议 TongMu 要求，梳理所有大模型接入节点、模型选择、输入输出与不确定性来源，作为"可解释性 / 可追溯"的评估基准。
 > 版本：2026-09-17（补 mavis 路径节点 N9/N10 与 mavis 各角色 LLM 映射；
-> 2026-09-17 起 mavis+injector 为 case01 当前运行路径，旧引擎 N1–N8 供归档回溯，见 `case01/README.md` 归档注记）。
+> 2026-09-17 起 mavis+injector 为 case01 当前运行路径，旧运行方式 N1–N8 供归档回溯，见 `case01/README.md` 归档注记）。
 
 ---
 
@@ -14,7 +14,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  case01 引擎（程序决定事实，LLM 只负责"表达"）                        │
+│  case01 运行方式（程序决定事实，LLM 只负责"表达"）                        │
 │                                                                     │
 │  ┌─────────────┐   ┌──────────────┐   ┌──────────────────────────┐  │
 │  │ World/System │   │ Orchestrator │   │ Reflection/Router（事后） │  │
@@ -56,7 +56,7 @@
 | N10 | **Investment AI（mavis Agent，本地）**（injector scenario agent 配置） | T0 咨询 + 最终反馈回应（B 线角色担当） | 本地 Ollama `qwen3:4b-instruct-2507-q4_K_M` | **硬性本地，不可切外部** | 角色配置 | Financial Data（story 事件写入记忆）+ 注入上下文 | 投资建议文本 |
 | N11 | **ConditionPlanParser（mavis 路径动态化）**（`bridge._install_c_plan` + `world/branch.ConditionPlanParser`） | T0 后用 Investment AI 的回答解析 C 条件化仓位方案 | 默认本地（复用 `agent.llm`）；复用 N5 相同的 `ConditionPlanParser` | 本地 | 0.1 | Investment AI 的 T0 回答 | `{action, fraction, buy_fraction, condition, trigger, judge, source}` |
 
-> mavis 路径下，N1/N2/N3（旧引擎的 `investment_ai.py` / `financial.py` / `ethan.py`）不再承担
+> mavis 路径下，N1/N2/N3（旧运行方式的 `investment_ai.py` / `financial.py` / `ethan.py`）不再承担
 > 运行时对话与检索：对话由 mavis Agent 表达（N9/N10），检索语义由"按节点释放的 story 事件"
 > 承担（injector 记录 `retrievals.mode=injection`）。Reflection（N6）/ Router（N7）在 mavis
 > 路径由 `pipeline.py --reflect` 在映射记录上复用 `case01.reflection` 补齐。
@@ -97,4 +97,4 @@
 
 - 契约（`serve.py` / `case01_api.openapi.yaml`）只暴露**只读**结果（runs、runs/{id}、full-context），**不暴露** N1–N8 内部调用细节；专家端看到的是反思+问题，而非模型内部。
 - mavis 路径（N9–N11）同样不影响平台契约：平台看到的是映射后的 case01 run.json（相同顶层键），mavis 的 LLM 表达细节不出现在专家端。`demo-A/B/C-mavis` 三条新样本已落盘 `case01/runs/`，供平台换样（见 `通知平台侧_换样本_20260917.md`）。
-- 若平台要展示"大模型性能指标"（统一后台第二模块），建议以 `run.json` 内的 `retrievals` + Router `issues` 元数据为入口，不要读取引擎内部。
+- 若平台要展示"大模型性能指标"（统一后台第二模块），建议以 `run.json` 内的 `retrievals` + Router `issues` 元数据为入口，不要读取运行方式内部。

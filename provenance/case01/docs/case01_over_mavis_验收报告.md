@@ -1,10 +1,10 @@
 # Case01 over MAVIS · 阶段 3 验收报告
 
 > **状态**:历史存档
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:阶段 3 验收记录;**阶段 3 抽包仍未开工**
 > 日期：2026-09-16 · 复核更新：2026-09-18（第 1/2/3/5 节补端到端与隔离实测）
-> 分支：`feat/case01-injector`（引擎侧）/ `feat/generic-injection-hooks`（mavis 侧）
+> 分支：`feat/case01-injector`（实现侧）/ `feat/generic-injection-hooks`（mavis 侧）
 > 依据：`case01_over_mavis_设计说明.md` §8、`case01_over_mavis_执行计划.md` 阶段 3
 
 ## 1. 字段级对比（通过）
@@ -15,7 +15,7 @@
 - **端到端复核（2026-09-18）**：把 B 线实跑记录直接走 `pipeline --from-record --reflect`
   （原始记录 → 映射 → Reflection/Router）得到 17 个顶层键、`compat.gaps` 与
   `compat.missing_keys` 均为空、8 turns / 12 events / 7 retrievals / 22 audit /
-  reflection 5167 字 / Router 4 个问题。Router 问题字段与旧引擎逐键一致
+  reflection 5167 字 / Router 4 个问题。Router 问题字段与旧运行方式逐键一致
   （`id` / `summary` / `field` / `risk` / `routing_reason`）。
 - **同日修正一处映射偏差**：`branch_action.timeline` 原来照抄分支号，而 Branch C 走的是
   Timeline A（旧 `demo-3` 实测 `timeline="A"`，`BRANCH_TO_TIMELINE={A:A,B:B,C:A}`）。
@@ -107,7 +107,7 @@ I missed my friend's co-investment opportunity because it required at least RMB 
 ## 7. 结论
 
 阶段 3 四项验收全部通过，可进入阶段 4（替换、归档、demo 重录、文档同步）。
-进入阶段 4 前需要确认两件事：是否现在替换已冻结的旧引擎；Branch C 仓位是否要在替换前补齐。
+进入阶段 4 前需要确认两件事：是否现在替换已冻结的旧运行方式；Branch C 仓位是否要在替换前补齐。
 （说明：Branch C 仓位已于 2026-09-17 补齐并补测试，见第 8 节。）
 
 ## 8. 三线定版重跑（2026-09-17，Branch C 修复后的代码）
@@ -144,8 +144,8 @@ serve 只读接口与 full-context 均已复核（full-context 10245–10506 字
    = 200,000×(1−0.95) 即未投入的 5%；09-07 按 27.40 退出后
    `cash = 10,000 + 190,000×(27.40/45.20) = 125,176.99`，**与记录逐分吻合**
    （`abs(expected−recorded)<0.01`）。B/C 无操作现金恒为 200,000，无跳变。
-4. **跨记录交叉**：mavis 三线末账与旧引擎对应线（A=2、B=3、C=1）完全同口径
+4. **跨记录交叉**：mavis 三线末账与旧运行方式对应线（A=2、B=3、C=1）完全同口径
    （125,176.99 / 200,000 / 200,000），数值一致，无回归。
 
-结论：三条 demo 顶层结构、时间线、分支仓位规则、财务记账全部自洽，且与旧引擎账目对齐。
+结论：三条 demo 顶层结构、时间线、分支仓位规则、财务记账全部自洽，且与旧运行方式账目对齐。
 复核所用临时脚本不入库，结论已并入本报告。

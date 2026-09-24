@@ -1,7 +1,7 @@
 # case00 — 原初的 6 角色投资咨询场景（已冻结）
 
 > **状态**:现行
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:case00 已冻结;只作对照与展示
 > 2026-09-19 建容器并**冻结**：case00 后续不再维护，只保留可看、可复现。
 > 与 case01 的关系见 `../docs/case00_case01_并列说明.md`。
@@ -41,13 +41,13 @@ cd D:\zzr\provenance\provenance
 
 ## 声明化场景(2026-09-20,仅声明化不重写语义)
 
-case00 新增一份给场景引擎 `case_engine` 用的声明式配置
+case00 新增一份给场景运行方式 `case_engine` 用的声明式配置
 `cases/case00_village/scenario.yaml`(目录名即 `case_id = case00_village`,声明
 `meta.engine: sandbox-value`)。它只做**声明**:6 个角色、价值权重(制度层
 `governance.json` + 各 `agent.json` 的 `initial_tendency`)、剧情/关系/地图资产路径、
-沙盒参数,全部经 `custom` 原样透传;引擎能加载、能校验,但**不建模** case00 的迷宫沙盒语义。
+沙盒参数,全部经 `custom` 原样透传;运行方式能加载、能校验,但**不建模** case00 的迷宫沙盒语义。
 
-**多引擎理解**:`case_engine/config` 只加载/校验 `meta.engine` 声明的引擎 id
+**多运行方式理解**:`case_engine/config` 只加载/校验 `meta.engine` 声明的运行方式 id
 (注册表在 `case_engine/engines.py`)。case00 用 **sandbox-value**(生成式价值权重沙盒:
 移动/感知/调度/价值倾向，原语在 mavisframework）；case01 用 **experiment-eval**（受控
 实验/评估）。两者配合使用，各自声明、互不依赖。
@@ -55,7 +55,7 @@ case00 新增一份给场景引擎 `case_engine` 用的声明式配置
 **沙盒运行语义不变**:实时仍走 `live_fastapi.py`(5001)与 `live/`,只读存档仍走
 本目录 `serve.py`(5003)。价值权重 `value_tendency` 依旧是 case00 的状态本体。
 此声明为过渡态:case00 与 case01 由同一 `case_engine` 声明加载,但 case00 的
-沙盒引擎桥尚未实现。
+沙盒运行方式的桥接尚未实现。
 
 ## 两条硬约定
 

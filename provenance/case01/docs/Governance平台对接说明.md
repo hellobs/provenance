@@ -1,18 +1,18 @@
-# GTC Case 01 → Governance Platform 对接说明(Platform / HCI 侧与引擎侧共用)
+# GTC Case 01 → Governance Platform 对接说明(Platform / HCI 侧与实现侧共用)
 
 > **状态**:参考(5002 面)
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:5002 冻结契约的说明;数据口径/信息边界/平台侧状态机三节仍有效。**唯一对接入口已改为 5010** —— 见 `docs/平台对接契约_5010唯一入口.md`
 > 配套文件:`case01_api.openapi.yaml`(机器可读接口契约)。
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
-> 与 `05_GTC_HCI_增量需求说明_平台侧.txt`。本文只讲"引擎侧 这边提供什么、
+> 与 `05_GTC_HCI_增量需求说明_平台侧.txt`。本文只讲"实现侧 这边提供什么、
 > 平台侧 这边需要实现什么、两边怎么对数据",不重复全文。
-> 维护:研究侧;引擎侧职责对接:引擎侧;
+> 维护:研究侧;实现侧职责对接:实现侧;
 > Platform / HCI 侧实现:平台侧 团队(含 研究侧)。
 
 ## 0. 一句话分工
 
-**引擎侧(case01)提供只读数据:** 已完成 Run 的索引、结构化治理数据
+**实现侧(case01)提供只读数据:** 已完成 Run 的索引、结构化治理数据
 (Raw Reflection / Router 拆分 / Audit 链)、以及给专家看的 **Full Context
 自然语言全文**。
 **平台侧(Governance Platform)负责:** Expert Review Task 的建单、专家池与
@@ -43,7 +43,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 端口,提供 `/embed/scene`、`/embed/goals`、`/embed/explain`、`/embed/timeline`、
 `/embed/reflections` 五个嵌入式面板,面向实时运行画面与治理面板,不是"已完成 Run
 的治理数据"的只读接口。**平台不应依赖 5001**;若要把它用于正式展示,需另行约定。
-其中 `/embed/reflections` 面板引擎侧自述为"反思标记 → LoRA 线数据入口",这只说明
+其中 `/embed/reflections` 面板实现侧自述为"反思标记 → LoRA 线数据入口",这只说明
 它能看到反思标记,不等于它是专家审核的数据源,别把这条写进平台契约。
 
 ## 2. 三个只读端点
@@ -76,7 +76,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
   `routing_reason`(路由理由);
 
 > 口径说明(`risk` 取值来源与核对日期 2026-09-18):六份已落盘记录
-> `260905-demo-case01-old-B` / `260905-demo-case01-old-A` / `260905-demo-case01-old-C`(旧引擎)与 `260917-demo-case01-mavis-A` / `260917-demo-case01-mavis-B` /
+> `260905-demo-case01-old-B` / `260905-demo-case01-old-A` / `260905-demo-case01-old-C`(旧运行方式)与 `260917-demo-case01-mavis-A` / `260917-demo-case01-mavis-B` /
 > `260917-demo-case01-mavis-C` 的 `router.issues[].risk` 实测均为小写 `high` / `medium` / `low`
 > (见各 `runs/<run_id>/run.json`)。本契约以小写为准,平台侧勿按大写匹配。
 > **不要为了迁就本说明去改记录。**
@@ -90,7 +90,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 > **顶层附加键(核对日期 2026-09-18):** 三条 mavis 样本(`260917-demo-case01-mavis-A` /
 > `260917-demo-case01-mavis-B` / `260917-demo-case01-mavis-C`)的 `run.json` 顶层比本文其它节多出三个键——
 > `summary`(运行统计:节点数/交互/耗时)、`injector`(injector 状态机内部结构)、
-> `compat`(兼容性检查结果)。这三个都是引擎侧**内部附加键,平台不读**。
+> `compat`(兼容性检查结果)。这三个都是实现侧**内部附加键,平台不读**。
 > 其中 `injector` 段含 Branch 实验元信息与逐节点 dialogue **原文,属于实验元数据,
 > 不得进专家面向的任何展示**(与 §2.3 的信息边界同一约束)。
 - `audit`: 该 Run 世界侧动作时间线(释放事件 / 买卖 / 状态推进),
@@ -189,5 +189,5 @@ case01 侧每完成一个完整 Run(含 Reflection / Router)才落盘,且为只�
 - [ ] 关键节点有时间、责任人、动作、结果,可按 Run / Reflection 回溯;
 - [ ] 最终结论与材料池状态可查询。
 
-有任何字段/语义问题,请同步引擎侧职责对接人(引擎侧)或文档维护人(研究侧);
+有任何字段/语义问题,请同步实现侧职责对接人(实现侧)或文档维护人(研究侧);
 平台实现请勿自行补剧情或改动 case01 产物。

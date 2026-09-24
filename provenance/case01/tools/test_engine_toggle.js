@@ -15,7 +15,7 @@ const fn = m[0];
 
 // 标记必须真的在模板里(否则"先选引擎"就落空了)
 const marked = [...html.matchAll(/data-engines="([^"]+)"/g)].map((x) => x[1]);
-const hasEmptyOption = /<option value="">[^<]*请先选择引擎/.test(html);
+const hasEmptyOption = /<option value="">[^<]*请先选择运行方式/.test(html);
 
 function mkEl(id, engines) {
   return { id, style: { display: '?' }, _engines: engines || null,
@@ -66,7 +66,7 @@ for (const [engine, want, desc, wantDisabled] of cases) {
   const wantHead = [want.roles, want.evalSec, want.sbx];
   const headOk = got.headings.every((d, i) => d === wantHead[i]);
   const btnOk = got.disabled.every((d) => d === wantDisabled);
-  const hintOk = engine === '' ? got.hint.includes('请先选择引擎') : got.hint.includes(engine);
+  const hintOk = engine === '' ? got.hint.includes('请先选择运行方式') : got.hint.includes(engine);
   const pass = ok && btnOk && hintOk && headOk;
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${desc}  engine='${engine || '(空)'}'  ` +
     `roles=${got.roles || '""'} eval=${got.evalSec || '""'} sbx=${got.sbx || '""'} ` +

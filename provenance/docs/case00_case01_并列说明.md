@@ -1,7 +1,7 @@
 # case00 / case01 两个案例的并列说明
 
 > **状态**:现行
-> **最后核对**:2026-09-22
+> **最后核对**:2026-09-24
 > **说明**:两个案例并列时的口径(谁冻结、谁在推进)
 > 2026-09-19。**case00 = 仓库原有的 6 角色投资咨询场景**（Provenance 原生，最一开始那套多 agent 设定）；
 > **case01 = 作用于 mavis 的注入器**（2 角色、节点驱动的受控实验）。
@@ -47,13 +47,13 @@ cd D:\zzr\provenance\provenance
   `/api/runs/{run_id}`（快照步数 + 最后一步的角色坐标与 value_tendency）、`/health`。
 - `case00/README.md`——冻结声明与两条硬约定。
 
-**声明化场景（2026-09-20，仅声明化不重写语义；价值权重已引擎标准段）**：case00 另有一份
-`cases/case00_village/scenario.yaml` 供场景引擎 `case_engine` 加载/校验——
+**声明化场景（2026-09-20，仅声明化不重写语义；价值权重已运行方式标准段）**：case00 另有一份
+`cases/case00_village/scenario.yaml` 供场景运行方式 `case_engine` 加载/校验——
 6 角色 + 价值权重（制度层 `governance` + 个人起点 `initial_tendency`）。其中
-**`value_tendency` 已提升为引擎标准段 `world.value_tendency`**（与 case01 用标准段表达
+**`value_tendency` 已提升为运行方式标准段 `world.value_tendency`**（与 case01 用标准段表达
 状态一致，供 `sandbox-value` 预检真读取校验，不再是 pure `custom` 透传）；
 `scenario_assets` / `sandbox_params` 仍经 `custom` 透传。此时 case00 与 case01 由同一
-`case_engine` 声明加载，case00 的沙盒原语引擎仍未实跑，**运行语义不变**：实时仍
+`case_engine` 声明加载，case00 的沙盒原语运行方式仍未实跑，**运行语义不变**：实时仍
 `live_fastapi.py`（5001）、只读仍 `case00/serve.py`（5003）。
 
 启动只读面：
@@ -79,14 +79,14 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 
 - **成品三线**（平台契约读的就是这里）：`runs/260917-demo-case01-mavis-A/run.json`、
   `-B/`、`-C/`，各约 56 KB，含 turns / retrievals / events / reflection / router / injector
-- **旧引擎对照**（archive 基线 `d41cdec` 的产物，保留不删）：
+- **旧运行方式对照**（archive 基线 `d41cdec` 的产物，保留不删）：
   `runs/260905-demo-case01-old-{A,B,C}/`（`run.json` + `turns.jsonl` + `retrievals.jsonl` + `branch.json`）
 - **注入器原始与映射**：`runs_injector/`——`def-B/{raw.json,mapped.json}`（默认剧本）、
   `live-B-<日期>/raw.json`（真实跑一次的原始记录）、`smoke/`、`isolation/probe-B.json`
 - **静态审查页**：`runs_html/`（index + 6 个 demo 页 + viz 子目录）
 
 **记录命名（2026-09-19 定稿）**：`<YYMMDD>-<kind>-<case>-<engine>-<branch>[-HHMM]`。
-样本如 `260905-demo-case01-old-B`（旧引擎）与 `260917-demo-case01-mavis-A`（mavis），
+样本如 `260905-demo-case01-old-B`（旧运行方式）与 `260917-demo-case01-mavis-A`（mavis），
 实跑如 `260919-live-case01-mavis-B-1424`。**日期在最前**（便于按时间排序）、
 **带 `case`**（现在 case00 / case01 并存）、**带 `engine`**（`old` / `mavis`，一眼分出对照）。
 规则有三条：
@@ -110,7 +110,7 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
 
 - **互不依赖**。5001（case00）与 5002 / 5010（case01）是三个独立进程；
   case01 的联调不依赖 5001，5001 也不需要 case01。仓库里早已这么记
-  （`case01/docs/对接确认单_引擎侧答复_20260905.md`：provenance 旧场景服务 5001，与 Case 01 无关）。
+  （`case01/docs/对接确认单_实现侧答复_20260905.md`：provenance 旧场景服务 5001，与 Case 01 无关）。
 - case01 复用 mavis 与 mavis-vizkit；case00 走 provenance 自己的 `live/` 编排，用同一套 Phaser 前端。
 - 二者**共用同一个本地 Ollama**（`qwen3:4b-instruct-2507-q4_K_M`）。
 
@@ -176,8 +176,8 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
   做法对齐 `live/routes.py` 的 `_render_reflections_page`——自包含 HTML + 原生 JS +
   `fetch` 打自己的 JSON API，不依赖 Phaser、不需要构建步骤。分九块：概览 / 对话(turns) /
   检索(retrievals) / 事件(events) / 状态(state_history) / 反思(reflection) /
-  问题分流(router) / 注入器(injector) / 审计(audit)；六条记录（mavis 三条 + 旧引擎三条）都能选；
-  旧引擎记录没有 `injector` 段，面板显示"无注入器记录"。
+  问题分流(router) / 注入器(injector) / 审计(audit)；六条记录（mavis 三条 + 旧运行方式三条）都能选；
+  旧运行方式记录没有 `injector` 段，面板显示"无注入器记录"。
   **它不再是独立服务**：路由放在 `APIRouter` 里，由 5010 的实时面 `include_router` 挂上去
   （`attach_to()`），所以界面只有一个（小镇实时动 + 右栏"结果记录"卡片）。`--port 5004` 的独立跑法
   只留作排障。
@@ -186,11 +186,11 @@ python live_switch.py --stop all                  # 全停(不碰只读面)
   `/api/review/runs` 里每条记录都跑一遍），抓"pane 抛异常"与"输出里出现 undefined /
   `[object Object]` / NaN"。**没有浏览器时这是唯一能抓 JS 运行期错误的手段**（`node --check`
   只查语法）。用法见文件头；需要面板服务在跑。
-- **两种记录形态必须都认**：mavis 的检索是 `date/mode/injected[]`，旧引擎是
+- **两种记录形态必须都认**：mavis 的检索是 `date/mode/injected[]`，旧运行方式是
   `current_date/hits[]/source_stats`。首版只认前者，把旧记录的命中明细**整个丢了**
   （修复后 `260905-demo-case01-old-C` 的检索块从 1174 字符涨到 4764）。同理旧记录没有 `injector`/`summary`/`compat`，
   面板要分段渲染并明说"该记录早于 mavis 路径"，**不能**渲染成 `mode= / 节点 0 个`。
-  另外默认选中的必须是成品三线（mavis），不能落在旧引擎对照记录上。
+  另外默认选中的必须是成品三线（mavis），不能落在旧运行方式对照记录上。
 
 **还没组件化：case01 的注入器本体。** 它目前仍是 provenance 内的模块（`case01/injector/` + `case01/world/`）。
 阶段 3 设计稿 `case01/docs/任务_阶段3_抽包设计稿_20260918.md` 已于 2026-09-19 评审通过，

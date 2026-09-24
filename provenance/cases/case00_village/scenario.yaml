@@ -1,13 +1,13 @@
 # ============================================================
-# scenario.yaml — Case 00 场景声明式定义(引擎加载/校验,语义透传)
+# scenario.yaml — Case 00 场景声明式定义(运行方式加载/校验,语义透传)
 # case_id = case00_village = cases/ 下目录名。
 #
 # 过渡态约定(2026-09-20,用户拍板:仅声明化不重写语义):
 #   case00 = provenance 原生的 6 角色投资咨询**沙盒**仿真(移动/感知/调度/
 #   关系/价值倾向演化)。case_engine 暂不建模这些沙盒原语,本文件只做**声明**:
-#   - 引擎侧:roles/meta 可加载、可校验(满足 case_engine 的 Validate 契约);
+#   - 实现侧:roles/meta 可加载、可校验(满足 case_engine 的 Validate 契约);
 #   - 沙盒侧:价值权重(value_tendency)、资产路径(assets)、沙盒参数(params)统一落在
-#     `world` 标准段(不设 custom 逃生舱);**语义仍由旧沙盒引擎持有**
+#     `world` 标准段(不设 custom 逃生舱);**语义仍由旧沙盒运行方式持有**
 #   本文件不改动、不复制运行语义;资产路径指向冻结留档 case00/scenario/。
 # 价值数据逐字取自 governance.json 与各 agent.json(忠实原文,不做润色/改动)。
 # ============================================================
@@ -16,16 +16,16 @@ meta:
   case_id: case00_village
   name: "6 角色投资咨询中心"
   description: "provenance 原生的 6 角色多 agent 投资咨询沙盒:角色在投资咨询中心按制度约束与剧情事件连续仿真,价值倾向(value_tendency)随交互演化"
-  engine: sandbox-value             # 推荐/默认引擎(价值权重沙盒);运行时可 --engine 覆盖
+  engine: sandbox-value             # 推荐/默认运行方式(价值权重沙盒);运行时可 --engine 覆盖
   protocol: sandbox                 # 值演化/干预型(区别于 case01 的受控实验 experiment)
   simulation: "investment"          # 取自 story/relationships 的 simulation 字段
   start_date: "2025-02-13"          # live_fastapi 的 --start(沙盒墙钟起始)
-  runtime: "live_fastapi.py(5001) + live/"   # 过渡:沙盒语义仍由旧引擎持有
+  runtime: "live_fastapi.py(5001) + live/"   # 过渡:沙盒语义仍由旧运行方式持有
   audit_target: ai_advisor          # 专家审核链只监控 AI 助手(2026-09-22 已定):
                                     # 六角色仅 ai_advisor 为 ai_tool,其余 user 不产生
                                     # "AI 自主判断"可审。调用方经 kw 传 evolution+llm 触发。
 
-# ---- 角色(引擎 Validate:非空唯一 id;role_type 复刻 agent.json) ----
+# ---- 角色(运行方式 Validate:非空唯一 id;role_type 复刻 agent.json) ----
 roles:
   - id: ai_advisor
     display_name: "AI Advisor"
@@ -54,7 +54,7 @@ roles:
     type: user                      # 资深散户(高频求教者)
     llm: local
 
-# ---- 价值权重:引擎标准段(note case00 的状态是每角色的权重向量,非 case01 的
+# ---- 价值权重:运行方式标准段(note case00 的状态是每角色的权重向量,非 case01 的
 #      单个主角 state_schema;经 world.value_tendency 供 sandbox-value 预检消费) ----
 world:
   value_tendency:

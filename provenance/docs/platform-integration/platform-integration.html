@@ -199,11 +199,11 @@
               Provenance 以 <strong>5010 单一实时入口</strong>对外服务：可视化面板经
               <code>/embed/*</code> 以 iframe 方式嵌入治理平台，已完成运行的治理数据经
               <code>/api/runs</code>、<code>/api/run-detail</code> 等只读接口单向提供；
-              引擎与平台之间<strong>无反向依赖、互不写入</strong>。专家审核流程（建单、状态机、冲突处理、训练材料池）由平台侧实现。
+              运行方式与平台之间<strong>无反向依赖、互不写入</strong>。专家审核流程（建单、状态机、冲突处理、训练材料池）由平台侧实现。
             </p>
             <div class="report-intro__meta">
               <span>版本 v1.0 · 2026-09-21</span>
-              <span>维护：研究侧 · 引擎侧对接：引擎侧</span>
+              <span>维护：研究侧 · 实现侧对接：实现侧</span>
               <span>对接方：平台侧 治理平台 / HCI 团队</span>
             </div>
           </div>
@@ -227,15 +227,15 @@
             <p>
               本文面向 <strong>平台侧 治理平台的实现方</strong>，回答三个问题：可视化界面如何嵌入、
               已完成运行的治理数据从哪个接口取、平台需要自己实现哪些部分。文档只讲"对方提供什么、
-              另一方实现什么、两边怎么对数据"，不重复引擎内部设计。
+              另一方实现什么、两边怎么对数据"，不重复运行方式内部设计。
             </p>
           </section>
 
           <section id="architecture">
             <h2>2 · 总体架构</h2>
             <p>
-              系统自下而上分为四层：引擎内核（mavisframework）、可视化插件（mavis-vizkit）、
-              案例引擎（case00 / case01 / case_engine）、以及对外平台侧（5010 实时服务与共享数据契约）。
+              系统自下而上分为四层：运行方式内核（mavisframework）、可视化插件（mavis-vizkit）、
+              案例运行方式（case00 / case01 / case_engine）、以及对外平台侧（5010 实时服务与共享数据契约）。
               依赖方向<strong>严格单向</strong>，无反向依赖。
             </p>
 
@@ -254,13 +254,13 @@ flowchart TB
     API["治理数据接口<br/>/api/goals · /api/timeline · /api/explain<br/>/api/reflections · /api/review/*"]
   end
 
-  subgraph CASE["案例引擎层"]
+  subgraph CASE["案例运行方式层"]
     C0["case00 小镇治理"]
     C1["case01 注入器推演<br/>(injector + world + reflection/router)"]
-    CE["case_engine 引擎策略<br/>(experiment-eval / sandbox-value)"]
+    CE["case_engine 运行方式<br/>(experiment-eval / sandbox-value)"]
   end
 
-  subgraph CORE["引擎内核（独立仓）"]
+  subgraph CORE["运行方式内核（独立仓）"]
     VIZ["mavis-vizkit 可视化插件包"]
     MAVIS["mavisframework 内核<br/>(Simulator · agent_core · 插件面)"]
   end
@@ -284,9 +284,9 @@ flowchart TB
 
             <h3>2.1 一次运行的数据闭环</h3>
             <p>
-              配置工具触发一次组合运行后，引擎把结果写为成品的 <code>run.json</code> 记录；
+              配置工具触发一次组合运行后，运行方式把结果写为成品的 <code>run.json</code> 记录；
               实时面（5010）既驱动可视化，也把同一份记录归入统一历史契约。平台侧只需通过只读接口
-              读取成品记录，不必关心运行过程。数据流方向为：<strong>引擎 → 记录文件 → 5010 只读接口 → 治理平台</strong>。
+              读取成品记录，不必关心运行过程。数据流方向为：<strong>运行方式 → 记录文件 → 5010 只读接口 → 治理平台</strong>。
             </p>
           </section>
 
@@ -354,7 +354,7 @@ flowchart LR
           <section id="api-contract">
             <h2>4 · 治理数据接口契约（只读）</h2>
             <p>
-              治理平台<b>只通过只读 HTTP 接口取数</b>，不写回引擎、不读引擎文件。字段命名与
+              治理平台<b>只通过只读 HTTP 接口取数</b>，不写回运行方式、不读运行方式文件。字段命名与
               case01 审阅契约 <code>_brief()</code> 对齐，配置工具与前端读的是同一套接口。
             </p>
 
@@ -401,7 +401,7 @@ flowchart LR
             <h2>5 · 平台侧需要实现的部分</h2>
             <p>
               以下职责<strong>属于治理平台</strong>，Provenance 只提供只读数据来源，不代为实现。
-              分工边界是：<strong>引擎不写平台、平台不写引擎</strong>。
+              分工边界是：<strong>运行方式不写平台、平台不写运行方式</strong>。
             </p>
             <div class="table-wrap">
               <table>
@@ -419,7 +419,7 @@ flowchart LR
               </table>
             </div>
             <p>
-              冲突处理规则已由引擎侧在配置中固化：同专业 2 人结论互斥 → 追加 3 位未参与专家 →
+              冲突处理规则已由实现侧在配置中固化：同专业 2 人结论互斥 → 追加 3 位未参与专家 →
               5 人中取多数结论、少数意见保留。平台只需按此状态流转。
             </p>
           </section>
@@ -430,7 +430,7 @@ flowchart LR
               Provenance 已保证 <code>/api/run-detail</code> 的 <code>full-context</code> 输出
               为自然语言全文，不含以下<strong>实验元信息</strong>：Branch A/B/C 标签、Branch 判定方式、
               Future Timeline 预设、未披露的隐藏信息等。平台展示时<strong>请勿再次叠加这些内部字段</strong>，
-              也勿把 <code>router.issues[].id</code> 之外的引擎内部段（如 <code>injector</code>、逐节点原文）暴露给专家。
+              也勿把 <code>router.issues[].id</code> 之外的运行方式内部段（如 <code>injector</code>、逐节点原文）暴露给专家。
             </p>
             <p>
               另请区分"实时面状态"与"治理数据"：<code>/health</code> 与 <code>/api/review/live</code>
@@ -454,8 +454,8 @@ flowchart LR
             </ol>
             <div class="callout">
               <span class="callout__label">部署提示</span>
-              5010 默认绑定 <code>127.0.0.1</code>。若平台与引擎不在同一主机，请把部署环境
-              （服务器 / 内网穿透 / 容器）告知引擎侧（引擎侧），由引擎侧确认开放或部署方案后再联调。
+              5010 默认绑定 <code>127.0.0.1</code>。若平台与运行方式不在同一主机，请把部署环境
+              （服务器 / 内网穿透 / 容器）告知实现侧（实现侧），由实现侧确认开放或部署方案后再联调。
             </div>
           </section>
 
@@ -464,7 +464,7 @@ flowchart LR
             <ul>
               <li>专家账号体系：直接用平台现有用户，还是先做 mock 名单？</li>
               <li>反思文本定位：平台需要按 issue 定位对应反思片段，还是按 Router 摘要就近截取？</li>
-              <li>数据同步方式：平台轮询 <code>/api/runs</code> 是否可接受？是否需要引擎加 Webhook / 推送？</li>
+              <li>数据同步方式：平台轮询 <code>/api/runs</code> 是否可接受？是否需要运行方式加 Webhook / 推送？</li>
             </ul>
           </section>
 

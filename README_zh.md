@@ -8,7 +8,7 @@
 
 ## 0. 现状速览（2026-09-21）
 
-**分层**：声明（场景数据）→ 引擎（`case_engine/`，可注册、可替换）→ 案例（`case01/`、`case00/`）
+**分层**：声明（场景数据）→ 运行方式（`case_engine/`，可注册、可替换）→ 案例（`case01/`、`case00/`）
 → 内核（`mavisframework`，独立发版，v1.3.0）→ 呈现（`packages/mavis-vizkit`，mavis 插件）。
 
 **服务（本机）**：
@@ -181,7 +181,7 @@ python app.py
 
 ### 7.4 机制概要
 
-行动 → 与**行为绑定目标**的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。目标名刻意设计为语义可区分(见 7.1);剧情事件与角色日程轮换行为,保持曲线活跃而非平坦。形式化见引擎 README 第 7 节。
+行动 → 与**行为绑定目标**的 embedding 相似度 → 相对占比 × 权重 → 滑动窗口 → 倾向(与人物底色混合)→ 提示词 → 行动。目标名刻意设计为语义可区分(见 7.1);剧情事件与角色日程轮换行为,保持曲线活跃而非平坦。形式化见运行方式 README 第 7 节。
 
 ### 7.5 可解释性面板(`/api/explain`)
 
@@ -242,7 +242,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
   - `GET /api/export-chart?agent=<名>` — matplotlib 倾向曲线 PNG
   - `GET /api/explain?agent=<名>` — 可解释性面板:倾向构成分解(α 混合)/体验窗口明细(行动·对齐度·反馈)/干预因果链(每次干预后的倾向迁移量)。checkpoint 序列加载按目录 mtime 缓存
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面使用
-- **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;引擎测试在 mavis 仓库 `tests/`
+- **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;运行方式测试在 mavis 仓库 `tests/`
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
 - **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(独立进程,端口 **8060**,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)
