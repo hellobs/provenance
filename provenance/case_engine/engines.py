@@ -32,7 +32,10 @@ _COMPONENTS = {
 ENGINES: Dict[str, Dict[str, Any]] = {
     "experiment-eval": {
         "name": "受控实验 / 评估",
-        "output": "run.json",
+        # 2026-09-24 体检:实测它的产物是 `<case_id>_exp.json`,键只有
+        # branch/consistency/engine/run_type/scenario/state/timeline —— **没有九块**。
+        # 原写 "run.json" 与实现不符:真正产出九块 run.json 的是 case01 的注入器路径(mavis)。
+        "output": "<case_id>_exp.json(最小线小结:分支/一致性/时间线;不含九块)",
         "primitives": "branch(分支) / reflection(反思) / consistency(一致性) / retrieval(检索)",
         "components": _COMPONENTS["experiment-eval"],
         "note": "把一次场景交互压成一条分支线,可审计、可复现",

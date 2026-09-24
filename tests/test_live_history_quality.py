@@ -229,6 +229,35 @@ def test_pagination_and_unknown_params(monkeypatch):
     assert "quality" in warn["ignored_note"]
 
 
+def test_every_source_has_a_view_marker(monkeypatch):
+    """三种 source 的 data 形状完全不同,**每种都要有 `view`** 让客户端判断自己在渲染哪一套。
+
+    2026-09-24 体检:以前只有 review 带 view —— 平台侧按九块写渲染,遇到 checkpoint/compressed
+    行会拿到 {conversation, shots} / {files} 而不知道自己在看什么。
+    这里同时钉住"只有 review 有九块"(只有它出自 case01 成品记录)。
+    """
+    for k, v in FIXTURE.items():
+        monkeypatch.setenv({"runs": "CASE01_RUNS_ROOT",
+                            "checkpoint": "CASE00_CHECKPOINTS_ROOT",
+                            "compressed": "RESULTS_COMPRESSED_ROOT"}[k], v)
+    body = _call(H.list_all_runs(include_questionable=True))
+    seen = {}
+    for r in body["runs"]:
+        seen.setdefault(r["source"], r["run_id"])
+    assert set(seen) == {"review", "checkpoint", "compressed"}, seen
+    for src, rid in seen.items():
+        d = _call(H.run_detail(src, rid))
+        assert d.get("ok") and d.get("view"), (src, d.get("view"))
+        data = d.get("data") or {}
+        if src == "review":
+            assert d["view"] == "expert-safe"
+            for k in ("turns", "events", "reflection", "router"):
+                assert k in data, k
+        else:
+            assert "turns" not in data and "reflection" not in data, \
+                "{} 不该有九块(它不是 case01 成品记录)".format(src)
+
+
 def test_expert_safe_record_keeps_contract_keys():
     """白名单要覆盖平台契约 §2.2 明确要读的那些键。"""
     rec = {"run_id": "r", "start_date": "d", "end_date": "e", "turns": [1],

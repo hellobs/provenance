@@ -381,6 +381,9 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
             except Exception:  # noqa: BLE001
                 conv = {"error": "conversation.json 不可读"}
         return JSONResponse({"ok": True, "source": "checkpoint", "run_id": run_id,
+                             # view(2026-09-24):三种 source 的 data 形状**完全不同**,
+                             # 客户端得有一个字段能判断自己在渲染哪一套;以前只有 review 带 view。
+                             "view": "case00-archive",
                              "data": {"conversation": conv,
                                       "shots": sorted(
                                           f for f in os.listdir(ck_root)
@@ -393,6 +396,7 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                                 status_code=404)
         files = sorted(f for f in os.listdir(comp_root))
         return JSONResponse({"ok": True, "source": "compressed", "run_id": run_id,
+                             "view": "compressed-index",
                              "data": {"files": files}})
     return JSONResponse({"ok": False, "errors": ["未知 source: {}".format(source)]},
                         status_code=404)
