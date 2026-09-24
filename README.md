@@ -351,8 +351,9 @@ live simulation.
 ## 12. Security & exposure (2026-09-23)
 
 **None of these services has authentication.** Anyone who can reach a port can read every
-run record; 5010 additionally lets them rewrite governance weights, undo interventions and
-mark reflections; 8060 (config tool) can edit scenarios, delete roles and launch a run.
+run record; 5010 additionally lets them rewrite governance weights, undo interventions,
+mark reflections and restart a run (4 write endpoints in total); 8060 (config tool) can
+edit scenarios, delete roles and launch a run.
 
 - **Loopback-only by default.** Binding a non-loopback address requires an explicit
   `LIVE_ALLOW_REMOTE=1`; otherwise the process **refuses to start** and prints exactly what
