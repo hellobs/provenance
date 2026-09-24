@@ -5,7 +5,9 @@
 ②跨源白名单默认只给本机来源(原来默认 `*`,而服务没有鉴权);
 ③默认配置下,外站 Origin 拿不到 ACAO。
 """
+import io
 import os
+import re
 import sys
 
 import pytest
@@ -78,3 +80,67 @@ def test_foreign_origin_gets_no_acao_by_default(monkeypatch):
     assert acao is None, "默认白名单下不该给外站 ACAO,实际:{}".format(acao)
     r2 = c.get("/api/runs", headers={"Origin": "http://127.0.0.1:5010"})
     assert r2.headers.get("access-control-allow-origin") == "http://127.0.0.1:5010"
+
+
+# --------------------------------------------------------------- 清单与代码必须一致
+# 为什么要这两条:2026-09-24 CI 红过一次 —— vizkit 插件里注册了 `/control/restart`,
+# 暴露面清单没登记,而当时的测试只断言"清单里有那几个字面量",于是清单和代码
+# 各说各话,谁也发现不了。现在**从代码里扫**写端点,双向对齐。
+
+# 所有可能注册路由的面(含 vizkit 插件 —— 漏掉它就等于漏掉 /control/restart)
+_SURFACES = (
+    "provenance/live/routes.py",
+    "provenance/live/history.py",
+    "provenance/case01/review_app.py",
+    "provenance/live_fastapi.py",
+    "provenance/case01/vizkit/live_run.py",
+    "packages/mavis-vizkit/src/mavis_vizkit/plugins/live.py",
+    "packages/mavis-vizkit/src/mavis_vizkit/plugins/report.py",
+    "packages/mavis-vizkit/src/mavis_vizkit/plugins/town.py",
+    "packages/mavis-vizkit/src/mavis_vizkit/plugins/console.py",
+)
+_WRITE_DECORATOR = re.compile(
+    r"@(?:app|router)\.(?:post|put|patch|delete)\(\s*[\"']([^\"']+)[\"']")
+
+
+def _registered_write_paths():
+    """从代码里扫出真实注册的写端点 → {path: 文件}。"""
+    found = {}
+    for rel in _SURFACES:
+        p = os.path.join(_REPO, rel)
+        if not os.path.isfile(p):
+            continue
+        text = io.open(p, encoding="utf-8", errors="replace").read()
+        for m in _WRITE_DECORATOR.finditer(text):
+            found.setdefault(m.group(1), rel)
+    return found
+
+
+def test_scanner_actually_sees_the_plugin():
+    """先证明扫描面本身没漏:漏了 vizkit 插件,下面的守卫就是假的。"""
+    reg = _registered_write_paths()
+    assert "/control/restart" in reg, "扫描面里没有 vizkit 插件(它才是最容易漏的一处)"
+    assert reg["/control/restart"].endswith("plugins/live.py")
+
+
+def test_every_registered_write_endpoint_is_listed():
+    """代码里注册的写端点,必须在 `netguard.WRITE_ENDPOINTS` 里有名字。
+
+    加一个新的写端点而忘了登记 → 这条红(而不是等到"有人开端口时才发现清单不全")。
+    """
+    listed = "\n".join(NG.WRITE_ENDPOINTS)
+    missing = {p: rel for p, rel in _registered_write_paths().items() if p not in listed}
+    assert not missing, (
+        "这些写端点没进 netguard.WRITE_ENDPOINTS(暴露面清单):{}"
+        " —— 它们是**无鉴权**的状态变更口子,开放端口前必须点名。".format(missing))
+
+
+def test_listed_5010_endpoints_actually_exist():
+    """反向:清单里写的 5010 端点必须真在代码里(防陈旧条目/拼错)。"""
+    reg = _registered_write_paths()
+    for line in NG.WRITE_ENDPOINTS:
+        if not line.startswith("5010"):
+            continue
+        m = re.search(r"POST\s+(/\S+)", line)
+        assert m, "清单条目格式变了,守卫读不出端点:{}".format(line)
+        assert m.group(1) in reg, "清单写了代码里没有的端点:{}".format(line)
