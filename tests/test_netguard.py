@@ -144,3 +144,22 @@ def test_listed_5010_endpoints_actually_exist():
         m = re.search(r"POST\s+(/\S+)", line)
         assert m, "清单条目格式变了,守卫读不出端点:{}".format(line)
         assert m.group(1) in reg, "清单写了代码里没有的端点:{}".format(line)
+
+
+_MAVIS_CONFIG_TOOL = os.path.join(_REPO, "..", "mavis", "config_tool", "app.py")
+
+
+def test_config_tool_write_count_matches_the_list():
+    """清单里 8060 那行写的"等 N 个写端点"必须与代码一致。
+
+    为什么要它:8060 是**无鉴权**的写面(改场景/删角色/执行运行),清单上那个数字若漂了,
+    读清单的人会低估暴露面。数字来自真实 decorator 计数,不靠人记。
+    """
+    if not os.path.isfile(_MAVIS_CONFIG_TOOL):
+        pytest.skip("mavis 仓不在预期位置(与 test_mavis_purity 同口径)")
+    src = io.open(_MAVIS_CONFIG_TOOL, encoding="utf-8", errors="replace").read()
+    actual = len(re.findall(r"@app\.(?:post|put|patch|delete)\(", src))
+    m = re.search(r"等\s*(\d+)\s*个写端点", "\n".join(NG.WRITE_ENDPOINTS))
+    assert m, "清单里没有写端点数量(格式变了,守卫读不出来)"
+    claimed = int(m.group(1))
+    assert claimed == actual, "8060 代码里 {} 个写端点,清单写 {} 个".format(actual, claimed)
