@@ -44,6 +44,10 @@ def append_mark(record: dict) -> None:
         marks = load_marks()
         marks.append(record)
         write_json_atomic(path, marks)
+        # JSONL 在写侧同步刷新(2026-09-25 体检):此前只有 HTTP 路由层补调
+        # rebuild_jsonl,直接调 append_mark 的路径(脚本/测试/工具)会留陈旧
+        # JSONL —— 而 .jsonl 文件就躺在磁盘上,消费方(LoRA 线)读了就是旧数据。
+        rebuild_jsonl()
 
 
 def jsonl_row(mark: dict) -> str:

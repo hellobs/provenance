@@ -79,3 +79,40 @@ class TestExport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMarkWriteRoundTrip(unittest.TestCase):
+    """标记写入 API → lora_prep 读取 → 导出,全链回归(阶段:LoRA 预准备)。"""
+
+    def test_append_then_export(self):
+        import tempfile
+        from live import reflections as refl
+
+        with tempfile.TemporaryDirectory() as td:
+            mp = os.path.join(td, "reflection_marks.json")
+            old = refl.MARKS_PATH
+            refl.MARKS_PATH = mp
+            try:
+                mark = refl.new_mark(
+                    agent="Investment AI", simulation="s", sim_time="20250213-10:00",
+                    node_id="n1",
+                    thought="市场传闻未经官方披露证实,且传播路径依赖单一第三方测算,证据分级不足,不建议参与。",
+                    verdict="incorrect",
+                    correction="官方披露缺失时不建议任何仓位;应明确提示传闻被证伪时的回撤风险与不可逆损失。",
+                    context={"role": "AI Investment Advisor", "action": "建议小仓位参与",
+                             "value_tendency": {"Risk Control": 0.3}})
+                refl.append_mark(mark)
+                # 写侧:JSON 数组是唯一真源,JSONL 由 rebuild 同步刷新
+                self.assertTrue(os.path.isfile(mp))
+                jl = mp + "l"
+                self.assertTrue(os.path.isfile(jl), "append 后 JSONL 未同步刷新")
+                # 读侧:lora_prep 与 live.load_marks 读到同一份数据
+                from case01.tools.lora_prep import load_marks_any, export
+                marks, src_path = load_marks_any()
+                self.assertEqual(len(marks), 1)
+                self.assertEqual(os.path.normpath(src_path), os.path.normpath(mp))
+                report = export(marks, out_root=td)
+                self.assertEqual(report["stats"]["sft"], 1)
+                self.assertEqual(report["stats"]["dpo"], 1)
+            finally:
+                refl.MARKS_PATH = old
