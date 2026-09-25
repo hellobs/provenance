@@ -2,6 +2,7 @@
 import io
 import os
 
+from live import state
 from live.state import BASE_DIR, load_tendency_series, log
 
 
@@ -33,7 +34,8 @@ def render_tendency_png(ckpt_dir: str, agent: str,
             cons = {}
     my_ivs = sorted(
         [x for x in my_ivs if x.get("agent") == agent and x.get("simulation") == cur_sim],
-        key=lambda x: str(x.get("sim_time", "")),
+        # 同 sim_time 的多条按墙钟 time 兜底(第十一轮体检:竖线的先后要与时间轴一致)
+        key=state.intervention_sort_key,
     )
 
     # ---- matplotlib 渲染 ----

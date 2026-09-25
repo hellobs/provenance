@@ -1485,7 +1485,14 @@
 				h += '<div style="display:flex; align-items:center; gap:5px; margin:2px 0; flex-wrap:wrap;">';
 				h += '<span style="flex:0 0 110px; color:#555;" title="' + goalsEscape(g) + '"><span style="color:' + color + ';">■</span> ' + goalsEscape(g) + '</span>';
 				h += '<span style="color:#333; font-weight:bold;">' + Math.round(dec.tendency * 1000) / 10 + '%</span>';
-				h += '<span style="color:#999;">= 底色 ' + Math.round(dec.base_component * 1000) / 10 + '% (α×' + Math.round(dec.base_value * 1000) / 10 + '%) + 体验 ' + Math.round(dec.experience_component * 1000) / 10 + '% ((1-α)×窗口均值 ' + Math.round(dec.window_mean * 1000) / 10 + '%)</span>';
+				h += '<span style="color:#999;">= 底色 ' + Math.round(dec.base_component * 1000) / 10 + '% + 体验 ' + Math.round(dec.experience_component * 1000) / 10 + '%</span>';
+				// 原始占比(未归一化)单独写:以前把它直接当分量显示,屏幕上会出现
+				// "48.4% = 底色 2.5% + 体验 13.3%"这种加不起来的等式(第十一轮体检)。
+				h += '<span style="color:#bbb;">(拆解依据:α×底色 ' + Math.round(dec.base_value * 1000) / 10 + '% / (1-α)×窗口均值 ' + Math.round(dec.window_mean * 1000) / 10 + '%';
+				if (d.normalization && Math.abs(d.normalization.factor - 1) > 0.001) {
+					h += ';两项按 Σ=' + d.normalization.raw_total + ' 归一化后相加=100%';
+				}
+				h += ')</span>';
 				h += '</div>';
 			}
 			// ② 窗口明细:最近体验(行动 → 对齐度 → 反馈)

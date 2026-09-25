@@ -599,17 +599,50 @@ async def explain_agent(agent: str = ""):
             wsum = sum(weights) or 1.0
             win_mean[g] = sum(v * wt for v, wt in zip(vals, weights)) / wsum
     decomposition = {}
+    # 归一化(2026-09-24 第十一轮体检):引擎在 observe_consequence 里是
+    #   ①先算窗口加权均值 ②raw = α×底色 + (1-α)×均值 ③按约束删目标 ④**整体归一化**,
+    # 而面板以前直接把 ①/② 的**未归一化**分量与 ④ 之后的 tendency 摆在一起,
+    # 于是屏幕上出现"48.4% = 底色 2.5% + 体验 13.3%"这种自己都不等的等式
+    # (实测 stock-en8:三个目标偏差 -0.18 ~ -0.25)。
+    # 现在改成:把**已经显示出来的那个 tendency** 按"混合前两个来源的原始占比"劈开 ——
+    #   base 占比 = α×底色 / raw,体验占比 = (1-α)×均值 / raw
+    # 这样两项之和**恒等于** tendency(屏幕上那个等式再也不会自相矛盾);
+    # 归一化的系数(Σraw)与原始值照旧给出,口径不藏。
+    _constraints = set((live_agent.get_constraints() or {}).keys())
+    raw = {}
+    for g in set(win_mean) | set(base):
+        raw[g] = alpha * base.get(g, 0.0) + (1 - alpha) * win_mean.get(g, 0.0)
+    if _constraints:
+        raw = {g: v for g, v in raw.items() if g in _constraints}
+    raw_total = sum(raw.values()) or 1.0
     for g in vt:
         base_v = base.get(g, 0.0)
         exp_v = win_mean.get(g, 0.0)
+        raw_v = raw.get(g, 0.0)
+        if raw_v > 0:
+            base_share = alpha * base_v / raw_v
+        else:
+            # 没有可拆的来源(该目标既无底色也无窗口反馈):全算到底色项,
+            # 至少保证"两项之和 = tendency"这条不破。
+            base_share = 1.0
         decomposition[g] = {
             "tendency": round(vt[g], 4),
             "alpha": round(alpha, 4),
-            "base_component": round(alpha * base_v, 4),
-            "experience_component": round((1 - alpha) * exp_v, 4),
+            "base_component": round(vt[g] * base_share, 4),
+            "experience_component": round(vt[g] * (1.0 - base_share), 4),
+            # 原始值(未归一化)照旧给出,便于排查口径
             "base_value": round(base_v, 4),
             "window_mean": round(exp_v, 4),
+            "raw_component": round(raw_v, 4),
         }
+    # 归一化本身也是口径的一部分:不写出来,别人看到"底色 6.5% 而 α×底色=2.5%"会以为算错了
+    normalization = {
+        "raw_total": round(raw_total, 4),
+        "factor": round(1.0 / raw_total, 4),
+        "constraints_applied": bool(_constraints),
+        "note": ("两个分量按'混合前来源占比'劈开,相加恒等于 tendency;"
+                 "引擎口径是先把两项混合、按约束过滤、再整体归一"),
+    }
 
     # ② 窗口明细(最近 N 条体验,正序=从早到晚;每条含 模拟时间/行动/对齐度/反馈)
     ckpt_dir = state.current_ckpt_dir()
@@ -643,7 +676,8 @@ async def explain_agent(agent: str = ""):
                     [x for x in ivs if x.get("agent") == agent
                      # 历史干预(未写 simulation 字段)视为与当前会话兼容,不丢弃
                      and (not x.get("simulation") or x.get("simulation") == cur_sim)],
-                    key=lambda x: str(x.get("sim_time", "")),
+                    # 同 sim_time 的多条按墙钟 time 兜底(第十一轮体检:连点会在同一模拟分钟留下多条)
+                    key=state.intervention_sort_key,
                 )
             except Exception as e:
                 log.warning("explain 读取 interventions.json 失败: {}".format(e))
@@ -710,6 +744,7 @@ async def explain_agent(agent: str = ""):
         "experience_count": obs,
         "window_size": len(window),
         "decomposition": decomposition,
+        "normalization": normalization,
         "window_details": details,
         "intervention_chain": chain,
     })
@@ -743,7 +778,8 @@ async def timeline_data():
             ivs = sorted(
                 [x for x in all_ivs if x.get("agent")
                  and (not x.get("simulation") or x.get("simulation") == cur_sim)],
-                key=lambda x: str(x.get("sim_time", "")),
+                # 同 sim_time 的多条按墙钟 time 兜底(第十一轮体检)
+                key=state.intervention_sort_key,
             )
         except Exception as e:
             log.warning("timeline 读取 interventions.json 失败: {}".format(e))

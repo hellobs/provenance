@@ -238,6 +238,32 @@ class TestExplain:
         assert "Risk Control" in body["decomposition"]
         assert body["decomposition"]["Risk Control"]["alpha"] == pytest.approx(0.1)  # obs=23 → α=0.1
 
+    def test_decomposition_components_add_up_to_tendency(self, client):
+        """构成分解的三项必须**加得起来**(2026-09-24 第十一轮体检)。
+
+        引擎在 observe_consequence 里是"先混合、按约束过滤、再**整体归一化**",
+        而面板以前把未归一化的分量和归一化后的 tendency 摆在一起 ——
+        实测真实快照(stock-en8)上屏幕显示
+        "40.8% = 底色 6.5%… " 之前是 "40.8% = 底色 2.5% + 体验 13.3%",
+        三个目标偏差 -0.18 ~ -0.25,一眼就能看出算错了。
+        现在两个分量按同一个 Σ 折算,和必须等于 tendency;归一化系数也要给出来。
+        """
+        body = client.get("/api/explain", params={"agent": "AI Advisor"}).json()
+        dec = body["decomposition"]
+        assert dec, "夹具里应该算得出分解"
+        for g, d in dec.items():
+            s = d["base_component"] + d["experience_component"]
+            assert abs(s - d["tendency"]) <= 2e-4, (g, s, d["tendency"])
+        # 夹具这一局的 Σ(α×底色+(1-α)×均值) 远小于 1 → 必须真做了归一化,
+        # 否则上面那条会"因为刚好等于 1 而通过"(空转)。
+        norm = body["normalization"]
+        assert norm["raw_total"] < 1.0, norm
+        assert norm["factor"] == pytest.approx(1.0 / norm["raw_total"], rel=1e-3)
+        # 归一化前的分量照旧给出来(排查口径用),且确实被缩放过
+        risk = dec["Risk Control"]
+        raw_base = 0.1 * risk["base_value"]
+        assert risk["base_component"] > raw_base, (risk, raw_base)
+
     def test_missing_agent_returns_error(self, client):
         r = client.get("/api/explain", params={"agent": "Nobody"})
         assert r.status_code == 200
@@ -295,6 +321,26 @@ class TestTimeline:
         body = r.json()
         assert body["ok"] is True
         assert body["events"] == []
+
+    def test_same_sim_time_events_ordered_by_wall_clock(self, client, tmp_path):
+        """同一模拟分钟里的多次干预,顺序要按**真实时间**排(第十一轮体检)。
+
+        实测真实 `interventions.json`:30 条里有 10 条与别的条目同 `sim_time`
+        (例如 `20250213-19:18` 有 4 条)。只按 sim_time 排时它们的先后等于**文件顺序**,
+        时间轴/因果链/曲线三处会各排各的,叙事链就对不上操作顺序了。
+        这里把文件顺序故意写成与真实时间相反,断言按 time 排好。
+        """
+        iv_path = tmp_path / "results" / "checkpoints" / "interventions.json"
+        iv_path.write_text(json.dumps([
+            {"time": "2026-08-30 10:00:05", "sim_time": "20250213-12:00",
+             "simulation": "test-sim", "agent": "AI Advisor", "operator": "expert",
+             "old_constraints": {"A": 0.0}, "new_constraints": {"第一次": 0.5}},
+            {"time": "2026-08-30 10:00:01", "sim_time": "20250213-12:00",
+             "simulation": "test-sim", "agent": "AI Advisor", "operator": "expert",
+             "old_constraints": {}, "new_constraints": {"第二次": 0.5}},
+        ], ensure_ascii=False), encoding="utf-8")
+        events = client.get("/api/timeline").json()["events"]
+        assert [e["new_constraints"] for e in events] == [{"第二次": 0.5}, {"第一次": 0.5}]
 
 
 # ---------------------------------------------------------------------------

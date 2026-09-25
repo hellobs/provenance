@@ -224,6 +224,18 @@ def checkpoint_file(*parts) -> str:
     return os.path.join(BASE_DIR, "results/checkpoints", *parts)
 
 
+def intervention_sort_key(iv: dict):
+    """干预记录的排序键:先模拟时间,再**真实时间**兜底。
+
+    为什么不能只按 `sim_time` 排(2026-09-24 第十一轮体检):一次演示里同一个模拟分钟
+    可能被连点多次 —— 实测 `interventions.json` 30 条里有 10 条与别的条目同 `sim_time`
+    (例如 `20250213-19:18` 有 4 条),只按 sim_time 排时它们的先后是**文件顺序**,
+    不是真实操作顺序;时间轴、干预因果链、倾向曲线上的竖线三处会各排各的。
+    `time` 是墙钟(精确到秒),能区分同模拟分钟的连续操作。
+    """
+    return (str(iv.get("sim_time", "") or ""), str(iv.get("time", "") or ""))
+
+
 def read_json(path: str, default=None):
     if not os.path.exists(path):
         return default
