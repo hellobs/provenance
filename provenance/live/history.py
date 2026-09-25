@@ -238,6 +238,12 @@ def expert_safe_record(rec: dict) -> dict:
     以前 `/api/run-detail` 直接回整个 run.json,等于把实验底牌一起递出去。
 
     白名单 = 平台契约 §2.2 明确要读的那些键。
+
+    但**顶层白名单挡不住嵌在里面的分支真值**(2026-09-25 第十二轮体检实测):
+    `state_history[*].state.branch` 每个日快照都带一个 "A"/"B"/"C",
+    `audit` 里还有一条 `{"action": "set_branch", "branch": "A"}` ——
+    也就是说安全视图以前把**这一局走的是哪条线**直接告诉了专家(不是"有分支这个概念",
+    而是分支的取值)。所以下面再按路径清一遍(见 `_NESTED_EXPERIMENT_KEYS`)。
     """
     keep = ("run_id", "start_date", "end_date", "turns", "retrievals", "events",
             "state_history", "final_feedback", "audit", "condition_monitor",
@@ -246,8 +252,49 @@ def expert_safe_record(rec: dict) -> dict:
     # reflection/router 是专家审核的核心,缺了就补空结构(前端不必判 None)
     out.setdefault("reflection", {})
     out.setdefault("router", {"issues": []})
+    _scrub_experiment_values(out)
     out["_view"] = "expert-safe"
     return out
+
+
+# 嵌在各块里、会泄露"这一局是哪条线"的字段:值清空而不是整块删掉 ——
+# 删块会改动专家要看的记录结构(平台按契约读 `state_history`/`audit`),
+# 清值只丢掉实验底牌,不影响证据链的形状。
+_NESTED_EXPERIMENT_KEYS = ("branch",)
+
+
+def _scrub_experiment_values(out: dict) -> None:
+    """就地清掉嵌套的实验取值(state_history[*].state.branch、audit[*].branch)。
+
+    `audit` 里那条 `set_branch` 条目保留(它是"当时定过方向"的事实,删了等于改审计),
+    但把 `branch` 的值清掉;它的 `action` 名字仍在 —— 与第九轮记的"页面源码里
+    还留着机制名"同属一个待派单项(把实验相关的 JS/字段整体拆出去),这里先止血:
+    **取值**绝不能再发给专家。
+
+    注意**写时复制**:`out` 里的块与入参 `rec` 共用同一个对象,直接 pop 会连原记录
+    一起改掉 —— 同一进程里接着取裸视图就会"莫名其妙少了字段"。
+    """
+    hist = out.get("state_history")
+    if isinstance(hist, list):
+        new_hist = []
+        for h in hist:
+            if not isinstance(h, dict):
+                new_hist.append(h)
+                continue
+            st = h.get("state")
+            if isinstance(st, dict) and any(k in st for k in _NESTED_EXPERIMENT_KEYS):
+                h = dict(h)
+                h["state"] = {k: v for k, v in st.items()
+                              if k not in _NESTED_EXPERIMENT_KEYS}
+            new_hist.append(h)
+        out["state_history"] = new_hist
+    audit = out.get("audit")
+    if isinstance(audit, list):
+        out["audit"] = [
+            {k: v for k, v in a.items() if k not in _NESTED_EXPERIMENT_KEYS}
+            if isinstance(a, dict) and any(k in a for k in _NESTED_EXPERIMENT_KEYS) else a
+            for a in audit
+        ]
 
 
 def _brief_compressed(name: str) -> dict:

@@ -55,6 +55,11 @@ def _events(nodes: List[dict]) -> List[dict]:
                 "date": ev.get("date", node.get("date", "")),
                 "kind": ev.get("event_type", ""),
                 "summary": ev.get("content", ""),
+                # 出处(2026-09-25 第十二轮体检):这块是**专家视图里能看到的**事件流水
+                # (契约 §2.2 的 events),而 `_retrievals` 早就带了 source —— 两处同源却只有
+                # 一处带,等于"专家能看的没有出处、看不到的 injector 里才有"。
+                # 注意:这里补 source **不改变 AI 的信息环境**(AI 那边走 bridge 的白名单映射)。
+                "source": str(ev.get("source", "") or "").strip(),
             }
             price = (node.get("world") or {}).get("price_usd")
             if ev.get("event_type") == "price" and price is not None:

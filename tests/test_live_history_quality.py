@@ -304,6 +304,45 @@ def test_compressed_rows_say_they_are_index_only(monkeypatch):
     assert d["view"] == "compressed-index" and "incomplete" in d
 
 
+def test_expert_safe_record_scrubs_nested_branch_values():
+    """安全视图必须连**嵌在里面**的分支取值一起清掉(2026-09-25 第十二轮体检)。
+
+    实测真实记录:顶层 `branch`/`branch_action` 是剥掉了,但
+    `state_history[*].state.branch` 每个日快照都带一个 "A"/"B"/"C",
+    `audit` 里还有 `{"action": "set_branch", "branch": "A"}` —— 安全视图把
+    **这一局走的是哪条线**直接给了专家(不是"有分支"这个概念,是取值)。
+    这里钉三件事:①嵌套取值没了 ②专家要看的结构没被改坏 ③**原记录没被改动**
+    (写时复制:同一进程里接着取裸视图不能莫名其妙少字段)。
+    """
+    rec = {"run_id": "r", "branch": "B", "start_date": "d", "end_date": "e",
+           "turns": [], "retrievals": [], "events": [],
+           "state_history": [
+               {"date": "d1", "state": {"date": "d1", "branch": "B", "cash_rmb": 1.0}},
+               {"date": "d2", "state": {"date": "d2", "branch": "B", "cash_rmb": 2.0}}],
+           "audit": [{"t": "d1", "action": "set_branch", "branch": "B"},
+                     {"t": "d2", "action": "buy_position", "fraction": 1.0}],
+           "final_feedback": {}, "condition_monitor": [], "reflection": {"text": "x"},
+           "router": {"issues": []}, "injector": {"nodes": []},
+           "branch_action": {"source": "preset"}, "consistency": {"verdict": "consistent"}}
+    before = json.dumps(rec, ensure_ascii=False, sort_keys=True)
+    out = H.expert_safe_record(rec)
+
+    assert "branch" not in out, "顶层 branch 不该出现"
+    assert "branch_action" not in out
+    text = json.dumps(out, ensure_ascii=False)
+    assert '"branch"' not in text, text[:200]
+    # 值也不能以别的形式留下:除了那条 set_branch 的动作名,不该再有裸的 "B"
+    for h in out["state_history"]:
+        assert "branch" not in h["state"] and h["state"]["cash_rmb"] in (1.0, 2.0)
+    assert len(out["state_history"]) == 2 and len(out["audit"]) == 2
+    assert out["audit"][0]["action"] == "set_branch"      # 事实保留,取值清掉
+    assert "branch" not in out["audit"][0]
+    # 原记录不被顺手改掉
+    assert json.dumps(rec, ensure_ascii=False, sort_keys=True) == before
+    assert rec["state_history"][0]["state"]["branch"] == "B"
+    assert rec["audit"][0]["branch"] == "B"
+
+
 def test_expert_safe_record_keeps_contract_keys():
     """白名单要覆盖平台契约 §2.2 明确要读的那些键。"""
     rec = {"run_id": "r", "start_date": "d", "end_date": "e", "turns": [1],

@@ -94,6 +94,10 @@ def test_injected_items_keep_their_source_and_story_events_do_not():
                                           "events": nodes[0].events}]}, branch="A")
     injected = mapped["retrievals"][0]["injected"]
     assert [d["source"] for d in injected] == ["HCM 公告", "盘面"]
+    # 顶层 events(契约 §2.2 里**专家能看到**的那块)也必须带出处:
+    # 2026-09-25 第十二轮体检发现它一直丢 source —— 于是"专家能看的没有出处、
+    # 看不到的 injector 里才有",正好反了。
+    assert [e["source"] for e in mapped["events"]] == ["HCM 公告", "盘面"]
 
     story = MavisBridge._as_story_event(ev, nodes[0])
     assert "source" not in story, "AI 可见的 story 事件不该带出处(那是口径,不是补漏)"
