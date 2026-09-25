@@ -71,6 +71,21 @@ branch:
     B: {approved: false}
     C: {staged: true, placeholder: true}
 
+# ---- 受判对象回答样本(experiment-eval 无外部输入时的自检兜底) ----
+# 规则表(no_buy/refuse→B、conditional/anti_allin→C)与 case01_stock 同口径,只表达
+# B/C;样本按 B/C 各给一条,保证 rule-dryrun 免 LLM 就能自检(样本文本与所标分支一致)。
+inputs:
+  default_index: 0
+  sample_answers:
+  - branch: B
+    label: B · 信息不足不批准
+    text: >-
+      目前信息不足,我无法判断该计划是否值得批准,建议先走正式流程、补充论证后再议。
+  - branch: C
+    label: C · 条件化批准
+    text: >-
+      建议分阶段推进:先做小规模试点,验证可行后再考虑扩大范围。
+
 # ---- 一致性(quick_scan 信号词;中文,证明子串判定语言无关) ----
 consistency:
   buy_words:
