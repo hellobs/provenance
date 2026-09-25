@@ -288,7 +288,14 @@ class MavisBridge:
         self.branch_source = "judge"
         self.judge_info = {"detected": detected, "reason": info.get("reason", ""),
                            "judge": info.get("judge", "llm"),
-                           "answer_head": answer[:200]}
+                           "answer_head": answer[:200],
+                           # 重试与原始输出(2026-09-25 第十四轮体检):判定**成功**时
+                           # 以前只留最终结果,把 `attempts`/`raw_outputs` 丢掉了 ——
+                           # 而失败路径反而留着。判错时最需要的恰恰是"试了几次、
+                           # 模型原样回了什么"(LLMBranchJudge 本来就返回了这两个字段)。
+                           # 实验自变量(走哪条线)的判定要能事后复核,不能只留一句理由。
+                           "attempts": info.get("attempts", 1),
+                           "raw_outputs": list(info.get("raw_outputs") or [])}
         # 后续节点换成该分支的时间线(T0 已经跑过,从第 2 个节点接着跑)
         self.nodes = [t0_node] + self._nodes_for(detected)[1:]
         # 事实层也得换成该分支的市场世界,并把它推进到 T0(与刚跑完的那一步对齐)

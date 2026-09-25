@@ -142,6 +142,24 @@ def test_run_record_carries_branch_source_and_judge_info():
     assert rec["branch_source"] == "judge" and rec["judge_info"]["detected"] == "B"
 
 
+def test_successful_judge_keeps_attempts_and_raw_outputs():
+    """判定**成功**时也要留"试了几次 / 模型原样回了什么"(2026-09-25 第十四轮体检)。
+
+    以前 bridge 在成功路径上重建 judge_info 时只留 `detected/reason/judge/answer_head`,
+    把 LLMBranchJudge 返回的 `attempts`/`raw_outputs` 丢了(失败路径反而留着)。
+    分支是实验自变量:一次判错之后要能回看当时的原始输出,否则只能看到一句自述理由。
+    实测 28 条真实记录里 16 条 judge 记录**一条都没有**这两个字段。
+    """
+    b = _bridge(branch="A")
+    from case01.injector.nodes import NodeSpec
+
+    b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
+    info = b.judge_info
+    assert info["detected"] == "B"
+    assert info.get("attempts") == 1, info
+    assert info.get("raw_outputs"), "成功判定也要留原始输出"
+
+
 def test_mapping_uses_judged_branch_and_stamps_source():
     """映射出的记录必须用**判定后**的分支,并把 source=judge 写进 branch_action。"""
     raw = {"schema_version": "injector-0.1", "run_id": "r-judge", "mode": "mavis",
