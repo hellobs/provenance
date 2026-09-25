@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-"""case01_node 自定义触发条件:让 story 事件"到点必发"。
+"""过渡 shim(阶段 3 增量 2):实现已迁至 mavis_case01_injector.conditions;下版删除本文件。
 
-这用的是 mavis 提供的通用扩展点(`Simulator.register_condition`),不改框架主逻辑。
-仅在真实运行时调用(需要 import mavisframework),dry-run 路径不 import。
+以 sys.modules 自替换实现全等透传:monkeypatch/reload 等模块级操作的语义
+与原模块完全一致(操作的就是实现模块本体)。
 """
+import sys as _sys
 
+import mavis_case01_injector.conditions as _impl
 
-def install_case01_node_condition(node_state: dict):
-    """注册 `case01_node` 条件:事件的 condition.node_id 等于当前节点 id 时触发。
-
-    node_state: 驱动维护的可变 dict,形如 {"id": "node-1"}。
-    返回 Simulator 类,便于调用方断言注册结果。
-    """
-    from mavisframework.runtime.simulator import Simulator
-
-    @Simulator.register_condition("case01_node")
-    def _check_case01_node(game, ev):
-        condition = ev.get("condition") or {}
-        return str(condition.get("node_id", "")) == str(node_state.get("id", ""))
-
-    return Simulator
+_sys.modules[__name__] = _impl

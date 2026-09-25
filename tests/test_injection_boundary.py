@@ -19,7 +19,9 @@ import pytest
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 _PKG = os.path.join(_REPO, "provenance")
-INJECTOR = os.path.join(_PKG, "case01", "injector")
+# 阶段 3 抽包:注入器实现移至独立包,边界检查跟代码走
+INJECTOR = os.path.join(_REPO, "packages", "mavis-case01-injector", "src",
+                        "mavis_case01_injector")
 
 pytestmark = pytest.mark.skipif(not os.path.isdir(INJECTOR), reason="case01 注入器不在")
 

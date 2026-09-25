@@ -1,0 +1,219 @@
+# -*- coding: utf-8 -*-
+"""injector 记录 -> case01 run.json 兼容记录（阶段 3 的字段对齐层）。
+
+映射原则:
+- 只做"结构兼容":case01 run.json 的顶层键必须齐;取值来自 injector 的节点记录。
+- 取不到真值的字段（如逐日资金状态）显式留空并在 `compat` 里标注,不伪造。
+- 多出来的 `injector` 段是新增键,平台侧按"只增不改"读取即可。
+"""
+from typing import Dict, List, Optional
+
+# 角色名 -> case01 turn 的 speaker 标识
+ROLE_TO_SPEAKER = {"Ethan Lin": "ethan", "Investment AI": "ai"}
+
+# case01 run.json 的顶层键（对照 runs/demo-* 实测）
+CASE01_TOP_KEYS = [
+    "run_id", "start_date", "end_date", "branch", "branch_action",
+    "turns", "retrievals", "events", "state_history", "final_feedback",
+    "audit", "condition_monitor", "reflection", "router",
+]
+
+
+def _timeline_of(branch: str) -> str:
+    """分支 -> 实际市场时间线。C 走 A(旧引擎 demo-3 同口径)。"""
+    try:
+        from mavis_case01_injector.world.timelines import BRANCH_TO_TIMELINE
+    except Exception:            # 纯映射场景下也能降级工作
+        return str(branch or "")
+    return BRANCH_TO_TIMELINE.get(str(branch or ""), str(branch or ""))
+
+
+def _turns(nodes: List[dict]) -> List[dict]:
+    turns: List[dict] = []
+    for node in nodes:
+        for block in node.get("dialogue") or []:
+            if not isinstance(block, dict):
+                continue
+            for lines in block.values():
+                for line in lines or []:
+                    if not isinstance(line, (list, tuple)) or len(line) != 2:
+                        continue
+                    speaker, text = line
+                    turns.append({
+                        "speaker": ROLE_TO_SPEAKER.get(str(speaker), str(speaker)),
+                        "date": node.get("date", ""),
+                        "text": str(text),
+                    })
+    return turns
+
+
+def _events(nodes: List[dict]) -> List[dict]:
+    events: List[dict] = []
+    for node in nodes:
+        for ev in node.get("events") or []:
+            entry = {
+                "date": ev.get("date", node.get("date", "")),
+                "kind": ev.get("event_type", ""),
+                "summary": ev.get("content", ""),
+                # 出处(2026-09-25 第十二轮体检):这块是**专家视图里能看到的**事件流水
+                # (契约 §2.2 的 events),而 `_retrievals` 早就带了 source —— 两处同源却只有
+                # 一处带,等于"专家能看的没有出处、看不到的 injector 里才有"。
+                # 注意:这里补 source **不改变 AI 的信息环境**(AI 那边走 bridge 的白名单映射)。
+                "source": str(ev.get("source", "") or "").strip(),
+            }
+            price = (node.get("world") or {}).get("price_usd")
+            if ev.get("event_type") == "price" and price is not None:
+                entry["price_usd"] = price
+            events.append(entry)
+    return events
+
+
+def _retrievals(nodes: List[dict]) -> List[dict]:
+    """mavis 路径下"检索"= 该节点注入的材料清单（injector 侧记录,不伪造检索结果）。"""
+    out: List[dict] = []
+    for node in nodes:
+        docs = [{
+            "kind": ev.get("event_type", ""),
+            "source": ev.get("source", ""),
+            "summary": ev.get("content", ""),
+        } for ev in node.get("events") or []]
+        out.append({
+            "date": node.get("date", ""),
+            "query": (node.get("interactions") or [{}])[0].get("focus", "") if node.get("interactions") else "",
+            "injected": docs,
+            "mode": "injection",   # 与 case01 的向量检索区分
+        })
+    return out
+
+
+def _audit(nodes: List[dict]) -> List[dict]:
+    audit: List[dict] = []
+    for node in nodes:
+        date = node.get("date", "")
+        audit.append({
+            "t": date, "action": "release_events",
+            "node_id": node.get("node_id", ""),
+            "count": len(node.get("events") or []),
+        })
+        for req in node.get("interactions") or []:
+            audit.append({
+                "t": date, "action": "interaction",
+                "node_id": node.get("node_id", ""),
+                "from": req.get("from", ""), "to": req.get("to", ""),
+                "focus": req.get("focus", ""),
+                "started": bool(node.get("interaction_started")),
+                "retries": int(node.get("retries", 0) or 0),
+            })
+    return audit
+
+
+def _final_feedback(nodes: List[dict]) -> dict:
+    if not nodes:
+        return {"date": "", "ethan": "", "ai": ""}
+    last = nodes[-1]
+    turns = _turns([last])
+    ethan = next((t["text"] for t in reversed(turns) if t["speaker"] == "ethan"), "")
+    ai = next((t["text"] for t in reversed(turns) if t["speaker"] == "ai"), "")
+    return {"date": last.get("date", ""), "ethan": ethan, "ai": ai}
+
+
+def _state_history(nodes: List[dict]) -> List[dict]:
+    """优先用事实层快照(case01 World 同口径);没有则留空。"""
+    out: List[dict] = []
+    for node in nodes:
+        state = node.get("world_state")
+        if state:
+            out.append({"date": node.get("date", ""), "state": dict(state)})
+    return out
+
+
+def to_case01_record(record: dict, branch: str = "",
+                     t0_rounds: int = 0, c_plan: Optional[dict] = None,
+                     run_id: str = "") -> dict:
+    """把 injector 记录映射成 case01 run.json 兼容结构。
+
+    run_id: 显式指定输出记录的 run_id;不传则沿用原始记录里的(既有行为)。
+    **这条很重要**:映射路径下如果忽略调用方给的 run_id,输出的记录 id 就会和
+    落盘目录名不一致——5002 契约按记录里的 run_id 列,结果面板按目录名列,
+    同一条记录会出现两个名字(2026-09-19 实测踩到)。
+    """
+    nodes = list(record.get("nodes") or [])
+    compat_gaps: List[str] = []
+
+    state_history = _state_history(nodes)
+    if not state_history:
+        compat_gaps.append("state_history:未接入 case01 world 状态机,留空")
+    if not record.get("world_audit"):
+        compat_gaps.append("world_audit:未接入 case01 world 审计,留空")
+    if branch == "C" and not record.get("condition_monitor"):
+        compat_gaps.append("condition_monitor:未发生条件监测(真实运行且带 C 方案时由事实层填充)")
+    compat_gaps.append("reflection/router:由 case01.reflection 在运行后补齐,此处留空")
+
+    branch = branch or record.get("branch", "")
+    if branch == "C":
+        has_c_position = (
+            any((s.get("state") or {}).get("hcm_shares") for s in state_history)
+            or any(a.get("action") == "buy_position"
+                   for a in (record.get("world_audit") or [])))
+        if not has_c_position:
+            compat_gaps.append(
+                "Branch C 实际仓位:未建仓(需 Ollama 解析 T0 方案;"
+                "dry-run 或条件未触发则不建仓)")
+
+    mapped = {
+        "run_id": run_id or record.get("run_id", ""),
+        "start_date": nodes[0].get("date", "") if nodes else "",
+        "end_date": nodes[-1].get("date", "") if nodes else "",
+        "branch": branch or "",
+        "branch_action": {
+            # Branch C 没有第三条市场世界,按 03 文档第八节走 Timeline A
+            # (case01.world.timelines.BRANCH_TO_TIMELINE = {A:A, B:B, C:A})。
+            # 与已冻结的旧引擎记录(demo-2/demo-3 的 branch_action.timeline 均为 A)一致。
+            "timeline": _timeline_of(branch),
+            # 分支从哪来:preset(运行参数) / judge(由 T0 回答判定,01 §六 的设计原意)。
+            # **judge 模式下 T0 还没跑完时不要谎报 preset**:那时分支是兜底值、还没判,
+            # 面板会照着显示"实验设计预设 / 未判定",看着像 preset 跑(用户实测反馈)。
+            # 有 branch_mode 就按它说,判定结果为空时如实标成 pending。
+            "source": record.get("branch_source")
+            or ("judge" if record.get("branch_mode") == "judge" else "preset"),
+            "pending": bool(record.get("branch_mode") == "judge"
+                            and not record.get("branch_source")),
+            "judge_info": dict(record.get("judge_info") or {}),
+            "judge": ("llm(T0 回答判定)" if (record.get("branch_source") == "judge")
+                      else ("judge(failed/manual review required)" if record.get("branch_source") == "judge-failed"
+                            else ("judge(待 T0 判定)" if record.get("branch_mode") == "judge"
+                                  else "preset(mavis 路径不调 LLM judge)"))),
+            "c_plan": dict(c_plan or {}),
+            "t0_rounds": int(t0_rounds or 0),
+        },
+        "turns": _turns(nodes),
+        "retrievals": _retrievals(nodes),
+        "events": _events(nodes),
+        "state_history": state_history,
+        "final_feedback": _final_feedback(nodes),
+        # world 审计在前(事实层),injector 注入/交互记录在后
+        "audit": list(record.get("world_audit") or []) + _audit(nodes),
+        "condition_monitor": list(record.get("condition_monitor") or []),
+        "reflection": {},
+        "router": {},
+        # 运行摘要（新增键,便于 CLI/平台快速读取）
+        "summary": record.get("summary", {}),
+        # 调试跑说明(--nodes 截断等);空串表示正式跑。serve.py 默认不给这类记录。
+        "debug": record.get("debug", ""),
+        # 新增段：injector 的原始节点记录（平台按需读取,不影响既有解析）
+        "injector": {
+            "schema_version": record.get("schema_version", ""),
+            "mode": record.get("mode", ""),
+            "roles": record.get("roles", []),
+            "scenario_dir": record.get("scenario_dir", ""),
+            "nodes": nodes,
+            "summary": record.get("summary", {}),
+        },
+        "compat": {
+            "level": "schema",
+            "gaps": compat_gaps,
+        },
+    }
+    # 映射完成后校验顶层键是否齐（在字典构造之后计算,避免自引用）
+    mapped["compat"]["missing_keys"] = [k for k in CASE01_TOP_KEYS if k not in mapped]
+    return mapped

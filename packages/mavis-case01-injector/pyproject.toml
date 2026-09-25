@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mavis-case01-injector"
+version = "0.1.0"
+description = "case01 injector + world 事实层(阶段 3 抽包):注入器/节点序列/桥接/记录兼容映射"
+requires-python = ">=3.9"
+# 运行硬依赖 mavisframework 与 mavis-vizkit(bridge 无条件 import)。
+# 两者不在 PyPI(本仓自研),不写进 install_requires 以免 pip 联网解析失败;
+# 安装顺序由 provenance/requirements.txt 与 CI 保证(先框架后本包,均 --no-deps)。
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]

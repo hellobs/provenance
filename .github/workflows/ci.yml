@@ -28,6 +28,12 @@ jobs:
         run: |
           pip install -e packages/mavis-vizkit
 
+      - name: Install injector package (editable, phase 3)
+        # 阶段 3 抽包:case01/injector 的实现移至 packages/mavis-case01-injector,
+        # provenance 侧经 shim 兼容;测试与运行期 import 的是这个已安装包。
+        run: |
+          pip install -e packages/mavis-case01-injector
+
       - name: Install dependencies (single source, provenance/requirements.txt) + pytest
         # 单一来源:从 provenance/requirements.txt 装全部运行依赖,避免手维护的裸清单
         # 与 requirements 漂移(曾致 OpenAPI 守卫测试缺 pyyaml 在 CI 必红)。
