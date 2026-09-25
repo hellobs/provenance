@@ -53,6 +53,10 @@ jobs:
         run: |
           python -m pytest tests -v
 
+      - name: injector package suite (self-containment + smoke)
+        run: |
+          python -m pytest packages/mavis-case01-injector/tests -q
+
       - name: case_engine suite (engine's own tests)
         # 引擎本体(case_engine)的测试此前**从未在 CI 跑过** —— 正在被反复重构的那一层
         # 零覆盖,回归只能靠人跑。这里补上,与 case01 同源安装(case_engine 在 provenance/ 下)。
