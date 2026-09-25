@@ -68,7 +68,7 @@
 | Provider | 地址 / 标识 | 依赖 | 失败表现 |
 |---|---|---|---|
 | Ollama（本地） | `http://127.0.0.1:11434` | Ollama 服务在线、模型已拉取 | `is_available()` 为假；调用抛错 |
-| OpenRouter（外部） | `https://openrouter.ai/api/v1`，模型 `minimax/minimax-m3:free` | API Key（env `OPENROUTER_API_KEY` 或 `case01/.secrets.json`） | key 缺失 → 构造即 `RuntimeError`；网络/时延→超时重试 |
+| OpenRouter（外部） | `https://openrouter.ai/api/v1`，模型 `nvidia/nemotron-3-ultra-550b-a55b` | API Key（env `OPENROUTER_API_KEY` 或 `case01/.secrets.json`） | key 缺失 → 构造即 `RuntimeError`；网络/时延→超时重试 |
 | 浩泽 API（规划） | TBD | 待接入 / 替换 N1、N3、N7 任意节点 | TBD |
 
 ## 4. 不确定性来源（按影响排序）

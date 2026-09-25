@@ -207,6 +207,6 @@ Ollama configuration is used.
 - HuggingFace 本地权重:可用 `--local-hf` 直接加载 chat 与 embedding
   safetensors 目录;需要运行环境已安装 `torch`、`transformers>=4.51`、
   `safetensors`
-- Ethan / Router 经 `--external-ethan` 走 OpenRouter(minimax/minimax-m3:free),
+- Ethan / Router 走 OpenRouter(默认 `nvidia/nemotron-3-ultra-550b-a55b`;原 minimax 免费档已下线),
   key 存 `case01/.secrets.json`(gitignored)或环境变量 `OPENROUTER_API_KEY`
 - 真实公司 Financial Data(10 家,研究侧提供后替换/扩充 HCM 样例;字段格式不变)

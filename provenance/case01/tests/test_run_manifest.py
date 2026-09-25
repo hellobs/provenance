@@ -211,7 +211,7 @@ def test_judge_reports_local_backend():
 
 
 def test_judge_reports_api_backend():
-    assert _judge_kind(judge_llm=FakeJudge("api", "minimax/minimax-m3:free")) == "api"
+    assert _judge_kind(judge_llm=FakeJudge("api", "nvidia/nemotron-3-ultra-550b-a55b")) == "api"
     from case01.agents.llm import OpenRouterClient
     # 没配 key 时客户端构造会抛;只验类名映射,不碰网络
     assert collect_run_meta({}, judge_llm=object.__new__(OpenRouterClient))["judge"] == "api"

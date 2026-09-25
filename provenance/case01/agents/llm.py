@@ -396,10 +396,11 @@ class LocalHFClient:
 class OpenRouterClient(_ChatMixin):
     """外部 API(OpenAI 兼容)。key 从 secrets/env 读取;记录模型名但不含 key。
 
-    默认模型 minimax/minimax-m3:free(可配);reasoning 支持按模型可选。
+    默认模型 nvidia/nemotron-3-ultra-550b-a55b(可配);reasoning 支持按模型可选。
+    (2026-09-24:原 minimax/minimax-m3:free 免费档已被 OpenRouter 下线,付费档 key 限额,整体换型。)
     """
 
-    def __init__(self, model: str = "minimax/minimax-m3:free",
+    def __init__(self, model: str = "nvidia/nemotron-3-ultra-550b-a55b",
                  base_url: str = "https://openrouter.ai/api/v1",
                  api_key: str = "", timeout: float = 180.0, retries: int = 3):
         self.chat_model = model
