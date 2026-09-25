@@ -150,8 +150,9 @@ def _case00_engine_id() -> str:
         p = os.path.join(state.BASE_DIR, "cases", "case00_village", "scenario.yaml")
         if os.path.isfile(p):
             return getattr(load_yaml(p), "engine", None) or "sandbox-value"
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:  # noqa: BLE001 —— 回退必须留痕:场景坏了没人知道就等于没坏
+        log.warning("[embed] case00_village/scenario.yaml 读取失败,按 sandbox-value 处理",
+                    exc_info=True)
     return "sandbox-value"
 
 
@@ -318,6 +319,30 @@ async def get_goals():
     })
 
 
+# ---------------------------------------------------------------------------
+# 写端点共用守卫(2026-09-24 深度体检,与 vizkit /control/restart 同一口径):
+# 这些是会**改变状态**的口子,而浏览器里一个 <form> 就能发出 text/plain 等跨站
+# 简单请求(不需要 CORS 预检)——响应读不到但副作用照样发生。所以只认
+# application/json;没带 Content-Type 的空 body POST(老页面 / curl)仍放行。
+# ---------------------------------------------------------------------------
+async def _json_body(request: Request):
+    """JSON-only 守卫 + 容错解析。
+
+    返回 (body, None) 或 (None, JSONResponse):body 非 dict(空 body / 坏 JSON /
+    JSON 数组)时按 {} 处理,由各端点自身的字段校验兜住 —— 不抛 500。
+    """
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype and ctype != "application/json":
+        return None, JSONResponse(
+            {"ok": False, "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+            status_code=415)
+    try:
+        body = await request.json()
+    except Exception:      # noqa: BLE001 —— 没有 body 是正常的(老页面/curl);坏 body 走字段校验
+        return {}, None
+    return (body if isinstance(body, dict) else {}), None
+
+
 @app.post("/api/goals")
 async def update_goals(request: Request):
     """更新某角色的治理约束(专家设定期望目标权重)
@@ -327,7 +352,9 @@ async def update_goals(request: Request):
     约束不直接注入 prompt——仅作为客观后果反馈的对照基准。
     """
     server = state.server
-    body = await request.json()
+    body, err = await _json_body(request)
+    if err is not None:
+        return err
     name = str(body.get("name", "")).strip()
     goals = body.get("goals")
     if not name:
@@ -440,7 +467,9 @@ async def undo_intervention(request: Request):
             "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
             "(决策→后果→反思→内化这条线不允许倒带)。如确需修正,请在治理面板重新干预。"
         ]}, status_code=403)
-    body = await request.json()
+    body, err = await _json_body(request)
+    if err is not None:
+        return err
     agent = str(body.get("agent", "")).strip()
     sim_time = str(body.get("sim_time", "")).strip()
     rec_time = str(body.get("time", "")).strip()  # 真实写入时间(秒级,区分同刻干预)
@@ -939,7 +968,9 @@ async def mark_reflection(request: Request):
 
     文本随标记一并写档(记忆流只在运行期存在,标记即归档)。
     """
-    body = await request.json()
+    body, err = await _json_body(request)
+    if err is not None:
+        return err
     agent = str(body.get("agent", "")).strip()
     node_id = str(body.get("node_id", "")).strip()
     text = str(body.get("text", "")).strip()

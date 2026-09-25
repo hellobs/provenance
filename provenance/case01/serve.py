@@ -33,6 +33,8 @@ except ImportError:  # 直接脚本运行(在 case01 目录)
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from case01 import full_context as fc
 
+from live.netguard import resolve_embed_origins
+
 RUNS_ROOT = os.environ.get(
     "CASE01_RUNS_ROOT",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
@@ -50,12 +52,21 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# 跨源白名单(2026-09-24 对齐 live/routes.py 的安全口径):本服务没有鉴权,
+# allow_origins=["*"] 等于让任意网页一个 fetch 就把成品记录读走。默认只给本机来源;
+# 平台侧跨源取数请显式设 EMBED_ALLOW_ORIGINS(iframe 嵌入不走 CORS,不受影响)。
+_CORS_ORIGINS = resolve_embed_origins(os.environ.get(
+    "EMBED_ALLOW_ORIGINS", "http://127.0.0.1:5002,http://localhost:5002"))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # 开发期跨域放开;接入平台后可按域名收紧
+    allow_origins=_CORS_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+print("[serve] CORS allow_origins = {}{}".format(
+    _CORS_ORIGINS,
+    "" if os.environ.get("EMBED_ALLOW_ORIGINS", "").strip()
+    else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源;平台侧跨源取数请显式设域名)"))
 
 if os.path.isdir(RUNS_HTML_ROOT):
     app.mount("/viewer", StaticFiles(directory=RUNS_HTML_ROOT, html=True),
