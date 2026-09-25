@@ -138,8 +138,23 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                     financial_dir=financial_dir)
 
     if reflect:
-        _attach_reflection(record, llm=llm, router_llm=router_llm,
-                           external_router=external_router)
+        # 反思/Router 失败**不许丢整条记录**(2026-09-24:实测 Router 404 时桥接+反思
+        # 已完成,记录却没落盘,几分钟的 LLM 跑动白费)。失败事实写进 manifest 段,
+        # reflection/router 留空并由 compat gaps 标注 —— 出了什么事后人从记录上看得到。
+        try:
+            _attach_reflection(record, llm=llm, router_llm=router_llm,
+                               external_router=external_router)
+        except Exception as exc:  # noqa: BLE001 —— 留痕后继续写盘,不静默、不白跑
+            msg = "{}: {}".format(type(exc).__name__, exc)
+            print("[!] 反思/Router 挂了,记录照写但 reflection/router 留空:{}".format(msg))
+            record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
+                "reflection/router 失败: " + msg)
+            gaps = [g for g in record.get("compat", {}).get("gaps", [])
+                    if not g.startswith("reflection/router")]
+            record.setdefault("compat", {})["gaps"] = gaps
+            record["compat"]["reflection_attached"] = False
+            record["compat"]["gaps"].append(
+                "reflection/router:生成失败({}),本条为不完整记录".format(msg))
 
     # 一致性戳:在写盘之前盖(所以文件里一定有这一节,不是"看日志才知道")
     record = _attach_consistency(record, branch_source=branch_source)

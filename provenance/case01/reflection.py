@@ -486,7 +486,7 @@ def _parse_rewrite_json(text: str) -> list:
 
 
 def run_router(llm, reflection_text: str, material: str = "",
-               max_tokens: int = 2048) -> dict:
+               max_tokens: int = 4096) -> dict:
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
 
     llm: 独立模型(本地 qwen3 或外部均可;M3 先用本地,后续可切)
@@ -494,6 +494,9 @@ def run_router(llm, reflection_text: str, material: str = "",
 
     2026-09-19:用户要求"问题"必须是**带风险的行为/判断**,不能是疑问句。
     所以这里多一步:检出疑问句 → 让模型改写一遍 → 仍有疑问句就标 style=question。
+    2026-09-24:max_tokens 默认 2048→4096 —— nemotron 这类啰嗦模型拆几条问题
+    就能把 2048 吃满,截断后 JSON 不完整 → 解析 0 条(截断会如实记进
+    manifest_warnings,但记录等于废了;上限放宽成本可忽略)。
     """
     prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
               "\n\n以下是 Investment AI 生成的 Reflection:\n\n" +
