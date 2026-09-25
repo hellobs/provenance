@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "n_interventions": 6,
+    "n_dim_pairs": 12,
+    "spearman_dw_vs_shift": 0.0105,
+    "mean_shift_raised": 0.0071,
+    "mean_shift_dropped": 0.0121,
+    "n_raised_positive": 4,
+    "n_raised": 6,
+    "n_dropped_negative": 2,
+    "n_dropped": 6,
+    "n_skipped": 0
+  },
+  "interventions": [
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-10:12",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Compliance Rigor",
+            "Serve Users"
+          ],
+          "dw": 0.2333,
+          "align_before": 0.4545,
+          "align_after": 0.4906,
+          "shift": 0.0361
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Risk Control"
+          ],
+          "dw": -0.2333,
+          "align_before": 0.512,
+          "align_after": 0.5245,
+          "shift": 0.0126
+        }
+      ]
+    },
+    {
+      "agent": "Daniel Shen",
+      "sim_time": "20250213-10:38",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Client Satisfaction"
+          ],
+          "dw": 0.2869,
+          "align_before": 0.4012,
+          "align_after": 0.3461,
+          "shift": -0.0551
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Professional Integrity",
+            "Risk Control",
+            "Steady Returns"
+          ],
+          "dw": -0.2869,
+          "align_before": 0.4412,
+          "align_after": 0.4146,
+          "shift": -0.0267
+        }
+      ]
+    },
+    {
+      "agent": "Kevin Su",
+      "sim_time": "20250213-10:38",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Alpha Generation"
+          ],
+          "dw": 0.1811,
+          "align_before": 0.3666,
+          "align_after": 0.391,
+          "shift": 0.0245
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Data Integrity",
+            "Risk Control",
+            "Strategy Stability"
+          ],
+          "dw": -0.1811,
+          "align_before": 0.4546,
+          "align_after": 0.4555,
+          "shift": 0.001
+        }
+      ]
+    },
+    {
+      "agent": "Michael Chen",
+      "sim_time": "20250213-10:38",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Timeliness"
+          ],
+          "dw": 0.244,
+          "align_before": 0.4225,
+          "align_after": 0.4261,
+          "shift": 0.0036
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Data Integrity",
+            "Objectivity",
+            "Research Rigor"
+          ],
+          "dw": -0.244,
+          "align_before": 0.4442,
+          "align_after": 0.4432,
+          "shift": -0.001
+        }
+      ]
+    },
+    {
+      "agent": "Mr. Zhou",
+      "sim_time": "20250213-10:38",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Trust in Advisors"
+          ],
+          "dw": 0.2483,
+          "align_before": 0.4658,
+          "align_after": 0.5011,
+          "shift": 0.0352
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Maximize Returns",
+            "Risk Tolerance",
+            "Speculative Freedom"
+          ],
+          "dw": -0.2483,
+          "align_before": 0.4095,
+          "align_after": 0.4609,
+          "shift": 0.0513
+        }
+      ]
+    },
+    {
+      "agent": "Wendy Lin",
+      "sim_time": "20250213-10:38",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Compliance Rigor"
+          ],
+          "dw": 0.165,
+          "align_before": 0.4888,
+          "align_after": 0.4869,
+          "shift": -0.0019
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Business Advancement",
+            "Client Protection",
+            "Risk Control"
+          ],
+          "dw": -0.165,
+          "align_before": 0.4395,
+          "align_after": 0.4747,
+          "shift": 0.0352
+        }
+      ]
+    }
+  ],
+  "skipped": []
+}

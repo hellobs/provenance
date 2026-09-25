@@ -1,0 +1,22 @@
+{
+  "summary": {
+    "n_interventions": 0,
+    "n_dim_pairs": 0,
+    "spearman_dw_vs_shift": null,
+    "mean_shift_raised": null,
+    "mean_shift_dropped": null,
+    "n_raised_positive": 0,
+    "n_raised": 0,
+    "n_dropped_negative": 0,
+    "n_dropped": 0,
+    "n_skipped": 1
+  },
+  "interventions": [],
+  "skipped": [
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-09:30",
+      "reason": "窗口内无行动文本"
+    }
+  ]
+}

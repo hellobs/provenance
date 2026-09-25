@@ -1,0 +1,157 @@
+{
+  "summary": {
+    "n_interventions": 5,
+    "n_dim_pairs": 10,
+    "spearman_dw_vs_shift": 0.1394,
+    "mean_shift_raised": 0.0311,
+    "mean_shift_dropped": 0.0097,
+    "n_raised_positive": 3,
+    "n_raised": 5,
+    "n_dropped_negative": 2,
+    "n_dropped": 5,
+    "n_skipped": 0
+  },
+  "interventions": [
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-11:04",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Compliance Rigor"
+          ],
+          "dw": 0.4116,
+          "align_before": 0.5136,
+          "align_after": 0.5905,
+          "shift": 0.0769
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Risk Control",
+            "Serve Users"
+          ],
+          "dw": -0.4116,
+          "align_before": 0.4405,
+          "align_after": 0.4767,
+          "shift": 0.0362
+        }
+      ]
+    },
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-13:26",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Serve Users"
+          ],
+          "dw": 0.39,
+          "align_before": 0.4274,
+          "align_after": 0.388,
+          "shift": -0.0395
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Compliance Rigor",
+            "Risk Control"
+          ],
+          "dw": -0.39,
+          "align_before": 0.534,
+          "align_after": 0.5471,
+          "shift": 0.0131
+        }
+      ]
+    },
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-21:04",
+      "note": "",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Compliance Rigor",
+            "Risk Control"
+          ],
+          "dw": 0.1436,
+          "align_before": 0.5468,
+          "align_after": 0.5287,
+          "shift": -0.0182
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Serve Users"
+          ],
+          "dw": -0.1436,
+          "align_before": 0.4004,
+          "align_after": 0.4055,
+          "shift": 0.0051
+        }
+      ]
+    },
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250214-10:10",
+      "note": "decay验证:监管新规上调合规权重",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Compliance Rigor"
+          ],
+          "dw": 0.1577,
+          "align_before": 0.5082,
+          "align_after": 0.5981,
+          "shift": 0.0899
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Risk Control",
+            "Serve Users"
+          ],
+          "dw": -0.1577,
+          "align_before": 0.4618,
+          "align_after": 0.4605,
+          "shift": -0.0013
+        }
+      ]
+    },
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250214-10:16",
+      "note": "demo",
+      "dims": [
+        {
+          "kind": "raised",
+          "dims": [
+            "Risk Control"
+          ],
+          "dw": 0.2055,
+          "align_before": 0.5164,
+          "align_after": 0.5628,
+          "shift": 0.0465
+        },
+        {
+          "kind": "dropped",
+          "dims": [
+            "Compliance Rigor",
+            "Serve Users"
+          ],
+          "dw": -0.2055,
+          "align_before": 0.4616,
+          "align_after": 0.4569,
+          "shift": -0.0047
+        }
+      ]
+    }
+  ],
+  "skipped": []
+}
