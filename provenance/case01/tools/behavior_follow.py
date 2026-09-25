@@ -143,7 +143,8 @@ def analyse_intervention(events: List[dict], intervention: dict,
         return None
     before, after = split_window(events, t, window_min)
     if not before or not after:
-        return None
+        return {"agent": intervention.get("agent", ""), "sim_time": t,
+                "skip_reason": "窗口内无行动文本"}
 
     rows = []
     # 升维:记录值(前后都在约束里,打分口径一致)
@@ -157,6 +158,7 @@ def analyse_intervention(events: List[dict], intervention: dict,
                          "align_before": round(a_b, 4), "align_after": round(a_a, 4),
                          "shift": round(a_a - a_b, 4)})
     # 降维:干预后不在约束里,离线补算(两侧同口径离线,避免记录/补算口径混用)
+    scorer_failed = False
     if dropped:
         dims = sorted(dropped)
         b_txt = [e["action"] for e in _sample(before, sample)]
@@ -168,8 +170,12 @@ def analyse_intervention(events: List[dict], intervention: dict,
                          "dw": round(sum(-dropped[d] for d in dims), 4),
                          "align_before": round(a_b, 4), "align_after": round(a_a, 4),
                          "shift": round(a_a - a_b, 4)})
+        else:
+            scorer_failed = True   # 打分器失败(embed 不可得),不是"没有行动"
     if not rows:
-        return None
+        return {"agent": intervention.get("agent", ""), "sim_time": t,
+                "skip_reason": ("对齐度不可得:离线打分器失败(检查 Ollama/embedding)"
+                                if scorer_failed else "窗口内无可用的对齐记录")}
     return {"agent": intervention.get("agent", ""), "sim_time": t,
             "note": intervention.get("note", ""), "dims": rows}
 

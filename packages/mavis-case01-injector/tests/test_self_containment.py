@@ -6,6 +6,7 @@ mavis_case01_injector 的 src 里,除 `_providers.py`(过渡 seam)外,任何模�
 """
 import os
 import re
+import types
 
 import pytest
 
@@ -45,3 +46,24 @@ def test_world_subpackage_is_pure():
             continue
         src = open(p, encoding="utf-8", errors="replace").read()
         assert "_providers" not in src,             "world 子包不得依赖 _providers: {}".format(p)
+
+
+def test_mavis_provider_degrades_gracefully(monkeypatch):
+    """设计稿双路径验证:case01 缺席时(provider 返回 None),安全包装缺失
+    必须优雅跳过而非崩溃(_install_safe_mavis_providers 曾带崩建桥)。"""
+    pytest.importorskip("mavisframework")
+    import sys
+    from mavis_case01_injector import bridge as bridge_mod
+    from mavis_case01_injector import _providers
+
+    bridge = bridge_mod.MavisBridge.__new__(bridge_mod.MavisBridge)
+    bridge.game = types.SimpleNamespace(agents={})
+
+    # 路径 1:真 import 失败(sys.modules 置 None = 导入期报 ImportError)
+    monkeypatch.setitem(sys.modules, "case01.agents", None)
+    assert _providers.import_mavis_provider() is None
+    bridge._install_safe_mavis_providers()          # None → 优雅 return
+
+    # 路径 2:provider 正常 → 空 agents 也不炸
+    monkeypatch.setattr(_providers, "import_mavis_provider", lambda: object())
+    bridge._install_safe_mavis_providers()

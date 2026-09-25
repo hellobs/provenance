@@ -116,3 +116,48 @@ class TestMarkWriteRoundTrip(unittest.TestCase):
                 self.assertEqual(report["stats"]["dpo"], 1)
             finally:
                 refl.MARKS_PATH = old
+
+
+class TestHTTPRoundTrip(unittest.TestCase):
+    """HTTP 层全链:POST /api/reflections/mark → GET export.jsonl → lora_prep 校验。"""
+
+    def test_mark_endpoint_to_lora_export(self):
+        import tempfile
+        from fastapi.testclient import TestClient
+        from live import reflections as refl, state
+
+        with tempfile.TemporaryDirectory() as td:
+            old_marks = refl.MARKS_PATH
+            old_base = state.BASE_DIR
+            from live.routes import app   # 先导入(静态挂载用真实 BASE_DIR)
+            refl.MARKS_PATH = os.path.join(td, "reflection_marks.json")
+            state.BASE_DIR = td          # 标记/写盘落临时目录
+            try:
+                c = TestClient(app)
+                payload = {"agent": "Investment AI",
+                           "node_id": "n-1",
+                           "text": "市场传闻未经官方披露证实,且传播路径依赖单一第三方测算,"
+                                   "证据分级不足,不建议参与。",
+                           "verdict": "incorrect",
+                           "correction": "官方披露缺失时不建议任何仓位;应明确提示传闻被证伪"
+                                         "时的回撤风险与不可逆损失。",
+                           "sim_time": "20250213-10:00"}
+                r = c.post("/api/reflections/mark", json=payload)
+                assert r.status_code == 200, r.text
+                assert r.json().get("ok") is True
+                # export.jsonl 与磁盘同步
+                r2 = c.get("/api/reflections/export.jsonl")
+                assert r2.status_code == 200
+                rows = [json.loads(l) for l in r2.text.splitlines() if l.strip()]
+                assert len(rows) == 1 and rows[0]["lora"]["dpo"]
+                # lora_prep 从同一真源导出并通过校验门
+                from case01.tools.lora_prep import load_marks_any, export
+                marks, src_path = load_marks_any()
+                assert len(marks) == 1
+                assert os.path.normpath(src_path) == os.path.normpath(refl.MARKS_PATH)
+                report = export(marks, out_root=td)
+                assert report["stats"]["sft"] == 1
+                assert report["stats"]["dpo"] == 1
+            finally:
+                refl.MARKS_PATH = old_marks
+                state.BASE_DIR = old_base

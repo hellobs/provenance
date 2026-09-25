@@ -109,9 +109,26 @@ class TestAnalyse(unittest.TestCase):
         self.assertLess(kinds["dropped"]["shift"], 0, "churn 被降维且行为减少 → 位移为负")
         self.assertGreater(scorer.calls, 0, "降维必须真调了补算器")
 
-    def test_both_sides_empty_window_none(self):
+    def test_both_sides_empty_window_reason(self):
+        """空窗口不再静默:返回带 skip_reason 的字典(2026-09-25 体检)。"""
         ev = _mk_events([("20250213-08:00", "x")])
-        self.assertIsNone(analyse_intervention(ev, self.IV, window_min=90.0))
+        r = analyse_intervention(ev, self.IV, window_min=90.0)
+        self.assertIsNotNone(r)
+        self.assertIn("skip_reason", r)
+        self.assertEqual(r["skip_reason"], "窗口内无行动文本")
+
+    def test_scorer_failure_reason_is_not_misleading(self):
+        """打分器失败 ≠ 窗口内无行动:skip_reason 必须如实区分(不允许静默)。"""
+        class DeadScorer:
+            def alignment(self, action, goals):
+                return {}
+        ev = _mk_events([("20250213-09:{:02d}".format(10 + i), "churn thing {}".format(i))
+                         for i in range(5)] +
+                        [("20250213-10:{:02d}".format(10 + i), "calm thing {}".format(i))
+                         for i in range(5)])
+        r = analyse_intervention(ev, self.IV, window_min=90.0, scorer=DeadScorer())
+        self.assertIsNotNone(r)
+        self.assertIn("打分器失败", r["skip_reason"])
 
 
 class TestAggregate(unittest.TestCase):

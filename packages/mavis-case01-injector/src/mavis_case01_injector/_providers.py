@@ -36,9 +36,16 @@ def import_orchestrator():
 
 
 def import_mavis_provider():
-    """case01.agents.mavis_provider(Case01SafeProvider 安全包装)。"""
-    from case01.agents import mavis_provider
-    return mavis_provider
+    """case01.agents.mavis_provider(Case01SafeProvider 安全包装)。
+
+    与 reflection/orchestrator 不同,这里缺 provider 是**合法降级**(裸包用户
+    不需要 case01 安全包装):ImportError → 返回 None,由调用方跳过包装。
+    """
+    try:
+        from case01.agents import mavis_provider
+        return mavis_provider
+    except ImportError:
+        return None
 
 
 def import_case01_agents_secrets():
