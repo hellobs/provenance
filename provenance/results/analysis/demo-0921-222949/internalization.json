@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "n_interventions_analysed": 1,
+    "n_skipped": 0,
+    "mean_displacement_treated": 0.0185,
+    "mean_displacement_control": 0.0,
+    "internalization_gap": 0.0185,
+    "n_positive_gap": 1
+  },
+  "interventions": [
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-09:30",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 1,
+      "after_step": 16,
+      "treated_dims": [
+        "Compliance Rigor",
+        "Risk Control",
+        "Serve Users"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Compliance Rigor": 0.0278,
+        "Risk Control": -0.0006,
+        "Serve Users": 0.0283
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0185,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0185,
+      "tv_to_new_before": 0.0889,
+      "tv_to_new_after": 0.0796
+    }
+  ],
+  "skipped": []
+}

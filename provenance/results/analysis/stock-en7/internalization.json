@@ -1,0 +1,173 @@
+{
+  "summary": {
+    "n_interventions_analysed": 6,
+    "n_skipped": 0,
+    "mean_displacement_treated": 0.0664,
+    "mean_displacement_control": 0.0,
+    "internalization_gap": 0.0664,
+    "n_positive_gap": 6
+  },
+  "interventions": [
+    {
+      "agent": "AI Advisor",
+      "sim_time": "20250213-10:12",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 22,
+      "after_step": 82,
+      "treated_dims": [
+        "Compliance Rigor",
+        "Risk Control",
+        "Serve Users"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Compliance Rigor": -0.0388,
+        "Risk Control": 0.1531,
+        "Serve Users": 0.1061
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0735,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0735,
+      "tv_to_new_before": 0.052,
+      "tv_to_new_after": 0.0153
+    },
+    {
+      "agent": "Daniel Shen",
+      "sim_time": "20250213-10:38",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 35,
+      "after_step": 95,
+      "treated_dims": [
+        "Client Satisfaction",
+        "Professional Integrity",
+        "Risk Control",
+        "Steady Returns"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Steady Returns": 0.0841,
+        "Client Satisfaction": 0.1807,
+        "Risk Control": 0.0638,
+        "Professional Integrity": 0.0328
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0904,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0904,
+      "tv_to_new_before": 0.0816,
+      "tv_to_new_after": 0.0364
+    },
+    {
+      "agent": "Kevin Su",
+      "sim_time": "20250213-10:38",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 35,
+      "after_step": 95,
+      "treated_dims": [
+        "Alpha Generation",
+        "Data Integrity",
+        "Risk Control",
+        "Strategy Stability"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Alpha Generation": 0.1043,
+        "Data Integrity": 0.0012,
+        "Risk Control": 0.029,
+        "Strategy Stability": 0.0336
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.042,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.042,
+      "tv_to_new_before": 0.0343,
+      "tv_to_new_after": 0.0133
+    },
+    {
+      "agent": "Michael Chen",
+      "sim_time": "20250213-10:38",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 35,
+      "after_step": 95,
+      "treated_dims": [
+        "Data Integrity",
+        "Objectivity",
+        "Research Rigor",
+        "Timeliness"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Research Rigor": 0.0409,
+        "Objectivity": 0.0259,
+        "Timeliness": 0.0797,
+        "Data Integrity": 0.0129
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0399,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0399,
+      "tv_to_new_before": 0.0449,
+      "tv_to_new_after": 0.025
+    },
+    {
+      "agent": "Mr. Zhou",
+      "sim_time": "20250213-10:38",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 35,
+      "after_step": 95,
+      "treated_dims": [
+        "Maximize Returns",
+        "Risk Tolerance",
+        "Speculative Freedom",
+        "Trust in Advisors"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Maximize Returns": 0.0993,
+        "Speculative Freedom": 0.075,
+        "Trust in Advisors": 0.1894,
+        "Risk Tolerance": 0.015
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0947,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0947,
+      "tv_to_new_before": 0.0686,
+      "tv_to_new_after": 0.0212
+    },
+    {
+      "agent": "Wendy Lin",
+      "sim_time": "20250213-10:38",
+      "window_min": 120.0,
+      "note": "",
+      "before_step": 35,
+      "after_step": 95,
+      "treated_dims": [
+        "Business Advancement",
+        "Client Protection",
+        "Compliance Rigor",
+        "Risk Control"
+      ],
+      "control_dims": [],
+      "displacement_treated": {
+        "Risk Control": 0.0741,
+        "Compliance Rigor": 0.1198,
+        "Client Protection": 0.0368,
+        "Business Advancement": 0.0008
+      },
+      "displacement_control": {},
+      "mean_displacement_treated": 0.0579,
+      "mean_displacement_control": 0.0,
+      "internalization_gap": 0.0579,
+      "tv_to_new_before": 0.0457,
+      "tv_to_new_after": 0.0167
+    }
+  ],
+  "skipped": []
+}
