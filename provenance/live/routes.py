@@ -442,8 +442,10 @@ async def update_goals(request: Request):
             "note": str(body.get("note", "") or "").strip(),  # 专家干预理由(可审计/时间轴展示)
         })
         os.makedirs(os.path.dirname(audit_path), exist_ok=True)
-        with open(audit_path, "w", encoding="utf-8") as f:
-            json.dump(audit, f, ensure_ascii=False, indent=2)
+        # 原子写(2026-09-25 体检):干预审计与 reflection_marks 同一标准 —— 裸
+        # open("w") 写一半崩 = 整个审计数组损坏,可审计链就断了。
+        from live.state import write_json_atomic
+        write_json_atomic(audit_path, audit)
     except Exception as e:
         # 审计失败不阻断主流程,但必须记录——干预无审计会破坏可审计链
         log.error("写入干预审计失败(agent={}): {}".format(name, e), exc_info=True)
