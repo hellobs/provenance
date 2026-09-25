@@ -1,0 +1,11 @@
+{
+  "stats": {
+    "marks": 0,
+    "verdicts": {},
+    "sft": 0,
+    "dpo": 0,
+    "rejected": 0,
+    "reject_reasons": {}
+  },
+  "rows": []
+}

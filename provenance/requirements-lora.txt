@@ -1,0 +1,16 @@
+# LoRA 训练线依赖(与运行时 requirements.txt 分离,只在训练环境装)
+#
+# 0. torch 必须是 CUDA 版(运行时仓里的 torch 是 CPU 版,不能用于训练):
+#      pip install torch --index-url https://download.pytorch.org/whl/cu121
+#    本机 RTX 5060 Laptop 8GB:QLoRA 4bit + qwen3:4b 权重约 2.6GB,加 LoRA/优化器/
+#    激活(开 gradient checkpointing、seq<=1024、batch<=2)属"勉强可行"档;
+#    严肃训练建议云端 >=16GB。
+# 1. bitsandbytes 在 Windows 自 0.43 起官方支持;若 paged 优化器异常,退回 adamw_torch。
+# 2. 数据侧(lora_prep.py)不依赖本文件 —— 用运行时环境即可导出/校验 JSONL。
+
+# 训练栈(本机未装,--env 体检会如实报缺)
+peft>=0.11
+trl>=0.9
+datasets>=2.19
+bitsandbytes>=0.43; platform_system == "Windows"
+accelerate>=0.30

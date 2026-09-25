@@ -1,0 +1,31 @@
+{
+  "stats": {
+    "marks": 3,
+    "verdicts": {
+      "incorrect": 1,
+      "partial": 1,
+      "correct": 1
+    },
+    "sft": 3,
+    "dpo": 2,
+    "rejected": 0,
+    "reject_reasons": {}
+  },
+  "rows": [
+    {
+      "verdict": "incorrect",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "verdict": "partial",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "verdict": "correct",
+      "ok": true,
+      "errors": []
+    }
+  ]
+}
