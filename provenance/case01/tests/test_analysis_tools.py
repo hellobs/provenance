@@ -7,7 +7,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 from case01.tools.internalization_metrics import (  # noqa: E402
-    _parse_t, snapshot_at, snapshots_in_window, displacement, analyse_intervention)
+    _parse_t, snapshot_at, snapshots_in_window, displacement, analyse_intervention,
+    dynamics_metrics)
 from case01.tools.router_sensitivity import (  # noqa: E402
     _bigrams, jaccard, cross_match, risk_dist)
 
@@ -83,6 +84,63 @@ class TestAnalyseIntervention(unittest.TestCase):
         iv = {"agent": "X", "sim_time": "20250212-09:00",
               "old_constraints": {"a": 0.2}, "new_constraints": {"a": 0.4}}
         self.assertIsNone(analyse_intervention(self._traj(), iv, window_min=90.0))
+
+
+class TestDynamics(unittest.TestCase):
+    """内化动力学:响应延迟 / 持续性 / 过冲。"""
+
+    IV = {"agent": "X", "sim_time": "20250213-09:00",
+          "old_constraints": {"a": 0.2, "b": 0.5, "c": 0.3},
+          "new_constraints": {"a": 0.4}}
+
+    def _traj(self, a_values):
+        """干预在 09:00;演化点从 09:30 起(每 30 分钟一个),b/c 不动。
+        干预前状态由 08:30 快照承载(a=0.2)。"""
+        out = [{"sim_time": "20250213-08:30", "step": 0,
+                "tendency": {"a": 0.2, "b": 0.5, "c": 0.3}}]
+        t = 570
+        for i, v in enumerate(a_values):
+            hh, mm = divmod(t, 60)
+            out.append({"sim_time": "20250213-{:02d}:{:02d}".format(hh, mm),
+                        "step": (i + 1) * 10,
+                        "tendency": {"a": v, "b": 0.5, "c": 0.3}})
+            t += 30
+        return out
+
+    def test_latency_and_sustained(self):
+        # gap0=|0.2−0.4|=0.2;0.26→cum 0.06,0.30→0.10,0.31→0.11(峰值=终值)
+        # 一半 0.055 在 09:30 达到 → 延迟 30 分钟;终值=峰值 → sustained
+        traj = self._traj([0.26, 0.30, 0.31, 0.31])
+        r = dynamics_metrics(traj, self.IV)
+        self.assertEqual(r["latency_min"], 30.0)
+        self.assertEqual(r["persistence"], "sustained")
+        self.assertFalse(r["overshoot"])
+
+    def test_overshoot_detected(self):
+        # 越过 0.4 冲到 0.45 再回落 0.38:过冲被检出,且持续
+        traj = self._traj([0.33, 0.38, 0.45, 0.38])
+        r = dynamics_metrics(traj, self.IV)
+        self.assertTrue(r["overshoot"])
+        self.assertGreater(r["max_overshoot_frac"], 0.0)
+
+    def test_rebound(self):
+        # 冲高后回落到峰值的 1/3 以下:回弹
+        traj = self._traj([0.38, 0.39, 0.24, 0.23])
+        r = dynamics_metrics(traj, self.IV)
+        self.assertEqual(r["persistence"], "rebound")
+        self.assertLess(r["persistence_ratio"], 0.5)
+
+    def test_horizon_cut_at_next_intervention(self):
+        # 同 agent 下一次干预截断视界:之后的回落不计入持续性
+        traj = self._traj([0.38, 0.39, 0.24, 0.23])
+        r = dynamics_metrics(traj, self.IV, next_t="20250213-10:05")
+        # 视界只含 09:30、10:00 两个点,峰值即终值 → sustained
+        self.assertEqual(r["persistence"], "sustained")
+        self.assertEqual(r["horizon_end_sim_time"], "20250213-10:05")
+
+    def test_no_before_snapshot_none(self):
+        self.assertIsNone(dynamics_metrics(self._traj([0.3]), dict(
+            self.IV, sim_time="20250201-09:00")))
 
 
 class TestRouterSensitivityMetrics(unittest.TestCase):

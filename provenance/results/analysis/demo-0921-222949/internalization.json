@@ -5,7 +5,11 @@
     "mean_displacement_treated": 0.0185,
     "mean_displacement_control": 0.0,
     "internalization_gap": 0.0185,
-    "n_positive_gap": 1
+    "n_positive_gap": 1,
+    "median_latency_min": 20,
+    "n_sustained": 1,
+    "n_rebound": 0,
+    "n_overshoot": 0
   },
   "interventions": [
     {
@@ -31,7 +35,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0185,
       "tv_to_new_before": 0.0889,
-      "tv_to_new_after": 0.0796
+      "tv_to_new_after": 0.0796,
+      "latency_min": 20,
+      "peak_displacement": 0.0185,
+      "final_displacement": 0.0185,
+      "persistence_ratio": 1.0,
+      "persistence": "sustained",
+      "overshoot": false,
+      "max_overshoot_frac": 0.0,
+      "horizon_end_sim_time": "20250213-10:00"
     }
   ],
   "skipped": []

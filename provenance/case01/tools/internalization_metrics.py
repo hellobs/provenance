@@ -105,7 +105,8 @@ def displacement(tendency_before: Dict[str, float], tendency_after: Dict[str, fl
 
 
 def analyse_intervention(traj: List[dict], intervention: dict,
-                         window_min: float = DEFAULT_WINDOW_MIN) -> Optional[dict]:
+                         window_min: float = DEFAULT_WINDOW_MIN,
+                         next_t: str = "") -> Optional[dict]:
     """单条干预的内化位移分析;轨迹不足(before/after 任一缺失)返回 None。"""
     t = intervention.get("sim_time", "")
     before_s = snapshot_at(traj, t, before=True)
@@ -148,12 +149,92 @@ def analyse_intervention(traj: List[dict], intervention: dict,
         "internalization_gap": round(mean_tr - mean_ct, 4),
         "tv_to_new_before": round(_tv(tb, new_c), 4) if new_c and _tv(tb, new_c) is not None else None,
         "tv_to_new_after": round(_tv(ta, new_c), 4) if new_c and _tv(ta, new_c) is not None else None,
+        **(dynamics_metrics(traj, intervention, next_t=next_t) or {}),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 内化动力学(响应延迟 / 持续性 / 过冲)—— 纯函数,可单测
+# ---------------------------------------------------------------------------
+
+def dynamics_metrics(traj: List[dict], intervention: dict,
+                     next_t: str = "") -> Optional[dict]:
+    """干预维度朝 new 目标的位移轨迹特征(观测视界 = 到同 agent 下一次干预或轨迹末)。
+
+    - 峰值位移 peak:t 视界内 mean(gap_before − gap_now) 的最大值;
+    - 响应延迟 latency:位移首次达到 peak 一半所用分钟(sim 时钟);
+    - 持续性 persistence:视界末位移 / 峰值(≥0.5 视为保持,<0.5 视为回弹);
+    - 过冲 overshoot:任一 treated 维度的 (tendency − target) 符号相对干预前翻转
+      (越过目标再回来);max_overshoot 给出越过后最远的超出量占该维目标权重的比例。
+    轨迹不足(无前置快照)返回 None。
+    """
+    t = intervention.get("sim_time", "")
+    t0 = _parse_t(t)
+    before = snapshot_at(traj, t, before=True)
+    if before is None or t0 is None:
+        return None
+    new_c = {str(k): float(v) for k, v in (intervention.get("new_constraints") or {}).items()
+             if isinstance(v, (int, float))}
+    tb = before["tendency"]
+    dims = {d: new_c[d] for d in new_c if d in tb}
+    if not dims:
+        return None
+    # 视界:同 agent 下一次干预之前;没有则到轨迹末
+    horizon = _parse_t(next_t) if next_t else None
+    if horizon is None:
+        times = [_parse_t(x["sim_time"]) for x in traj]
+        horizon = max(v for v in times if v is not None) if times else t0
+    pts = []
+    for x in traj:
+        xv = _parse_t(x["sim_time"])
+        if xv is not None and t0 < xv <= horizon:
+            pts.append((xv, x["tendency"]))
+    if not pts:
+        return {"latency_min": None, "peak_displacement": 0.0, "final_displacement": 0.0,
+                "persistence_ratio": None, "overshoot": False, "max_overshoot_frac": 0.0,
+                "horizon_end_sim_time": next_t if next_t else (traj[-1]["sim_time"] if traj else "")}
+
+    gaps0 = {d: abs(tb[d] - tgt) for d, tgt in dims.items()}
+    series = []            # (xv, cum_disp, signed_cross)
+    for xv, tn in pts:
+        gaps = {d: abs(tn[d] - tgt) for d, tgt in dims.items() if d in tn}
+        if not gaps:
+            continue
+        cum = sum(gaps0[d] - gaps[d] for d in gaps) / len(gaps)
+        cross = []
+        for d, tgt in dims.items():
+            if d in tn:
+                s0, s1 = tb[d] - tgt, tn[d] - tgt
+                if s0 * s1 < 0 or (s0 != 0 and s1 == 0):
+                    cross.append(abs(s1) / tgt if tgt else 0.0)
+        series.append((xv, cum, max(cross) if cross else 0.0))
+
+    if not series:
+        return None
+    peak = max(s[1] for s in series)
+    final = series[-1][1]
+    latency = None
+    if peak > 0:
+        for xv, cum, _ in series:
+            if cum >= 0.5 * peak:
+                latency = round(xv - t0, 1)
+                break
+    max_cross = max(s[2] for s in series)
+    return {
+        "latency_min": latency,
+        "peak_displacement": round(peak, 4),
+        "final_displacement": round(final, 4),
+        "persistence_ratio": round(final / peak, 3) if peak > 0 else None,
+        "persistence": ("rebound" if peak > 0 and final < 0.5 * peak else "sustained") if peak > 0 else None,
+        "overshoot": max_cross > 0,
+        "max_overshoot_frac": round(max_cross, 4),
+        "horizon_end_sim_time": next_t if next_t else (traj[-1]["sim_time"] if traj else ""),
     }
 
 
 def analyse_simulation(ck_dir: str, interventions: List[dict],
                        window_min: float = DEFAULT_WINDOW_MIN) -> dict:
-    """一个模拟的内化分析汇总。"""
+    """一个模拟的内化分析汇总(含动力学:延迟/持续性/过冲)。"""
     by_agent: Dict[str, List[dict]] = {}
     for iv in interventions:
         by_agent.setdefault(iv.get("agent", ""), []).append(iv)
@@ -163,12 +244,17 @@ def analyse_simulation(ck_dir: str, interventions: List[dict],
         if not traj:
             skipped.append({"agent": agent, "reason": "无含 value_tendency 的 checkpoint"})
             continue
-        for iv in ivs:
-            r = analyse_intervention(traj, iv, window_min=window_min)
+        # 视界:同 agent 下一次干预的时刻(按时序)
+        ivs_sorted = sorted(ivs, key=lambda x: (_parse_t(x.get("sim_time", "")) or 0))
+        for i, iv in enumerate(ivs_sorted):
+            next_t = ivs_sorted[i + 1].get("sim_time", "") if i + 1 < len(ivs_sorted) else ""
+            r = analyse_intervention(traj, iv, window_min=window_min, next_t=next_t)
             (rows if r else skipped).append(r or {"agent": agent,
                                                   "sim_time": iv.get("sim_time", ""),
                                                   "reason": "干预时刻无前置快照"})
     treated = [r for r in rows if "internalization_gap" in r]
+    lat = [r["latency_min"] for r in treated if r.get("latency_min") is not None]
+    sus = [r for r in treated if r.get("persistence")]
     summary = {
         "n_interventions_analysed": len(treated),
         "n_skipped": len(skipped),
@@ -179,6 +265,10 @@ def analyse_simulation(ck_dir: str, interventions: List[dict],
         "internalization_gap": round(
             sum(r["internalization_gap"] for r in treated) / len(treated), 4) if treated else None,
         "n_positive_gap": sum(1 for r in treated if r["internalization_gap"] > 0),
+        "median_latency_min": sorted(lat)[len(lat) // 2] if lat else None,
+        "n_sustained": sum(1 for r in sus if r["persistence"] == "sustained"),
+        "n_rebound": sum(1 for r in sus if r["persistence"] == "rebound"),
+        "n_overshoot": sum(1 for r in treated if r.get("overshoot")),
     }
     return {"summary": summary, "interventions": rows, "skipped": skipped}
 
@@ -196,14 +286,20 @@ def _md(result: dict, sim: str) -> str:
              "| 对照维度平均位移 | {} |".format(s["mean_displacement_control"]),
              "| 内化差值(干预 − 对照) | **{}** |".format(s["internalization_gap"]),
              "| 差值为正的干预数 | {} / {} |".format(s["n_positive_gap"], s["n_interventions_analysed"]),
-             "", "| agent | sim_time | 干预维度位移均值 | 对照位移均值 | 差值 |",
-             "|---|---|---|---|---|"]
+             "| 响应延迟中位数(分钟) | {} |".format(s["median_latency_min"]),
+             "| 持续 / 回弹 | {} / {} |".format(s["n_sustained"], s["n_rebound"]),
+             "| 过冲(越过目标)次数 | {} |".format(s["n_overshoot"]),
+             "", "| agent | sim_time | 干预位移均值 | 对照位移均值 | 差值 | 延迟(分) | 持续性 | 过冲 |",
+             "|---|---|---|---|---|---|---|---|"]
     for r in result["interventions"]:
         if "internalization_gap" not in r:
             continue
-        lines.append("| {} | {} | {} | {} | {} |".format(
+        lines.append("| {} | {} | {} | {} | {} | {} | {} | {} |".format(
             r["agent"], r["sim_time"], r["mean_displacement_treated"],
-            r["mean_displacement_control"], r["internalization_gap"]))
+            r["mean_displacement_control"], r["internalization_gap"],
+            r.get("latency_min") if r.get("latency_min") is not None else "—",
+            r.get("persistence") or "—",
+            "{:.2f}".format(r["max_overshoot_frac"]) if r.get("overshoot") else "—"))
     if result["skipped"]:
         lines += ["", "跳过:"]
         lines += ["- {} @ {} : {}".format(x.get("agent", ""), x.get("sim_time", ""),

@@ -5,7 +5,11 @@
     "mean_displacement_treated": 0.0572,
     "mean_displacement_control": 0.0,
     "internalization_gap": 0.0572,
-    "n_positive_gap": 4
+    "n_positive_gap": 4,
+    "median_latency_min": 6,
+    "n_sustained": 4,
+    "n_rebound": 1,
+    "n_overshoot": 3
   },
   "interventions": [
     {
@@ -31,7 +35,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0938,
       "tv_to_new_before": 0.0638,
-      "tv_to_new_after": 0.0169
+      "tv_to_new_after": 0.0169,
+      "latency_min": 16,
+      "peak_displacement": 0.1046,
+      "final_displacement": 0.0063,
+      "persistence_ratio": 0.06,
+      "persistence": "rebound",
+      "overshoot": true,
+      "max_overshoot_frac": 0.1328,
+      "horizon_end_sim_time": "20250213-13:26"
     },
     {
       "agent": "AI Advisor",
@@ -56,7 +68,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0857,
       "tv_to_new_before": 0.0694,
-      "tv_to_new_after": 0.0265
+      "tv_to_new_after": 0.0265,
+      "latency_min": 6,
+      "peak_displacement": 0.1123,
+      "final_displacement": 0.1019,
+      "persistence_ratio": 0.908,
+      "persistence": "sustained",
+      "overshoot": false,
+      "max_overshoot_frac": 0.0,
+      "horizon_end_sim_time": "20250213-21:04"
     },
     {
       "agent": "AI Advisor",
@@ -81,7 +101,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0399,
       "tv_to_new_before": 0.0295,
-      "tv_to_new_after": 0.0095
+      "tv_to_new_after": 0.0095,
+      "latency_min": 4,
+      "peak_displacement": 0.0468,
+      "final_displacement": 0.041,
+      "persistence_ratio": 0.876,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.2232,
+      "horizon_end_sim_time": "20250214-10:10"
     },
     {
       "agent": "AI Advisor",
@@ -106,7 +134,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": -0.0231,
       "tv_to_new_before": 0.0544,
-      "tv_to_new_after": 0.066
+      "tv_to_new_after": 0.066,
+      "latency_min": 2,
+      "peak_displacement": 0.0322,
+      "final_displacement": 0.0322,
+      "persistence_ratio": 1.0,
+      "persistence": "sustained",
+      "overshoot": false,
+      "max_overshoot_frac": 0.0,
+      "horizon_end_sim_time": "20250214-10:16"
     },
     {
       "agent": "AI Advisor",
@@ -131,7 +167,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0899,
       "tv_to_new_before": 0.0511,
-      "tv_to_new_after": 0.0061
+      "tv_to_new_after": 0.0061,
+      "latency_min": 8,
+      "peak_displacement": 0.0928,
+      "final_displacement": 0.0852,
+      "persistence_ratio": 0.919,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.0577,
+      "horizon_end_sim_time": "20250215-22:32"
     }
   ],
   "skipped": []

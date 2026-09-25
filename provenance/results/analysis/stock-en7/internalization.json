@@ -5,7 +5,11 @@
     "mean_displacement_treated": 0.0664,
     "mean_displacement_control": 0.0,
     "internalization_gap": 0.0664,
-    "n_positive_gap": 6
+    "n_positive_gap": 6,
+    "median_latency_min": 12,
+    "n_sustained": 6,
+    "n_rebound": 0,
+    "n_overshoot": 4
   },
   "interventions": [
     {
@@ -31,7 +35,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0735,
       "tv_to_new_before": 0.052,
-      "tv_to_new_after": 0.0153
+      "tv_to_new_after": 0.0153,
+      "latency_min": 14,
+      "peak_displacement": 0.0757,
+      "final_displacement": 0.0641,
+      "persistence_ratio": 0.847,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.3916,
+      "horizon_end_sim_time": "20250213-14:40"
     },
     {
       "agent": "Daniel Shen",
@@ -58,7 +70,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0904,
       "tv_to_new_before": 0.0816,
-      "tv_to_new_after": 0.0364
+      "tv_to_new_after": 0.0364,
+      "latency_min": 12,
+      "peak_displacement": 0.0993,
+      "final_displacement": 0.0963,
+      "persistence_ratio": 0.97,
+      "persistence": "sustained",
+      "overshoot": false,
+      "max_overshoot_frac": 0.0,
+      "horizon_end_sim_time": "20250213-14:40"
     },
     {
       "agent": "Kevin Su",
@@ -85,7 +105,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.042,
       "tv_to_new_before": 0.0343,
-      "tv_to_new_after": 0.0133
+      "tv_to_new_after": 0.0133,
+      "latency_min": 6,
+      "peak_displacement": 0.0566,
+      "final_displacement": 0.0542,
+      "persistence_ratio": 0.958,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.1612,
+      "horizon_end_sim_time": "20250213-14:40"
     },
     {
       "agent": "Michael Chen",
@@ -112,7 +140,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0399,
       "tv_to_new_before": 0.0449,
-      "tv_to_new_after": 0.025
+      "tv_to_new_after": 0.025,
+      "latency_min": 6,
+      "peak_displacement": 0.0556,
+      "final_displacement": 0.0353,
+      "persistence_ratio": 0.635,
+      "persistence": "sustained",
+      "overshoot": false,
+      "max_overshoot_frac": 0.0,
+      "horizon_end_sim_time": "20250213-14:40"
     },
     {
       "agent": "Mr. Zhou",
@@ -139,7 +175,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0947,
       "tv_to_new_before": 0.0686,
-      "tv_to_new_after": 0.0212
+      "tv_to_new_after": 0.0212,
+      "latency_min": 8,
+      "peak_displacement": 0.0995,
+      "final_displacement": 0.0978,
+      "persistence_ratio": 0.982,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.0167,
+      "horizon_end_sim_time": "20250213-14:40"
     },
     {
       "agent": "Wendy Lin",
@@ -166,7 +210,15 @@
       "mean_displacement_control": 0.0,
       "internalization_gap": 0.0579,
       "tv_to_new_before": 0.0457,
-      "tv_to_new_after": 0.0167
+      "tv_to_new_after": 0.0167,
+      "latency_min": 16,
+      "peak_displacement": 0.0672,
+      "final_displacement": 0.0595,
+      "persistence_ratio": 0.886,
+      "persistence": "sustained",
+      "overshoot": true,
+      "max_overshoot_frac": 0.2143,
+      "horizon_end_sim_time": "20250213-14:40"
     }
   ],
   "skipped": []
