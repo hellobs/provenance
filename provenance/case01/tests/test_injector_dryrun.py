@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """injector dry-run 冒烟测试:验证节点生成、记录结构与"不依赖 mavis"。"""
+import os
+import subprocess
 import sys
 
 from case01.injector.bridge import MavisBridge
@@ -40,8 +42,25 @@ def test_dry_run_record_and_no_mavis_dependency():
     assert [r["step"] for r in record["nodes"]] == list(range(1, len(nodes) + 1))
     # dry-run 下关键节点视为已发生交互
     assert record["summary"]["interaction_started"] >= 2
-    # 全程不加载 mavis
-    assert "mavisframework" not in sys.modules
+    # 全程不加载 mavis —— 必须在**干净解释器**里判:
+    # 同进程判会随"谁先 import 过 mavisframework"而假红(外层 tests 会 import,
+    # 2026-09-25 第十五轮把几套测试放一起跑时实测到这个顺序依赖)。
+    pkg = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    code = (
+        "import sys\n"
+        "from case01.injector.bridge import MavisBridge\n"
+        "from case01.injector.nodes import default_nodes\n"
+        "b = MavisBridge(nodes=default_nodes('B', roles=['Investment AI', 'Ethan Lin']),\n"
+        "                dry_run=True, run_id='dry-B')\n"
+        "b.run()\n"
+        "print('MAVIS' if 'mavisframework' in sys.modules else 'CLEAN')\n"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = pkg + os.pathsep + env.get("PYTHONPATH", "")
+    probe = subprocess.run([sys.executable, "-X", "utf8", "-c", code],
+                           capture_output=True, text=True, env=env, cwd=pkg)
+    assert probe.returncode == 0, probe.stderr[-400:]
+    assert probe.stdout.strip().endswith("CLEAN"), probe.stdout[-200:]
 
 
 def test_external_state_and_interaction_callbacks():

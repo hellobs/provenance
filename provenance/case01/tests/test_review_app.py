@@ -362,6 +362,11 @@ def test_expert_face_ships_no_experiment_prose():
     for phrase in ("契约 §3.2 规定", "预设分支不看", "那是实验定义",
                    "不该出现在别人的页面上", "现在只有分支"):
         assert phrase not in html, "专家面源码里出现实验说明: {}".format(phrase)
+    # 棘轮(2026-09-24 第九轮):专家面**源码**里的机制名只许维持、不许再涨 ——
+    # 数字本身不是目标,涨了就说明又往页面里写了新的实验词(真正的目标是 0,
+    # 见《0924 下一步方向》第九轮那条 P0:把实验相关的 JS 整体从专家面拆出去)。
+    # 第十五轮改页签可用性逻辑时,一度因为把维护说明写进 JS 注释而涨到 15,
+    # 已把说明挪回 Python 侧(见 _PAGE 上方的"页面源码维护须知")。
     assert html.count("branch") <= 14, html.count("branch")
     assert html.count("injector") <= 12, html.count("injector")
 

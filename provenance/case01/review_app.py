@@ -257,6 +257,11 @@ def get_run(run_id: str, safe: int = 0):
 #     ② 维护说明写在这里(Python 侧),不写进 _PAGE。
 #     ③ 专家视图剥掉的字段见 live/history.expert_safe_record(唯一实现处);运行期
 #        隐藏哪些行见下面的 SAFE / SAFE_HIDDEN_ROWS。
+#   第十五轮补:页签可用性用 AVAILABLE_TABS(安全模式去掉实验相关页签),
+#   深链与宿主消息都按它判断 —— 以前那句守卫写在读 WANT_TAB 之前是死代码,
+#   于是 /embed/review?tab=injector 会把主区域渲染成导航里根本没有的那一块。
+#   两条相关守卫:case01/tests/test_review_app.py 的棘轮(专家面源码里的机制名只许维持)
+#   与 test_review_panel_probe.py(用 node 探针真跑页面 JS 查深链行为)。
 _PAGE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -432,19 +437,23 @@ const SAFE = Q.has("safe") ? (Q.get("safe") === "1") : EMBED;
 const SAFE_HIDDEN_ROWS = ["branch", "判定方式", "分支来源", "T0 立场一致性"];
 if (SAFE) { document.title = "GTC Case 01 · 结果记录"; }
 // 安全模式下这个页签不给(原因见 Python 侧说明)。
-if (SAFE && TAB === "injector") { TAB = "overview"; }
 const WANT_RUN = Q.get("run") || "";
 const WANT_TAB = Q.get("tab") || "";
-// 深链参数没对上时的**可见**提示:嵌进来的人会以为看的就是自己要的那条,不能静默回落。
-let PARAM_NOTE = "";
-if (WANT_TAB && TABS.some(t => t[0] === WANT_TAB)) { TAB = WANT_TAB; }
-
+// 转义要先定义:下面的提示里会插入 URL 参数(直接拼进 HTML 就是自造 XSS)。
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;");
-
-if (WANT_TAB && !TABS.some(t => t[0] === WANT_TAB)) {
-  PARAM_NOTE = `<div class="note">深链页签 tab=${esc(WANT_TAB)} 不存在,已用默认页签。</div>`;
+// **本面实际可用的页签** = 导航渲染用的同一份口径。
+// 以前这里用未过滤的 TABS 判断,于是深链指到"本面不提供的页签"时,主区域会渲染出
+// 导航里根本没有的那一块(2026-09-25 第十五轮体检:那句守卫写在读 WANT_TAB 之前,是死代码)。
+const AVAILABLE_TABS = TABS.filter(t => !SAFE || t[0] !== "injector");
+// 深链参数没对上时的**可见**提示:嵌进来的人会以为看的就是自己要的那条,不能静默回落。
+let PARAM_NOTE = "";
+if (WANT_TAB && AVAILABLE_TABS.some(t => t[0] === WANT_TAB)) { TAB = WANT_TAB; }
+else if (WANT_TAB) {
+  PARAM_NOTE = (SAFE && WANT_TAB === "injector")
+    ? `<div class="note">嵌入面没有该页签(专家视图不含实验元信息),已用默认页签。</div>`
+    : `<div class="note">深链页签 tab=${esc(WANT_TAB)} 不存在,已用默认页签。</div>`;
 }
 
 // ---- 与宿主(平台侧治理平台)的通信 ----
@@ -474,9 +483,14 @@ window.addEventListener("message", (ev) => {
       render();
     }
   }
-  if (m.type === "mavis:set-tab" && m.tab && TABS.some(t => t[0] === m.tab)
-      && !(SAFE && m.tab === "injector")) {
-    TAB = m.tab; render();
+  if (m.type === "mavis:set-tab" && m.tab) {
+    if (AVAILABLE_TABS.some(t => t[0] === m.tab)) { TAB = m.tab; }
+    else {
+      // 宿主点的这个页签在本面不可用(例如嵌入面上要那个实验相关页签、或写错的 id):
+      // **说出来**,别让宿主以为切过去了(以前是静默忽略,页面上什么都不显示)。
+      PARAM_NOTE = `<div class="note">宿主指定的页签 ${esc(m.tab)} 在本面不可用,已保持当前页签。</div>`;
+    }
+    render();
   }
 });
 
