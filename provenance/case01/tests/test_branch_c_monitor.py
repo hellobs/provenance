@@ -71,6 +71,39 @@ class TestEvaluateTrigger:
                            "测算。盘中最高 $50.30,收盘 $49.20。无新公告。"}]
         assert evaluate_trigger(trig, day) is False
 
+    def test_negation_covers_wu_queding(self):
+        """否定句"目前无确定采购安排"必须挡住(2026-09-25 第十三轮体检实测)。
+
+        这是 timeline A 09-07 公告里的**真实一句**。当时否定词表里有"无正式/无新/无任何",
+        却没有"无确定" —— 于是这一句不算否定。今天不触发只是因为另一个洞(英文短语词表
+        匹配不上中文摘要)把它挡住了;一旦关键词映射被修好,C 就会在**否定公告上建仓**。
+        这里把"否定要判全"这件事单独钉住,免得修了那边漏了这边。
+        """
+        trig = {"type": "keyword", "keywords": ["采购安排"]}
+        day = [{"kind": "disclosure",
+                "summary": "HCM 公告:综合测试结果与客户供应安排,未进入该客户首批商业"
+                           "供货名单;仍可能继续验证,目前无确定采购安排。收盘 $27.40。"}]
+        assert evaluate_trigger(trig, day) is False
+
+    def test_english_phrase_keywords_do_not_match_chinese_summaries(self):
+        """**已知缺口,不是期望行为**(第十三轮体检记录在案)。
+
+        Branch C 的计划由 AI 生成,实测 4/5 条真实记录的 `trigger.keywords` 是**英文短语**
+        ('signed order' / 'confirmed order' …),而 `_EN_KW_TO_CN` 的键都是**单词**
+        ('order' / 'signed' …) → 映射一次都没生效,英文词永远匹配不上中文事件摘要,
+        C 线因此**结构上不可能建仓**。
+        它今天"看起来对"(剧本本就不该确认订单)让这个洞没人发现 —— 这正是
+        "靠坏掉的机制拿到正确结果"。修它(按词切分再查表)会让 C 在现有时间线上触发,
+        属于研究侧口径决定,所以这里**只钉住现状**,修的时候这条会红、提醒同步改剧本或词表。
+        """
+        trig = {"type": "keyword",
+                "keywords": ["signed order", "confirmed order", "announcement"]}
+        day = [{"kind": "disclosure",
+                "summary": "HCM 发布正式公告:公司已签署正式供货协议并纳入采购名单。"}]
+        assert evaluate_trigger(trig, day) is False, (
+            "英文短语词表如今能匹配中文摘要了 —— 说明映射被修好,"
+            "请同步确认 C 线在现有时间线上的期望行为")
+
     def test_keyword_fires_on_real_announcement(self):
         trig = {"type": "keyword", "keywords": ["公告", "进入供应体系"]}
         day = [{"kind": "disclosure",
