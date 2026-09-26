@@ -90,3 +90,27 @@ def test_nodespec_roundtrip():
     assert d["context"] == {"k": {"v": 1}}
     assert d["require_interaction"] is True
     assert d["world"] == {"w": 2}
+
+def test_event_translation_multiset_complete():
+    """schema 翻译完整性(2026-09-26 深度体检):时间线事件的 (kind, summary)
+    多集必须与节点事件的 (event_type, content) 多集完全一致 —— 1:1 翻译,
+    零丢失零重复。字段改名/丢事件在此第一时间暴露。
+    """
+    from collections import Counter
+
+    tl = {
+        "2026-01-01": [
+            {"kind": "disclosure", "summary": "公告甲。"},
+            {"kind": "price", "summary": "收盘 10"},
+        ],
+        "2026-01-02": [
+            {"kind": "media", "summary": "媒体报道乙。"},
+            {"kind": "disclosure", "summary": "公告甲。"},   # 重复内容合法,多集应含两份
+        ],
+    }
+    nodes = nodes_from_timeline(tl, key_nodes="first_last", final_date="2026-01-03",
+                                append_final=True)
+    src = Counter((e["kind"], e["summary"]) for evs in tl.values() for e in evs)
+    node = Counter((e["event_type"], e["content"]) for n in nodes for e in n.events)
+    assert src == node, "事件翻译多集不一致: src-node={} node-src={}".format(
+        src - node, node - src)
