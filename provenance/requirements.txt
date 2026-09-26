@@ -43,5 +43,9 @@ matplotlib>=3.8
 # 本行必须保留:CI 从本文件单源安装依赖,缺它守卫测试在 CI 必红(ModuleNotFoundError)。
 pyyaml>=6.0
 
+# mavis_provider(case01.agents)用 requests 调 Ollama/外部 API;
+# 此前靠传递依赖侥幸在位 —— 2026-09-25 依赖审计补声明,新环境不再偶发 ImportError。
+requests>=2.31
+
 # 可选:向量记忆检索(默认 SimpleStore 纯 stdlib 不需要;要用向量才装)
 # llama-index>=0.10
