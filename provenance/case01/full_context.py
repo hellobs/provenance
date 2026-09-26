@@ -73,7 +73,46 @@ def _fmt_state(st: dict) -> str:
     return "当事人未买入 HCM,现金约 {} 元".format(_money(st.get("cash_rmb", 200000)))
 
 
+
+# 类型归一(2026-09-25 深度体检):畸形记录(旧版本/未来版本/手工编辑)的类型异常
+# 不应打崩 frozen 契约面 —— 500 对平台是"服务坏了",而不是"这条记录坏了"。
+# 只归一容器与已知叶子类型,不改业务内容;合法记录原样通过(等幂)。
+_SECTION_DICTS = ("final_feedback", "reflection", "router", "branch_action",
+                  "consistency", "injector", "compat", "summary")
+_SECTION_LISTS = ("turns", "retrievals", "events", "state_history", "audit",
+                  "condition_monitor")
+_SECTION_STRS = ("run_id", "branch", "start_date", "end_date", "debug")
+
+
+def normalize_record(rec):
+    """畸形记录的类型归一:非 dict 段落 → {},非 list 段落 → [](并滤掉非 dict 元素),
+    已知字符串字段非 str → str()。合法记录原样语义不变。"""
+    if not isinstance(rec, dict):
+        return {}
+    out = dict(rec)
+    for k in _SECTION_DICTS:
+        if k in out and not isinstance(out[k], dict):
+            out[k] = {}
+    for k in _SECTION_LISTS:
+        v = out.get(k)
+        if k in out and not isinstance(v, list):
+            out[k] = []
+        elif isinstance(v, list):
+            out[k] = [x for x in v if isinstance(x, dict)]
+    for k in _SECTION_STRS:
+        if k in out and out[k] is not None and not isinstance(out[k], str):
+            out[k] = str(out[k])
+    ref = out.get("reflection")
+    if isinstance(ref, dict) and not isinstance(ref.get("text", ""), str):
+        ref["text"] = str(ref.get("text") or "")
+    router = out.get("router")
+    if isinstance(router, dict) and not isinstance(router.get("issues", []), list):
+        router["issues"] = []
+    return out
+
+
 def build_full_context(rec: dict) -> str:
+    rec = normalize_record(rec)
     parts = []
     parts.append("GTC Case 01 · 一次投资咨询的完整记录")
     parts.append("")
@@ -221,7 +260,7 @@ def load_run(runs_root: str, run_id: str) -> Optional[dict]:
     if not os.path.exists(p):
         return None
     with open(p, encoding="utf-8") as f:
-        return json.load(f)
+        return normalize_record(json.load(f))
 
 
 def quality_of(rec: dict) -> dict:

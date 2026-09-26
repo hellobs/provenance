@@ -259,3 +259,45 @@ def test_real_repr_runs_ok():
         assert rec is not None
         txt = fc.build_full_context(rec)
         assert len(txt) > 200
+
+
+import json
+
+
+class TestMalformedRecordTolerance:
+    """畸形记录类型归一(2026-09-25 深度体检):契约面不得因单条坏记录 500。"""
+
+    MALFORMED = {
+        "minimal": {"run_id": "x1"},
+        "nulls": {"run_id": "x2", "branch": None, "turns": None,
+                  "reflection": None, "router": None},
+        "wrong_types": {"run_id": "x3", "branch": 123, "turns": "notalist",
+                        "events": 42, "reflection": {"text": 7},
+                        "router": "x", "final_feedback": "bad"},
+    }
+
+    def test_build_full_context_tolerates_all(self):
+        from case01.full_context import build_full_context
+        for name, rec in self.MALFORMED.items():
+            text = build_full_context(rec)
+            assert isinstance(text, str) and len(text) > 100, name
+
+    def test_normalize_is_idempotent_and_keeps_valid(self):
+        from case01.full_context import normalize_record
+        rec = {"run_id": "ok", "branch": "B", "turns": [{"speaker": "a", "text": "t"}],
+               "reflection": {"text": "长反思" * 10}}
+        once = normalize_record(rec)
+        assert once["turns"] == rec["turns"], "合法记录必须原样语义不变"
+        assert normalize_record(once) == once, "归一应等幂"
+
+    def test_load_run_normalizes(self, tmp_path):
+        from case01.full_context import load_run
+        d = tmp_path / "x9"
+        d.mkdir()
+        (d / "run.json").write_text(
+            json.dumps({"run_id": 9, "turns": "bad", "reflection": {"text": 7}}),
+            encoding="utf-8")
+        rec = load_run(str(tmp_path), "x9")
+        assert isinstance(rec["run_id"], str)
+        assert rec["turns"] == []
+        assert isinstance(rec["reflection"]["text"], str)
