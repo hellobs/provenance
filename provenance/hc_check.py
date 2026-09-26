@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 import urllib.request, re, sys
 
-html = urllib.request.urlopen("http://127.0.0.1:5010/", timeout=10).read().decode("utf-8", "replace")
+try:
+    html = urllib.request.urlopen("http://127.0.0.1:5010/", timeout=10).read().decode("utf-8", "replace")
+except urllib.error.URLError as e:
+    print("5010 服务未启动或不可达({})——先起 live 服务再跑本脚本".format(e.reason if hasattr(e, "reason") else e))
+    sys.exit(2)
 print("HTML 长度:", len(html))
 print("含 '<script' 数:", html.count("<script"))
 print("含 '</script>' 数:", html.count("</script>"))
