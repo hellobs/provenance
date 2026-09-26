@@ -111,6 +111,22 @@ def _recorded_alignment(events: List[dict], dims: List[str]) -> Optional[float]:
     return sum(vals) / len(vals) if vals else None
 
 
+def _probe_ollama(base_url: str = "http://127.0.0.1:11434",
+                  timeout: float = 2.0) -> bool:
+    """Ollama 可达性预检(2 秒 socket):死后端不再空转 GoalScorer 的重试策略
+    (embed 失败不进缓存,30 条文本 × 3 重试 × 60s 超时 = 分钟级,实测 616s)。"""
+    import socket
+    from urllib.parse import urlparse
+    try:
+        u = urlparse(base_url)
+        host = u.hostname or "127.0.0.1"
+        port = u.port or 80
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def _offline_alignment(actions: List[str], dims: List[str],
                        scorer=None) -> Optional[float]:
     """离线补算:同一 GoalScorer 对行动文本 × 维度名的 cosine 均值。"""
@@ -158,24 +174,41 @@ def analyse_intervention(events: List[dict], intervention: dict,
                          "align_before": round(a_b, 4), "align_after": round(a_a, 4),
                          "shift": round(a_a - a_b, 4)})
     # 降维:干预后不在约束里,离线补算(两侧同口径离线,避免记录/补算口径混用)
+    warnings: List[str] = []
     scorer_failed = False
     if dropped:
         dims = sorted(dropped)
         b_txt = [e["action"] for e in _sample(before, sample)]
         a_txt = [e["action"] for e in _sample(after, sample)]
-        a_b = _offline_alignment(b_txt, dims, scorer)
-        a_a = _offline_alignment(a_txt, dims, scorer)
-        if a_b is not None and a_a is not None:
-            rows.append({"kind": "dropped", "dims": dims,
-                         "dw": round(sum(-dropped[d] for d in dims), 4),
-                         "align_before": round(a_b, 4), "align_after": round(a_a, 4),
-                         "shift": round(a_a - a_b, 4)})
+        if scorer is None and not _probe_ollama():
+            # 死后端预检:不进 GoalScorer 的重试循环(embed 失败不进缓存,
+            # 全部文本逐个空转 = 分钟级,2026-09-25 实测 616s)
+            scorer_failed = True
+            warnings.append("Ollama 不可达,降维维度({})的离线补算跳过:"
+                            "本条结果只含升维维度,不完整".format("+".join(dims)))
         else:
-            scorer_failed = True   # 打分器失败(embed 不可得),不是"没有行动"
+            a_b = _offline_alignment(b_txt, dims, scorer)
+            a_a = _offline_alignment(a_txt, dims, scorer)
+            if a_b is not None and a_a is not None:
+                rows.append({"kind": "dropped", "dims": dims,
+                             "dw": round(sum(-dropped[d] for d in dims), 4),
+                             "align_before": round(a_b, 4),
+                             "align_after": round(a_a, 4),
+                             "shift": round(a_a - a_b, 4)})
+            else:
+                scorer_failed = True   # 打分器失败(embed 不可得),不是"没有行动"
+                warnings.append("离线打分器失败,降维维度({})的补算跳过:结果不完整"
+                                .format("+".join(dims)))
     if not rows:
         return {"agent": intervention.get("agent", ""), "sim_time": t,
                 "skip_reason": ("对齐度不可得:离线打分器失败(检查 Ollama/embedding)"
-                                if scorer_failed else "窗口内无可用的对齐记录")}
+                                if scorer_failed else "窗口内无可用的对齐记录"),
+                "warnings": warnings}
+    result = {"agent": intervention.get("agent", ""), "sim_time": t,
+              "note": intervention.get("note", ""), "dims": rows}
+    if warnings:
+        result["warnings"] = warnings    # 部分结果必须亮牌,不静默
+    return result
     return {"agent": intervention.get("agent", ""), "sim_time": t,
             "note": intervention.get("note", ""), "dims": rows}
 
