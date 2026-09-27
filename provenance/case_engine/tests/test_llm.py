@@ -16,7 +16,10 @@ def test_openrouter_key_from_env(monkeypatch):
 
 def test_openrouter_key_empty_no_env(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    # 无 env、无 .secrets.json → 空串(不报错)
+    # 密封:关掉 .env 与 .secrets.json 两处兜底,确保"确实没有"→ 空串(不报错)
+    # (不关的话,本机若存在 .env / .secrets.json 会读到真实 key,测试不再密封)
+    monkeypatch.setattr("case_engine.llm._env_files", lambda: [])
+    monkeypatch.setattr("case_engine.llm._secrets_candidates", lambda: [])
     assert openrouter_key() == ""
 
 
@@ -39,6 +42,8 @@ def test_localhf_requires_deps_or_path():
 
 def test_openrouter_requires_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("case_engine.llm._env_files", lambda: [])
+    monkeypatch.setattr("case_engine.llm._secrets_candidates", lambda: [])
     with pytest.raises(RuntimeError, match="key"):
         OpenRouterClient()
     # 显式传 key 则 OK(不报错)

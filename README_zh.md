@@ -58,26 +58,26 @@ cd ../mavis
 uv build                              # 生成 dist/mavisframework-1.3.0-py3-none-any.whl
 cd ../provenance
 
-# 2.2 创建环境并安装依赖(uv 或 conda)
-# uv
+# 2.2 创建环境(uv 或 conda;Python 3.12)
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
-uv pip install -r requirements.txt
+#   conda 用户:conda create -n provenance python=3.12 && conda activate provenance
 
-# conda
-conda create -n provenance python=3.12
-conda activate provenance
-pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
-pip install -r requirements.txt
+# 2.3 按顺序装依赖(**顺序不能反**;三条都做完才算装好)
+#     a) 框架(2.1 构建的 wheel;开发期也可 `pip install -e ../mavis` 可编辑安装)
+uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
+#     b) 本仓的两个**本地包**(不在 PyPI;漏这步,下一步会报 "No matching distribution found")
+uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
+#     c) 其余运行依赖 + 测试框架(requirements.txt **不含** pytest)
+uv pip install -r requirements.txt pytest
 ```
 
-> 需要 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/)。
+> 需要 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/);`uv pip` 换成 `pip` 同样适用。
 >
-> **开发/协作期可改用可编辑安装**(改框架代码即时生效,框架更新后 `git pull` 即可,无需重装):
+> **自检**(仓库根有 `pytest.ini` 设了 `pythonpath=provenance`,所以从仓库根或 `provenance/` 目录跑都行):
 > ```bash
-> uv pip install -e ../mavis   # 或 pip install -e ../mavis
+> pytest tests                                          # 外层:接口/页面/守卫
+> pytest provenance/case_engine/tests provenance/case01/tests
 > ```
-> 可编辑安装与 wheel 安装二选一,均可正常使用(详见框架 README 的版本管理章节)。
 
 ## 3. 配置大模型(二选一)
 
@@ -90,31 +90,29 @@ pip install -r requirements.txt
 
   无需改配置(默认即为 Ollama)。
 
-- **DeepSeek API**:在 `provenance/.env` 中配置
+- **OpenRouter 等外部 API(需 key)**:最省事的是一条命令(写入 + 联网自检,key 不打印):
 
-  ```
-  LLM_API_KEY=你的key
+  ```bash
+  python provenance/tools/setup_api.py --key sk-xxxx
+  python provenance/tools/setup_api.py --show      # 只看当前 key 从哪来
   ```
 
-  并编辑 `provenance/data/config.json` 的 `agent.think.llm`:
-
-  ```json
-  "llm": {
-    "provider": "openai",
-    "model": "deepseek-chat",
-    "base_url": "https://api.deepseek.com/v1",
-    "api_key": ""
-  }
-  ```
+  也可以照仓库根的 `.env.example` 复制成 `.env` 并填 `OPENROUTER_API_KEY=...` ——
+  `.env` 会被**自动读取**(不覆盖系统环境变量),不必懂"环境变量怎么设";
+  `.env` 与 `.secrets.json` 都已 gitignore。解析顺序:`环境变量 → .env → .secrets.json`
+  (仓库根 / 包根)。
 
 ## 4. 实时模拟
 
 ```bash
 cd provenance/provenance
-python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
+python live_switch.py --start case01        # 5010 是唯一实时入口(case00/case01 互斥共用)
+# 只看界面、不跑推演:python live_switch.py --start case00 --no-sim
 ```
 
-浏览器打开 http://127.0.0.1:5001/（旧端口；现行入口 5010）
+浏览器打开 http://127.0.0.1:5010/ 。只读面 `python -m case00.serve --port 5003` /
+`python -m case01.serve --port 5002`;配置工具在**框架仓**:`cd ../mavis/config_tool && python app.py`(8060),
+它会自动发现平台仓,**无需设环境变量**(见 mavis 的 config_tool README)。
 
 ## 5. 角色配置
 

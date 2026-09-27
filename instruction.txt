@@ -1,2 +1,19 @@
-cd D:\zzr\GenerativeAgentsCN\provenance
-C:\Users\rui\miniconda3\envs\generative_agents_cn\python.exe live.py --name invest-room --start "20250213-09:30" --stride 2 --step 0 --port 5001
+本文件已停用。
+
+它原来是一段**过时的个人启动笔记**(指向 D:\zzr\GenerativeAgentsCN\provenance、
+用 miniconda 解释器、跑 live.py --port 5001),照它操作会连错仓库与端口。
+
+请改看仓库根目录的上手文档:
+
+    README_zh.md     # 中文;§2「环境准备」逐步装依赖,§3「运行」起服务
+    README.md        # English
+
+最省事的顺序(完整命令见 README_zh.md §2):
+    1) 克隆框架仓库到本仓同级目录并安装:mavis
+    2) pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
+    3) pip install -r requirements.txt && pip install pytest
+    4) 配置模型:本地 Ollama(默认,无需密钥)或 OpenRouter(见 .env.example /
+       python provenance/tools/setup_api.py)
+    5) cd provenance && python -m pytest case_engine/tests case01/tests   # 自检
+
+端口只有一个实时入口 5010(case00/case01 互斥共用),详见 docs/平台对接契约_5010唯一入口.md。

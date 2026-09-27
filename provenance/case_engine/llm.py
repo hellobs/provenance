@@ -15,21 +15,97 @@ import urllib.error
 from typing import List, Optional
 
 
+def _pkg_dir() -> str:
+    """平台包根(<repo>/provenance):case_engine/llm.py 的上一级。"""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _repo_dir() -> str:
+    return os.path.dirname(_pkg_dir())
+
+
+def _env_files() -> list:
+    return [os.path.join(_repo_dir(), ".env"), os.path.join(_pkg_dir(), ".env")]
+
+
+def _secrets_candidates() -> list:
+    """.secrets.json 候选(按优先级):**仓库根**、**包根**。
+
+    刻意**不**递归扫子目录 —— 否则会把任意子目录下的密钥读进来,行为不可预期、
+    测试也不再密封。case01 侧自己的历史路径(case01/.secrets.json)由
+    `case01.agents.secrets` 先查,再落到这里。
+    """
+    return [os.path.join(_repo_dir(), ".secrets.json"),
+            os.path.join(_pkg_dir(), ".secrets.json")]
+
+
+def load_env_files() -> None:
+    """把 .env 里的 KEY=VALUE 灌进 os.environ(**不覆盖**已有值)。极小实现,不引依赖。
+
+    这样"复制 .env.example 为 .env 并填 key"就能用,无需懂环境变量怎么设。
+    """
+    for p in _env_files():
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        except OSError:
+            pass
+
+
 def openrouter_key() -> str:
-    """优先环境变量 OPENROUTER_API_KEY,其次本包所在目录 .secrets.json。
-    绝不打印/落盘 key,仅读取。"""
+    """解析 OpenRouter key,顺序:**环境变量 → .env → .secrets.json**(都不打印 key)。
+
+    - 环境变量:`OPENROUTER_API_KEY`
+    - `.env`:仓库根或包根的 `.env`(照 `.env.example` 复制即可)
+    - `.secrets.json`:仓库根 / 包根 / 包根下任一子目录(兼容历史写法)
+    一条命令就能配好:`python provenance/tools/setup_api.py --key sk-...`。
+    """
+    load_env_files()
     key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if key:
         return key
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     "..", ".secrets.json")
-    if os.path.exists(p):
+    for p in _secrets_candidates():
         try:
             with open(p, encoding="utf-8") as f:
                 d = json.load(f)
-            return str(d.get("openrouter_api_key", "")).strip()
-        except Exception:
-            return ""
+            k = str(d.get("openrouter_api_key", "")).strip()
+            if k:
+                return k
+        except (OSError, ValueError):
+            continue
+    return ""
+
+
+def openrouter_source() -> str:
+    """key 是从哪来的(只报**来源**,不报 key)——供 setup/自检打印,便于排查。"""
+    if os.environ.get("OPENROUTER_API_KEY", "").strip():
+        return "环境变量 OPENROUTER_API_KEY"
+    for p in _env_files():
+        if os.path.isfile(p):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    txt = f.read()
+                if "OPENROUTER_API_KEY" in txt:
+                    return ".env: {}".format(p)
+            except OSError:
+                pass
+    for p in _secrets_candidates():
+        try:
+            with open(p, encoding="utf-8") as f:
+                if str(json.load(f).get("openrouter_api_key", "")).strip():
+                    return ".secrets.json: {}".format(p)
+        except (OSError, ValueError):
+            continue
     return ""
 
 
@@ -317,8 +393,9 @@ class OpenRouterClient(_ChatMixin):
         self._api_key = api_key or openrouter_key()
         if not self._api_key:
             raise RuntimeError(
-                "OpenRouter key 未配置:设置环境变量 OPENROUTER_API_KEY 或"
-                "写入 .secrets.json(不入 git)")
+                "未配置 OpenRouter key。最省事的一条命令:\n"
+                "  python provenance/tools/setup_api.py --key sk-xxxx\n"
+                "(也可照 .env.example 复制成 .env,或设环境变量 OPENROUTER_API_KEY)")
 
     def _chat_url(self) -> str:
         return self.base_url + "/chat/completions"
