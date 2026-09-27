@@ -25,6 +25,7 @@ IVD 语义边界(哪些算"干预"):
 import json
 import math
 import os
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -81,16 +82,24 @@ def _audit_path(ctx: InterventionContext) -> str:
     return os.path.join(ctx.base_dir, "results", "checkpoints", "interventions.json")
 
 
+_AUDIT_LOCK = threading.Lock()   # 串行化读-改-写:两专家同时干预不丢审计记录
+
+
 def _append_audit(ctx: InterventionContext, record: dict) -> None:
-    """向 interventions.json 追加一条审计(读-改-原子写)。"""
+    """向 interventions.json 追加一条审计(加锁 + 读-改-原子写)。
+
+    与 live/reflections.append_mark 的 _MARKS_LOCK 同一标准:原子写只保证
+    "文件不是半截",不保证并发追加不丢行 —— 丢行要靠锁。
+    """
     path = _audit_path(ctx)
-    audit = []
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            audit = json.load(f)
-    audit.append(record)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    write_json_atomic(path, audit)
+    with _AUDIT_LOCK:
+        audit = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                audit = json.load(f)
+        audit.append(record)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        write_json_atomic(path, audit)
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +141,12 @@ def get(strategy_id: str) -> type:
 
 
 class InterventionStrategy:
-    """干预策略基类:子类实现 describe/apply,类属性给 id 与显示名。"""
+    """干预策略基类:子类实现 describe/_apply,类属性给 id 与显示名。
+
+    `apply` 是对外入口(注册表/HTTP/库调用共用):在委托给子类 `_apply` 之前
+    统一做 payload 归一(非 dict → {})—— 策略作为库被直接调用时(绕过 HTTP 层
+    的 _json_body)不会因畸形 payload 裸崩 AttributeError。
+    """
     strategy_id: str = ""
     name: str = ""
 
@@ -140,8 +154,13 @@ class InterventionStrategy:
         from live.interventions import describe as _registry_describe
         return _registry_describe(self.strategy_id)
 
-    def apply(self, ctx: InterventionContext, payload: dict) -> Any:
-        raise NotImplementedError("干预策略 {!r} 未实现 apply".format(
+    def apply(self, ctx: InterventionContext, payload: Any) -> Any:
+        if not isinstance(payload, dict):
+            payload = {}
+        return self._apply(ctx, payload)
+
+    def _apply(self, ctx: InterventionContext, payload: dict) -> Any:
+        raise NotImplementedError("干预策略 {!r} 未实现 _apply".format(
             self.strategy_id))
 
 
@@ -155,7 +174,7 @@ class WeightAdjustStrategy(InterventionStrategy):
     strategy_id = "goals"
     name = "调整治理约束权重"
 
-    def apply(self, ctx: InterventionContext, payload: dict) -> dict:
+    def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         name = str(payload.get("name", "")).strip()
         goals = payload.get("goals")
         if not name:
@@ -271,7 +290,7 @@ class UndoInterventionStrategy(InterventionStrategy):
     strategy_id = "undo"
     name = "撤销干预(权重回滚)"
 
-    def apply(self, ctx: InterventionContext, payload: dict) -> Any:
+    def _apply(self, ctx: InterventionContext, payload: dict) -> Any:
         if sandbox_rollback_blocked(ctx.base_dir):
             return InterventionResult({"ok": False, "errors": [
                 "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
@@ -370,7 +389,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
     strategy_id = "mark"
     name = "反思标记(专家审核)"
 
-    def apply(self, ctx: InterventionContext, payload: dict) -> dict:
+    def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         from live.reflections import (VALID_VERDICTS, append_mark, new_mark,
                                       rebuild_jsonl)
 
@@ -446,7 +465,7 @@ class CorrectiveFeedbackStrategy(InterventionStrategy):
     strategy_id = "corrective_feedback"
     name = "纠正回流(写入 agent 记忆流)"
 
-    def apply(self, ctx: InterventionContext, payload: dict) -> dict:
+    def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         agent_name = str(payload.get("agent", "")).strip()
         correction = str(payload.get("correction", "") or "").strip()
         note = str(payload.get("note", "") or "").strip()

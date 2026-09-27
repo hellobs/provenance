@@ -345,7 +345,7 @@ async def update_goals(request: Request):
     if err is not None:
         return err
     res = _interventions.get("goals")().apply(_intervention_ctx(), body)
-    return _wrap_intervention_result(res)
+    return _wrap_intervention_result("goals", res)
 
 
 def _intervention_ctx() -> InterventionContext:
@@ -363,8 +363,17 @@ def _intervention_ctx() -> InterventionContext:
     )
 
 
-def _wrap_intervention_result(res) -> JSONResponse:
-    """策略返回普通 dict → 200;InterventionResult → 自带状态码。"""
+def _wrap_intervention_result(strategy_id: str, res) -> JSONResponse:
+    """策略返回普通 dict → 200;InterventionResult → 自带状态码。
+
+    策略返回 None = 策略自身的 bug(如漏了 return)—— 显式 500 + log,
+    不静默包成 "null" 响应体让调用方猜。
+    """
+    if res is None:
+        log.error("干预策略 {!r} 返回 None(策略实现漏 return?)".format(strategy_id))
+        return JSONResponse({"ok": False,
+                             "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
+                                 strategy_id)]}, status_code=500)
     if isinstance(res, _interventions.InterventionResult):
         return JSONResponse(res.body, status_code=res.status)
     return JSONResponse(res)
@@ -388,7 +397,7 @@ async def run_intervention(strategy_id: str, request: Request):
                  strategy_id, " / ".join(_interventions.all_ids()))]},
             status_code=404)
     res = _interventions.get(strategy_id)().apply(_intervention_ctx(), body)
-    return _wrap_intervention_result(res)
+    return _wrap_intervention_result(strategy_id, res)
 
 
 @app.get("/api/interventions")
@@ -410,7 +419,7 @@ async def undo_intervention(request: Request):
     if err is not None:
         return err
     res = _interventions.get("undo")().apply(_intervention_ctx(), body)
-    return _wrap_intervention_result(res)
+    return _wrap_intervention_result("undo", res)
 
 
 # ---------------------------------------------------------------------------
@@ -831,7 +840,7 @@ async def mark_reflection(request: Request):
     if err is not None:
         return err
     res = _interventions.get("mark")().apply(_intervention_ctx(), body)
-    return _wrap_intervention_result(res)
+    return _wrap_intervention_result("mark", res)
 
 
 @app.get("/api/reflections/export.jsonl")

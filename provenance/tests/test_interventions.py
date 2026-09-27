@@ -350,3 +350,54 @@ class TestGenericDispatch:
             iv)
         assert result["summary"]["n_interventions_analysed"] == 0
         assert result["summary"]["n_skipped"] >= 1
+
+
+class TestStrategyHardening:
+    """深度体检补(2026-09-27):payload 归一 / None 防御 / 并发审计。"""
+
+    def test_non_dict_payload_normalized_in_base(self, sandbox_env):
+        """策略作为库被直接调用(绕过 HTTP 层 _json_body)时,非 dict payload
+        由基类归一为 {} → 走字段校验,不裸崩 AttributeError。"""
+        ctx = ivm.InterventionContext(server=None, base_dir=str(sandbox_env))
+        for evil in (None, [], "str", 42):
+            r = ivm.get("goals")().apply(ctx, evil)
+            assert r["ok"] is False and r["errors"] == ["缺少角色名"], (evil, r)
+
+    def test_strategy_returning_none_gets_500(self, sandbox_env, monkeypatch):
+        """策略漏 return → 显式 500 + log,不静默包成 "null" 响应体。"""
+        class _Buggy(ivm.InterventionStrategy):
+            strategy_id = "test-buggy-x9"
+            name = "坏策略(测试)"
+
+            def _apply(self, ctx, payload):
+                return None
+
+        ivm.register("test-buggy-x9", _Buggy, {"name": "坏策略(测试)"})
+        try:
+            c = TestClient(_app)
+            r = c.post("/api/intervention/test-buggy-x9", json={})
+            assert r.status_code == 500
+            assert "返回空结果" in r.json()["errors"][0]
+        finally:
+            ivm.STRATEGIES.pop("test-buggy-x9", None)
+            ivm._INTERVENTIONS.pop("test-buggy-x9", None)
+
+    def test_concurrent_audit_no_lost_records(self, sandbox_env):
+        """两专家同时干预:审计读-改-写有锁,不丢行(丢行=审计链断裂)。"""
+        import threading
+        ctx = ivm.InterventionContext(server=None, base_dir=str(sandbox_env))
+        threads = []
+        for i in range(12):
+            t = threading.Thread(target=ivm._append_audit, args=(
+                ctx, {"time": "t{}".format(i), "sim_time": "20250213-10:00",
+                      "simulation": "", "agent": "A{}".format(i),
+                      "operator": "expert", "intervention": "goals",
+                      "old_constraints": {}, "new_constraints": {}}))
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
+        audit = json.load(open(os.path.join(
+            str(sandbox_env), "results", "checkpoints", "interventions.json"),
+            encoding="utf-8"))
+        assert len(audit) == 12, "并发追加丢了审计记录: {} 条".format(len(audit))
