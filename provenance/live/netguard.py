@@ -7,7 +7,7 @@
   `POST /api/goals`(改治理约束权重)、`POST /api/undo-intervention`(撤销干预)、
   `POST /api/reflections/mark`(标记反思并写档)、
   `POST /control/restart`(重开一局;vizkit 插件在 on_restart 回调存在时注册);
-- 8060 配置工具有 13 个写端点,含 `POST /api/scenario/save`、`POST /api/run/execute`、
+- 8060 配置工具有 14 个写端点,含 `POST /api/scenario/save`、`POST /api/run/execute`、
   `POST /api/agent/delete`;
 - CORS 原来默认 `*`:跨源读的口子一开,**任意网页**都能把成品记录(研究资料)读走;
 - 全栈没有 Host 头校验,也没有登录。
@@ -30,7 +30,7 @@ WRITE_ENDPOINTS = (
     "5010  POST /api/intervention/{strategy_id}  (统一干预分发口:按注册表分发到全部已注册策略,"
     "含 corrective_feedback 纠正回流;清单见 GET /api/interventions)",
     "5010  POST /control/restart        (重开一局;vizkit 插件注册,on_restart 存在时生效)",
-    "8060  POST /api/scenario/save、/api/run/execute、/api/agent/delete 等 13 个写端点",
+    "8060  POST /api/scenario/save、/api/run/execute、/api/agent/delete、/api/dirs 等 14 个写端点",
 )
 
 
