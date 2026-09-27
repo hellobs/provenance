@@ -16,14 +16,14 @@ import urllib.error
 from typing import List, Optional
 
 
-def __openrouter_key() -> str:
+def _openrouter_key() -> str:
     """key 解析:环境变量优先;缺省时经过渡 seam 读 case01/.secrets.json(抽包收尾前)。"""
     k = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if k:
         return k
     try:
         from mavis_case01_injector._providers import import_case01_agents_secrets
-        return import_case01_agents_secrets()._openrouter_key()
+        return import_case01_agents_secrets().openrouter_key()
     except ImportError:
         return ""
 
