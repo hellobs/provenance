@@ -47,7 +47,7 @@ def test_expert_face_deeplink_tab_behaviour(tmp_path):
     page = tmp_path / "embed_review.html"
     page.write_text(html, encoding="utf-8")
     proc = subprocess.run(["node", _PROBE, "--page-file", str(page), "--only-deeplink"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0, out
     assert "合计通过" in out, out
