@@ -183,7 +183,7 @@ provenance/results/compressed/*
 !provenance/results/compressed/invest-room/
 
 # Tiled 编辑器工作文件(tilemap.json/.tmx 是运行时与编辑底图,已入库;其余为中间产物)
-provenance/frontend/static/assets/village/tilemap/*.bak
+provenance/frontend/static/assets/village/tilemap/*.bak*
 provenance/frontend/static/assets/village/tilemap/_debug_err.txt
 provenance/frontend/static/assets/village/tilemap/finance_extras.jpg
 # tilemap_to_maze 工具自动导出的中间产物(等价于 tilemap.json,不入库)
@@ -221,6 +221,11 @@ provenance/case*/scenario/maze.json.*.bak
 # --fix-spawns 挪坐标时留下的 agent.json 备份(旧值在 git 历史里)
 provenance/case*/**/agents/*/agent.json.*.bak
 provenance/case*/agents/*/agent.json.*.bak
+# 角色目录**整体**备份(如 install_scene --remap 留下的 agents.remap-<ts>.bak/,
+# 含 agent.json 与贴图;旧版本在 git 历史里,不必入库)
+provenance/case*/scenario/*.bak/
+# 前端 village 根下 maze 的就地备份(此前只盖了 case*/scenario 与 tilemap,漏了这处)
+provenance/frontend/static/assets/village/maze.json.bak*
 
 # 审计/共享临时目录(工作区里有,但不入库)
 .audit-tmp/
