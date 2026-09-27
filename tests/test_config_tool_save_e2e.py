@@ -124,3 +124,41 @@ def test_saved_agents_carry_initial_tendency(tmp_path, monkeypatch):
             assert rel.get("skipped_agents"), "角色 {} 没写出来也没报告".format(role)
             continue
         assert seen[role] == dims, (role, seen[role], dims)
+
+
+class TestHTTPLayerFormIntegrity:
+    """HTTP 层表单完整性(2026-09-27 体检):_json_body 曾自递归,
+    所有 POST 的表单字段被静默丢成 {} —— e2e 直接调内部函数绕过了 HTTP 层,
+    CI 全绿但真实保存全空。此测试走 TestClient 真打端点。"""
+
+    def test_save_preserves_form_fields(self, tmp_path, monkeypatch):
+        app_mod = _tool_app()
+        monkeypatch.setattr(app_mod, "_PLATFORM_DIR", str(tmp_path))
+        from fastapi.testclient import TestClient
+        c = TestClient(app_mod.app)
+        form = {"case_id": "http_integrity_case",
+                "name": "HTTP 层完整性场景",
+                "engine": "experiment-eval",
+                "description": "表单字段必须活着到达落盘",
+                "start_date": "2026-09-01", "end_date": "2026-09-30"}
+        r = c.post("/api/scenario/save", json=form)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        # 关键断言:字段活着(case_id/name 不能退化成默认值)
+        assert body.get("case_id") == "http_integrity_case", (
+            "表单字段丢失(_json_body 自递归复发?): {}".format(body))
+        saved = body.get("path")
+        assert saved and os.path.isfile(saved)
+        import io as _io
+        text = _io.open(saved, encoding="utf-8").read()
+        assert "http_integrity_case" in text and "HTTP 层完整性场景" in text
+
+    def test_preview_reflects_fields(self, tmp_path):
+        app_mod = _tool_app()
+        from fastapi.testclient import TestClient
+        c = TestClient(app_mod.app)
+        r = c.post("/api/scenario/preview",
+                   json={"case_id": "pv_case", "name": "预览场景",
+                         "engine": "experiment-eval"})
+        assert r.status_code == 200
+        assert "pv_case" in r.json().get("yaml", ""), "预览未收到表单字段"
