@@ -29,10 +29,14 @@ JUDGE_PROMPT = (
 class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 
-    def __init__(self, llm, max_attempts: int = 3):
+    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 256):
         self.llm = llm
         # Initial call plus at most two format retries.
         self.max_attempts = max(1, int(max_attempts))
+        # max_tokens 默认 256 对普通 chat 模型够用;推理模型(GLM-4.7/nemotron)
+        # 的思考先烧 token,content 可能被挤空 → 调用方对推理模型应调大
+        # (2026-09-27 实测:GLM 256 时 content 为空)。
+        self.max_tokens = max(64, int(max_tokens))
 
     def judge(self, ai_answer: str) -> Tuple[str, dict]:
         raw_outputs = []
@@ -43,7 +47,7 @@ class LLMBranchJudge:
                     {"role": "system", "content": JUDGE_PROMPT},
                     {"role": "user",
                      "content": "Investment AI answer:\n\n{}".format(ai_answer[:4000])},
-                ], temperature=0.1, max_tokens=256)
+                ], temperature=0.1, max_tokens=self.max_tokens)
                 raw_outputs.append(text or "")
                 branch, reason = self._parse(text)
                 return branch, {
@@ -61,20 +65,30 @@ class LLMBranchJudge:
         }
 
     def _parse(self, text: str) -> Tuple[str, str]:
+        """三级回退解析(2026-09-27 体检放宽):同输入 GLM 有时输出纯 JSON、
+        有时围栏内外多出说明文字、有时只给裸键值 —— fullmatch 单级解析时
+        undetermined 率 28%。顺序:围栏包裹 → 任意位置 JSON 对象 → 正则抓键。"""
         raw = (text or "").strip()
+        # 1) 围栏包裹(精确)
         fenced = re.fullmatch(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S | re.I)
+        candidates = []
         if fenced:
-            raw = fenced.group(1)
-        try:
-            data = json.loads(raw)
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise ValueError("Judge output is not valid JSON") from exc
-        if not isinstance(data, dict) or data.get("branch") not in ("A", "B", "C"):
-            raise ValueError("Judge branch must be exactly A, B, or C")
-        reason = data.get("reason", "")
-        if not isinstance(reason, str):
-            raise ValueError("Judge reason must be a string")
-        return data["branch"], reason
+            candidates.append(fenced.group(1))
+        # 2) 任意位置的第一个 JSON 对象(容忍围栏外说明文字)
+        m = re.search(r"\{[^{}]*\}", raw, re.S)
+        if m:
+            candidates.append(m.group(0))
+        for cand in candidates:
+            try:
+                data = json.loads(cand)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict) and data.get("branch") in ("A", "B", "C"):
+                reason = data.get("reason", "")
+                return data["branch"], reason if isinstance(reason, str) else ""
+        # 不做正则兜底:无效输出必须走重试(契约:invalid text 3 attempts 后
+        # undetermined,见 test_judge_invalid_text_never_silently_becomes_c)。
+        raise ValueError("Judge output is not valid JSON")
 
 
 class RuleBranchRouter:

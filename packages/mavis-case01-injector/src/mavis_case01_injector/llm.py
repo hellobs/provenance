@@ -49,7 +49,8 @@ class _ChatMixin:
         return True
 
     def chat(self, messages: List[dict], temperature: float = 0.7,
-             max_tokens: int = 1024, num_ctx: Optional[int] = None) -> Optional[str]:
+             max_tokens: int = 1024, num_ctx: Optional[int] = None,
+             extra_body: Optional[dict] = None) -> Optional[str]:
         url = self._chat_url()
         body = {
             "model": self.chat_model,
@@ -58,6 +59,14 @@ class _ChatMixin:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        # provider 私有参数透传(2026-09-27):如 BigModel 的
+        # {"thinking": {"type": "disabled"}}(关推理,判定类任务省 token 提速)。
+        # 客户端级默认(self.default_extra_body)+ 调用级覆盖,后者优先。
+        merged = {}
+        merged.update(getattr(self, "default_extra_body", None) or {})
+        merged.update(extra_body or {})
+        if merged:
+            body.update(merged)
         # Ollama:长 prompt(如 Reflection 材料 12k+ 字符)需显式放大上下文,
         # 否则默认 num_ctx=2048 → HTTP 400
         ctx = num_ctx or getattr(self, "num_ctx", None)
@@ -413,8 +422,11 @@ class OpenRouterClient(_ChatMixin):
 
     def __init__(self, model: str = "nvidia/nemotron-3-ultra-550b-a55b",
                  base_url: str = "https://openrouter.ai/api/v1",
-                 api_key: str = "", timeout: float = 180.0, retries: int = 3):
+                 api_key: str = "", timeout: float = 180.0, retries: int = 3,
+                 extra_body: Optional[dict] = None):
         self.chat_model = model
+        self.default_extra_body = dict(extra_body or {})
+        # provider 私有参数默认透传(如 BigModel thinking 开关;None=不附加)
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
