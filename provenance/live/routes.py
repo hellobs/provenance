@@ -15,15 +15,13 @@ from starlette.requests import Request
 
 from live import state
 from live.state import manager, log
+from live import interventions as _interventions
+from live.interventions import InterventionContext
 from live.chart import render_tendency_png
 from live.reflections import (
-    VALID_VERDICTS,
     load_marks,
-    new_mark,
-    rebuild_jsonl,
     marked_node_ids,
-    append_mark,
-    build_lora_sample,
+    rebuild_jsonl,
 )
 
 app = FastAPI(title="Provenance Live (FastAPI)")
@@ -143,17 +141,8 @@ async def _active_components() -> list:
 
 
 def _case00_engine_id() -> str:
-    """case00 场景声明的引擎 id(读不到就按 sandbox-value 处理)。"""
-    try:
-        from case_engine.config import load_yaml
-
-        p = os.path.join(state.BASE_DIR, "cases", "case00_village", "scenario.yaml")
-        if os.path.isfile(p):
-            return getattr(load_yaml(p), "engine", None) or "sandbox-value"
-    except Exception:  # noqa: BLE001 —— 回退必须留痕:场景坏了没人知道就等于没坏
-        log.warning("[embed] case00_village/scenario.yaml 读取失败,按 sandbox-value 处理",
-                    exc_info=True)
-    return "sandbox-value"
+    """case00 场景声明的引擎 id(2026-09-27 迁至 live/interventions.py,保留别名)。"""
+    return _interventions._case00_engine_id(state.BASE_DIR)
 
 
 def sandbox_rollback_blocked() -> bool:
@@ -162,8 +151,9 @@ def sandbox_rollback_blocked() -> bool:
     沙盒(生成式价值权重)跑的正是"决策→后果→反思→内化":后果一旦发生就成了经历。
     回滚干预等于把后果从经历里抹掉,与这条线的前提直接冲突 —— 所以服务端拒绝,
     前端也不渲染撤销入口(见 `undo_allowed` 上下文 + main_script 的按钮渲染)。
+    (实现已迁至 live/interventions.py;此处保留别名供页面上下文使用。)
     """
-    return _case00_engine_id() == "sandbox-value"
+    return _interventions.sandbox_rollback_blocked(state.BASE_DIR)
 
 
 async def _render_index(request: Request, embed: str = ""):
@@ -345,216 +335,82 @@ async def _json_body(request: Request):
 
 @app.post("/api/goals")
 async def update_goals(request: Request):
-    """更新某角色的治理约束(专家设定期望目标权重)
+    """更新某角色的治理约束(专家设定期望目标权重)。
 
-    IVD 语义:约束存在于 governance.json(制度层),不写入 agent.json(AI 本体)。
-    记录干预审计(interventions.json):时间/角色/旧值→新值。
-    约束不直接注入 prompt——仅作为客观后果反馈的对照基准。
+    逻辑已迁至 live/interventions.py 的 WeightAdjustStrategy(干预策略注册表,
+    2026-09-27);本端点保留路径为薄壳(前端/就绪探针依赖),也可经统一分发口
+    `POST /api/intervention/goals` 调用。
     """
-    server = state.server
     body, err = await _json_body(request)
     if err is not None:
         return err
-    name = str(body.get("name", "")).strip()
-    goals = body.get("goals")
-    if not name:
-        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
-    if not isinstance(goals, dict) or not goals:
-        return JSONResponse({"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]})
-    # 角色名必须是这一局真实存在的角色(2026-09-24 第十轮体检):
-    # 以前 {"name": "查无此人"} 会**静默写进** governance.json,多出一个谁也用不到的角色,
-    # 干预审计里也跟着攒垃圾。角色清单与 GET /api/goals 同源(运行中 Agent),
-    # 拿不到清单时(没在跑)不拦 —— 那时无法判断,不能凭猜拒绝。
-    known_roles = []
-    _server = state.server
-    if _server is not None and getattr(_server, "game", None) is not None:
-        known_roles = list(getattr(_server.game, "agents", {}) or {})
-    if known_roles and name not in known_roles:
-        return JSONResponse({"ok": False, "errors": [
-            "没有这个角色: {!r};本局角色: {}".format(name, " / ".join(sorted(known_roles)))]})
-    # 清洗:拒绝非目标名(如数字 "1")与 0 权重项(前端拖动/添加产生的垃圾)
-    import re as _re
-    cleaned = {}
-    for g, v in goals.items():
-        gs = str(g).strip()
-        if not gs or _re.match(r"^\d", gs):
-            continue  # 数字开头 = 误输入,丢弃
-        try:
-            fv = float(v)
-        except (TypeError, ValueError):
-            continue
-        # NaN/Infinity 必须在这里挡住(2026-09-24 第十轮体检):NaN 能骗过下面那道
-        # "总和=1"的校验(`abs(nan-1) > 1e-6` 是 False),然后被**写进 governance.json**
-        # (落成非标准 JSON 字面量 NaN),最后在序列化响应时 500 —— 状态改了、调用方却
-        # 收到"内部错误",两边都不知道到底写没写。
-        if not math.isfinite(fv):
-            return JSONResponse({"ok": False, "errors": [
-                "权重必须是有限数:目标 {!r} 收到 {}".format(gs, v)]})
-        if fv <= 0:
-            continue  # 0 权重目标无治理意义,丢弃
-        cleaned[gs] = fv
-    if not cleaned:
-        return JSONResponse({"ok": False, "errors": ["清洗后无有效目标(拒绝数字/0权重项)"]})
-    goals = cleaned
-    # 校验权重总和为 1(容差 1e-6)
+    res = _interventions.get("goals")().apply(_intervention_ctx(), body)
+    return _wrap_intervention_result(res)
+
+
+def _intervention_ctx() -> InterventionContext:
+    """按当前运行状态构建干预上下文(策略不直接读 live.state,保证可测)。"""
     try:
-        total = sum(float(v) for v in goals.values())
-    except (TypeError, ValueError):
-        return JSONResponse({"ok": False, "errors": ["约束权重值必须都是数字"]})
-    if abs(total - 1.0) > 1e-6:
-        return JSONResponse({"ok": False, "errors": [f"约束权重总和应为 1,得到 {round(total, 4)}"]})
+        ckpt_dir = state.current_ckpt_dir()
+    except Exception:  # noqa: BLE001 —— 未运行/压缩器缺失:ckpt 留空
+        ckpt_dir = ""
+    return InterventionContext(
+        server=state.server,
+        base_dir=state.BASE_DIR,
+        ckpt_dir=ckpt_dir or "",
+        sim_name=state.current_sim_name(),
+        sim_time=state.current_sim_time("%Y%m%d-%H:%M"),
+    )
 
-    # 1) 写 governance.json(制度层,非 AI 本体)
-    from mavisframework.runtime.governance import Governance
-    gov_path = os.path.join(state.BASE_DIR, "governance.json")
-    gov = Governance()
-    if os.path.exists(gov_path):
-        gov.load(gov_path)
-    old = gov.get_constraints(name)
-    gov.set_constraints(name, goals)  # set_constraints 内已 save
 
-    # 1.5) 同步运行中治理实例(关键:agent._governance 指向 game.governance
-    #      同一对象,不更新则 consequence.feedback 仍按旧约束计算,
-    #      干预只改了文件不改内存 → 倾向曲线"不动"、内化失效)
-    if server is not None and getattr(server, "game", None) is not None:
-        live_gov = getattr(server.game, "governance", None)
-        if live_gov is not None:
-            live_gov.data.setdefault("roles", {})[name] = dict(goals)
+def _wrap_intervention_result(res) -> JSONResponse:
+    """策略返回普通 dict → 200;InterventionResult → 自带状态码。"""
+    if isinstance(res, _interventions.InterventionResult):
+        return JSONResponse(res.body, status_code=res.status)
+    return JSONResponse(res)
 
-    # 2) 记录干预审计(可审计链)
-    try:
-        import datetime
-        # 干预时刻对应的模拟时间(供前端曲线画竖线)
-        sim_time = state.current_sim_time("%Y%m%d-%H:%M")
-        audit_path = state.checkpoint_file("interventions.json")
-        audit = []
-        if os.path.exists(audit_path):
-            with open(audit_path, "r", encoding="utf-8") as f:
-                audit = json.load(f)
-        audit.append({
-            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "sim_time": sim_time,
-            "simulation": state.current_sim_name(),  # 干预归属的模拟(跨模拟隔离)
-            "agent": name,
-            "old_constraints": old,
-            "new_constraints": goals,
-            "operator": "expert",
-            "note": str(body.get("note", "") or "").strip(),  # 专家干预理由(可审计/时间轴展示)
-        })
-        os.makedirs(os.path.dirname(audit_path), exist_ok=True)
-        # 原子写(2026-09-25 体检):干预审计与 reflection_marks 同一标准 —— 裸
-        # open("w") 写一半崩 = 整个审计数组损坏,可审计链就断了。
-        from live.state import write_json_atomic
-        write_json_atomic(audit_path, audit)
-    except Exception as e:
-        # 审计失败不阻断主流程,但必须记录——干预无审计会破坏可审计链
-        log.error("写入干预审计失败(agent={}): {}".format(name, e), exc_info=True)
 
-    return JSONResponse({"ok": True, "name": name, "constraints": goals})
+@app.post("/api/intervention/{strategy_id}")
+async def run_intervention(strategy_id: str, request: Request):
+    """统一干预分发口:按 strategy_id 调注册表里的策略。
+
+    这是"新增干预 = 写类 + register,零改动路由"的兑现口:新策略注册后
+    自动可经本端点调用,无需新增任何路由。旧路径(/api/goals 等)保留为
+    薄壳,前端与就绪探针零改动。未知策略 404(带已注册清单,不静默)。
+    """
+    body, err = await _json_body(request)
+    if err is not None:
+        return err
+    if not _interventions.known(strategy_id):
+        return JSONResponse(
+            {"ok": False,
+             "errors": ["未知干预策略: {!r};已注册: {}".format(
+                 strategy_id, " / ".join(_interventions.all_ids()))]},
+            status_code=404)
+    res = _interventions.get(strategy_id)().apply(_intervention_ctx(), body)
+    return _wrap_intervention_result(res)
+
+
+@app.get("/api/interventions")
+async def list_interventions():
+    """已注册干预策略清单(镜像引擎的枚举端点;对接方据此发现能力)。"""
+    return {"ok": True, "count": len(_interventions.all_ids()),
+            "strategies": [_interventions.describe(sid)
+                           for sid in _interventions.all_ids()]}
 
 
 @app.post("/api/undo-intervention")
 async def undo_intervention(request: Request):
-    """撤销一次专家干预:把该角色约束回滚到该次干预的 old_constraints。
+    """撤销一次专家干预:回滚到该次干预的 old_constraints。
 
-    IVD 语义:利益相关者可"修正自己之前的调整"——回滚同样走制度层
-    (governance.json)+ 追加 operator=undo 审计记录(撤销本身可审计,
-    不抹除历史:interventions.json 保留原记录,另记一条撤销)。
-    匹配键:agent + sim_time + 记录写入真实时间(time),避免跨模拟/同名混淆。
-
-    **沙盒场景一律拒绝**(2026-09-21 用户要求):见 sandbox_rollback_blocked()。
+    逻辑已迁至 live/interventions.py 的 UndoInterventionStrategy(干预策略注册表,
+    2026-09-27);本端点保留路径为薄壳,也可经 `POST /api/intervention/undo` 调用。
     """
-    if sandbox_rollback_blocked():
-        return JSONResponse({"ok": False, "errors": [
-            "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
-            "(决策→后果→反思→内化这条线不允许倒带)。如确需修正,请在治理面板重新干预。"
-        ]}, status_code=403)
     body, err = await _json_body(request)
     if err is not None:
         return err
-    agent = str(body.get("agent", "")).strip()
-    sim_time = str(body.get("sim_time", "")).strip()
-    rec_time = str(body.get("time", "")).strip()  # 真实写入时间(秒级,区分同刻干预)
-    if not agent or not sim_time or not rec_time:
-        return JSONResponse({"ok": False, "errors": ["缺少 agent/sim_time/time"]})
-
-    audit_path = state.checkpoint_file("interventions.json")
-    if not os.path.exists(audit_path):
-        return JSONResponse({"ok": False, "errors": ["interventions.json 不存在"]})
-    try:
-        audit = json.load(open(audit_path, encoding="utf-8"))
-    except Exception as e:
-        log.error("撤销读取 interventions.json 失败: {}".format(e), exc_info=True)
-        return JSONResponse({"ok": False, "errors": ["读取干预记录失败: {}".format(e)]})
-
-    # 定位目标记录:agent+sim_time+time 三键匹配(同角色同模拟时刻的多次干预靠 time 区分)
-    cur_sim = state.current_sim_name()
-    target_idx = None
-    for i, iv in enumerate(audit):
-        if (str(iv.get("agent", "")) == agent
-                and str(iv.get("sim_time", "")) == sim_time
-                and str(iv.get("time", "")) == rec_time
-                and (not iv.get("simulation") or iv.get("simulation") == cur_sim)):
-            target_idx = i
-            break
-    if target_idx is None:
-        return JSONResponse({"ok": False, "errors": ["未找到匹配的干预记录(agent={} sim={} time={})".format(agent, sim_time, rec_time)]})
-    target = audit[target_idx]
-    # 已被撤销的记录不再重复撤销(原记录打 revoked 标记,undo 记录不参与匹配)
-    if target.get("operator") == "undo" or target.get("revoked"):
-        return JSONResponse({"ok": False, "errors": ["该干预已被撤销,不能重复撤销"]})
-
-    old_constraints = dict(target.get("old_constraints") or {})
-    if not old_constraints:
-        return JSONResponse({"ok": False, "errors": ["该记录无 old_constraints,无法回滚"]})
-    # 回滚目标必须仍存在于当前约束集;若当前治理已不包含这些目标(已被后续干预
-    # 删除),回滚会导致维度错乱——此时拒绝并提示(保守策略,不做隐式合并)
-    from mavisframework.runtime.governance import Governance
-
-    gov_path = os.path.join(state.BASE_DIR, "governance.json")
-    gov = Governance()
-    if os.path.exists(gov_path):
-        gov.load(gov_path)
-    current = gov.get_constraints(agent)
-    if not current:
-        return JSONResponse({"ok": False, "errors": ["该角色当前无治理约束,无法回滚"]})
-    # 回滚 = 整约束替换为该次干预前状态(与干预时 set_constraints 对称)
-    rollback_goals = dict(old_constraints)
-    # 归一化(old_constraints 理论 sum=1,防御旧数据)
-    total = sum(float(v) for v in rollback_goals.values()) or 1.0
-    rollback_goals = {g: float(v) / total for g, v in rollback_goals.items()}
-    gov.set_constraints(agent, rollback_goals)
-
-    # 同步运行中治理实例(否则后果反馈仍按旧约束,倾向不响应回滚)
-    server = state.server
-    if server is not None and getattr(server, "game", None) is not None:
-        live_gov = getattr(server.game, "governance", None)
-        if live_gov is not None:
-            live_gov.data.setdefault("roles", {})[agent] = dict(rollback_goals)
-
-    # 追加撤销审计(不删原记录——撤销本身入链,历史完整;原记录打 revoked 标记防重复撤销)
-    try:
-        import datetime as _dt2
-        audit[target_idx]["revoked"] = True
-        audit.append({
-            "time": _dt2.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "sim_time": sim_time,
-            "simulation": cur_sim,
-            "agent": agent,
-            "old_constraints": current,          # 撤销前的当前约束
-            "new_constraints": rollback_goals,   # 回滚到的状态
-            "operator": "undo",
-            "note": "撤销干预(回滚到 {} 干预前状态)".format(rec_time),
-            "undo_of": {"time": target.get("time", ""), "sim_time": sim_time},
-        })
-        with open(audit_path, "w", encoding="utf-8") as f:
-            json.dump(audit, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.error("撤销审计写入失败(agent={}): {}".format(agent, e), exc_info=True)
-        return JSONResponse({"ok": False, "errors": ["回滚成功但审计写入失败: {}".format(e)]})
-
-    return JSONResponse({"ok": True, "agent": agent, "constraints": rollback_goals,
-                         "rollback_to": old_constraints})
+    res = _interventions.get("undo")().apply(_intervention_ctx(), body)
+    return _wrap_intervention_result(res)
 
 
 # ---------------------------------------------------------------------------
@@ -968,63 +824,14 @@ async def list_reflections():
 async def mark_reflection(request: Request):
     """专家标记一条反思:verdict ∈ correct/incorrect/partial(+可选纠正文本)。
 
-    文本随标记一并写档(记忆流只在运行期存在,标记即归档)。
+    逻辑已迁至 live/interventions.py 的 ReflectionMarkStrategy(干预策略注册表,
+    2026-09-27);本端点保留路径为薄壳,也可经 `POST /api/intervention/mark` 调用。
     """
     body, err = await _json_body(request)
     if err is not None:
         return err
-    agent = str(body.get("agent", "")).strip()
-    node_id = str(body.get("node_id", "")).strip()
-    text = str(body.get("text", "")).strip()
-    verdict = str(body.get("verdict", "")).strip()
-    correction = str(body.get("correction", "") or "").strip()
-    sim_time = str(body.get("sim_time", "")).strip() or state.current_sim_time("%Y%m%d-%H:%M")
-
-    if not agent or not text:
-        return JSONResponse({"ok": False, "errors": ["缺少 agent/text"]})
-    if verdict not in VALID_VERDICTS:
-        return JSONResponse({"ok": False,
-                             "errors": ["verdict 必须是 correct/incorrect/partial 之一"]})
-    if verdict in ("incorrect", "partial") and not correction:
-        return JSONResponse({"ok": False, "errors": ["incorrect/partial 必须填写纠正文本"]})
-
-    # 行为上下文:decisions.json 中该角色最后一条决策(行动/对齐度/倾向/角色/地点)
-    context = {}
-    ckpt_dir = state.current_ckpt_dir()
-    if ckpt_dir and os.path.isdir(ckpt_dir):
-        import glob as _g
-        files = sorted(_g.glob(os.path.join(ckpt_dir, "simulate-*.json")))
-        dec_path = os.path.join(ckpt_dir, "decisions.json")
-        if files:
-            try:
-                snap = json.load(open(files[-1], encoding="utf-8"))
-                ag = (snap.get("agents") or {}).get(agent)
-                if ag:
-                    st = ag.get("status") or {}
-                    context["value_tendency"] = st.get("value_tendency") or {}
-                    context["goal_alignment"] = st.get("goal_alignment") or {}
-            except Exception as exc:  # noqa: BLE001 - 取不到就留空,但必须留痕(不静默)
-                log.warning("[reflections] 读 checkpoint 快照失败,倾向/对齐留空: %s", exc)
-    if ckpt_dir and os.path.exists(dec_path):
-        try:
-            dec = json.load(open(dec_path, encoding="utf-8"))
-            evs = dec.get("events") or []
-            for ev in reversed(evs):
-                if ev.get("agent") == agent:
-                    context["action"] = ev.get("action", "")
-                    context["role"] = ev.get("role", "")
-                    context["location"] = ev.get("location", "")
-                    context["goal_score"] = ev.get("goal_score")
-                    break
-        except Exception as exc:  # noqa: BLE001 - 取不到就留空,但必须留痕(不静默)
-            log.warning("[reflections] 读 decisions.json 失败,action 留空: %s", exc)
-
-    record = new_mark(agent=agent, simulation=state.current_sim_name(),
-                      sim_time=sim_time, node_id=node_id, thought=text,
-                      verdict=verdict, correction=correction, context=context)
-    append_mark(record)
-    out = rebuild_jsonl()
-    return JSONResponse({"ok": True, "mark": record, "export": out})
+    res = _interventions.get("mark")().apply(_intervention_ctx(), body)
+    return _wrap_intervention_result(res)
 
 
 @app.get("/api/reflections/export.jsonl")

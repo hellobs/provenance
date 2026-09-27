@@ -24,9 +24,11 @@ REMOTE_ENV = "LIVE_ALLOW_REMOTE"
 
 # 把这几个写端点列清楚:开放端口前必须先知道自己在暴露什么
 WRITE_ENDPOINTS = (
-    "5010  POST /api/goals              (改治理约束的期望目标权重)",
-    "5010  POST /api/undo-intervention  (撤销一次专家干预)",
-    "5010  POST /api/reflections/mark   (标记反思并写档)",
+    "5010  POST /api/goals              (改治理约束的期望目标权重;干预策略 goals)",
+    "5010  POST /api/undo-intervention  (撤销一次专家干预;干预策略 undo)",
+    "5010  POST /api/reflections/mark   (标记反思并写档;干预策略 mark)",
+    "5010  POST /api/intervention/{strategy_id}  (统一干预分发口:按注册表分发到全部已注册策略,"
+    "含 corrective_feedback 纠正回流;清单见 GET /api/interventions)",
     "5010  POST /control/restart        (重开一局;vizkit 插件注册,on_restart 存在时生效)",
     "8060  POST /api/scenario/save、/api/run/execute、/api/agent/delete 等 13 个写端点",
 )

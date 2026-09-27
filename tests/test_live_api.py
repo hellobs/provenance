@@ -351,8 +351,11 @@ class TestUndo:
     # 所以要测"回滚能力"本身,必须显式切到非沙盒引擎;沙盒的拒绝行为另有一条测试。
     @pytest.fixture(autouse=True)
     def _non_sandbox_engine(self, monkeypatch):
-        from live import routes as _routes
-        monkeypatch.setattr(_routes, "_case00_engine_id", lambda: "experiment-eval")
+        # 2026-09-27:守卫实现迁至 live/interventions.py(干预策略注册表),
+        # 补丁目标随代码走;签名带上 base_dir。
+        from live import interventions as _ivm
+        monkeypatch.setattr(_ivm, "_case00_engine_id",
+                            lambda base_dir: "experiment-eval")
 
     def _seed_intervention(self, tmp_path):
         iv_path = tmp_path / "results" / "checkpoints" / "interventions.json"
@@ -404,8 +407,9 @@ class TestUndo:
 
     def test_sandbox_refuses_timeline_rollback(self, client, tmp_path, monkeypatch):
         """沙盒场景必须拒绝回滚:后果属于角色的经历,不允许倒带。"""
-        from live import routes as _routes
-        monkeypatch.setattr(_routes, "_case00_engine_id", lambda: "sandbox-value")
+        from live import interventions as _ivm
+        monkeypatch.setattr(_ivm, "_case00_engine_id",
+                            lambda base_dir: "sandbox-value")
         self._seed_intervention(tmp_path)
         # 拒绝必须"什么都没动":对比请求前后的 governance.json 原文
         gov_path = tmp_path / "governance.json"
