@@ -1,7 +1,7 @@
 # GTC Case 01 → Governance Platform 对接说明(Platform / HCI 侧与实现侧共用)
 
 > **状态**:参考(5002 面)
-> **最后核对**:2026-09-24
+> **最后核对**:2026-09-27
 > **说明**:5002 冻结契约的说明;数据口径/信息边界/平台侧状态机三节仍有效。**唯一对接入口已改为 5010** —— 见 `docs/平台对接契约_5010唯一入口.md`
 > 配套文件:`case01_api.openapi.yaml`(机器可读接口契约)。
 > 上游设计依据:`GTC/0904doc/04_GTC_Reflection_Governance_Platform_技术集成流程.txt`
