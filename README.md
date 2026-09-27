@@ -34,7 +34,8 @@ harness is `case01/tools/branch_judge_eval.py` (report:
 - `5010` the single integration entry (live face + data face: aggregate `/api/runs`,
   expert-safe `/api/run-detail/...`, six `/embed/*` surfaces)
 - `5002` case01 read-only contract · `5003` case00 archive (read-only) ·
-  `5004` multi-scenario (read-only) · `5020` staged pixel scene · `8060` config tool
+  `5020` staged pixel scene · `8060` config tool
+  (`5004` multi-scenario panel retired — review panel debug mode only)
 
 **Tests**: `python -m pytest tests` (outer) · `python -m pytest case01/tests case_engine/tests`
 · the `packages/mavis-vizkit` suite · the `../mavis` kernel suite.
