@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>Reverie</title>
-  <!-- Bootstrap CSS:本地 vendor 优先(部署无网络依赖),CDN 兜底 -->
+  <!-- Bootstrap CSS:全部走本地 vendor —— 内网/断网 iframe 嵌入可用,不引外部 CDN
+       (2026-09-27 前端离线化;此前"本地+CDN 两条都加载"并非兜底,反而多一次外网请求) -->
   <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+  <link rel="stylesheet" href="/static/vendor/bootstrap-theme.min.css">
 </head>
 
 <body class="top-navigation" data-embed="{{ embed|default('') }}" data-chrome="{{ chrome|default('1') }}" style="background-color: white{% if not embed or embed in ("scene", "explore") %}; padding-top: 56px{% endif %}">
@@ -57,11 +57,10 @@
   {% block content %}
   {% endblock content %}
 
-  <!-- jQuery + Bootstrap JS:本地 vendor 优先,CDN 兜底 -->
+  <!-- jQuery + Bootstrap JS:全部走本地 vendor(离线可用;不再引 jquery-latest ——
+       在线时它会覆盖本地锁定版,反而造成版本漂移。2026-09-27 前端离线化) -->
   <script src="/static/vendor/jquery.min.js" type="text/javascript"></script>
-  <script src="https://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
   <script src="/static/vendor/bootstrap.min.js" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
 
   {% block js_content %}
   {% endblock js_content %}

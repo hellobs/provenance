@@ -489,6 +489,35 @@ class TestPageRender:
             with open(os.path.join(out_dir, fn), "w", encoding="utf-8") as f:
                 f.write(r.text)
 
+    def test_templates_have_no_external_cdn(self):
+        """离线化不变量(2026-09-27):运行时模板**不得**引外部 JS/CSS/图片。
+
+        平台侧在内网/断网环境用 iframe 嵌入,任何外链(cdn.jsdelivr / code.jquery)
+        都会加载失败。运行时对"缺 vendor"有 CDN 兜底(routes.py 的 phaser 分支),
+        属**有条件**回退;模板源码这一层必须零外链,再配合 test_vendor_assets_present
+        (vendor 齐备 → 兜底不被触发),才等于离线可用。
+        """
+        import glob
+        import re
+
+        tpl_root = os.path.join(_PKG, "frontend", "templates")
+        bad = []
+        for p in sorted(glob.glob(os.path.join(tpl_root, "**", "*.html"), recursive=True)):
+            with open(p, encoding="utf-8", errors="replace") as f:
+                txt = f.read()
+            for u in re.findall(
+                    r"<(?:link|script|img)\b[^>]*\b(?:href|src)\s*=\s*[\"'](https?://[^\"']+)",
+                    txt, re.I):
+                bad.append((os.path.relpath(p, _PKG), u))
+        assert not bad, "模板引用了外部资源(离线嵌入会失败): {}".format(bad)
+
+    def test_vendor_assets_present(self):
+        """本地 vendor 必须齐 —— 缺了就回退 CDN,离线会坏。"""
+        vend = os.path.join(_PKG, "frontend", "static", "vendor")
+        for f in ("bootstrap.min.css", "bootstrap-theme.min.css",
+                  "bootstrap.min.js", "jquery.min.js", "phaser.min.js"):
+            assert os.path.isfile(os.path.join(vend, f)), "缺本地 vendor: {}".format(f)
+
     @pytest.mark.parametrize("path", ["/", "/embed/goals"])
     def test_page_js_syntax(self, client, path):
         """页面内联 JS 语法检查:用 node --check 验证(浏览器同款 JS 解析)
