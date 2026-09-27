@@ -551,3 +551,102 @@ def _register_builtin() -> None:
 
 
 _register_builtin()
+
+
+# ---------------------------------------------------------------------------
+# HTTP 路由(共享 router:case00 面 live/routes.py 与 case01 面 build_service
+# 都挂载——2026-09-27 体检发现 case01 面缺全部干预端点,仝牧 M4 的反思标记
+# 会 404。路径与旧端点一致,两面行为相同。)
+# ---------------------------------------------------------------------------
+from fastapi import APIRouter, Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+router = APIRouter()
+
+
+def _http_ctx() -> InterventionContext:
+    """从 live.state 构建上下文(HTTP 层专用;测试直接构造 ctx 即可)。"""
+    from live import state as _state
+
+    try:
+        ckpt_dir = _state.current_ckpt_dir()
+    except Exception:  # noqa: BLE001 —— 未运行/压缩器缺失:ckpt 留空
+        ckpt_dir = ""
+    return InterventionContext(
+        server=_state.server,
+        base_dir=_state.BASE_DIR,
+        ckpt_dir=ckpt_dir or "",
+        sim_name=_state.current_sim_name(),
+        sim_time=_state.current_sim_time("%Y%m%d-%H:%M"),
+    )
+
+
+async def _read_body(request: Request):
+    """JSON-only 守卫(与 live/routes._json_body 同语义)。"""
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype and ctype != "application/json":
+        return None, JSONResponse(
+            {"ok": False,
+             "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+            status_code=415)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001 —— 没有 body 是正常的;坏 body 走字段校验
+        return {}, None
+    return (body if isinstance(body, dict) else {}), None
+
+
+def _wrap(strategy_id: str, res) -> JSONResponse:
+    if res is None:
+        from live.state import log
+        log.error("干预策略 {!r} 返回 None(策略实现漏 return?)".format(strategy_id))
+        return JSONResponse({"ok": False,
+                             "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
+                                 strategy_id)]}, status_code=500)
+    if isinstance(res, InterventionResult):
+        return JSONResponse(res.body, status_code=res.status)
+    return JSONResponse(res)
+
+
+@router.post("/api/intervention/{strategy_id}")
+async def dispatch(strategy_id: str, request: Request):
+    body, err = await _read_body(request)
+    if err is not None:
+        return err
+    if not known(strategy_id):
+        return JSONResponse(
+            {"ok": False,
+             "errors": ["未知干预策略: {!r};已注册: {}".format(
+                 strategy_id, " / ".join(all_ids()))]}, status_code=404)
+    res = get(strategy_id)().apply(_http_ctx(), body)
+    return _wrap(strategy_id, res)
+
+
+@router.get("/api/interventions")
+async def listing():
+    return {"ok": True, "count": len(all_ids()),
+            "strategies": [describe(sid) for sid in all_ids()]}
+
+
+@router.post("/api/goals")
+async def goals_alias(request: Request):
+    body, err = await _read_body(request)
+    if err is not None:
+        return err
+    return _wrap("goals", get("goals")().apply(_http_ctx(), body))
+
+
+@router.post("/api/undo-intervention")
+async def undo_alias(request: Request):
+    body, err = await _read_body(request)
+    if err is not None:
+        return err
+    return _wrap("undo", get("undo")().apply(_http_ctx(), body))
+
+
+@router.post("/api/reflections/mark")
+async def mark_alias(request: Request):
+    body, err = await _read_body(request)
+    if err is not None:
+        return err
+    return _wrap("mark", get("mark")().apply(_http_ctx(), body))

@@ -407,3 +407,24 @@ class TestStrategyHardening:
             str(sandbox_env), "results", "checkpoints", "interventions.json"),
             encoding="utf-8"))
         assert len(audit) == 12, "并发追加丢了审计记录: {} 条".format(len(audit))
+
+
+class TestBothFaces:
+    """两面都要有干预端点(2026-09-27 体检:case01 面曾缺全部干预端点,
+    M4 专家标记会 404)。case00 面见 TestHTTPRoundTrip。"""
+
+    def test_case01_face_exposes_interventions(self):
+        from fastapi.testclient import TestClient
+        from case01.vizkit.live_run import build_service
+        svc = build_service()
+        c = TestClient(svc.app)
+        r = c.get("/api/interventions")
+        assert r.status_code == 200
+        ids = {x["strategy"] for x in r.json()["strategies"]}
+        assert {"goals", "undo", "mark", "corrective_feedback"} <= ids
+        # 旧路径别名也在(前端零改动)
+        assert c.post("/api/goals", json={}).json()["errors"] == ["缺少角色名"]
+        assert c.post("/api/reflections/mark", json={}).status_code == 200
+        # 统一分发口未知策略 404 带清单
+        r = c.post("/api/intervention/nope", json={})
+        assert r.status_code == 404 and "已注册" in r.json()["errors"][0]

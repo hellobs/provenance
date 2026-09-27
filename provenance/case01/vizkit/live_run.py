@@ -106,6 +106,10 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     # 于是 case01 实时面同样可开数据界面、同样能翻到 all 的历史。
     from live.history import router as history_router
     live.app.include_router(history_router)
+    # 干预策略端点与 case00 面同源共享(2026-09-27 体检:case01 面此前缺全部
+    # 干预端点——M4 专家的反思标记(/api/reflections/mark)在这里会 404)。
+    from live.interventions import router as interventions_router
+    live.app.include_router(interventions_router)
     return live
 
 
