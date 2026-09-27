@@ -23,8 +23,11 @@ BANNER = re.compile(r"^>\s*\*\*状态\*\*", re.M)
 
 
 def _md_files():
+    # 2026-09-27:扫**整仓**,不只 packages 包内 —— 仓库根 docs/(7 份)、packages/*/README.md、
+    # tools/tilemap_to_maze_README.md 与两个根 README 此前都不在守卫范围里,与索引自述的
+    # "本仓每份 .md" 不符(见第 2 轮体检)。
     out = []
-    for dirpath, dirs, files in os.walk(_PKG):
+    for dirpath, dirs, files in os.walk(_REPO):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith("runs_archive")]
         for fn in files:
             if fn.lower().endswith(".md"):

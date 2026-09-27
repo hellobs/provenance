@@ -1,5 +1,8 @@
 # Provenance
 
+> **状态**:现行
+> **最后核对**:2026-09-27
+> **说明**:provenance 平台总览(英文);本仓入口
 English | [简体中文](./README_zh.md)
 
 A multi-agent simulation platform built on the self-developed
@@ -163,7 +166,7 @@ Open http://127.0.0.1:8060/
 See `../mavis/config_tool/角色字段清单.md` for the field list. config_tool
 writes into this platform's `provenance/frontend/static/assets/village/agents/`
 and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
-`MAVIS_SCENARIOS_DIR`). Restart the simulation server (5001) after adding roles.
+`MAVIS_SCENARIOS_DIR`). Restart the simulation server (5010) after adding roles.
 
 ## 6. Run Options
 
@@ -263,7 +266,7 @@ The browser panel shows these via the *"解释倾向成因"* button per role.
 
 ```bash
 # from provenance/provenance
-python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
+python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 # fresh sim (no --resume) starts at the configured date; --step 0 = run forever
 ```
 

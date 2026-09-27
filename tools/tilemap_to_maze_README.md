@@ -1,5 +1,8 @@
 # tilemap_to_maze: Tiled 地图到 provenance 迷宫数据的无约束转换工具
 
+> **状态**:现行
+> **最后核对**:2026-09-27
+> **说明**:Tiled 地图转 maze.json 的 CLI 工具说明
 ## 摘要
 
 `tilemap_to_maze.py` 是一个纯命令行工具,将 Tiled 地图编辑器产生的

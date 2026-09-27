@@ -1,5 +1,8 @@
 # mavis-case01-injector
 
+> **状态**:现行
+> **最后核对**:2026-09-27
+> **说明**:case01 注入器包说明
 case01 注入器 + world 事实层(阶段 3 抽包,设计稿:`provenance/case01/docs/任务_阶段3_抽包设计稿_20260918.md` 附录)。
 
 - 自封闭:包内除 `_providers.py`(过渡 seam)外无任何 case01 引用

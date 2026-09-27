@@ -1,5 +1,8 @@
 # Provenance
 
+> **状态**:现行
+> **最后核对**:2026-09-27
+> **说明**:provenance 平台总览(中文);本仓入口
 [English](./README.md) | 简体中文
 
 基于自研 [mavisframework](https://github.com/hellobs/mavis) 构建的多智能体仿真平台,
@@ -137,7 +140,7 @@ python app.py
 字段清单见 `../mavis/config_tool/角色字段清单.md`。config_tool 产物默认写入本平台的
 `provenance/frontend/static/assets/village/agents/` 与 `provenance/scenarios/`
 (可通过环境变量 `MAVIS_ASSETS_ROOT` / `MAVIS_SCENARIOS_DIR` 覆盖)。
-新增角色后,重启仿真服务器(5001)即可让新角色进入模拟。
+新增角色后,重启仿真服务器(5010)即可让新角色进入模拟。
 
 ## 6. 运行参数
 
@@ -208,7 +211,7 @@ python app.py
 
 ```bash
 # 在 provenance/provenance 目录下
-python live_fastapi.py --name stock-en6 --resume --step 0 --port 5001
+python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 # 全新模拟:去掉 --resume(从配置日期开始);--step 0 = 无限运行
 ```
 
