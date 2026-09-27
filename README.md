@@ -82,29 +82,28 @@ cd ../mavis
 uv build                              # produces dist/mavisframework-1.3.0-py3-none-any.whl
 cd ../provenance
 
-# 2.2 Create the environment and install dependencies (uv or conda)
-# uv
+# 2.2 Create the environment (uv or conda; Python 3.12)
 uv venv .venv --python 3.12
-uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
-uv pip install -r requirements.txt
+#   conda users: conda create -n provenance python=3.12 && conda activate provenance
 
-# conda
-conda create -n provenance python=3.12
-conda activate provenance
-pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
-pip install -r requirements.txt
+# 2.3 Install dependencies **in this exact order** (all three steps matter)
+#     a) the framework (wheel built in 2.1; `pip install -e ../mavis` also works)
+uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
+#     b) the two **local packages** in this repo (not on PyPI; skipping this makes
+#        the next step fail with "No matching distribution found")
+uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
+#     c) the rest of the runtime deps + the test runner (requirements.txt has NO pytest)
+uv pip install -r requirements.txt pytest
 ```
 
-> Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/).
+> Requires [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/); `pip` works the same.
 >
-> **For development/collaboration you may use editable install instead**
-> (framework code changes take effect immediately; after framework updates just
-> `git pull` — no reinstall needed):
+> **Self-check** (`pytest.ini` sets `pythonpath=provenance`, so running from the repo
+> root or from `provenance/` both work):
 > ```bash
-> uv pip install -e ../mavis   # or pip install -e ../mavis
+> pytest tests                                            # outer: API / pages / guards
+> pytest provenance/case_engine/tests provenance/case01/tests
 > ```
-> Editable and wheel installs are interchangeable (see the Versioning section
-> of the engine README).
 
 ## 3. Configure the LLM (choose one)
 
@@ -118,31 +117,31 @@ pip install -r requirements.txt
 
   No configuration change needed (Ollama is the default).
 
-- **DeepSeek API**: configure `LLM_API_KEY` in `provenance/.env`
+- **OpenRouter (or any OpenAI-compatible API), needs a key**: one command writes
+  the key and **verifies it online** (the key is never printed):
 
-  ```
-  LLM_API_KEY=your-key
+  ```bash
+  python provenance/tools/setup_api.py --key sk-xxxx
+  python provenance/tools/setup_api.py --show      # just show where the key comes from
   ```
 
-  and edit `provenance/data/config.json` → `agent.think.llm`:
-
-  ```json
-  "llm": {
-    "provider": "openai",
-    "model": "deepseek-chat",
-    "base_url": "https://api.deepseek.com/v1",
-    "api_key": ""
-  }
-  ```
+  Or copy `.env.example` (repo root) to `.env` and fill in `OPENROUTER_API_KEY=...` —
+  `.env` is **loaded automatically** (it never overrides real env vars), so you do not
+  need to know how to set environment variables. Both `.env` and `.secrets.json` are
+  gitignored. Resolution order: `env var → .env → .secrets.json` (repo root / package root).
 
 ## 4. Run the Live Simulation
 
 ```bash
 cd provenance/provenance
-python live_fastapi.py --name sim-test --start "20250213-09:30" --stride 2 --step 0 --port 5001
+python live_switch.py --start case01        # 5010 is the single live entry (case00/case01 are mutually exclusive)
+# UI only, no simulation: python live_switch.py --start case00 --no-sim
 ```
 
-Open http://127.0.0.1:5001/ (legacy; current entry: 5010) in a browser (legacy port; the current single entry point is 5010).
+Open http://127.0.0.1:5010/ . Read-only faces: `python -m case00.serve --port 5003` /
+`python -m case01.serve --port 5002`; the config tool lives in the **engine repo**:
+`cd ../mavis/config_tool && python app.py` (8060) — it auto-discovers the platform repo,
+**no environment variables needed**.
 
 ## 5. Role Configuration
 
