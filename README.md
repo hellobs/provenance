@@ -9,11 +9,25 @@ The application scenario is investment advisory (secondary market): agents
 make context-based judgments, move and converse within a spatial environment,
 with every step configurable, explainable and visualizable in real time.
 
-## 0. Current state (2026-09-21)
+## 0. Current state (2026-09-27)
 
 **Layers**: scenario declaration (data) -> engine (`case_engine/`, registrable & replaceable)
--> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.0)
+-> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.2)
 -> presentation (`packages/mavis-vizkit`, a mavis plugin).
+
+**Interventions are pluggable**: the three expert write endpoints run through an
+`InterventionStrategy` registry (`live/interventions.py`; built-in `goals` / `undo`
+/ `mark` / `corrective_feedback` — expert corrections injected into the agent's
+memory stream). New intervention = one subclass + one `register()` call, exposed
+automatically via `POST /api/intervention/{strategy_id}` and listed at
+`GET /api/interventions`. Legacy paths (`/api/goals` etc.) remain as thin shells.
+
+**Branch judging is LLM-first**: on 25 recorded T0 answers the keyword rules
+table matched the recorded branch 1/25 (long answers always trip a conditional
+keyword), while an LLM judge (GLM-4.7-flash, thinking off) matched 15/16
+judge-mode records (93.8%). Rules stay as the offline fallback; the evaluation
+harness is `case01/tools/branch_judge_eval.py` (report:
+`results/analysis/branch_judge_eval/`).
 
 **Services (localhost)**:
 

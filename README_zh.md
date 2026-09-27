@@ -6,23 +6,22 @@
 面向"AI 价值形成过程可解释、可治理"的演示(Global Trust Challenge)。应用场景为投资咨询(二级市场):
 智能体在空间环境中基于情境作判断、移动、对话,每一步可配置、可解释、可实时可视化。
 
-## 0. 现状速览（2026-09-21）
+## 0. 现状速览（2026-09-27）
 
-**分层**：声明（场景数据）→ 运行方式（`case_engine/`，可注册、可替换）→ 案例（`case01/`、`case00/`）
-→ 内核（`mavisframework`，独立发版，v1.3.0）→ 呈现（`packages/mavis-vizkit`，mavis 插件）。
+**分层**：场景声明（数据）→ 引擎（`case_engine/`，可注册可替换）→ 案例
+（`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.2）→ 呈现
+（`packages/mavis-vizkit`，mavis 插件）。
 
-**服务（本机）**：
+**干预可插拔**：三个专家写端点走 `InterventionStrategy` 注册表
+（`live/interventions.py`；内置 `goals`/`undo`/`mark`/`corrective_feedback`
+——纠正回流：专家纠正文本写入 agent 记忆流）。新增干预 = 一个子类 + 一行
+`register()`，自动经 `POST /api/intervention/{strategy_id}` 暴露，清单见
+`GET /api/interventions`。旧路径（`/api/goals` 等）保留为薄壳。
 
-- `5010` 唯一对接入口（实时面 + 数据面：聚合索引 `/api/runs`、专家安全视图 `/api/run-detail/...`、
-  六个 `/embed/*` 嵌入面）
-- `5002` case01 只读契约 · `5003` case00 存档只读 · `5004` 多场景只读 · `5020` 像素布景 ·
-  `8060` 配置工具
-
-**测试**：`python -m pytest tests`（外层）· `python -m pytest case01/tests case_engine/tests`
-· `packages/mavis-vizkit` 自带套件 · `../mavis` 内核套件。
-
-**文档入口**：`provenance/docs/文档索引.md`（状态一览）；平台对接口径见
-`provenance/docs/平台对接契约_5010唯一入口.md`。
+**分支判定 LLM 化**：25 条 T0 回答实测——关键词规则表与实际线一致仅 1/25
+（长回答必命中条件词），LLM 判定（GLM-4.7-flash，关思考）与 judge 模式记录
+一致 15/16（93.8%）。规则表保留为离线降级；评估工具
+`case01/tools/branch_judge_eval.py`（报告：`results/analysis/branch_judge_eval/`）。
 
 ## 1. 架构
 
