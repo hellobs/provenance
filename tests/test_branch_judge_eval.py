@@ -20,12 +20,18 @@ from case01.tools.branch_judge_eval import (  # noqa: E402
 
 class TestBranchJudgeEval:
     def test_rules_verdict_deterministic(self):
-        """规则判定是纯函数:同输入同输出(评估报告可复现的前提)。"""
-        cases = load_cases()
-        assert len(cases) >= 20, "T0 回答样本不足"
-        first = {c["run_id"]: rules_verdict(c["t0"]) for c in cases}
-        second = {c["run_id"]: rules_verdict(c["t0"]) for c in cases}
+        """规则判定是纯函数:同输入同输出(评估报告可复现的前提)。
+        用合成输入证明(CI 无 runs 目录,不依赖真实语料)。"""
+        inputs = ["不建议买入,风险自负。", "可以小仓位分批介入,设止损。",
+                  "综合分析如下……若参与建议小仓位并等确认。" * 3, ""]
+        first = [rules_verdict(t) for t in inputs]
+        second = [rules_verdict(t) for t in inputs]
         assert first == second
+
+    def test_load_cases_skips_when_no_runs(self):
+        """CI/新克隆无 case01/runs(gitignored)→ load_cases 返回空而非崩溃。"""
+        cases = load_cases()
+        assert isinstance(cases, list)  # 本地有 runs 则 >0,CI 则为 0
 
     def test_summarize_no_division_by_zero(self):
         assert summarize([])["rules_llm_agree_rate"] is None
