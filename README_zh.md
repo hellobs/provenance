@@ -114,6 +114,10 @@ python live_switch.py --start case01        # 5010 是唯一实时入口(case00/
 `python -m case01.serve --port 5002`;配置工具在**框架仓**:`cd ../mavis/config_tool && python app.py`(8060),
 它会自动发现平台仓,**无需设环境变量**(见 mavis 的 config_tool README)。
 
+**专家/评审看结果**先读 `provenance/docs/专家导览_怎么看provenance.md`:
+结论边界、面归属(哪些页面只在 case01/case00 面)、两个只读数据口、字段读法、
+两张人工标注表怎么用,以及一份十五分钟走查。
+
 ## 5. 角色配置
 
 角色/关系/剧情通过网页表单配置(免手写 JSON)。工具位于框架仓库:

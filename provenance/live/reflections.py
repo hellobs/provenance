@@ -4,7 +4,7 @@
   文本只在运行期存在(checkpoint 快照仅存 node_id 引用),因此**标记时必须把文本
   一并存档**,否则事后无法审计。
 - 存储:results/checkpoints/reflection_marks.json(数组,与 interventions.json 同域)。
-- 导出:JSONL(每行一个样本),供 LoRA 线(罗昊哲)消费为 (反思, 专家纠正) 训练对。
+- 导出:JSONL(每行一个样本),供 LoRA 线消费为 (反思, 专家纠正) 训练对。
 """
 import datetime
 import json
