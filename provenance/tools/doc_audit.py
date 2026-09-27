@@ -168,6 +168,7 @@ def md_files(root):
     for dirpath, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS
                    and not d.startswith("runs_archive")]
+        dirs.sort()   # 目录顺序也钉住:否则日期并列的行随 scandir 顺序漂移,产生假 diff
         for fn in sorted(files):
             if fn.lower().endswith(".md"):
                 out.append(os.path.join(dirpath, fn))
