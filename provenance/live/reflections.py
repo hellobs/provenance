@@ -107,12 +107,14 @@ def build_lora_sample(mark: dict) -> dict:
     - DPO: chosen=修正后反思, rejected=原反思(incorrect/partial 时有意义)
     """
     agent = mark.get("agent", "")
-    role = (mark.get("context") or {}).get("role", "")
-    action = (mark.get("context") or {}).get("action", "")
+    # context 类型守卫(2026-09-27 体检):畸形 context(字符串等)不毒化导出链
+    ctx = mark.get("context") if isinstance(mark.get("context"), dict) else {}
+    role = ctx.get("role", "")
+    action = ctx.get("action", "")
     thought = mark.get("thought", "")
     correction = mark.get("correction", "")
     verdict = mark.get("verdict", "")
-    tendency = (mark.get("context") or {}).get("value_tendency") or {}
+    tendency = ctx.get("value_tendency") or {}
     tend_str = ", ".join(f"{k}={v}" for k, v in tendency.items()) if tendency else "无"
 
     instruction = (

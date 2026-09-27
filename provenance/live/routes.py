@@ -375,7 +375,7 @@ def _wrap_intervention_result(strategy_id: str, res) -> JSONResponse:
                              "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
                                  strategy_id)]}, status_code=500)
     if isinstance(res, _interventions.InterventionResult):
-        return JSONResponse(res.body, status_code=res.status)
+        return JSONResponse(dict(res), status_code=res.status)
     return JSONResponse(res)
 
 

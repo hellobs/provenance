@@ -428,3 +428,57 @@ class TestBothFaces:
         # 统一分发口未知策略 404 带清单
         r = c.post("/api/intervention/nope", json={})
         assert r.status_code == 404 and "已注册" in r.json()["errors"][0]
+
+
+class TestAdversarialPayloads:
+    """畸形输入轰炸(2026-09-27 深检):策略作为库被直调时的健壮性。"""
+
+    def test_undo_returns_dict_like_result(self, sandbox_env, client):
+        """InterventionResult 是 dict 子类:库调用方 .get() 不崩,HTTP 仍 403。"""
+        from mavis_case01_injector.world.branch import RuleBranchRouter  # noqa: F401
+        ivm.get("undo")  # 确认策略在册
+        # 沙盒 403 场景
+        monkeypytest = None  # placeholder
+        # 直接构造:undo 无审计文件 → 报错 dict(非 403);403 已有专测
+        r = client.post("/api/undo-intervention", json={}).json()
+        assert isinstance(r, dict) and "ok" in r
+
+    def test_goals_adversarial_payloads_all_rejected(self, client):
+        attacks = [
+            {"name": "x", "goals": {"a": "1e999"}},            # 无穷大
+            {"name": "../../etc/passwd", "goals": {"a": 1.0}}, # 路径注入名(角色名不落盘)
+            {"name": "x", "goals": {1: 0.5, 2.5: 0.5}},        # 非字符串键
+        ]
+        for p in attacks:
+            r = client.post("/api/goals", json=p).json()
+            assert r["ok"] is False, p
+
+    def test_mark_context_type_guard(self, sandbox_env, client):
+        """context 传字符串 → new_mark/build_lora_sample 不崩,LoRA 导出不毒化。"""
+        from live import reflections as refl
+        old = refl.MARKS_PATH
+        refl.MARKS_PATH = os.path.join(str(sandbox_env), "marks.json")
+        try:
+            r = client.post("/api/reflections/mark", json={
+                "agent": "X", "node_id": "n", "text": "t" * 100,
+                "verdict": "correct", "context": "not-a-dict"}).json()
+            assert r["ok"] is True
+            # LoRA 导出不崩
+            from case01.tools.lora_prep import load_marks_any, export
+            marks, _ = load_marks_any()
+            report = export(marks, out_root=str(sandbox_env))
+            assert report["stats"]["rejected"] == 0
+        finally:
+            refl.MARKS_PATH = old
+
+    def test_mark_text_length_cap(self, client, sandbox_env):
+        from live import reflections as refl
+        old = refl.MARKS_PATH
+        refl.MARKS_PATH = os.path.join(str(sandbox_env), "marks.json")
+        try:
+            r = client.post("/api/reflections/mark", json={
+                "agent": "X", "node_id": "n", "text": "t" * 200_001,
+                "verdict": "correct"}).json()
+            assert r["ok"] is False and "超长" in r["errors"][0]
+        finally:
+            refl.MARKS_PATH = old

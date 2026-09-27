@@ -55,11 +55,17 @@ class InterventionContext:
     sim_time: str = ""
 
 
-@dataclass
-class InterventionResult:
-    """非 200 响应(如 undo 的沙盒 403)。普通 dict 一律按 200 包 JSONResponse。"""
-    body: dict
+class InterventionResult(dict):
+    """非 200 响应(如 undo 的沙盒 403)。
+
+    继承 dict:库调用方(绕过 HTTP 直调策略)对返回值 .get() 不崩;
+    HTTP 层用 isinstance 识别并以 status 包装 JSONResponse。
+    """
     status: int = 200
+
+    def __init__(self, body: dict, status: int = 200):
+        super().__init__(body)
+        self.status = status
 
 
 def _agents_of(ctx: InterventionContext) -> Dict[str, Any]:
@@ -179,6 +185,8 @@ class WeightAdjustStrategy(InterventionStrategy):
         goals = payload.get("goals")
         if not name:
             return {"ok": False, "errors": ["缺少角色名"]}
+        if "/" in name or "\\" in name or ".." in name:
+            return {"ok": False, "errors": ["非法角色名(含路径分隔符): {!r}".format(name)]}
         if not isinstance(goals, dict) or not goals:
             return {"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]}
         # 角色名必须是这一局真实存在的角色:以前 {"name": "查无此人"} 会静默写进
@@ -407,7 +415,8 @@ class ReflectionMarkStrategy(InterventionStrategy):
                     "errors": ["verdict 必须是 correct/incorrect/partial 之一"]}
         if verdict in ("incorrect", "partial") and not correction:
             return {"ok": False, "errors": ["incorrect/partial 必须填写纠正文本"]}
-
+        if len(text) > 200_000:
+            return {"ok": False, "errors": ["text 超长(>200k 字符),疑似滥用"]}
         # 行为上下文:最近快照的倾向/对齐 + decisions.json 最后一条决策
         context = {}
         ckpt_dir = ctx.ckpt_dir
