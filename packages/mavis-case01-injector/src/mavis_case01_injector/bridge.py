@@ -915,7 +915,8 @@ class MavisBridge:
     def _install_safe_mavis_providers(self) -> None:
         """Install case-local validation without modifying upstream Mavis."""
         from mavis_case01_injector._providers import import_mavis_provider
-        Case01SafeProvider = import_mavis_provider()
+        _mp = import_mavis_provider()
+        Case01SafeProvider = getattr(_mp, "Case01SafeProvider", None) if _mp else None
         if Case01SafeProvider is None:      # 裸包:不包 case01 安全层,原样使用
             return
 

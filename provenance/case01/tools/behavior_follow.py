@@ -303,6 +303,10 @@ def _md(result: dict, sim: str) -> str:
              "", "| agent | sim_time | 类别 | 维度 | Δw | 对齐前→后 | 位移 |",
              "|---|---|---|---|---|---|---|"]
     for r in result["interventions"]:
+        if "dims" not in r:      # skip_reason 行(打分器失败/窗口无行动):如实列出
+            lines.append("| {} | {} | 跳过 | {} | — | — | — |".format(
+                r.get("agent", ""), r.get("sim_time", ""), r.get("skip_reason", "")))
+            continue
         for d in r["dims"]:
             lines.append("| {} | {} | {} | {} | {:+.3f} | {:.3f}→{:.3f} | {:+.3f} |".format(
                 r["agent"], r["sim_time"], d["kind"], "+".join(d["dims"]),
