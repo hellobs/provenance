@@ -90,6 +90,9 @@ def test_foreign_origin_gets_no_acao_by_default(monkeypatch):
 # 所有可能注册路由的面(含 vizkit 插件 —— 漏掉它就等于漏掉 /control/restart)
 _SURFACES = (
     "provenance/live/routes.py",
+    # 干预策略注册表的共享 router:case01 实时面直接挂它(live_run.build_service),
+    # 写端点写在这个文件里 —— 漏扫它,新干预端点就会绕过暴露面清单(2026-09-27)。
+    "provenance/live/interventions.py",
     "provenance/live/history.py",
     "provenance/case01/review_app.py",
     "provenance/live_fastapi.py",

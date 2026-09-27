@@ -613,7 +613,10 @@ def _wrap(strategy_id: str, res) -> JSONResponse:
                              "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
                                  strategy_id)]}, status_code=500)
     if isinstance(res, InterventionResult):
-        return JSONResponse(res.body, status_code=res.status)
+        # dict(res):InterventionResult 是 dict 子类,body 存在字典本体里(不是 .body
+        # 属性)—— 2026-09-27 体检:此前误用 res.body → AttributeError,catch 到
+        # case01 面(挂共享 router)的沙盒 undo 由 403 变 500。与 routes.py 同口径。
+        return JSONResponse(dict(res), status_code=res.status)
     return JSONResponse(res)
 
 

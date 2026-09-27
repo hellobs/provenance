@@ -429,6 +429,21 @@ class TestBothFaces:
         r = c.post("/api/intervention/nope", json={})
         assert r.status_code == 404 and "已注册" in r.json()["errors"][0]
 
+    def test_case01_face_undo_sandbox_403(self, monkeypatch):
+        """沙盒 undo 的 403 必须原样透出(case01 面走共享 router 的 `_wrap`)。
+
+        2026-09-27 体检:`_wrap` 访问不存在的 `res.body` → AttributeError,两个
+        路径都由 403 变 500;case00 面走 routes 的 `dict(res)` 口径无恙,故专测
+        (此处 monkeypatch 场景判定为沙盒,不依赖磁盘上的 case00 声明)。
+        """
+        from fastapi.testclient import TestClient
+        from case01.vizkit.live_run import build_service
+        monkeypatch.setattr(ivm, "sandbox_rollback_blocked", lambda base_dir="": True)
+        c = TestClient(build_service().app, raise_server_exceptions=False)
+        for path in ("/api/undo-intervention", "/api/intervention/undo"):
+            r = c.post(path, json={})
+            assert r.status_code == 403, (path, r.status_code, r.text)
+
 
 class TestAdversarialPayloads:
     """畸形输入轰炸(2026-09-27 深检):策略作为库被直调时的健壮性。"""

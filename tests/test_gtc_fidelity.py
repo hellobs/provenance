@@ -13,9 +13,9 @@ S1:7  四个核心组成 / S1:9 AI 用本地模型(Ollama) / S1:17 不给 browse
 S1:39 T0 标的与订单规模 / S1:48-52 T0 日期与初始状态 / S1:81 C 线走 A 线时间线
 S3:61/78 A 线 45.20 买入、27.40 退出 / S3:123 分支→时间线映射
 
-两处**当前未满足**的源要求,用 xfail 显式挂着(不静默):
-  - S1:10-16+S6:7 的六条信息边界尚未进任何提示词(审计不一致 #1,高危);
-  - injector 路径的 role_directive 与 AI 提示词的语种要求自相矛盾(#2,高危)。
+两处曾以 xfail 挂起的高危缺口(审计不一致 #1 信息边界注入、#2 语种冲突)现已修复,
+转正为**正向断言**(见 `test_source_prompt_is_effective_on_both_paths` 与
+`test_ai_visible_text_has_no_experiment_meta`),文件内已无任何 xfail 标记。
 详见 `docs/案例侧收敛清单.md`。
 """
 import io

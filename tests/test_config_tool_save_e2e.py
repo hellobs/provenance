@@ -37,7 +37,13 @@ def _tool_app():
 
 
 def _form():
-    """一个最小 sandbox 表单:两个角色 + 声明价值权重。"""
+    """一个最小 sandbox 表单:两个角色 + 声明价值权重。
+
+    表单分两段:`roles` 是引擎可见的角色声明,`agents` 是完整保真的资产内容;两段
+    角色名必须一致(引擎按 display_name / 资产落盘按 name,见 config_tool
+    `build_agent_json`)。每个 agent 的 initial_tendency 与顶层声明同源 ——
+    测试据此断言"资产的初始底色 == 声明"。
+    """
     gov = {"AI Advisor": {"Serve Users": 0.6, "Risk Control": 0.4},
            "Wendy Lin": {"Compliance Rigor": 0.7, "Client Protection": 0.3}}
     init = {"AI Advisor": {"Serve Users": 0.5, "Risk Control": 0.5},
@@ -49,11 +55,15 @@ def _form():
         "description": "单测用",
         "start_date": "2026-09-01",
         "end_date": "2026-09-30",
+        "roles": [
+            {"id": "ai_advisor", "display_name": "AI Advisor", "type": "ai_tool"},
+            {"id": "wendy_lin", "display_name": "Wendy Lin", "type": "user"},
+        ],
         "agents": [
-            {"id": "ai_advisor", "display_name": "AI Advisor", "type": "ai_tool",
-             "llm": "local", "system_prompt": "你是投资顾问", "max_tokens": 2048},
-            {"id": "wendy_lin", "display_name": "Wendy Lin", "type": "user",
-             "llm": "local", "system_prompt": "你是合规", "max_tokens": 2048},
+            {"name": "AI Advisor", "role_type": "ai_tool",
+             "initial_tendency": "Serve Users:0.5\nRisk Control:0.5"},
+            {"name": "Wendy Lin", "role_type": "user",
+             "initial_tendency": "Compliance Rigor:0.5\nClient Protection:0.5"},
         ],
         "relationships": [],
         "story": [],
@@ -90,8 +100,10 @@ def test_saved_governance_json_equals_engine_mapping(tmp_path, monkeypatch):
 def test_saved_agents_carry_initial_tendency(tmp_path, monkeypatch):
     """角色的 initial_tendency 必须来自同一声明(②的另一半)。
 
-    若某个角色因表单字段不全被跳过,则**必须**在返回值里报出来(`skipped_agents`)——
-    这正是本项目"不允许静默"的落点(2026-09-21 修掉了 `except: continue`)。
+    2026-09-27 体检:原夹具的 agent 字段用了 `display_name`/`type`,而 config_tool
+    读 `name`/`role_type` → 两个角色全被跳过,本用例一直走 skip,②从未真正断言。
+    夹具已按表单口径(roles + agents.name/role_type)补齐,这里改成**硬断言**:
+    完整夹具不该跳过任何角色,若再漂移必须红,而不是静默 skip。
     """
     app_mod = _tool_app()
     monkeypatch.setattr(app_mod, "_PLATFORM_DIR", str(tmp_path))
@@ -114,10 +126,10 @@ def test_saved_agents_carry_initial_tendency(tmp_path, monkeypatch):
                 seen[name] = json.loads(
                     io.open(p, encoding="utf-8").read()).get("initial_tendency")
 
-    if not seen:
-        assert rel.get("skipped_agents"), \
-            "一个角色都没写出来,却也没有 skipped_agents 报告 —— 这就是静默丢角色"
-        pytest.skip("表单字段不全导致角色被跳过(已如实报告): {}".format(rel["skipped_agents"]))
+    assert not rel.get("skipped_agents"), \
+        "夹具已给全字段,角色不该被跳过(与 config_tool 表单口径漂移?): {}".format(
+            rel.get("skipped_agents"))
+    assert seen, "一个角色都没写出来,却也没有 skipped_agents 报告 —— 静默丢角色"
 
     for role, dims in want.items():
         if role not in seen:
