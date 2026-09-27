@@ -61,6 +61,24 @@ def test_declaration_is_self_consistent(plan):
     assert plan["all_ok"], plan["roles"]
 
 
+def test_declared_weights_sum_to_one(plan):
+    """守恒前置(2026-09-27 体检):声明的两本账、每个角色 Σ 必须 = 1。
+
+    运行时 value_tendency 每次 observe 会归一化,但**初值直接取声明**([agent_core.py]
+    的 attach_governance),而引擎明说"不改写/不归一"([config.py] value_tendency_args)。
+    声明一旦 Σ≠1,t=0 的倾向就违反 Σ=1 守恒,倾向曲线/位移分析/.goal_score 全部失真。
+    `value_tendency_plan` 只**报告** sums_to_one(容差 0.02)且不算进 all_ok,故在此钉成门禁。
+    """
+    mat = plan["materialize"]
+    bad = []
+    for book in ("governance.json", "initial_tendency"):
+        for role, dims in mat[book].items():
+            total = sum(v for v in dims.values() if isinstance(v, (int, float)))
+            if abs(total - 1.0) > 1e-6:
+                bad.append((book, role, round(total, 6)))
+    assert not bad, "声明的价值权重 Σ≠1(会破坏守恒不变量): {}".format(bad)
+
+
 def test_initial_tendency_assets_match_declaration(plan):
     """角色初始倾向必须等于声明(运行时干预不碰它)。"""
     mat = plan["materialize"]

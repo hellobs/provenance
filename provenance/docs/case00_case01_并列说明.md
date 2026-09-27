@@ -1,12 +1,16 @@
 # case00 / case01 两个案例的并列说明
 
 > **状态**:现行
-> **最后核对**:2026-09-24
+> **最后核对**:2026-09-27
 > **说明**:两个案例并列时的口径(谁冻结、谁在推进)
 > 2026-09-19。**case00 = 仓库原有的 6 角色投资咨询场景**（Provenance 原生，最一开始那套多 agent 设定）；
 > **case01 = 作用于 mavis 的注入器**（2 角色、节点驱动的受控实验）。
 > 两者并存、互不依赖。case00 已收成 first-class 的 `case00/` 容器并**冻结不维护**；
 > **任何时刻只允许一个实时可视化在跑**（第三节列了五个服务的分工）。
+>
+> **端口口径更正（2026-09-27 体检）**：本文正文多处把 case00 实时写成 **5001**（0905/0919 拆分时代的
+> 记述）。现行口径是 **5010 为唯一实时入口**（case00 与 case01 互斥共用，由 `live_switch.py` 启停；
+> `live_fastapi.py` 的 `--port` 默认也是 5010）；5004 面板服务已退役、5020 无启动脚本。遇 5001 按 5010 理解。
 
 ## 一、case00 是什么
 
@@ -20,7 +24,7 @@ first-class 容器 `case00/`（见下一小节），但容器只是**冻结留�
 - 角色底色与贴图：`frontend/static/assets/village/agents/`（6 个目录，各含 `agent.json` + 行走图）
 - 地图：`frontend/static/assets/village/maze.json`
 - 前端（权威实现）：`frontend/templates/main_script.html`（Phaser：消息解析、移动队列、倾向曲线、治理面板）
-- 服务：`live_fastapi.py` + `live/`，端口 **5001**；对外面为 `/`（小镇实时）、`/embed/scene`、
+- 服务：`live_fastapi.py` + `live/`，端口 **5010**；对外面为 `/`（小镇实时）、`/embed/scene`、
   `/embed/goals`、`/embed/explain`、`/api/goals`、`/api/export-chart`
 - 运行存档：`results/checkpoints/<run-name>/`（已有 `gtc-demo`、`gtc-demo10`、`gtc-demo14` 等）、`results/compressed/`
 
@@ -31,7 +35,7 @@ first-class 容器 `case00/`（见下一小节），但容器只是**冻结留�
 
 ```
 cd D:\zzr\provenance\provenance
-.\.venv-live\Scripts\python.exe live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5001
+.\.venv-live\Scripts\python.exe live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5010
 ```
 
 只想看 Web 层（小镇页与三个 `/embed` 面板）、不跑模拟线程：把 `--step 0` 换成 `--no-sim`。

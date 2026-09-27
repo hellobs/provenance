@@ -126,6 +126,9 @@ celerybeat.pid
 
 # Environments
 .env
+# 外部 API key 落盘位置(case01/.secrets.json 已由嵌套 .gitignore 兜住;
+# 这条是"换目录放也不漏"的兜底 —— 2026-09-27 体检补)
+.secrets.json
 .venv
 env/
 venv/
@@ -170,8 +173,14 @@ checkpoints/
 # 临时测试脚本与工具
 _tmp_test/
 
-# 新生成的模拟回放数据（内置的 example 已追踪，不受影响）
-results/compressed/
+# 新生成的模拟回放数据（注意:中间带分隔符的规则锚定在 .gitignore 所在目录(仓库根),
+# 必须写 provenance/ 前缀 —— 原来的 `results/compressed/` 匹配不到
+# provenance/results/compressed/,规则形同虚设,2026-09-27 体检修正）
+provenance/results/compressed/*
+# 内置样例已追踪:用白名单保住(git 规则:父目录被整体排除就无法重新包含,
+# 故上面必须用 `/*`(排除内容)而非 `目录/`,否则这两条白名单不生效)
+!provenance/results/compressed/example/
+!provenance/results/compressed/invest-room/
 
 # Tiled 编辑器工作文件(tilemap.json/.tmx 是运行时与编辑底图,已入库;其余为中间产物)
 provenance/frontend/static/assets/village/tilemap/*.bak

@@ -26,11 +26,12 @@ case00 是 provenance 平台**最一开始那套多 agent 设定**：6 个角色
 
 ## 怎么跑
 
-实时可视化（这是 case00 的"实时"入口，**5001**）：
+实时可视化（case00 的"实时"入口现为 **5010** —— 5010 是 case00/case01 共用的**唯一实时入口**，
+由 `live_switch.py` 统一启停、同一时刻只起一个；`live_fastapi.py` 的 `--port` 默认也是 5010）：
 
 ```
 cd D:\zzr\provenance\provenance
-.\.venv-live\Scripts\python.exe live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5001
+.\.venv-live\Scripts\python.exe live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5010
 ```
 
 只读存档浏览（**5003**）：
@@ -52,16 +53,16 @@ case00 新增一份给场景运行方式 `case_engine` 用的声明式配置
 移动/感知/调度/价值倾向，原语在 mavisframework）；case01 用 **experiment-eval**（受控
 实验/评估）。两者配合使用，各自声明、互不依赖。
 
-**沙盒运行语义不变**:实时仍走 `live_fastapi.py`(5001)与 `live/`,只读存档仍走
+**沙盒运行语义不变**:实时仍走 `live_fastapi.py`(5010)与 `live/`,只读存档仍走
 本目录 `serve.py`(5003)。价值权重 `value_tendency` 依旧是 case00 的状态本体。
 此声明为过渡态:case00 与 case01 由同一 `case_engine` 声明加载,但 case00 的
 沙盒运行方式的桥接尚未实现。
 
 ## 两条硬约定
 
-1. **同一时刻只允许一个实时可视化。** case00 的实时（5001）与 case01 的实时（5010）
-   共用同一个本地 Ollama，同时跑会把双方都拖慢。只读面（5002 / 5003）不跑模拟，
-   不受此限，可以随时开着。（case01 的结果面板挂在 5010 上，`--review-only` 起它不推演、
-   也不算实时面；独立的 5004 已退役。）
+1. **同一时刻只允许一个实时可视化。** case00 与 case01 的实时面**共用 5010**
+   （由 `live_switch.py` 互斥启停），且共用同一个本地 Ollama，同时跑会把双方都拖慢。
+   只读面（5002 / 5003）不跑模拟，不受此限，可以随时开着。（case01 的结果面板挂在 5010 上，
+   `--review-only` 起它不推演、也不算实时面；独立的 5004 已退役。）
 2. **case00 不再维护。** 不新增功能、不改场景设定；除修正性改动外不接受开发。
    要做新的实验，走 case01（或在 case01 的插件面上再挂新案例）。

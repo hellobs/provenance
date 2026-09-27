@@ -19,9 +19,12 @@ if gov is not None:
     roles = gov.get("roles", {})
     print("governance.json roles: %d 个角色" % len(roles))
     for n, r in roles.items():
-        ws = {k: round(v, 4) for k, v in r.items() if isinstance(v, (int, float))}
-        tot = round(sum(ws.values()), 4)
-        print("   %-14s 权重项=%d  sum=%.3f  %s" % (n, len(ws), tot, "OK" if abs(tot - 1.0) < 1e-6 else "!!sum!=1"))
+        # 先求和再判:此前先逐项 round(4) 再求和,引入 1e-4 级误差,把 Σ 本为 1 的角色
+        # 误报成 !!sum!=1(2026-09-27 体检:Mr. Zhou 实际 Σ=1.0000000000000002 被判错)。
+        ws = {k: v for k, v in r.items() if isinstance(v, (int, float))}
+        tot = sum(ws.values())
+        print("   %-14s 权重项=%d  sum=%.6f  %s" % (
+            n, len(ws), tot, "OK" if abs(tot - 1.0) < 1e-6 else "!!sum!=1"))
 else:
     issues.append("governance.json 缺失/不可读")
 
