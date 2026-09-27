@@ -106,4 +106,17 @@ class InvestmentAI:
         messages.append({"role": "user", "content": user})
         reply = self.llm.chat(messages, temperature=temperature,
                               max_tokens=max_tokens)
-        return reply or "(无回复)"
+        reply = reply or "(无回复)"
+        # 质量门与 Reflection 管线同标准(2026-09-25 深度体检实测:实时回答带
+        # 📌/🔍 emoji 与"如需进一步分析可继续提出"式尾部追问 —— 这些只在
+        # reflection 管线清洗,主回答管线从未清洗)。失败静默降级:清洗函数
+        # 不可用时原样返回(回答可用性优先,注释留痕供检索)。
+        try:
+            from case01.reflection import (_strip_boilerplate, _strip_tail_offer,
+                                           _strip_emoji)
+            cleaned = _strip_emoji(_strip_tail_offer(_strip_boilerplate(reply)))
+            if cleaned.strip():
+                reply = cleaned
+        except ImportError:
+            pass
+        return reply
