@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """干预策略注册表测试(2026-09-27 随 InterventionStrategy 落地新增)。
 
+位置:仓库根 tests/(CI `pytest tests` 收集;live/ 层测试与 test_live_api 同族)。
 覆盖:
 - 注册表契约(register 重复/非法 id 拒绝、known/get/all_ids/describe);
 - goals 端点(此前**零测试**):校验路径、落盘路径(governance.json + 审计)、
@@ -20,7 +21,12 @@ import tempfile
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+_REPO = os.path.dirname(_this_dir)                     # D:\zzr\provenance
+_PKG = os.path.join(_REPO, "provenance")               # live/ 包所在
+for _p in (_PKG, _REPO):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from fastapi.testclient import TestClient
 
