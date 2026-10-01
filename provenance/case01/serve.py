@@ -12,8 +12,8 @@
 
 边界(04 十一 / 05 七):
   · 本服务只读 case01 已完成的 Run 产物;不做任何写操作。
-  · 专家任务状态机、持久化、专家池、冲突轮次、训练材料池归集均由
-    平台侧实现;本服务不持有这些状态。
+  · 本服务只提供 Router 使用的专家**类别目录**;具体专家人员、可用状态、任务分配、
+    冲突轮次和训练材料池归集均由平台侧实现。
   · 不暴露 .secrets.json / Financial Data 原始语料 / Ollama 与外部模型地址。
 启动(任一):python serve.py | uvicorn serve:app | uvicorn case01.serve:app --port 5002
 """
@@ -29,9 +29,11 @@ from fastapi.staticfiles import StaticFiles
 # 以及 python -m case01.serve 或 uvicorn case01.serve:app(在 provenance 目录)。
 try:  # 包内导入(作为 case01.serve)
     from . import full_context as fc
+    from .expert_pool import load_expert_pool
 except ImportError:  # 直接脚本运行(在 case01 目录)
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from case01 import full_context as fc
+    from case01.expert_pool import load_expert_pool
 
 from live.netguard import resolve_embed_origins
 
@@ -93,11 +95,18 @@ def index() -> dict:
             "GET /api/runs",
             "GET /api/runs/{run_id}",
             "GET /api/runs/{run_id}/full-context",
+            "GET /api/expert-categories",
         ],
         "docs": "/docs",
         "openapi": "/openapi.json",
         "viewer": "/viewer/",
     }
+
+
+@app.get("/api/expert-categories", tags=["experts"])
+def expert_categories() -> dict:
+    """Router 当前使用的专家类别池；只读，不包含具体专家人员或可用状态。"""
+    return load_expert_pool()
 
 
 @app.get("/api/runs", tags=["runs"])

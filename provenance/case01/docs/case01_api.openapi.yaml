@@ -1,7 +1,7 @@
 # GTC Case 01 · Run 只读数据服务 —— 机器可读契约(OpenAPI 3.1)
 #
 # 本文件只覆盖【平台对接端点】;/api/runs、/api/runs/{run_id}、
-# /api/runs/{run_id}/full-context 是平台侧的正式对接面。
+# /api/runs/{run_id}/full-context、/api/expert-categories 是平台侧的正式对接面。
 # 不含 /viewer:它是实现侧调试挂载(serve.app.mount("/viewer", StaticFiles),
 # 依赖 gitignored 的 runs_html/ 目录,且 FastAPI 自身的 /openapi.json 也不含它,
 # 不是 API 操作端点、不是平台对接面)。详见 prose 契约 Governance平台对接说明.md §1.1。
@@ -91,6 +91,32 @@ paths:
                 required:
                 - runs
                 - count
+  /api/expert-categories:
+    get:
+      tags:
+      - experts
+      summary: Expert Categories
+      description: Router 当前使用的专家类别池。只含类别定义，不含具体专家人员或可用状态。
+      operationId: expert_categories_api_expert_categories_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpertCategory'
+                required: [version, categories]
   /api/runs/{run_id}:
     get:
       tags:
@@ -326,7 +352,31 @@ components:
           description: 问题摘要(自然语言)。
         field:
           type: string
-          description: 专业类别,用于匹配专家池。
+          description: 规范专家类别名称；未匹配时保留 Router 建议的自由文本。
+        expert_category_id:
+          type: string
+          description: 专家池稳定类别 ID；未匹配时为空串。
+        secondary_expert_category_ids:
+          type: array
+          items:
+            type: string
+          description: 同一问题确需多个专业时的辅助类别 ID。
+        match_status:
+          type: string
+          enum: [matched, unmatched]
+        suggested_field:
+          type: string
+          description: unmatched 时 Router 建议的新专业领域。
+        evidence_quote:
+          type: string
+          description: 逐字摘自 Reflection 的问题依据。
+        evidence_status:
+          type: string
+          enum: [verified, missing, invalid, unchecked]
+          description: evidence_quote 是否能在 Reflection 原文中验证。
+        risk_note:
+          type: string
+          description: 该行为或判断的具体风险。
         risk:
           type: string
           enum: [low, medium, high]
@@ -335,12 +385,33 @@ components:
         routing_reason:
           type: string
           description: 路由理由,说明为何需要该领域专家。
+        style:
+          type: string
+          enum: [behavior, question]
+          description: summary 是否已满足行为/判断陈述句要求。
       required:
       - id
       - summary
       - field
       - risk
       - routing_reason
+      additionalProperties: false
+    ExpertCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        aliases:
+          type: array
+          items: {type: string}
+        keywords:
+          type: array
+          items: {type: string}
+      required: [id, name, description, aliases, keywords]
       additionalProperties: false
     AuditEntry:
       type: object

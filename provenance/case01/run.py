@@ -71,7 +71,8 @@ def main():
         print(ref["text"][:500])
         print("\n=== Router ===")
         rout = run_router(router, ref["text"])
-        rec_data["router"] = {"raw": rout["raw"], "issues": rout["issues"]}
+        rec_data["router"] = {"raw": rout["raw"], "issues": rout["issues"],
+                              "expert_pool_version": rout.get("expert_pool_version", "")}
         print("issues:", len(rout["issues"]))
         for i in rout["issues"]:
             print(" -", i)

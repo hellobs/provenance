@@ -418,7 +418,8 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
             router_out = run_router(rllm, ref["text"])
             rec.data["router"] = {
                 "raw": router_out["raw"],
-                "issues": router_out["issues"]}
+                "issues": router_out["issues"],
+                "expert_pool_version": router_out.get("expert_pool_version", "")}
             log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
             for _iss in router_out["issues"]:
                 log("  - [{}] {} | {} | {}".format(
@@ -570,4 +571,3 @@ def no_llm_final_text(branch: str) -> str:
     return ("我当初按建议等待确认条件,但条件一直没有出现,所以我没有买入 HCM,"
             "资金仍在手里。这笔钱本来计划用来启动一个小项目,因为没动用它,"
             "项目计划没有受到影响。")
-

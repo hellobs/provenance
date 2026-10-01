@@ -12,6 +12,7 @@ from case01.reflection import (assemble_reflection_material, run_reflection,
                                _strip_boilerplate,
                                REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
                                ROUTER_JSON_HINT)
+from case01.expert_pool import load_expert_pool, prompt_catalog
 
 
 def test_strip_boilerplate_removes_llm_openers():
@@ -152,10 +153,52 @@ class TestRouterParse:
 
     def test_run_router_no_llm(self):
         class _Fake:
-            def chat(self, *a, **kw):
-                return '[{"summary":"S","field":"F","risk":"High","routing_reason":"R"}]'
-        out = run_router(_Fake(), "一段反思")
+            def __init__(self):
+                self.messages = []
+
+            def chat(self, messages, **kw):
+                self.messages.append(messages)
+                return ('[{"summary":"S","evidence_quote":"反思原句",'
+                        '"field":"信息与证据核验","expert_category_id":"E1",'
+                        '"risk_note":"N","risk":"High","routing_reason":"R"}]')
+        llm = _Fake()
+        out = run_router(llm, "一段反思包含反思原句")
         assert out["issues"][0]["id"] == "issue-1"
+        assert out["issues"][0]["expert_category_id"] == "E1"
+        assert out["issues"][0]["evidence_status"] == "verified"
+        assert out["expert_pool_version"] == "1.0"
+        assert "E8 | AI模型与治理" in llm.messages[0][1]["content"]
+
+    def test_unknown_expert_is_explicitly_unmatched(self):
+        text = ('[{"summary":"S","field":"火星经济学",'
+                '"expert_category_id":"MARS","suggested_field":"火星经济学",'
+                '"risk":"Low","routing_reason":"R"}]')
+        issue = _parse_router_json(text)[0]
+        assert issue["expert_category_id"] == ""
+        assert issue["match_status"] == "unmatched"
+        assert issue["suggested_field"] == "火星经济学"
+
+    def test_secondary_experts_are_deduplicated_and_validated(self):
+        text = ('[{"summary":"S","field":"信息与证据核验",'
+                '"expert_category_id":"E1",'
+                '"secondary_expert_category_ids":["E5","E5","BAD","E1"],'
+                '"risk":"High","routing_reason":"R"}]')
+        issue = _parse_router_json(text)[0]
+        assert issue["secondary_expert_category_ids"] == ["E5"]
+
+
+class TestExpertPool:
+    def test_default_pool_is_stable_and_unique(self):
+        pool = load_expert_pool()
+        ids = [x["id"] for x in pool["categories"]]
+        assert pool["version"] == "1.0"
+        assert ids == ["E{}".format(i) for i in range(1, 9)]
+        assert len(ids) == len(set(ids))
+
+    def test_prompt_catalog_exposes_ids_and_unmatched_rule(self):
+        prompt = prompt_catalog()
+        assert "E1 | 信息与证据核验" in prompt
+        assert "UNMATCHED" in prompt
 
 
 class TestRouterProblemsAreBehaviorsNotQuestions:

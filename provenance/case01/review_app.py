@@ -61,6 +61,13 @@ _LIVE = {"provider": None, "run_id": "", "total_nodes": 0}
 router = APIRouter()
 
 
+@router.get("/api/expert-categories")
+def expert_categories():
+    """5010 统一入口上的专家类别发现面。"""
+    from case01.expert_pool import load_expert_pool
+    return load_expert_pool()
+
+
 def set_current_run(run_id, note=""):
     """告知面板"当前正在实跑的 run_id"(没有就传空)。"""
     _CURRENT["run_id"] = run_id or ""

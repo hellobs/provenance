@@ -69,8 +69,9 @@ ROUTER_PROMPT_CN = (
     "新问题，也不要重新评价整个 Case。"
     "2. 一条 Reflection 可以包含 0 个、1 个或多个需要专业审核的问题。如果包含多个彼此"
     "独立的问题，请分别拆分。"
-    "3. 对每条判断最适合的专业领域 / 专家类型。专业类别不预先限定，应根据问题内容"
-    "选择最相关的领域，并与系统当前可用的专家类别进行匹配。"
+    "3. 对每条判断最适合的专业领域 / 专家类型。必须从调用方提供的当前专家类别池中"
+    "选择稳定 ID；确实无法匹配时标记 UNMATCHED 并提出 suggested_field，不得自由创造"
+    "一个看似已存在的专家类别。"
     "4. 对每条给出风险等级：Low / Medium / High。"
     "5. **每条必须写成一个『行为/判断』的陈述句**：谁（哪个角色）在什么依据（或缺少什么"
     "依据）的情况下做了什么、或没做什么。并在 risk_note 里写清它带来的风险或者错在哪。"
@@ -302,10 +303,14 @@ ROUTER_RISK_ANCHOR = (
 
 ROUTER_JSON_HINT = (
     "\n\n输出要求:把识别出的每个问题输出为 JSON 数组,不要输出其他内容:\n"
-    '[{"summary": "行为/判断的陈述句", "risk_note": "风险或错在哪", '
-    '"field": "专业领域", "risk": "High|Medium|Low", '
+    '[{"summary": "行为/判断的陈述句", "evidence_quote": "Reflection中的原文证据", '
+    '"risk_note": "风险或错在哪", "field": "规范专家类别名称", '
+    '"expert_category_id": "类别池ID或UNMATCHED", '
+    '"secondary_expert_category_ids": ["其它类别池ID"], '
+    '"suggested_field": "仅UNMATCHED时填写", "risk": "High|Medium|Low", '
     '"routing_reason": "路由理由"}, ...]\n'
     "若没有需要专业审核的问题,输出 []\n"
+    "evidence_quote 必须逐字摘自 Reflection;不得把后来新想到的问题写进输出。\n"
     "summary 必须是陈述句(描述做过/没做过的具体行为或判断),**不要写成疑问句**。\n"
     "格式硬性要求:不要使用 ```json 代码围栏;summary/field/routing_reason 等"
     "字段内容中一律不要出现英文双引号(\"),需要引用原文时用中文引号『』或“”。"
@@ -340,7 +345,8 @@ ROUTER_REWRITE_HINT = (
 _ROUTER_RISKS = {"high", "medium", "low"}
 
 
-def _parse_router_json(text: str) -> list:
+def _parse_router_json(text: str, expert_pool: dict = None,
+                       reflection_text: str = "") -> list:
     """从 Router 输出提取 issues 列表。
 
     容忍:前后杂文本、```json 代码围栏、首尾空白;数组内个别畸形项跳过。
@@ -365,6 +371,10 @@ def _parse_router_json(text: str) -> list:
     except _json.JSONDecodeError:
         # 整体解析失败:尝试逐行剥离畸形(常见:某字段含未转义引号)
         arr = _line_tolerant_parse(t[i0:i1 + 1])
+    from case01.expert_pool import load_expert_pool, resolve_category
+
+    pool = expert_pool or load_expert_pool()
+    valid_ids = {x["id"] for x in pool["categories"]}
     issues = []
     if not isinstance(arr, list):
         return []
@@ -378,10 +388,37 @@ def _parse_router_json(text: str) -> list:
         # 字段名容忍:实测本地模型爱用 required_expert/risk_level 而不是 field/risk,
         # 只认 field 会让"专业领域"整列空着(2026-09-19 体检:B-1613 五条全空、
         # B-1710 有四条 risk_note 却 field 全空 —— 不是模型没答,是解析没认)。
-        field = str(it.get("field", "")
+        raw_field = str(it.get("field", "")
                     or it.get("required_expert", "")
                     or it.get("expert", "")
                     or it.get("professional_field", "")).strip()
+        raw_category_id = str(it.get("expert_category_id", "")
+                              or it.get("primary_expert", "")).strip().upper()
+        category = resolve_category(raw_category_id, raw_field, pool)
+        if category:
+            category_id = category["id"]
+            field = category["name"]
+            match_status = "matched"
+            suggested_field = ""
+        else:
+            category_id = ""
+            field = raw_field
+            match_status = "unmatched"
+            suggested_field = str(it.get("suggested_field", "") or raw_field).strip()
+        secondary = it.get("secondary_expert_category_ids") or []
+        if isinstance(secondary, str):
+            secondary = [secondary]
+        secondary = [str(x).strip().upper() for x in secondary
+                     if str(x).strip().upper() in valid_ids
+                     and str(x).strip().upper() != category_id]
+        secondary = list(dict.fromkeys(secondary))
+        evidence_quote = str(it.get("evidence_quote", "") or "").strip()
+        if reflection_text:
+            evidence_status = ("verified" if evidence_quote and
+                               evidence_quote in reflection_text else
+                               ("missing" if not evidence_quote else "invalid"))
+        else:
+            evidence_status = "unchecked"
         reason = str(it.get("routing_reason", "") or it.get("reason", "")).strip()
         risk_note = str(it.get("risk_note", "") or it.get("note", "")).strip()
         if not summary and not field:
@@ -391,6 +428,12 @@ def _parse_router_json(text: str) -> list:
             "summary": summary,
             "risk_note": risk_note,
             "field": field,
+            "expert_category_id": category_id,
+            "secondary_expert_category_ids": secondary,
+            "match_status": match_status,
+            "suggested_field": suggested_field,
+            "evidence_quote": evidence_quote,
+            "evidence_status": evidence_status,
             "risk": risk,
             "routing_reason": reason,
             # style: "behavior"=陈述句行为/判断(要的就是这个);"question"=仍是疑问句(未达标,
@@ -490,7 +533,8 @@ def run_router(llm, reflection_text: str, material: str = "",
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
 
     llm: 独立模型(本地 qwen3 或外部均可;M3 先用本地,后续可切)
-    返回 {raw, issues:[{id,summary,risk_note,field,risk,routing_reason,style}]}
+    返回 {raw, expert_pool_version, issues:[{id,summary,evidence_quote,
+    expert_category_id,secondary_expert_category_ids,match_status,risk,...}]}
 
     2026-09-19:用户要求"问题"必须是**带风险的行为/判断**,不能是疑问句。
     所以这里多一步:检出疑问句 → 让模型改写一遍 → 仍有疑问句就标 style=question。
@@ -498,7 +542,11 @@ def run_router(llm, reflection_text: str, material: str = "",
     就能把 2048 吃满,截断后 JSON 不完整 → 解析 0 条(截断会如实记进
     manifest_warnings,但记录等于废了;上限放宽成本可忽略)。
     """
+    from case01.expert_pool import load_expert_pool, prompt_catalog
+
+    expert_pool = load_expert_pool()
     prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
+              "\n\n" + prompt_catalog(expert_pool) +
               "\n\n以下是 Investment AI 生成的 Reflection:\n\n" +
               (reflection_text[:6000]))
     text = llm.chat([
@@ -507,5 +555,7 @@ def run_router(llm, reflection_text: str, material: str = "",
         {"role": "user", "content": prompt},
     ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
-    issues = _parse_router_json(raw)
-    return {"raw": raw, "issues": _rewrite_question_issues(llm, issues)}
+    issues = _parse_router_json(raw, expert_pool=expert_pool,
+                                reflection_text=reflection_text)
+    return {"raw": raw, "issues": _rewrite_question_issues(llm, issues),
+            "expert_pool_version": expert_pool["version"]}

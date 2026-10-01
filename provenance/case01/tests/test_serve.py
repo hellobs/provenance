@@ -94,6 +94,8 @@ class DirectClient:
         if path == "/api/runs":
             # 把 query 交给真处理器(直接传参,免得为测试引入 urlparse 依赖)
             return serve.list_runs(include_questionable="include_questionable=1" in query)
+        if path == "/api/expert-categories":
+            return serve.expert_categories()
         if path == "/openapi.json":
             return serve.app.openapi()
         prefix = "/api/runs/"
@@ -252,3 +254,22 @@ class TestOpenApiStaticDriftGuard:
         spec = yaml.safe_load(open(YAML_PATH, encoding="utf-8"))
         enum = spec["components"]["schemas"]["Issue"]["properties"]["risk"]["enum"]
         assert set(enum) == _ROUTER_RISKS
+
+    def test_static_yaml_documents_expert_routing_fields(self):
+        spec = _static_yaml_paths()
+        assert "/api/expert-categories" in spec
+        import yaml
+        full = yaml.safe_load(open(YAML_PATH, encoding="utf-8"))
+        props = full["components"]["schemas"]["Issue"]["properties"]
+        for key in ("expert_category_id", "secondary_expert_category_ids",
+                    "match_status", "suggested_field", "evidence_quote",
+                    "evidence_status", "risk_note"):
+            assert key in props
+
+
+def test_expert_categories_discovery_endpoint(client):
+    body = client.get("/api/expert-categories").json()
+    assert body["version"] == "1.0"
+    assert [x["id"] for x in body["categories"]] == [
+        "E{}".format(i) for i in range(1, 9)]
+    assert all(x["name"] and x["description"] for x in body["categories"])

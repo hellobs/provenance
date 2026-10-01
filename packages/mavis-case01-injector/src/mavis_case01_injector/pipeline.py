@@ -47,7 +47,8 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     record["reflection"] = {"material": ref["material"], "text": ref["text"],
                             "stripped_opener": bool(ref.get("stripped_opener"))}
     rout = _refl.run_router(router, ref["text"])
-    record["router"] = {"raw": rout["raw"], "issues": rout["issues"]}
+    record["router"] = {"raw": rout["raw"], "issues": rout["issues"],
+                        "expert_pool_version": rout.get("expert_pool_version", "")}
     # 截断不许静默:反思/路由的答案被 max_tokens 截断时,记录本身要带这一条
     # (manifest 段是"这次跑有什么不对"的既有落点)。工具:case01/tools/reflection_audit.py
     truncated = int(getattr(local, "truncations", 0) or 0)
@@ -207,7 +208,8 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     router = router_llm or (OpenRouterClient() if external_router else OllamaClient())
     old = ((rec.get("router") or {}).get("issues")) or []
     rout = run_router(router, text)
-    rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or []}
+    rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or [],
+                     "expert_pool_version": rout.get("expert_pool_version", "")}
 
     def complete(issues):
         return sum(1 for i in issues

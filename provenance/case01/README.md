@@ -90,6 +90,11 @@ python -m uvicorn case01.serve:app --port 5002   # 需在 provenance 包根目�
 python -m case01.render
 ```
 
+专家类别池默认读取 `case01/expert_pool.json`;治理平台已有自己的类别目录时可通过
+`CASE01_EXPERT_POOL_PATH=/path/to/expert_pool.json` 替换。5010/5002 均提供只读发现口
+`GET /api/expert-categories`。目录只包含稳定类别 ID 与职责,具体专家人员和可用状态仍由
+治理平台管理。
+
 ## 新架构用法(mavis + injector,当前路径)
 
 ```bash
