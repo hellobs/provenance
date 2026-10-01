@@ -1,21 +1,59 @@
 # Provenance
 
 > **状态**:现行
-> **最后核对**:2026-09-27
 > **说明**:provenance 平台总览(英文);本仓入口
-English | [简体中文](./README_zh.md)
+**AI value formation is observable, governable and auditable.**
 
-A multi-agent simulation platform built on the self-developed
-[mavisframework](https://github.com/hellobs/mavis) engine, demonstrating
-"AI value formation is observable and governable" (Global Trust Challenge).
-The application scenario is investment advisory (secondary market): agents
-make context-based judgments, move and converse within a spatial environment,
-with every step configurable, explainable and visualizable in real time.
+**Built on [mavisframework](https://github.com/hellobs/mavis) v1.3.3** (a self-developed generative multi-agent simulation engine, versioned independently). The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time.
 
-## 0. Current state (2026-09-27)
+[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.3%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
+
+**English** | [简体中文](./README_zh.md)
+
+---
+
+> **Abstract**
+>
+> This is a multi-agent simulation platform. The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time. It serves the Global Trust Challenge *process-alignment* story — **AI value formation can be observed, governed and audited**.
+>
+> Platform and engine are separated: [mavisframework](https://github.com/hellobs/mavis) is maintained and released independently (v1.3.3); this repo depends on it via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. **Constraints never enter the prompt** — an expert edit only weights the *consequence feedback*, so the tendency converges only through later experience (lagged convergence = observable evidence of internalization).
+>
+> → [0\. Current state](#0-current-state) ｜ [7\. IVD Governance Platform](#7-ivd-governance-platform) ｜ [Expert tour](provenance/docs/专家导览_怎么看provenance.md)
+
+**Scope**
+
+| Covered | Not covered |
+|---|---|
+| Real-time simulation & visualization; 5010 as the single integration entry (live face + data face) IVD governance: constraint edits, tendency curves, intervention audit, three-layer explanation Pluggable expert interventions (`InterventionStrategy` registry) Read-only discovery surfaces: expert tour, platform contract, field reading guide Embed surfaces `/embed/*` (iframe, no CORS) | Turnkey support for any other business scenario (new scenario = a `cases/*/scenario.yaml` + an engine) Hardened security for public exposure (**no authentication**; loopback-only by default) A real market model (consequence feedback is a lightweight embedding-similarity stand-in) Final judgment on research conclusions (the AI only guarantees mechanical correctness) |
+
+**Handing over / integrating? Start with [provenance/docs/文档索引.md](provenance/docs/文档索引.md)** — it shows at a glance which documents are current and which are superseded. The single contract handed to a governance platform is [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md).
+
+---
+
+## Table of Contents
+
+* [0\. Current state](#0-current-state)
+* [1\. Architecture](#1-architecture)
+* [2\. Environment & Engine Setup](#2-environment--engine-setup)
+* [3\. Configure the LLM](#3-configure-the-llm)
+* [4\. Run the Live Simulation](#4-run-the-live-simulation)
+* [5\. Role Configuration](#5-role-configuration)
+* [6\. Run Options](#6-run-options)
+* [7\. IVD Governance Platform](#7-ivd-governance-platform)
+* [8\. Deploy & Embed](#8-deploy--embed)
+* [9\. Notes](#9-notes)
+* [10\. Custom Maps](#10-custom-maps)
+* [11\. References](#11-references)
+* [12\. Security & exposure](#12-security--exposure)
+
+---
+
+## 0. Current state
+
+(checked 2026-10-01)
 
 **Layers**: scenario declaration (data) -> engine (`case_engine/`, registrable & replaceable)
--> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.2)
+-> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.3)
 -> presentation (`packages/mavis-vizkit`, a mavis plugin).
 
 **Interventions are pluggable**: the three expert write endpoints run through an
@@ -52,10 +90,16 @@ harness is `case01/tools/branch_judge_eval.py` (report:
 Provenance (platform, this repo)
 ├── provenance/          # platform core
 │   ├── live_fastapi.py  # real-time simulation + visualization (FastAPI + WebSocket, single entry)
+│   ├── case_engine/     # engine layer: scenario declaration -> registrable/replaceable runtime
+│   ├── cases/           # scenario declarations (data): case00_village / case01_stock / case02_minimal
+│   ├── case01/          # case: investment advisory (secondary market) baseline
+│   ├── case00/          # case: village (frozen; kept for comparison & display)
+│   ├── live/            # live face: intervention strategies, network guard, ...
 │   ├── frontend/        # Phaser frontend + texture pool (agents_pool/)
-│   ├── scenarios/       # business scenario configs (investment: roles/relations/story)
+│   ├── scenarios/       # legacy business scenario configs (investment: roles/relations/story)
 │   ├── data/            # configs & prompts
 │   └── results/         # checkpoints & decision traces (decisions.json)
+├── packages/            # local packages: mavis-vizkit (presentation) / mavis-case01-injector
 └── depends on mavisframework  # engine (separate repo hellobs/mavis, installed as wheel)
 ```
 
@@ -82,7 +126,7 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 #   or SSH (requires a configured SSH key added to your GitHub account):
 # git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # produces dist/mavisframework-1.3.0-py3-none-any.whl
+uv build                              # produces dist/mavisframework-1.3.3-py3-none-any.whl
 cd ../provenance
 
 # 2.2 Create the environment (uv or conda; Python 3.12)
@@ -91,7 +135,7 @@ uv venv .venv --python 3.12
 
 # 2.3 Install dependencies **in this exact order** (all three steps matter)
 #     a) the framework (wheel built in 2.1; `pip install -e ../mavis` also works)
-uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.3-py3-none-any.whl
 #     b) the two **local packages** in this repo (not on PyPI; skipping this makes
 #        the next step fail with "No matching distribution found")
 uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
@@ -145,6 +189,11 @@ Open http://127.0.0.1:5010/ . Read-only faces: `python -m case00.serve --port 50
 `python -m case01.serve --port 5002`; the config tool lives in the **engine repo**:
 `cd ../mavis/config_tool && python app.py` (8060) — it auto-discovers the platform repo,
 **no environment variables needed**.
+
+**Experts/reviewers** should read `provenance/docs/专家导览_怎么看provenance.md` first:
+conclusion boundaries, which faces exist only on the case01/case00 side, the two read-only
+data endpoints, how to read the fields, how to use the two manual-annotation tables, and a
+fifteen-minute walkthrough.
 
 ## 5. Role Configuration
 
@@ -333,8 +382,6 @@ live simulation.
   real simulation/LLM needed) covers goals read/write, intervention scoping,
   explain three layers, export error handling. Engine tests live in the
   mavis repo (`tests/`).
-- Decision export: `decisions.json` (time/role/action/others/importance) for
-  governance platforms and expert UI
 - Phaser script: the server prefers the local
   `frontend/static/vendor/phaser.min.js` (works offline) and falls back to CDN.
   For offline use, download
@@ -365,7 +412,9 @@ live simulation.
 - Code: [mavisframework (self-developed engine)](https://github.com/hellobs/mavis) / [Generative Agents (original)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
 - Map tool: `tools/tilemap_to_maze.py` (bundled) / [tiled_to_maze (legacy GUI)](https://github.com/jiejieje/tiled_to_maze.json)
 
-## 12. Security & exposure (2026-09-23)
+## 12. Security & exposure
+
+(2026-09-23)
 
 **None of these services has authentication.** Anyone who can reach a port can read every
 run record; 5010 additionally lets them rewrite governance weights, undo interventions,
@@ -385,3 +434,10 @@ edit scenarios, delete roles and launch a run.
 - Secrets: the OpenRouter key lives in `case01/.secrets.json` (gitignored, not in git); a scan
   of 5000+ artifacts and logs found no key material.
 
+Code locations: `live/netguard.py` (binding & allowlist policy), `tests/test_netguard.py`
+(behaviour assertions). Integration details: `provenance/docs/给平台侧_嵌入与数据接入.md`;
+health-check conclusions: `provenance/docs/0923_体检报告.md`.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE).

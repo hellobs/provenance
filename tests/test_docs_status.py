@@ -3,7 +3,7 @@
 
 2026-09-21:用户要求"过时的文件加上日期或做修改(尤其 md)"。光改一次会再烂回去,
 所以把"文档必须自报状态"变成 CI 能红的东西:
-- 本仓每份 .md 顶部都要有 `> **状态**:` / `> **最后核对**:`;
+- 本仓每份 .md 顶部都要有 `> **状态**:` / `> **最后核对**:`(仓库根两个 README 免日期);
 - `docs/文档索引.md` 存在,且每份 md 都在索引里出现过(不然新增文档没人知道它现行还是老的)。
 """
 import io
@@ -20,6 +20,9 @@ SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_sha
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs",
              "runs_injector", "runs_html")
 BANNER = re.compile(r"^>\s*\*\*状态\*\*", re.M)
+# 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起)。
+# 工具侧同一份名单见 tools/doc_audit.py 的 NO_DATE。
+NO_DATE = {"README.md", "README_zh.md"}
 
 
 def _md_files():
@@ -48,6 +51,8 @@ def test_every_md_declares_its_status():
 def test_status_block_carries_a_date():
     bad = []
     for p in _md_files():
+        if os.path.relpath(p, _REPO).replace("\\", "/") in NO_DATE:
+            continue
         txt = io.open(p, encoding="utf-8", errors="replace").read(1500)
         if not re.search(r"\*\*最后核对\*\*:\s*\d{4}-\d{2}-\d{2}", txt):
             bad.append(os.path.relpath(p, _PKG).replace("\\", "/"))

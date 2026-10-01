@@ -1,18 +1,59 @@
 # Provenance
 
 > **状态**:现行
-> **最后核对**:2026-09-27
 > **说明**:provenance 平台总览(中文);本仓入口
-[English](./README.md) | 简体中文
+**AI 价值形成过程，可观察、可治理、可审计。**
 
-基于自研 [mavisframework](https://github.com/hellobs/mavis) 构建的多智能体仿真平台,
-面向"AI 价值形成过程可解释、可治理"的演示(Global Trust Challenge)。应用场景为投资咨询(二级市场):
-智能体在空间环境中基于情境作判断、移动、对话,每一步可配置、可解释、可实时可视化。
+**本平台基于 [mavisframework](https://github.com/hellobs/mavis) v1.3.3 构建**（自研生成式智能体仿真框架，独立发版）。应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。
 
-## 0. 现状速览（2026-09-27）
+[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.3%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
+
+[English](./README.md) | **简体中文**
+
+---
+
+> **摘要**
+>
+> 本平台是一个多智能体仿真平台，应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。平台面向 Global Trust Challenge 的*过程对齐*叙事——**AI 的价值形成过程可被观察、可被治理、可被审计**。
+>
+> 平台与框架分离：[mavisframework](https://github.com/hellobs/mavis) 独立维护、独立发版（v1.3.3），本仓通过 `requirements.txt` 中的 `mavisframework>=1.2.0,<2.0.0` 依赖它。**制度约束不进提示词**——专家调整约束只加权*后果反馈*，倾向需经后续体验才逐步收敛（滞后收敛 = 内化发生的可观测证据）。
+>
+> → [0\. 现状速览](#0-现状速览) ｜ [7\. IVD 治理平台](#7-ivd-治理平台) ｜ [专家导览](provenance/docs/专家导览_怎么看provenance.md)
+
+**范围界定**
+
+| 本平台覆盖 | 本平台不覆盖 |
+|---|---|
+| 实时推演与可视化；5010 唯一对接入口（实时面 + 数据面） IVD 治理：约束编辑、倾向曲线、干预审计、三层解释 专家干预可插拔（`InterventionStrategy` 注册表） 只读发现面：专家导览、平台契约、字段读法 嵌入面 `/embed/*`（iframe 免 CORS） | 换业务场景的开箱即用（换场景 = 写 `cases/*/scenario.yaml` + 引擎） 对外服务的安全加固（**无鉴权**，默认只绑本机） 真实市场模型（后果反馈是 embedding 相似度的轻量替代） 研究结论的最终裁定（AI 只负责机械正确性） |
+
+**接手/对接请先读 [provenance/docs/文档索引.md](provenance/docs/文档索引.md)** —— 一眼看清哪些文档是现行口径、哪些已被取代。交给治理平台的唯一口径见 [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md)。
+
+---
+
+## 目录
+
+* [0\. 现状速览](#0-现状速览)
+* [1\. 架构](#1-架构)
+* [2\. 环境准备与框架安装](#2-环境准备与框架安装)
+* [3\. 配置大模型](#3-配置大模型)
+* [4\. 实时模拟](#4-实时模拟)
+* [5\. 角色配置](#5-角色配置)
+* [6\. 运行参数](#6-运行参数)
+* [7\. IVD 治理平台](#7-ivd-治理平台)
+* [8\. 部署与嵌入](#8-部署与嵌入)
+* [9\. 说明](#9-说明)
+* [10\. 修改地图](#10-修改地图)
+* [11\. 参考资料](#11-参考资料)
+* [12\. 安全与暴露面](#12-安全与暴露面)
+
+---
+
+## 0. 现状速览
+
+（2026-10-01 核对）
 
 **分层**：场景声明（数据）→ 引擎（`case_engine/`，可注册可替换）→ 案例
-（`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.2）→ 呈现
+（`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.3）→ 呈现
 （`packages/mavis-vizkit`，mavis 插件）。
 
 **干预可插拔**：三个专家写端点走 `InterventionStrategy` 注册表
@@ -26,16 +67,32 @@
 一致 15/16（93.8%）。规则表保留为离线降级；评估工具
 `case01/tools/branch_judge_eval.py`（报告：`results/analysis/branch_judge_eval/`）。
 
+**服务面（本机）**：
+
+- `5010` 唯一对接入口（实时面 + 数据面：聚合 `/api/runs`、专家安全
+  `/api/run-detail/...`、六个 `/embed/*` 面）
+- `5002` case01 只读契约 · `5003` case00 存档只读 · `5020` 分阶段像素场景
+  · `8060` 配置工具（`5004` 多场景面板已退役 —— 仅评审面板调试用）
+
+**文档**：入口是 `provenance/docs/文档索引.md`（状态一览）；平台侧契约是
+`provenance/docs/平台对接契约_5010唯一入口.md`。
+
 ## 1. 架构
 
 ```
 Provenance(平台,本仓库)
 ├── provenance/          # 平台本体
 │   ├── live_fastapi.py  # 实时模拟 + 可视化(FastAPI + WebSocket,唯一入口)
+│   ├── case_engine/     # 引擎层:场景声明 → 可注册可替换的运行方式
+│   ├── cases/           # 场景声明(数据):case00_village / case01_stock / case02_minimal
+│   ├── case01/          # 案例:投资咨询(二级市场)基线
+│   ├── case00/          # 案例:村庄(已冻结,作对照与展示)
+│   ├── live/            # 实时面:干预策略/网络守卫等
 │   ├── frontend/        # 可视化前端(Phaser + 贴图池 agents_pool/)
-│   ├── scenarios/       # 业务场景配置(investment: 角色/关系/剧情)
+│   ├── scenarios/       # 旧业务层场景配置(investment: 角色/关系/剧情)
 │   ├── data/            # 配置与提示词
 │   └── results/         # 存档与决策留痕(decisions.json)
+├── packages/            # 本地包: mavis-vizkit(呈现) / mavis-case01-injector(注入器)
 └── 依赖 mavisframework  # 框架(独立仓库 hellobs/mavis,以 wheel 安装)
 ```
 
@@ -58,7 +115,7 @@ CI 会先用 `tools/check_engine_baseline.py` 断言插件面存在,再跑测试
 git clone https://github.com/hellobs/mavis.git ../mavis
 # 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # 生成 dist/mavisframework-1.3.0-py3-none-any.whl
+uv build                              # 生成 dist/mavisframework-1.3.3-py3-none-any.whl
 cd ../provenance
 
 # 2.2 创建环境(uv 或 conda;Python 3.12)
@@ -67,7 +124,7 @@ uv venv .venv --python 3.12
 
 # 2.3 按顺序装依赖(**顺序不能反**;三条都做完才算装好)
 #     a) 框架(2.1 构建的 wheel;开发期也可 `pip install -e ../mavis` 可编辑安装)
-uv pip install ../mavis/dist/mavisframework-1.3.0-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.3-py3-none-any.whl
 #     b) 本仓的两个**本地包**(不在 PyPI;漏这步,下一步会报 "No matching distribution found")
 uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
 #     c) 其余运行依赖 + 测试框架(requirements.txt **不含** pytest)
@@ -226,6 +283,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 | `/embed/scene` | 仅 Phaser 场景(无浮动面板)——用于"仿真画面"位置 |
 | `/embed/goals` | 仅治理面板(滑条 + 倾向曲线 + 解释按钮) |
 | `/embed/explain` | 治理面板并自动展开解释面板 |
+| `/embed/timeline` | 干预时间线面板(全角色、整页)——用于"审计留痕"位置 |
 
 示例(React/Next.js):
 
@@ -243,6 +301,8 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 - **API**:
   - `GET /api/goals` — 约束/倾向/干预(按 `simulation` 字段仅返回当前模拟)/角色类型/embedding 健康度
   - `POST /api/goals` — 专家改约束 → 写 governance.json + interventions.json 审计(带 `simulation` 标记);拒绝数字/零权重垃圾目标;权重和须为 1
+  - `POST /api/undo-intervention` — 按 agent + sim_time + 记录时间回滚某次干预到其 `old_constraints`;追加一条 `operator=undo` 审计并把原记录标 `revoked` —— 历史只增不删,只作修订
+  - `GET /api/timeline` — 全角色干预时间线(按 sim_time 排序):每条含 old→new 约束、note、operator 与倾向迁移量(与 `/api/explain` 同一窗口算法);revoked/undo 事件带标记供前端区分
   - `GET /api/export-chart?agent=<名>` — matplotlib 倾向曲线 PNG
   - `GET /api/explain?agent=<名>` — 可解释性面板:倾向构成分解(α 混合)/体验窗口明细(行动·对齐度·反馈)/干预因果链(每次干预后的倾向迁移量)。checkpoint 序列加载按目录 mtime 缓存
 - 决策导出:模拟过程自动生成 decisions.json(时间/角色/动作/涉他/重要性),供决策平台与专家界面使用
@@ -261,8 +321,11 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 
 - 论文:[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 - 代码:[mavisframework(自研框架)](https://github.com/hellobs/mavis) / [Generative Agents(原始项目)](https://github.com/joonspk-research/generative_agents) / [wounderland](https://github.com/Archermmt/wounderland)
+- 地图工具:仓库自带 `tools/tilemap_to_maze.py` / [tiled_to_maze(旧 GUI)](https://github.com/jiejieje/tiled_to_maze.json)
 
-## 12. 安全与暴露面(2026-09-23)
+## 12. 安全与暴露面
+
+（2026-09-23）
 
 **这些服务没有任何鉴权**:能连上端口的人可以读走全部成品记录;5010 还能改治理约束、
 撤销干预、标记反思、重开一局(共 **4 个**写端点);8060(配置工具)还能改场景、删角色、执行一次运行。所以:
@@ -280,3 +343,6 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 代码位置:`live/netguard.py`(绑定与白名单策略)、`tests/test_netguard.py`(行为断言)。
 对接细节见 `provenance/docs/给平台侧_嵌入与数据接入.md`,体检结论见 `provenance/docs/0923_体检报告.md`。
 
+## 许可证
+
+Apache License 2.0，见 [LICENSE](LICENSE)。

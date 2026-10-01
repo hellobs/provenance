@@ -122,8 +122,17 @@ def _status_for(rel):
     return ("待核对", "尚未人工核对状态")
 
 
+# 仓库根两个 README 是**入口文档**,不是审计产物:状态块只留「状态」与「说明」,
+# 不带「最后核对」日期(2026-10-01 起;日期给不了读者任何东西,却要天天刷新)。
+# 其余文档一律三行,理由见索引「三、维护约定」。
+NO_DATE = {"../README.md", "../README_zh.md"}
+
+
 def banner_text(rel, date):
     state, note = _status_for(rel)
+    if rel in NO_DATE:
+        return ("> **状态**:{}\n"
+                "> **说明**:{}\n").format(state, note)
     return ("> **状态**:{}\n"
             "> **最后核对**:{}\n"
             "> **说明**:{}\n").format(state, date, note)
@@ -286,7 +295,8 @@ def main():
             st, note = _status_for(path)
             out.append("| {} | `{}` | {} | {} |".format(st, path, cdate(path), note))
         out += ["", "## 三、维护约定", "",
-                "1. 文档顶部必须有 `> **状态**:` / `> **最后核对**:` / `> **说明**:` 三行;",
+                "1. 文档顶部必须有状态块:一般文档是 `> **状态**:` / `> **最后核对**:` / `> **说明**:` 三行;"
+                "仓库根两个 README 是入口文档,只留 `> **状态**:` / `> **说明**:` 两行(不带日期);",
                 "2. 口径变了就**改状态并写明被谁取代**,不要删文件(评审要能追);",
                 "3. 新增文档后跑一次 `python tools/doc_audit.py --banner --index`;",
                 "4. `task_*` / `任务_*` 这类派发单完成后一律标「历史存档」。"]
