@@ -419,6 +419,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
             rec.data["router"] = {
                 "raw": router_out["raw"],
                 "issues": router_out["issues"],
+                "postprocess": router_out.get("postprocess", {}),
                 "expert_pool_version": router_out.get("expert_pool_version", "")}
             log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
             for _iss in router_out["issues"]:

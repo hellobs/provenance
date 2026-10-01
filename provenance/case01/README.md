@@ -94,7 +94,9 @@ python -m case01.render
 `CASE01_EXPERT_POOL_PATH=/path/to/expert_pool.json` 替换。5010/5002 均提供只读发现口
 `GET /api/expert-categories`。目录只包含稳定类别 ID 与职责,具体专家人员和可用状态仍由
 治理平台管理。Router 的问题依据使用本次 Reflection 的临时句子编号(`S001...`);
-程序按编号回填逐字原文,不存在的编号会显式记入 `invalid_evidence_sentence_ids`。
+程序按编号回填逐字原文,不存在的编号会显式记入 `invalid_evidence_sentence_ids`。随后
+过滤仅由提问句支撑的条目、按根因合并重复问题,最终最多保留 5 个独立问题;过滤、合并
+与截断数量记录在 `router.postprocess` 中。
 
 ## 新架构用法(mavis + injector,当前路径)
 

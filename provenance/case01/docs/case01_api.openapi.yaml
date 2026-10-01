@@ -215,6 +215,8 @@ paths:
                         description: 拆分出的待专业审核问题。
                         items:
                           $ref: '#/components/schemas/Issue'
+                      postprocess:
+                        $ref: '#/components/schemas/RouterPostprocess'
                     required:
                     - ran
                     - issues
@@ -402,12 +404,34 @@ components:
           type: string
           enum: [behavior, question]
           description: summary 是否已满足行为/判断陈述句要求。
+        merged_from_issue_ids:
+          type: array
+          items:
+            type: string
+          description: 被合并进当前根因的 Router 原始临时问题 ID。
       required:
       - id
       - summary
       - field
       - risk
       - routing_reason
+      additionalProperties: false
+    RouterPostprocess:
+      type: object
+      description: Router 确定性后处理统计，用于审计过滤、合并和数量截断。
+      properties:
+        raw_issue_count:
+          type: integer
+        question_only_filtered_count:
+          type: integer
+        merged_issue_count:
+          type: integer
+        truncated_issue_count:
+          type: integer
+        final_issue_count:
+          type: integer
+        max_issues:
+          type: integer
       additionalProperties: false
     ExpertCategory:
       type: object

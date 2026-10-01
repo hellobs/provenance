@@ -172,6 +172,7 @@ def run_detail(run_id: str) -> dict:
         "router": {
             "ran": bool(router.get("issues") is not None),
             "issues": router.get("issues", []),
+            "postprocess": router.get("postprocess", {}),
         },
         "audit": rec.get("audit", []),
     }

@@ -161,6 +161,7 @@ class TestListAndDetail:
         assert m["reflection"]["text"] == "反思全文"
         assert len(m["router"]["issues"]) == 1
         assert m["router"]["issues"][0]["risk"] == "High"
+        assert m["router"]["postprocess"] == {}
         assert m["audit"][0]["action"] == "set_branch"
 
     def test_detail_missing_reflection(self, client):
@@ -266,6 +267,8 @@ class TestOpenApiStaticDriftGuard:
                     "evidence_sentence_ids", "invalid_evidence_sentence_ids",
                     "model_evidence_quote", "evidence_status", "risk_note"):
             assert key in props
+        router_props = full["paths"]["/api/runs/{run_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["router"]["properties"]
+        assert "postprocess" in router_props
 
 
 def test_expert_categories_discovery_endpoint(client):

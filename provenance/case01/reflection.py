@@ -86,6 +86,9 @@ ROUTER_PROMPT_CN = (
     "8. 不要批准、否决或修改 Reflection，不要替专家作最终判断。你的职责仅限于：问题拆分、"
     "分类、风险判断、摘要和专家路由。"
     "9. 不要因为最终结果是正面或负面，就自动判断原始决策或 Reflection 正确或错误。"
+    "10. 按根因合并：同一行为/判断即使涉及多个风险、多个专家或多条证据，也只输出一个问题，"
+    "把其它专家放入 secondary_expert_category_ids。不要把 Reflection 中列出的自省问题、"
+    "小标题或待查提问各自拆成问题。最终最多输出 5 个彼此独立的问题。"
     "对每个识别出的问题输出：行为/判断摘要：风险或错在哪：专业领域：风险等级：路由理由："
 )
 
@@ -344,6 +347,7 @@ ROUTER_REWRITE_HINT = (
 )
 
 _ROUTER_RISKS = {"high", "medium", "low"}
+MAX_ROUTER_ISSUES = 5
 
 
 def number_reflection_sentences(text: str, max_chars: int = 6000) -> list:
@@ -571,6 +575,117 @@ def _parse_rewrite_json(text: str) -> list:
     return _parse_router_json(text)
 
 
+def _summary_ngrams(text: str) -> set:
+    """用于近似去重的稳定字符二元组；不依赖额外 embedding 服务。"""
+    compact = re.sub(r"[\W_]+", "", (text or "").lower())
+    if len(compact) < 2:
+        return {compact} if compact else set()
+    return {compact[i:i + 2] for i in range(len(compact) - 1)}
+
+
+def _same_root_cause(a: dict, b: dict) -> bool:
+    """保守判断两个条目是否描述同一根因。
+
+    优先使用可审计的证据编号；摘要只在高度近似时作为补充，避免把同领域但
+    实际独立的问题误合并。
+    """
+    ae = set(a.get("evidence_sentence_ids") or [])
+    be = set(b.get("evidence_sentence_ids") or [])
+    if ae and be:
+        overlap = ae & be
+        if ae == be or (len(overlap) >= 2 and
+                        len(overlap) / min(len(ae), len(be)) >= 0.8):
+            return True
+    ag = _summary_ngrams(a.get("summary", ""))
+    bg = _summary_ngrams(b.get("summary", ""))
+    return bool(ag and bg and len(ag & bg) / len(ag | bg) >= 0.78)
+
+
+def _merge_issue(target: dict, incoming: dict, sentence_map: dict) -> None:
+    """把同根因条目的证据、专家和说明并入首条。"""
+    target_ids = list(target.get("evidence_sentence_ids") or [])
+    for sid in incoming.get("evidence_sentence_ids") or []:
+        if sid not in target_ids:
+            target_ids.append(sid)
+    target_ids.sort(key=lambda x: int(x[1:]) if x[1:].isdigit() else 10**9)
+    target["evidence_sentence_ids"] = target_ids
+    target["evidence_quote"] = "\n".join(
+        sentence_map[sid] for sid in target_ids if sid in sentence_map)
+
+    invalid = list(target.get("invalid_evidence_sentence_ids") or [])
+    for sid in incoming.get("invalid_evidence_sentence_ids") or []:
+        if sid not in invalid:
+            invalid.append(sid)
+    target["invalid_evidence_sentence_ids"] = invalid
+    target["evidence_status"] = ("invalid" if invalid else
+                                 ("verified" if target_ids else
+                                  target.get("evidence_status", "missing")))
+
+    experts = list(target.get("secondary_expert_category_ids") or [])
+    incoming_experts = ([incoming.get("expert_category_id", "")] +
+                        list(incoming.get("secondary_expert_category_ids") or []))
+    for expert_id in incoming_experts:
+        if expert_id and expert_id != target.get("expert_category_id") and expert_id not in experts:
+            experts.append(expert_id)
+    target["secondary_expert_category_ids"] = experts
+
+    rank = {"low": 1, "medium": 2, "high": 3}
+    if rank.get(incoming.get("risk"), 0) > rank.get(target.get("risk"), 0):
+        target["risk"] = incoming["risk"]
+    for key in ("risk_note", "routing_reason"):
+        old = target.get(key, "")
+        new = incoming.get(key, "")
+        if new and new not in old:
+            target[key] = "；".join(x for x in (old, new) if x)
+    target.setdefault("merged_from_issue_ids", []).append(incoming.get("id", ""))
+
+
+def consolidate_router_issues(issues: list, evidence_sentences: dict,
+                              max_issues: int = MAX_ROUTER_ISSUES) -> tuple:
+    """过滤提问证据、合并同根因并限制问题数，返回 ``(issues, stats)``。
+
+    所有删除和合并均计入 stats，调用方可以审计后处理而不是静默改变结果。
+    """
+    stats = {"raw_issue_count": len(issues), "question_only_filtered_count": 0,
+             "merged_issue_count": 0, "truncated_issue_count": 0,
+             "final_issue_count": 0, "max_issues": max_issues}
+    candidates = []
+    for issue in issues:
+        evidence_ids = list(issue.get("evidence_sentence_ids") or [])
+        question_ids = [sid for sid in evidence_ids
+                        if looks_like_question(evidence_sentences.get(sid, ""))]
+        if evidence_ids and len(question_ids) == len(evidence_ids):
+            stats["question_only_filtered_count"] += 1
+            continue
+        if question_ids:
+            issue["evidence_sentence_ids"] = [sid for sid in evidence_ids
+                                               if sid not in question_ids]
+            issue["evidence_quote"] = "\n".join(
+                evidence_sentences[sid] for sid in issue["evidence_sentence_ids"])
+        candidates.append(issue)
+
+    merged = []
+    for issue in candidates:
+        target = next((x for x in merged if _same_root_cause(x, issue)), None)
+        if target is None:
+            issue["merged_from_issue_ids"] = []
+            merged.append(issue)
+        else:
+            _merge_issue(target, issue, evidence_sentences)
+            stats["merged_issue_count"] += 1
+
+    if len(merged) > max_issues:
+        rank = {"high": 3, "medium": 2, "low": 1}
+        merged = sorted(enumerate(merged),
+                        key=lambda pair: (-rank.get(pair[1].get("risk"), 0), pair[0]))
+        stats["truncated_issue_count"] = len(merged) - max_issues
+        merged = [item for _, item in merged[:max_issues]]
+    for index, issue in enumerate(merged, 1):
+        issue["id"] = "issue-{}".format(index)
+    stats["final_issue_count"] = len(merged)
+    return merged, stats
+
+
 def run_router(llm, reflection_text: str, material: str = "",
                max_tokens: int = 4096) -> dict:
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
@@ -603,5 +718,7 @@ def run_router(llm, reflection_text: str, material: str = "",
     issues = _parse_router_json(raw, expert_pool=expert_pool,
                                 reflection_text=reflection_text,
                                 evidence_sentences=sentence_map)
-    return {"raw": raw, "issues": _rewrite_question_issues(llm, issues),
+    issues, postprocess = consolidate_router_issues(issues, sentence_map)
+    issues = _rewrite_question_issues(llm, issues)
+    return {"raw": raw, "issues": issues, "postprocess": postprocess,
             "expert_pool_version": expert_pool["version"]}

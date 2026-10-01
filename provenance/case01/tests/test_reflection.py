@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from case01.reflection import (assemble_reflection_material, run_reflection,
                                run_router, _parse_router_json, looks_like_question,
                                _strip_boilerplate, number_reflection_sentences,
-                               numbered_reflection_text,
+                               numbered_reflection_text, consolidate_router_issues,
+                               MAX_ROUTER_ISSUES,
                                REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
                                ROUTER_JSON_HINT)
 from case01.expert_pool import load_expert_pool, prompt_catalog
@@ -170,6 +171,7 @@ class TestRouterParse:
         assert out["issues"][0]["evidence_quote"] == "一段反思包含反思原句"
         assert out["issues"][0]["model_evidence_quote"] == ""
         assert out["expert_pool_version"] == "1.0"
+        assert out["postprocess"]["final_issue_count"] == 1
         assert "E8 | AI模型与治理" in llm.messages[0][1]["content"]
         assert "[S001] 一段反思包含反思原句" in llm.messages[0][1]["content"]
 
@@ -230,6 +232,59 @@ class TestExpertPool:
         prompt = prompt_catalog()
         assert "E1 | 信息与证据核验" in prompt
         assert "UNMATCHED" in prompt
+
+
+class TestRouterConsolidation:
+    def _issue(self, issue_id, summary, evidence_ids, expert="E1", risk="medium"):
+        return {
+            "id": issue_id, "summary": summary, "risk_note": "风险", "field": "领域",
+            "expert_category_id": expert, "secondary_expert_category_ids": [],
+            "match_status": "matched", "suggested_field": "",
+            "evidence_sentence_ids": evidence_ids,
+            "invalid_evidence_sentence_ids": [], "evidence_quote": "",
+            "model_evidence_quote": "", "evidence_status": "verified",
+            "risk": risk, "routing_reason": "理由", "style": "behavior",
+        }
+
+    def test_question_only_evidence_is_filtered(self):
+        sentences = {"S001": "是否核实过消息来源？", "S002": "我没有核实消息来源。"}
+        issues = [
+            self._issue("issue-1", "需要核实消息", ["S001"]),
+            self._issue("issue-2", "没有核实消息来源", ["S002"]),
+        ]
+        got, stats = consolidate_router_issues(issues, sentences)
+        assert [x["summary"] for x in got] == ["没有核实消息来源"]
+        assert stats["question_only_filtered_count"] == 1
+        assert stats["final_issue_count"] == 1
+
+    def test_same_evidence_merges_experts_and_risk(self):
+        sentences = {"S001": "我没有核实来源。", "S002": "我据此建议买入。"}
+        issues = [
+            self._issue("issue-1", "未核实来源便建议买入", ["S001", "S002"], "E1"),
+            self._issue("issue-2", "依据不足时给出买入建议", ["S001", "S002"], "E4", "high"),
+        ]
+        got, stats = consolidate_router_issues(issues, sentences)
+        assert len(got) == 1 and got[0]["risk"] == "high"
+        assert got[0]["expert_category_id"] == "E1"
+        assert got[0]["secondary_expert_category_ids"] == ["E4"]
+        assert got[0]["merged_from_issue_ids"] == ["issue-2"]
+        assert got[0]["evidence_quote"] == "我没有核实来源。\n我据此建议买入。"
+        assert stats["merged_issue_count"] == 1
+
+    def test_issue_count_is_capped_and_audited(self):
+        sentences = {"S{:03d}".format(i): "独立行为{}。".format(i)
+                     for i in range(1, MAX_ROUTER_ISSUES + 3)}
+        issues = [self._issue("issue-{}".format(i), "不同问题{}".format(i), [sid])
+                  for i, sid in enumerate(sentences, 1)]
+        got, stats = consolidate_router_issues(issues, sentences)
+        assert len(got) == MAX_ROUTER_ISSUES
+        assert stats["truncated_issue_count"] == 2
+        assert [x["id"] for x in got] == ["issue-{}".format(i)
+                                            for i in range(1, MAX_ROUTER_ISSUES + 1)]
+
+    def test_prompt_requires_root_cause_merge_and_limit(self):
+        assert "按根因合并" in ROUTER_PROMPT_CN
+        assert "最多输出 5 个" in ROUTER_PROMPT_CN
 
 
 class TestRouterProblemsAreBehaviorsNotQuestions:
