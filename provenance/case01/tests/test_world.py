@@ -53,6 +53,14 @@ class TestBranchRouter:
         assert b == "B"
         assert "否定" in action["reason"]
 
+    def test_llm_judge_accepts_explicit_undetermined(self):
+        class _FakeLLM:
+            def chat(self, *a, **kw):
+                return '{"branch":"undetermined","reason":"没有明确行动建议"}'
+        b, info = LLMBranchJudge(_FakeLLM()).judge("只分析行业背景")
+        assert b == "undetermined"
+        assert info["attempts"] == 1
+
 
 class TestWorldState:
     def _mk(self, branch="A", date=None, invest=True):

@@ -73,8 +73,9 @@ class TestBranchJudgeEval:
         assert rules_verdict(long_text) == "C"
 
     def test_action_first_prompt_resolves_waiting_ambiguity(self):
-        assert "仅说『等官方确认』" in ACTION_FIRST_PROMPT
-        assert "缺少目标仓位或买入承诺时不得判 C" in ACTION_FIRST_PROMPT
+        assert "仅说『等待正式确认』" in ACTION_FIRST_PROMPT
+        assert "没有买入承诺时不得判 C" in ACTION_FIRST_PROMPT
+        assert "建议现在重仓买入』是 A" in ACTION_FIRST_PROMPT
 
     def test_judge_accepts_injected_prompt(self):
         from mavis_case01_injector.world.branch import LLMBranchJudge
