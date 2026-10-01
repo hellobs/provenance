@@ -15,7 +15,7 @@ for _p in (_PKG, _REPO):
         sys.path.insert(0, _p)
 
 from case01.tools.branch_judge_eval import (  # noqa: E402
-    load_cases, rules_verdict, summarize)
+    ACTION_FIRST_PROMPT, load_cases, load_cases_from_report, rules_verdict, summarize)
 
 
 class TestBranchJudgeEval:
@@ -42,6 +42,27 @@ class TestBranchJudgeEval:
                      "secs": 1.0}]
         s = summarize(err_rows)
         assert s["llm_ok"] == 0 and s["rules_llm_agree_rate"] is None
+        assert s["prediction_distribution"] == {}
+        assert s["collapse_warning"] is False
+
+    def test_summarize_flags_single_class_collapse(self):
+        rows = [{"run_id": str(i), "actual": "B", "source": "judge",
+                 "rules": "C", "llm": "B", "rules_eq_llm": False,
+                 "llm_eq_actual": True} for i in range(10)]
+        s = summarize(rows)
+        assert s["prediction_distribution"] == {"B": 10}
+        assert s["actual_distribution"] == {"B": 10}
+        assert s["collapse_warning"] is True
+
+    def test_load_cases_from_report_uses_only_frozen_inputs(self, tmp_path):
+        p = tmp_path / "old.json"
+        p.write_text(json.dumps({"rows": [
+            {"run_id": "r1", "t0": "answer", "actual": "b", "source": "judge",
+             "llm": "A", "rules": "C"},
+            {"run_id": "bad", "t0": "", "actual": "A"},
+        ]}), encoding="utf-8")
+        assert load_cases_from_report(str(p)) == [{
+            "run_id": "r1", "t0": "answer", "actual": "B", "source": "judge"}]
 
     def test_rules_verdict_defaults_to_c_on_long_neutral_text(self):
         """已知缺陷的回归锚:长中性回答含条件词 → 规则表判 C。
@@ -50,6 +71,23 @@ class TestBranchJudgeEval:
         long_text = ("我们分析了市场传闻,建议如果您仍想参与,可以考虑小仓位分批介入,"
                      "并设置止损,同时等待公司正式公告确认后再评估。")
         assert rules_verdict(long_text) == "C"
+
+    def test_action_first_prompt_resolves_waiting_ambiguity(self):
+        assert "仅说『等官方确认』" in ACTION_FIRST_PROMPT
+        assert "缺少目标仓位或买入承诺时不得判 C" in ACTION_FIRST_PROMPT
+
+    def test_judge_accepts_injected_prompt(self):
+        from mavis_case01_injector.world.branch import LLMBranchJudge
+
+        class _Fake:
+            def __init__(self): self.messages = None
+            def chat(self, messages, **kwargs):
+                self.messages = messages
+                return '{"branch":"B","reason":"zero exposure"}'
+
+        llm = _Fake()
+        assert LLMBranchJudge(llm, prompt="custom").judge("x")[0] == "B"
+        assert llm.messages[0]["content"] == "custom"
 
 
 class TestExtraBodyPassthrough:

@@ -181,7 +181,8 @@ class VLLMClient(_ChatMixin):
 
     def __init__(self, base_url: str, chat_model: str,
                  embed_base_url: str = "", embed_model: str = "",
-                 api_key: str = "", timeout: float = 120.0, retries: int = 3):
+                 api_key: str = "", timeout: float = 120.0, retries: int = 3,
+                 extra_body: Optional[dict] = None):
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_base_url = (embed_base_url or base_url).rstrip("/")
@@ -189,6 +190,10 @@ class VLLMClient(_ChatMixin):
         self.api_key = api_key
         self.timeout = timeout
         self.retries = retries
+        # Qwen3 等混合思考模型可在客户端级固定 chat-template 参数。
+        # 判定/路由这类结构化任务通常应关闭 thinking，避免 reasoning 挤占
+        # max_tokens 后 content 为空；调用级 extra_body 仍可覆盖这里。
+        self.default_extra_body = dict(extra_body or {})
 
     def _chat_url(self) -> str:
         return self.base_url + "/chat/completions"
@@ -259,11 +264,16 @@ def local_client_from_env(retries: int = 3):
         base_url = os.environ.get("CASE01_LLM_BASE_URL", "").strip()
         if not base_url:
             raise ValueError("vLLM requires CASE01_LLM_BASE_URL including /v1")
+        disable_thinking = os.environ.get(
+            "CASE01_LLM_DISABLE_THINKING", "").strip().lower() in (
+                "1", "true", "yes", "on")
         return VLLMClient(
             base_url=base_url, chat_model=chat_model,
             embed_base_url=os.environ.get("CASE01_EMBED_BASE_URL", "").strip(),
             embed_model=embed_model,
-            api_key=os.environ.get("CASE01_LLM_API_KEY", "").strip(), retries=retries)
+            api_key=os.environ.get("CASE01_LLM_API_KEY", "").strip(), retries=retries,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+            if disable_thinking else None)
     raise ValueError("CASE01_LLM_PROVIDER must be ollama or vllm")
 
 

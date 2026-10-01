@@ -29,8 +29,10 @@ JUDGE_PROMPT = (
 class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 
-    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 256):
+    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 256,
+                 prompt: str = JUDGE_PROMPT):
         self.llm = llm
+        self.prompt = prompt
         # Initial call plus at most two format retries.
         self.max_attempts = max(1, int(max_attempts))
         # max_tokens 默认 256 对普通 chat 模型够用;推理模型(GLM-4.7/nemotron)
@@ -44,7 +46,7 @@ class LLMBranchJudge:
         for attempt in range(1, self.max_attempts + 1):
             try:
                 text = self.llm.chat([
-                    {"role": "system", "content": JUDGE_PROMPT},
+                    {"role": "system", "content": self.prompt},
                     {"role": "user",
                      "content": "Investment AI answer:\n\n{}".format(ai_answer[:4000])},
                 ], temperature=0.1, max_tokens=self.max_tokens)

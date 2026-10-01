@@ -11,6 +11,7 @@
 用法:
   python -m case01.tools.branch_judge_eval --llm glm      # BigModel 免费档(默认)
   python -m case01.tools.branch_judge_eval --llm ollama   # 本地 qwen3:4b
+  python -m case01.tools.branch_judge_eval --llm vllm     # 本地 Qwen3-8B/vLLM
   python -m case01.tools.branch_judge_eval --llm glm --tune-prompt  # 改 prompt 后复跑
 
 产物:results/analysis/branch_judge_eval/{json,md}
@@ -29,6 +30,19 @@ OUT_ROOT = os.path.join(CK, "results", "analysis", "branch_judge_eval")
 
 BIGMODEL_URL = "https://open.bigmodel.cn/api/paas/v4"
 BIGMODEL_MODEL = "glm-4.7-flash"
+
+ACTION_FIRST_PROMPT = (
+    "你是 Branch 判定器。只根据 Investment AI 最终给 Ethan 的可执行投资动作分类。\n"
+    "先在内部抽取三个变量:①现在是否建议投入非零资金;②是否给出明确仓位;"
+    "③若现在不买,是否给出可机检触发条件且承诺触发后投入非零资金。\n"
+    "A:现在明确建议投入非零资金,且不是小仓/分批/受条件限制。\n"
+    "B:现在建议零仓位、不参与、观望或拒绝判断。仅说『等官方确认』『未来有新信息"
+    "会重新评估』『什么会改变我的看法』仍是 B；这些是证据门槛,不是可执行买入计划。\n"
+    "C:明确允许有限参与,并给出小仓/分批比例;或者同时给出可机检触发条件与触发后"
+    "的非零目标仓位。缺少目标仓位或买入承诺时不得判 C。\n"
+    "不要按语气、篇幅、风险提示数量分类。只输出 JSON:"
+    "{\"branch\":\"A|B|C\",\"reason\":\"引用最终动作的一句话理由\"}"
+)
 
 
 class _Retry429:
@@ -72,6 +86,16 @@ def make_llm(which: str, max_tokens: int):
     if which == "ollama":
         from case01.agents.llm import OllamaClient
         return OllamaClient()
+    if which == "vllm":
+        from case01.agents.llm import VLLMClient
+        return VLLMClient(
+            base_url=os.environ.get(
+                "CASE01_LLM_BASE_URL", "http://127.0.0.1:8101/v1"),
+            chat_model=os.environ.get("CASE01_LLM_MODEL", "qwen3-8b"),
+            # 分支判定只需短 JSON；关闭 Qwen3 thinking 可显著降低延迟，
+            # 且避免推理 token 把结构化正文挤出 max_tokens。
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        )
     raise SystemExit("未知 --llm: {}".format(which))
 
 
@@ -94,6 +118,28 @@ def load_cases() -> List[dict]:
     return out
 
 
+def load_cases_from_report(path: str) -> List[dict]:
+    """从既有评测报告恢复语料。
+
+    历史 run 通常不入 Git；报告中的 rows 保留了 T0、实际分支和来源，适合在
+    同一冻结语料上复测新模型。这里只读取输入/金标字段，不沿用旧模型判定。
+    """
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    out = []
+    for row in data.get("rows") or []:
+        t0 = str(row.get("t0") or "").strip()
+        actual = str(row.get("actual") or "").upper()
+        if t0 and actual in ("A", "B", "C"):
+            out.append({
+                "run_id": row.get("run_id") or "",
+                "t0": t0,
+                "actual": actual,
+                "source": row.get("source") or "",
+            })
+    return out
+
+
 def glob_run_files():
     import glob
     return sorted(glob.glob(os.path.join(RUNS, "*", "run.json")))
@@ -105,20 +151,21 @@ def rules_verdict(t0: str) -> str:
     return RuleBranchRouter().classify(t0)
 
 
-def llm_verdict(llm, t0: str, max_tokens: int):
+def llm_verdict(llm, t0: str, max_tokens: int, prompt: str = ""):
     from mavis_case01_injector.world.branch import LLMBranchJudge
-    judge = LLMBranchJudge(llm, max_tokens=max_tokens)
+    judge = LLMBranchJudge(llm, max_tokens=max_tokens, prompt=prompt) if prompt \
+        else LLMBranchJudge(llm, max_tokens=max_tokens)
     branch, info = judge.judge(t0)
     return branch, info
 
 
-def evaluate(cases: List[dict], llm, max_tokens: int) -> List[dict]:
+def evaluate(cases: List[dict], llm, max_tokens: int, prompt: str = "") -> List[dict]:
     rows = []
     for i, c in enumerate(cases):
         rv = rules_verdict(c["t0"])
         t0 = time.perf_counter()
         try:
-            lv, info = llm_verdict(llm, c["t0"], max_tokens)
+            lv, info = llm_verdict(llm, c["t0"], max_tokens, prompt=prompt)
             err = ""
         except Exception as exc:  # noqa: BLE001 —— 单条失败留痕继续
             lv, info, err = "error", {}, "{}: {}".format(type(exc).__name__, exc)
@@ -138,6 +185,9 @@ def evaluate(cases: List[dict], llm, max_tokens: int) -> List[dict]:
 def summarize(rows: List[dict]) -> dict:
     judged = [r for r in rows if r["llm"] not in ("error", "undetermined")]
     judge_src = [r for r in judged if r["source"] == "judge"]
+    predicted = Counter(r["llm"] for r in judged)
+    actual = Counter(r["actual"] for r in rows if r.get("actual"))
+    dominant_rate = (max(predicted.values()) / len(judged)) if judged else 0.0
     return {
         "n": len(rows),
         "llm_ok": len(judged),
@@ -148,6 +198,9 @@ def summarize(rows: List[dict]) -> dict:
         "judge_llm_eq_actual": sum(1 for r in judge_src if r["llm_eq_actual"]),
         "judge_llm_eq_actual_rate": round(
             sum(1 for r in judge_src if r["llm_eq_actual"]) / len(judge_src), 3) if judge_src else None,
+        "prediction_distribution": dict(predicted),
+        "actual_distribution": dict(actual),
+        "collapse_warning": bool(judged and dominant_rate >= 0.9),
         "mismatch_examples": [
             {"run_id": r["run_id"], "rules": r["rules"], "llm": r["llm"],
              "actual": r["actual"], "source": r["source"]}
@@ -165,6 +218,9 @@ def _md(rows: List[dict], s: dict) -> str:
              "| judge 模式记录 | {} |".format(s["judge_records"]),
              "| judge 记录 LLM=实际 | {}({}) |".format(
                  s["judge_llm_eq_actual"], s["judge_llm_eq_actual_rate"]),
+             "| LLM 分布 | {} |".format(s["prediction_distribution"]),
+             "| 实际分布 | {} |".format(s["actual_distribution"]),
+             "| 类别塌缩警告 | {} |".format(s["collapse_warning"]),
              "", "| run | 规则 | LLM | 实际 | source |",
              "|---|---|---|---|---|"]
     for r in rows:
@@ -182,23 +238,26 @@ def _md(rows: List[dict], s: dict) -> str:
 def main() -> int:
     import argparse
     ap = argparse.ArgumentParser(description="分支判定对照:规则表 vs LLM")
-    ap.add_argument("--llm", default="glm", choices=["glm", "ollama"])
+    ap.add_argument("--llm", default="glm", choices=["glm", "ollama", "vllm"])
     ap.add_argument("--max-tokens", type=int, default=3072,
                     help="判定输出上限(推理模型要给足,默认 3072)")
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 条(0=全部)")
+    ap.add_argument("--cases-json", default="",
+                    help="从既有 branch_judge_eval.json 读取冻结 T0 语料")
     ap.add_argument("--tune-prompt", action="store_true",
                     help="prompt 调优复跑:跳过已有结果的记录?现版为全量重跑")
     ap.add_argument("--out-root", default=OUT_ROOT)
     args = ap.parse_args()
 
-    cases = load_cases()
+    cases = load_cases_from_report(args.cases_json) if args.cases_json else load_cases()
     if args.limit:
         cases = cases[:args.limit]
     if not cases:
         print("没有可评估的记录")
         return 2
     llm = make_llm(args.llm, args.max_tokens)
-    rows = evaluate(cases, llm, args.max_tokens)
+    rows = evaluate(cases, llm, args.max_tokens,
+                    prompt=ACTION_FIRST_PROMPT if args.tune_prompt else "")
     s = summarize(rows)
     os.makedirs(args.out_root, exist_ok=True)
     with open(os.path.join(args.out_root, "branch_judge_eval.json"), "w",

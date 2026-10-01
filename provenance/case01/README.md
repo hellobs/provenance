@@ -125,6 +125,8 @@ Ollama remains the default. To connect directly to a vLLM OpenAI-compatible API:
 export CASE01_LLM_PROVIDER=vllm
 export CASE01_LLM_BASE_URL=http://127.0.0.1:8101/v1
 export CASE01_LLM_MODEL=<vLLM 上实际部署的模型名>
+# Qwen3 的判定/Router 等结构化任务建议关闭 thinking:
+export CASE01_LLM_DISABLE_THINKING=1
 ```
 
 To switch back, set `CASE01_LLM_PROVIDER=ollama` and use
