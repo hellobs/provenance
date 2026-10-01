@@ -93,7 +93,8 @@ python -m case01.render
 专家类别池默认读取 `case01/expert_pool.json`;治理平台已有自己的类别目录时可通过
 `CASE01_EXPERT_POOL_PATH=/path/to/expert_pool.json` 替换。5010/5002 均提供只读发现口
 `GET /api/expert-categories`。目录只包含稳定类别 ID 与职责,具体专家人员和可用状态仍由
-治理平台管理。
+治理平台管理。Router 的问题依据使用本次 Reflection 的临时句子编号(`S001...`);
+程序按编号回填逐字原文,不存在的编号会显式记入 `invalid_evidence_sentence_ids`。
 
 ## 新架构用法(mavis + injector,当前路径)
 

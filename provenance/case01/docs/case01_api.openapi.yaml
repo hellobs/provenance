@@ -369,7 +369,20 @@ components:
           description: unmatched 时 Router 建议的新专业领域。
         evidence_quote:
           type: string
-          description: 逐字摘自 Reflection 的问题依据。
+          description: 程序根据 evidence_sentence_ids 回填的 Reflection 逐字原文。
+        evidence_sentence_ids:
+          type: array
+          items:
+            type: string
+          description: Router 引用的本次 Reflection 临时句子编号(S001...)。
+        invalid_evidence_sentence_ids:
+          type: array
+          items:
+            type: string
+          description: Router 返回但本次编号表中不存在的 ID；非空时 evidence_status=invalid。
+        model_evidence_quote:
+          type: string
+          description: 兼容旧 Router 的自由文本引用；新路径不依赖它建立证据。
         evidence_status:
           type: string
           enum: [verified, missing, invalid, unchecked]

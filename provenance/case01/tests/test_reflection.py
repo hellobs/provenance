@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01.reflection import (assemble_reflection_material, run_reflection,
                                run_router, _parse_router_json, looks_like_question,
-                               _strip_boilerplate,
+                               _strip_boilerplate, number_reflection_sentences,
+                               numbered_reflection_text,
                                REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
                                ROUTER_JSON_HINT)
 from case01.expert_pool import load_expert_pool, prompt_catalog
@@ -158,7 +159,7 @@ class TestRouterParse:
 
             def chat(self, messages, **kw):
                 self.messages.append(messages)
-                return ('[{"summary":"S","evidence_quote":"反思原句",'
+                return ('[{"summary":"S","evidence_sentence_ids":["S001"],'
                         '"field":"信息与证据核验","expert_category_id":"E1",'
                         '"risk_note":"N","risk":"High","routing_reason":"R"}]')
         llm = _Fake()
@@ -166,8 +167,38 @@ class TestRouterParse:
         assert out["issues"][0]["id"] == "issue-1"
         assert out["issues"][0]["expert_category_id"] == "E1"
         assert out["issues"][0]["evidence_status"] == "verified"
+        assert out["issues"][0]["evidence_quote"] == "一段反思包含反思原句"
+        assert out["issues"][0]["model_evidence_quote"] == ""
         assert out["expert_pool_version"] == "1.0"
         assert "E8 | AI模型与治理" in llm.messages[0][1]["content"]
+        assert "[S001] 一段反思包含反思原句" in llm.messages[0][1]["content"]
+
+    def test_sentence_ids_resolve_to_exact_source_text(self):
+        reflection = "第一句说明证据。第二句说明后果！\n\n### 小结\n第三句。"
+        sentences = number_reflection_sentences(reflection)
+        assert sentences == [("S001", "第一句说明证据。"),
+                             ("S002", "第二句说明后果！"),
+                             ("S003", "### 小结"),
+                             ("S004", "第三句。")]
+        assert "[S002] 第二句说明后果！" in numbered_reflection_text(sentences)
+        raw = ('[{"summary":"S","evidence_sentence_ids":["S002","S004"],'
+               '"field":"E1","expert_category_id":"E1",'
+               '"risk":"High","routing_reason":"R"}]')
+        issue = _parse_router_json(raw, reflection_text=reflection,
+                                   evidence_sentences=dict(sentences))[0]
+        assert issue["evidence_status"] == "verified"
+        assert issue["evidence_quote"] == "第二句说明后果！\n第三句。"
+
+    def test_nonexistent_sentence_id_is_invalid_not_silently_dropped(self):
+        raw = ('[{"summary":"S","evidence_sentence_ids":["S001","S999"],'
+               '"field":"E1","expert_category_id":"E1",'
+               '"risk":"High","routing_reason":"R"}]')
+        issue = _parse_router_json(
+            raw, reflection_text="原文。", evidence_sentences={"S001": "原文。"})[0]
+        assert issue["evidence_status"] == "invalid"
+        assert issue["evidence_sentence_ids"] == ["S001"]
+        assert issue["invalid_evidence_sentence_ids"] == ["S999"]
+        assert issue["evidence_quote"] == "原文。"
 
     def test_unknown_expert_is_explicitly_unmatched(self):
         text = ('[{"summary":"S","field":"火星经济学",'

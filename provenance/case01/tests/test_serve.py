@@ -263,7 +263,8 @@ class TestOpenApiStaticDriftGuard:
         props = full["components"]["schemas"]["Issue"]["properties"]
         for key in ("expert_category_id", "secondary_expert_category_ids",
                     "match_status", "suggested_field", "evidence_quote",
-                    "evidence_status", "risk_note"):
+                    "evidence_sentence_ids", "invalid_evidence_sentence_ids",
+                    "model_evidence_quote", "evidence_status", "risk_note"):
             assert key in props
 
 

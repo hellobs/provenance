@@ -303,14 +303,15 @@ ROUTER_RISK_ANCHOR = (
 
 ROUTER_JSON_HINT = (
     "\n\n输出要求:把识别出的每个问题输出为 JSON 数组,不要输出其他内容:\n"
-    '[{"summary": "行为/判断的陈述句", "evidence_quote": "Reflection中的原文证据", '
+    '[{"summary": "行为/判断的陈述句", "evidence_sentence_ids": ["S001"], '
     '"risk_note": "风险或错在哪", "field": "规范专家类别名称", '
     '"expert_category_id": "类别池ID或UNMATCHED", '
     '"secondary_expert_category_ids": ["其它类别池ID"], '
     '"suggested_field": "仅UNMATCHED时填写", "risk": "High|Medium|Low", '
     '"routing_reason": "路由理由"}, ...]\n'
     "若没有需要专业审核的问题,输出 []\n"
-    "evidence_quote 必须逐字摘自 Reflection;不得把后来新想到的问题写进输出。\n"
+    "evidence_sentence_ids 必须引用下方带编号 Reflection 中直接支持该问题的句子;"
+    "不得自己改写证据、不得引用不存在的编号、不得把后来新想到的问题写进输出。\n"
     "summary 必须是陈述句(描述做过/没做过的具体行为或判断),**不要写成疑问句**。\n"
     "格式硬性要求:不要使用 ```json 代码围栏;summary/field/routing_reason 等"
     "字段内容中一律不要出现英文双引号(\"),需要引用原文时用中文引号『』或“”。"
@@ -345,8 +346,32 @@ ROUTER_REWRITE_HINT = (
 _ROUTER_RISKS = {"high", "medium", "low"}
 
 
+def number_reflection_sentences(text: str, max_chars: int = 6000) -> list:
+    """把 Router 可见的 Reflection 切成稳定的可引用句子 ``[(S001, 原文)]``。
+
+    保留每段逐字文本；模型只返回 ID，程序再由 ID 回填原文，从而避免模型在
+    ``evidence_quote`` 中做近义改写。编号只对本次 Router 输入有效。
+    """
+    source = (text or "")[:max_chars]
+    parts = []
+    for line in source.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # 中文/英文句末标点后切分；Markdown 标题通常没有句号，整行作为一句。
+        chunks = re.split(r"(?<=[。！？!?])\s*", line)
+        parts.extend(x.strip() for x in chunks if x.strip())
+    return [("S{:03d}".format(i), sentence)
+            for i, sentence in enumerate(parts, 1)]
+
+
+def numbered_reflection_text(sentences: list) -> str:
+    return "\n".join("[{}] {}".format(sid, text) for sid, text in sentences)
+
+
 def _parse_router_json(text: str, expert_pool: dict = None,
-                       reflection_text: str = "") -> list:
+                       reflection_text: str = "",
+                       evidence_sentences: dict = None) -> list:
     """从 Router 输出提取 issues 列表。
 
     容忍:前后杂文本、```json 代码围栏、首尾空白;数组内个别畸形项跳过。
@@ -412,12 +437,27 @@ def _parse_router_json(text: str, expert_pool: dict = None,
                      if str(x).strip().upper() in valid_ids
                      and str(x).strip().upper() != category_id]
         secondary = list(dict.fromkeys(secondary))
-        evidence_quote = str(it.get("evidence_quote", "") or "").strip()
-        if reflection_text:
+        model_evidence_quote = str(it.get("evidence_quote", "") or "").strip()
+        evidence_ids = it.get("evidence_sentence_ids") or []
+        if isinstance(evidence_ids, str):
+            evidence_ids = [evidence_ids]
+        evidence_ids = list(dict.fromkeys(
+            str(x).strip().upper() for x in evidence_ids if str(x).strip()))
+        sentence_map = evidence_sentences or {}
+        invalid_evidence_ids = [x for x in evidence_ids if x not in sentence_map]
+        valid_evidence_ids = [x for x in evidence_ids if x in sentence_map]
+        if evidence_ids:
+            evidence_quote = "\n".join(sentence_map[x] for x in valid_evidence_ids)
+            evidence_status = ("verified" if valid_evidence_ids and
+                               not invalid_evidence_ids else "invalid")
+        elif reflection_text:
+            # 兼容旧 Router 输出:evidence_quote 仍可做严格逐字校验。
+            evidence_quote = model_evidence_quote
             evidence_status = ("verified" if evidence_quote and
                                evidence_quote in reflection_text else
                                ("missing" if not evidence_quote else "invalid"))
         else:
+            evidence_quote = model_evidence_quote
             evidence_status = "unchecked"
         reason = str(it.get("routing_reason", "") or it.get("reason", "")).strip()
         risk_note = str(it.get("risk_note", "") or it.get("note", "")).strip()
@@ -432,7 +472,10 @@ def _parse_router_json(text: str, expert_pool: dict = None,
             "secondary_expert_category_ids": secondary,
             "match_status": match_status,
             "suggested_field": suggested_field,
+            "evidence_sentence_ids": valid_evidence_ids,
+            "invalid_evidence_sentence_ids": invalid_evidence_ids,
             "evidence_quote": evidence_quote,
+            "model_evidence_quote": model_evidence_quote,
             "evidence_status": evidence_status,
             "risk": risk,
             "routing_reason": reason,
@@ -545,10 +588,12 @@ def run_router(llm, reflection_text: str, material: str = "",
     from case01.expert_pool import load_expert_pool, prompt_catalog
 
     expert_pool = load_expert_pool()
+    sentences = number_reflection_sentences(reflection_text)
+    sentence_map = dict(sentences)
     prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
               "\n\n" + prompt_catalog(expert_pool) +
-              "\n\n以下是 Investment AI 生成的 Reflection:\n\n" +
-              (reflection_text[:6000]))
+              "\n\n以下是带证据编号的 Investment AI Reflection:\n\n" +
+              numbered_reflection_text(sentences))
     text = llm.chat([
         {"role": "system",
          "content": "You are the Reflection Router. Respond in Chinese."},
@@ -556,6 +601,7 @@ def run_router(llm, reflection_text: str, material: str = "",
     ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
     issues = _parse_router_json(raw, expert_pool=expert_pool,
-                                reflection_text=reflection_text)
+                                reflection_text=reflection_text,
+                                evidence_sentences=sentence_map)
     return {"raw": raw, "issues": _rewrite_question_issues(llm, issues),
             "expert_pool_version": expert_pool["version"]}
