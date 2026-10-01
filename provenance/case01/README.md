@@ -98,6 +98,12 @@ python -m case01.render
 过滤仅由提问句支撑的条目、按根因合并重复问题,最终最多保留 5 个独立问题;过滤、合并
 与截断数量记录在 `router.postprocess` 中。
 
+每次新生成的 Reflection 同时写入 `reflection.quality`:自动质量门按八维覆盖、案例事实
+锚点、结果/过程区分、具体自省、不确定性、可执行改进和样式给出 0–100 分及失败原因。
+该分数只用于筛查;忠实度、深层语义切题度和自相矛盾仍列入 `manual_review_required`,由
+`python -m case01.tools.reflection_review --export` 的人工标注流程复核。旧记录没有落盘该
+字段时，`GET /api/runs/{run_id}` 会用已保存的反思与材料即时补算，不改写历史文件。
+
 ## 新架构用法(mavis + injector,当前路径)
 
 ```bash

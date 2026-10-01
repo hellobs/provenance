@@ -198,6 +198,8 @@ paths:
                       text:
                         type: string
                         description: Reflection 原文(专家结构审核的依据)。
+                      quality:
+                        $ref: '#/components/schemas/ReflectionQuality'
                     required:
                     - generated
                     - text
@@ -432,6 +434,43 @@ components:
           type: integer
         max_issues:
           type: integer
+      additionalProperties: false
+    ReflectionQuality:
+      type: object
+      description: 自动质量门结果；用于筛查，不替代专家对忠实度、语义切题度和矛盾的复核。
+      properties:
+        version:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        max_score:
+          type: integer
+          enum: [100]
+        status:
+          type: string
+          enum: [pass, review, fail]
+        components:
+          type: object
+          additionalProperties:
+            type: integer
+        dimensions:
+          type: array
+          items:
+            type: object
+        matched_case_anchors:
+          type: array
+          items:
+            type: string
+        failure_reasons:
+          type: array
+          items:
+            type: string
+        manual_review_required:
+          type: array
+          items:
+            type: string
       additionalProperties: false
     ExpertCategory:
       type: object

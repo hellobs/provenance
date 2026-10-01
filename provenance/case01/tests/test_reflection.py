@@ -11,7 +11,7 @@ from case01.reflection import (assemble_reflection_material, run_reflection,
                                run_router, _parse_router_json, looks_like_question,
                                _strip_boilerplate, number_reflection_sentences,
                                numbered_reflection_text, consolidate_router_issues,
-                               MAX_ROUTER_ISSUES,
+                               evaluate_reflection_quality, MAX_ROUTER_ISSUES,
                                REFLECTION_PROMPT_CN, ROUTER_PROMPT_CN,
                                ROUTER_JSON_HINT)
 from case01.expert_pool import load_expert_pool, prompt_catalog
@@ -107,6 +107,44 @@ class TestRunReflection:
         out = run_reflection(_Fake(), _sample_run())
         assert "text" in out and "material" in out
         assert "反思" in out["text"]
+        assert out["quality"]["max_score"] == 100
+
+
+class TestReflectionQuality:
+    def test_specific_eight_dimension_reflection_passes(self):
+        material = "2026-08-27 MarketScope 称订单为120-150亿元，后来股价上涨40%。"
+        text = (
+            "判断过程中，合理之处是保持谨慎，但不足是我未能核实来源和正式披露。"
+            "信息与证据并不一致，我对传言可信度的假设过强，也低估了不确定性。"
+            "媒体的立场和叙事可能存在吸引资金的激励与利益冲突。"
+            "用户据此选择不买入并错失机会，这一行动产生了实际后果。"
+            "2026-08-27 的最终结果并不意味着当时的判断质量必然错误，结果不能掩盖判断过程。"
+            "MarketScope 所称120-150亿元仍需进一步帮助和专业领域知识才能验证。"
+            "我认识到未来应当保留事实核验，并重新考虑市场情绪的权重。"
+            "以后应建立来源交叉验证清单、量化不确定性并记录触发条件，避免再次依靠单一叙事。"
+            "这些改进需要落实到每次咨询的核实、限制仓位和持续跟踪中，而不是泛泛提醒。"
+            "对于无法确认的订单规模，应等待正式公告并明确说明可能性，而不是把假设写成事实。"
+        )
+        q = evaluate_reflection_quality(text, material)
+        assert q["status"] == "pass"
+        assert q["score"] >= 90
+        assert q["components"]["dimension_coverage"] == 40
+        assert len(q["matched_case_anchors"]) >= 2
+        assert q["failure_reasons"] == []
+        assert "fidelity" in q["manual_review_required"]
+
+    def test_generic_short_reflection_fails_with_reasons(self):
+        q = evaluate_reflection_quality("这次结果不好，以后需要加强分析。", "HCM 亏损39%。")
+        assert q["status"] == "fail"
+        assert q["score"] < 50
+        assert any("过短" in x for x in q["failure_reasons"])
+        assert any("本案例" in x for x in q["failure_reasons"])
+
+    def test_score_is_deterministic_and_bounded(self):
+        a = evaluate_reflection_quality("判断存在不足。" * 30, "事件材料")
+        b = evaluate_reflection_quality("判断存在不足。" * 30, "事件材料")
+        assert a == b
+        assert 0 <= a["score"] <= a["max_score"] == 100
 
 
 class TestRouterParse:

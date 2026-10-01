@@ -30,10 +30,12 @@ from fastapi.staticfiles import StaticFiles
 try:  # 包内导入(作为 case01.serve)
     from . import full_context as fc
     from .expert_pool import load_expert_pool
+    from .reflection import evaluate_reflection_quality
 except ImportError:  # 直接脚本运行(在 case01 目录)
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from case01 import full_context as fc
     from case01.expert_pool import load_expert_pool
+    from case01.reflection import evaluate_reflection_quality
 
 from live.netguard import resolve_embed_origins
 
@@ -152,6 +154,10 @@ def run_detail(run_id: str) -> dict:
     ba = rec.get("branch_action") or {}
     ref = rec.get("reflection") or {}
     router = rec.get("router") or {}
+    reflection_quality = ref.get("quality")
+    if (not isinstance(reflection_quality, dict) or not reflection_quality) and ref.get("text"):
+        reflection_quality = evaluate_reflection_quality(
+            ref.get("text", ""), ref.get("material", ""))
     meta = {
         "run_id": rec.get("run_id") or run_id,
         "start_date": rec.get("start_date", ""),
@@ -168,6 +174,7 @@ def run_detail(run_id: str) -> dict:
         "reflection": {
             "generated": bool(ref.get("text")),
             "text": ref.get("text", ""),
+            "quality": reflection_quality or {},
         },
         "router": {
             "ran": bool(router.get("issues") is not None),

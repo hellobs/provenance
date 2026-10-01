@@ -67,7 +67,8 @@ def main():
         print("=== Reflection ===")
         ref = run_reflection(local, rec_data)
         rec_data["reflection"] = {"material": ref["material"],
-                                  "text": ref["text"]}
+                                  "text": ref["text"],
+                                  "quality": ref.get("quality", {})}
         print(ref["text"][:500])
         print("\n=== Router ===")
         rout = run_router(router, ref["text"])

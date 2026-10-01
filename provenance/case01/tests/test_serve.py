@@ -159,6 +159,8 @@ class TestListAndDetail:
         assert m["branch_summary"].startswith("建议买入")
         assert m["reflection"]["generated"] is True
         assert m["reflection"]["text"] == "反思全文"
+        assert m["reflection"]["quality"]["max_score"] == 100
+        assert m["reflection"]["quality"]["status"] == "fail"
         assert len(m["router"]["issues"]) == 1
         assert m["router"]["issues"][0]["risk"] == "High"
         assert m["router"]["postprocess"] == {}
@@ -168,6 +170,7 @@ class TestListAndDetail:
         r = client.get("/api/runs/run-02")
         m = r.json()
         assert m["reflection"]["generated"] is False
+        assert m["reflection"]["quality"] == {}
         assert m["router"]["issues"] == []
         assert m["branch_summary"].startswith("条件化方案")
 
@@ -269,6 +272,8 @@ class TestOpenApiStaticDriftGuard:
             assert key in props
         router_props = full["paths"]["/api/runs/{run_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["router"]["properties"]
         assert "postprocess" in router_props
+        reflection_props = full["paths"]["/api/runs/{run_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["reflection"]["properties"]
+        assert reflection_props["quality"]["$ref"] == "#/components/schemas/ReflectionQuality"
 
 
 def test_expert_categories_discovery_endpoint(client):

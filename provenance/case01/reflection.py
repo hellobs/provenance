@@ -293,6 +293,7 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
     raw = text or ""
     cleaned = _strip_boilerplate(raw)
     return {"material": material, "text": cleaned,
+            "quality": evaluate_reflection_quality(cleaned, material),
             "stripped_opener": bool(raw) and cleaned != raw.lstrip()}
 
 
@@ -371,6 +372,96 @@ def number_reflection_sentences(text: str, max_chars: int = 6000) -> list:
 
 def numbered_reflection_text(sentences: list) -> str:
     return "\n".join("[{}] {}".format(sid, text) for sid, text in sentences)
+
+
+_QUALITY_DIMENSIONS = (
+    ("judgment", "判断质量", ("合理", "不足", "质疑", "判断过程", "做得较好")),
+    ("evidence", "信息与证据", ("信息", "证据", "来源", "披露", "可信", "一致")),
+    ("uncertainty", "假设与不确定性", ("假设", "不确定", "权重", "可能性")),
+    ("interests", "利益与立场", ("利益", "立场", "冲突", "激励", "媒体", "叙事")),
+    ("actions", "行动与后果", ("行动", "后果", "买入", "不买入", "损失", "错失")),
+    ("outcome_process", "结果与判断过程", ("结果", "判断质量", "并不意味着", "不能掩盖")),
+    ("help", "进一步帮助", ("进一步帮助", "超出", "专业", "需要引入", "领域知识")),
+    ("learning", "经验迁移", ("学到", "认识到", "值得保留", "重新考虑", "以后", "未来")),
+)
+_SELF_CRITIQUE_MARKERS = ("未能", "没有", "不足", "忽略", "低估", "高估", "过高", "过低", "盲区")
+_ACTIONABLE_MARKERS = ("核实", "交叉验证", "建立", "量化", "等待", "限制", "设置", "引入", "跟踪", "记录")
+_OUTCOME_PROCESS_MARKERS = ("并不意味着", "不意味着", "不能掩盖", "结果与判断", "结果如何", "判断过程")
+_UNCERTAINTY_MARKERS = ("不确定", "假设", "可能", "概率", "权重", "无法确认")
+
+
+def _case_anchors(material: str) -> list:
+    """提取适合逐字核对的案例锚点，避免用常见词假装“切题”。"""
+    patterns = (
+        r"\d+(?:[.–—-]\d+)?\s*(?:%|％|亿元|万元|元|万股|股)",
+        r"\b[A-Za-z][A-Za-z0-9_-]{2,}\b",
+        r"\d{4}[-/.年]\d{1,2}(?:[-/.月]\d{1,2}日?)?",
+    )
+    anchors = []
+    for pattern in patterns:
+        anchors.extend(re.findall(pattern, material or ""))
+    # 忽略材料结构里的固定角色名；它们不能证明反思结合了具体案例。
+    ignored = {"Investment", "AI", "Ethan"}
+    return list(dict.fromkeys(x.strip() for x in anchors
+                              if x.strip() and x.strip() not in ignored))
+
+
+def evaluate_reflection_quality(text: str, material: str = "") -> dict:
+    """确定性反思质量门（自动筛查，不冒充人工语义裁决）。
+
+    总分 100：八维覆盖 40、案例落地 15、结果/过程区分 10、具体自省 10、
+    不确定性 5、可执行改进 10、样式 10。忠实度和深层切题度仍需专家复核。
+    """
+    source = (text or "").strip()
+    dimensions = []
+    for key, label, markers in _QUALITY_DIMENSIONS:
+        hits = [marker for marker in markers if marker in source]
+        dimensions.append({"id": key, "label": label, "score": 5 if hits else 0,
+                           "max_score": 5, "evidence_markers": hits[:3]})
+
+    anchors = _case_anchors(material)
+    matched_anchors = [anchor for anchor in anchors if anchor in source]
+    grounding_score = 15 if len(matched_anchors) >= 2 else (8 if matched_anchors else 0)
+    outcome_hits = [x for x in _OUTCOME_PROCESS_MARKERS if x in source]
+    critique_hits = [x for x in _SELF_CRITIQUE_MARKERS if x in source]
+    uncertainty_hits = [x for x in _UNCERTAINTY_MARKERS if x in source]
+    actionable_hits = [x for x in _ACTIONABLE_MARKERS if x in source]
+    style_ok = bool(source) and (_strip_boilerplate(source) == source and
+                                 _strip_tail_offer(source) == source and
+                                 _strip_emoji(source) == source)
+    components = {
+        "dimension_coverage": sum(x["score"] for x in dimensions),
+        "case_grounding": grounding_score,
+        "outcome_process_distinction": 10 if outcome_hits else 0,
+        "specific_self_critique": 10 if len(critique_hits) >= 2 else (5 if critique_hits else 0),
+        "uncertainty_awareness": 5 if uncertainty_hits else 0,
+        "actionable_improvement": 10 if len(actionable_hits) >= 2 else (5 if actionable_hits else 0),
+        "style": 10 if style_ok else 0,
+    }
+    score = sum(components.values())
+    failures = []
+    if len(source) < 300:
+        failures.append("反思过短，难以实质覆盖完整经历")
+    missing_dims = [x["label"] for x in dimensions if not x["score"]]
+    if missing_dims:
+        failures.append("缺少实质维度：" + "、".join(missing_dims))
+    if not matched_anchors:
+        failures.append("未引用可逐字核对的本案例数字、日期或专有名词")
+    if not outcome_hits:
+        failures.append("未明确区分最终结果与当时判断过程")
+    if not critique_hits:
+        failures.append("未指出具体的自身判断或行为不足")
+    if not actionable_hits:
+        failures.append("未提出可执行的后续改进动作")
+    if not style_ok:
+        failures.append("存在客套开场、尾部追问或 emoji 等样式问题")
+    status = "pass" if score >= 70 and not failures else ("review" if score >= 50 else "fail")
+    return {
+        "version": "1.0", "score": score, "max_score": 100, "status": status,
+        "components": components, "dimensions": dimensions,
+        "matched_case_anchors": matched_anchors[:10], "failure_reasons": failures,
+        "manual_review_required": ["fidelity", "semantic_relevance", "contradiction"],
+    }
 
 
 def _parse_router_json(text: str, expert_pool: dict = None,

@@ -410,7 +410,8 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
             log("=== Reflection(本地同源模型,后台) ===")
             ref = run_reflection(llm, rec.data)
             rec.data["reflection"] = {
-                "material": ref["material"], "text": ref["text"]}
+                "material": ref["material"], "text": ref["text"],
+                "quality": ref.get("quality", {})}
             log(ref["text"][:200] + "…" if len(ref["text"]) > 200 else ref["text"])
             # Router(独立模型:router_llm,缺省回落到本地)
             rllm = router_llm or llm
