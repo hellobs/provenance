@@ -3,7 +3,7 @@
 
 2026-09-21:用户要求"过时的文件加上日期或做修改(尤其 md)"。光改一次会再烂回去,
 所以把"文档必须自报状态"变成 CI 能红的东西:
-- 本仓每份 .md 顶部都要有 `> **状态**:` / `> **最后核对**:`(仓库根两个 README 免日期);
+- 本仓每份 .md 顶部都要有 `> **状态**:`(英文版 README 写 `> **Status**:`)/ `> **最后核对**:`(仓库根两个 README 免日期);
 - `docs/文档索引.md` 存在,且每份 md 都在索引里出现过(不然新增文档没人知道它现行还是老的)。
 """
 import io
@@ -19,9 +19,10 @@ _PKG = os.path.join(_REPO, "provenance")
 SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs",
              "runs_injector", "runs_html")
-BANNER = re.compile(r"^>\s*\*\*状态\*\*", re.M)
-# 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起)。
-# 工具侧同一份名单见 tools/doc_audit.py 的 NO_DATE。
+BANNER = re.compile(r"^>\s*\*\*(状态|Status)\*\*", re.M)
+# 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起);
+# 英文版 README 用英文键 `> **Status**`。
+# 工具侧同一份名单见 tools/doc_audit.py 的 README_BANNER。
 NO_DATE = {"README.md", "README_zh.md"}
 
 

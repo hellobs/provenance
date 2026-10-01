@@ -1,7 +1,8 @@
-# Provenance
+<h1 align="center">Provenance</h1>
 
 > **状态**:现行
 > **说明**:provenance 平台总览(中文);本仓入口
+
 **AI 价值形成过程，可观察、可治理、可审计。**
 
 **本平台基于 [mavisframework](https://github.com/hellobs/mavis) v1.3.3 构建**（自研生成式智能体仿真框架，独立发版）。应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。

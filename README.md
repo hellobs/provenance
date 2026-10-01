@@ -1,7 +1,7 @@
-# Provenance
+<h1 align="center">Provenance</h1>
 
-> **状态**:现行
-> **说明**:provenance 平台总览(英文);本仓入口
+> **Status**:current — Provenance platform overview (English); the entry point of this repository
+
 **AI value formation is observable, governable and auditable.**
 
 **Built on [mavisframework](https://github.com/hellobs/mavis) v1.3.3** (a self-developed generative multi-agent simulation engine, versioned independently). The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time.

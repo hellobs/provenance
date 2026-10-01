@@ -31,6 +31,10 @@ ROOTS = (
 # 归一化时必须把**所有**这种行都删掉再插一条,否则越跑越多(2026-09-21 修)
 BANNER_RE = re.compile(r"^>\s*\*\*(状态|Status|最后核对|说明)\*\*.*$", re.M)
 
+# 标题行:Markdown 的 `#` 或**居中标题**用的 `<h1 align="center">…</h1>`
+# (2026-10-01:两个 README 的项目名改成居中,状态块仍要认得出插在哪一行之后)
+HEADING_RE = re.compile(r"^\s*(?:#|<h1[\s>])", re.I)
+
 # 「状态」键的**整段**:键行 + 紧跟其后的 `>` 续行。
 # 2026-09-27 修:只删键行的话,旧状态的续行会留在原地、接到新插上去的「说明」下面,
 # 变成一句断掉的话(实测见 case01/docs/转接_给下一棒_20260924.md:旧状态是两行,
@@ -122,17 +126,20 @@ def _status_for(rel):
     return ("待核对", "尚未人工核对状态")
 
 
-# 仓库根两个 README 是**入口文档**,不是审计产物:状态块只留「状态」与「说明」,
-# 不带「最后核对」日期(2026-10-01 起;日期给不了读者任何东西,却要天天刷新)。
-# 其余文档一律三行,理由见索引「三、维护约定」。
-NO_DATE = {"../README.md", "../README_zh.md"}
+# 仓库根两个 README 是**入口文档**,不是审计产物,所以:
+#   - 不带「最后核对」日期(2026-10-01 起;日期给不了读者任何东西,却要天天刷新);
+#   - **各用自己的语言** —— 英文版挂一句中文说明,读者会当成漏改(2026-10-01 反馈)。
+# 其余文档一律三行中文,理由见索引「三、维护约定」。
+README_BANNER = {
+    "../README.md": "> **Status**:current — Provenance platform overview (English); the entry point of this repository",
+    "../README_zh.md": "> **状态**:现行\n> **说明**:provenance 平台总览(中文);本仓入口",
+}
 
 
 def banner_text(rel, date):
+    if rel in README_BANNER:
+        return README_BANNER[rel] + "\n"
     state, note = _status_for(rel)
-    if rel in NO_DATE:
-        return ("> **状态**:{}\n"
-                "> **说明**:{}\n").format(state, note)
     return ("> **状态**:{}\n"
             "> **最后核对**:{}\n"
             "> **说明**:{}\n").format(state, date, note)
@@ -150,13 +157,14 @@ def apply_banner(path, rel, date):
     lines = txt2.split("\n")
     ins = 0
     for i, line in enumerate(lines[:12]):
-        if line.strip().startswith("#"):
+        if HEADING_RE.match(line):
             ins = i + 1
             break
     # 标题后面紧跟的空行也算进来,保证只留一个空行
     while ins < len(lines) and not lines[ins].strip():
         lines.pop(ins)
-    lines[ins:ins] = [""] + block.split("\n")
+    # 状态块后面也补一个空行:否则它和正文第一段会被看成同一段(2026-10-01)
+    lines[ins:ins] = [""] + block.split("\n") + [""]
     txt3 = "\n".join(lines)
     if txt3 != txt:
         with io.open(path, "w", encoding="utf-8", newline="") as f:
