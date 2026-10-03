@@ -96,13 +96,14 @@ class OllamaClient(_ChatMixin):
                  chat_model: str = "qwen3:4b-instruct-2507-q4_K_M",
                  embed_model: str = "qwen3-embedding:0.6b-q8_0",
                  timeout: float = 120.0, retries: int = 3,
-                 num_ctx: int = 32768):
+                 num_ctx: int = 32768, think: Optional[bool] = None):
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_model = embed_model
         self.timeout = timeout
         self.retries = retries
         self.num_ctx = num_ctx
+        self.think = think
 
     def _chat_url(self) -> str:
         return self.base_url + "/v1/chat/completions"
@@ -144,12 +145,19 @@ class OllamaClient(_ChatMixin):
     # ------------------------------------------------------------------
     def native_chat(self, messages: List[dict], temperature: float = 0.4,
                     max_tokens: int = 3072, num_ctx: int = 32768,
-                    timeout: float = 600.0) -> Optional[str]:
+                    timeout: float = 600.0,
+                    think: Optional[bool] = None) -> Optional[str]:
         """Ollama 原生 /api/chat:支持 num_ctx(长 prompt 必需)。
 
         OpenAI 兼容 /v1/chat/completions 不接受 options/num_ctx,
         长 prompt(如 Reflection 材料 12k+ 字符)会因默认上下文小返回 400。
         timeout 默认 600s:8 维长反思在 4b 模型上单次生成可能 >120s。
+
+        `think`:qwen3 的 hybrid 思考模型(如 8b)默认开推理,thinking 文本与正文
+        **共享 `num_predict` 预算** —— 推理一长,正文就被截到只剩几十字(实测
+        3072 预算下正文 57 字 / 思考 796 字,关思考后正文 104 字)。结构化任务
+        (反思/路由)不需要推理链,关掉既省 token 又避免截断。
+        None=沿用构造时的 `self.think`(再缺省则模型默认)。
         """
         url = self.base_url + "/api/chat"
         body = {
@@ -159,6 +167,10 @@ class OllamaClient(_ChatMixin):
                         "num_predict": max_tokens},
             "stream": False,
         }
+        if think is None:
+            think = getattr(self, "think", None)
+        if think is not None:
+            body["think"] = think
         data = json.dumps(body).encode("utf-8")
         last_err = None
         for attempt in range(self.retries):
@@ -257,9 +269,16 @@ def local_client_from_env(retries: int = 3):
             "CASE01_LLM_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
+        # hybrid 思考模型(qwen3:8b)默认开推理,思考与正文共享 max_tokens 预算
+        # → 正文被截到几十字(见 native_chat 的 think 参数说明)。显式可关。
+        if os.environ.get("CASE01_LLM_DISABLE_THINKING", "").strip().lower() in (
+                "1", "true", "yes", "on"):
+            os.environ.setdefault("CASE01_OLLAMA_THINK", "false")
+        think = os.environ.get("CASE01_OLLAMA_THINK", "").strip().lower()
         return OllamaClient(
             base_url=base_url,
-            chat_model=chat_model, embed_model=embed_model, retries=retries)
+            chat_model=chat_model, embed_model=embed_model, retries=retries,
+            think=False if think in ("0", "false", "no", "off") else None)
     if provider == "vllm":
         base_url = os.environ.get("CASE01_LLM_BASE_URL", "").strip()
         if not base_url:
