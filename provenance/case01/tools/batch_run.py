@@ -114,6 +114,55 @@ def _digest(run_id: str) -> Dict:
     }
 
 
+def _ollama_loaded_model(base_url: str = "http://127.0.0.1:11434") -> str:
+    """问 Ollama 当前**实际驻留**的模型名(空=查不到)。
+
+    为什么记实测而不是只记请求值:2026-10-03 踩过——`--model qwen3:8b` 请求了 8b,
+    但 orchestrator 用无参 `OllamaClient()` 构造,吃签名默认值 4b,环境变量被绕过,
+    于是**跑了两小时都是 4b 而台账里写着 8b**。只记请求值会把这件事永久藏起来。
+    实测值能让口径错误在分析阶段就暴露。
+    """
+    try:
+        import urllib.request
+        with urllib.request.urlopen(base_url + "/api/ps", timeout=5) as r:
+            models = json.loads(r.read().decode("utf-8")).get("models") or []
+        names = [m.get("name") for m in models if m.get("name")]
+        # 同一时刻可能驻留多个(chat + embedding);取最大的那个当主模型
+        return max(names, key=lambda n: len(n)) if names else ""
+    except Exception:  # noqa: BLE001 —— 查不到不影响主流程
+        return ""
+
+
+def _run_with_probe(cmd, cwd: str, env: Dict, log_path: str, timeout: int,
+                    append: bool = False) -> tuple:
+    """跑子进程并在**推理中途**采一次 Ollama 驻留模型。
+
+    为什么要中途采:推理结束后 Ollama 会卸载模型,事后再查 `/api/ps` 常常是空
+    (踩过一次 —— 台账里 model_actual 记成空,等于没记)。
+    `append=True` 时续写日志(重试用同一份日志,便于事后看完整轨迹)。
+    返回 (returncode, 采到的模型名);模型名可能为空(查不到不编造)。
+    """
+    seen = ""
+    try:
+        with open(log_path, "a" if append else "w", encoding="utf-8") as lf:
+            if append:
+                lf.write("\n\n===== retry =====\n")
+                lf.flush()
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=lf,
+                                    stderr=subprocess.STDOUT)
+            deadline = time.time() + timeout
+            while proc.poll() is None and time.time() < deadline:
+                if not seen:
+                    seen = _ollama_loaded_model()
+                time.sleep(5)
+            code = proc.wait()
+            if not seen:
+                seen = _ollama_loaded_model()
+            return code, seen
+    except Exception as exc:  # noqa: BLE001 —— 单条崩不带走整批
+        return -1, seen
+
+
 def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
     """跑一条案例。返回台账行;失败不抛异常(一条崩不带走整批)。"""
     env = dict(os.environ)
@@ -134,16 +183,11 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
 
     t0 = time.time()
     rec = {"run_id": run_id, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
-           "cmd": " ".join(cmd), "attempt": 1, "timeline": args_ns.timeline or "auto"}
+           "cmd": " ".join(cmd), "attempt": 1, "timeline": args_ns.timeline or "auto",
+           "model_requested": args_ns.model or "(默认)"}
     log_path = os.path.join(out_dir, "{}.log".format(run_id))
-    try:
-        with open(log_path, "w", encoding="utf-8") as lf:
-            proc = subprocess.run(cmd, cwd=PROV_DIR, env=env, stdout=lf,
-                                  stderr=subprocess.STDOUT, timeout=args_ns.timeout)
-        rec["returncode"] = proc.returncode
-    except subprocess.TimeoutExpired:
-        rec["returncode"] = -9
-        rec["error"] = "timeout after {}s".format(args_ns.timeout)
+    rc, seen_model = _run_with_probe(cmd, PROV_DIR, env, log_path, args_ns.timeout)
+    rec["returncode"] = rc
     rec["seconds"] = round(time.time() - t0, 1)
 
     # 重试:偶发失败(模型超时/OOM/网络)值得再试;确定性失败重试无意义。
@@ -152,23 +196,24 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
             _log("  重试 {}/{}: {}".format(attempt - 1, args_ns.retries, run_id))
             rec["attempt"] = attempt
             t0 = time.time()
-            try:
-                with open(log_path, "a", encoding="utf-8") as lf:
-                    lf.write("\n\n===== retry {} =====\n".format(attempt))
-                    lf.flush()
-                    proc = subprocess.run(cmd, cwd=PROV_DIR, env=env, stdout=lf,
-                                          stderr=subprocess.STDOUT,
-                                          timeout=args_ns.timeout)
-                rec["returncode"] = proc.returncode
-            except subprocess.TimeoutExpired:
-                rec["returncode"] = -9
-                rec["error"] = "timeout after {}s".format(args_ns.timeout)
+            rc2, seen2 = _run_with_probe(cmd, PROV_DIR, env, log_path,
+                                        args_ns.timeout, append=True)
+            rec["returncode"] = rc2
+            seen_model = seen_model or seen2
             rec["seconds"] = round(rec.get("seconds", 0) + time.time() - t0, 1)
             if rec["returncode"] == 0:
                 break
 
     rec.update(_digest(run_id))
+    # 记实测模型:用运行中途采到的值(见 _ollama_loaded_model 的注释——请求值不可信)
+    rec["model_actual"] = seen_model or "(未检出)"
     rec["ok"] = rec["returncode"] == 0 and rec.get("read_ok", False)
+    # 口径事故要显式可见:请求与实测不一致时在台账里留痕,别指望分析阶段才发现
+    if rec["model_actual"] != "(未检出)" and rec["model_requested"] not in (
+            "(默认)", rec["model_actual"]):
+        rec["model_mismatch"] = True
+        _log("  ⚠️ 模型不符:请求 {} 实测 {} —— {}".format(
+            rec["model_requested"], rec["model_actual"], run_id))
     if not rec["ok"]:
         tail = ""
         try:
