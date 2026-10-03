@@ -38,7 +38,10 @@ REAL_RUNS = os.path.join(_PKG, "case01", "runs")
 REAL_CKPTS = os.path.join(_PKG, "results", "checkpoints")
 REAL_COMPRESSED = os.path.join(_PKG, "results", "compressed")
 
-HIDDEN = ("questionable", "debug", "deprecated")
+# 直接引用实现里那一份,**别再抄一份** —— 抄的那份已经因为新增 unreadable
+# 而漂移过一次(2026-10-03),症状是"接口隐藏了 12 条,测试却算成 22 条"。
+# 抄一份枚举 = 迟早对不上,这不是测试的问题。
+HIDDEN = H._HIDDEN_QUALITY
 _STRIPPED = ("injector", "branch_action", "consistency", "debug", "quality", "branch")
 
 
@@ -112,6 +115,54 @@ def test_deprecated_wins_over_ok_and_is_hidden_by_default(monkeypatch):
     assert "deprecated" in dflt["excluded"]["reason"]
 
 
+def test_run_without_json_is_reported_not_invisible(monkeypatch, tmp_path):
+    """★ 空 run 目录(跑崩了、一个字没落盘)必须**看得见**(2026-10-03 体检加)。
+
+    原来的收集处只有 `if os.path.isfile(.../run.json)`,于是这类目录既不返回、
+    也不计数、也不进 excluded —— 平台看到的是"少了一条",分不清"没这条"和
+    "这条废了"。契约 §3.1 写的"judge-failed → 进 excluded"因此不可达。
+    """
+    root = tmp_path / "runs"
+    (root / "half-written-run").mkdir(parents=True)      # 有目录,没有 run.json
+    good = root / "good-run"
+    good.mkdir(parents=True)
+    (good / "run.json").write_text(json.dumps({
+        "run_id": "good-run", "branch": "B", "start_date": "2026-08-27",
+        "end_date": "2026-09-15",
+        "turns": [{"speaker": "ethan", "date": "2026-08-27", "text": "q"}],
+        "branch_action": {"source": "judge"},
+        "consistency": {"verdict": "consistent", "reason": "", "method": "llm_stance"},
+    }, ensure_ascii=False), encoding="utf-8")
+
+    monkeypatch.setenv("CASE01_RUNS_ROOT", str(root))
+    full = _call(H.list_all_runs(include_questionable=True))
+    got = {r["run_id"]: r for r in full["runs"] if r.get("source") == "review"}
+    assert "half-written-run" in got, "空目录在索引里彻底消失了(平台无从得知)"
+    assert got["half-written-run"]["quality"] == "unreadable"
+    assert "run.json" in got["half-written-run"].get("error", ""), \
+        "必须说清为什么不可读,不能只给一个类别"
+
+    # 默认口径:不发给平台建单,但**必须**进 excluded 并报明
+    dflt = _call(H.list_all_runs())
+    assert "half-written-run" not in {r["run_id"] for r in dflt["runs"]}
+    ex = {x["run_id"]: x for x in dflt["excluded"]["runs"]}
+    assert "half-written-run" in ex, "被排除却没进 excluded 计数 = 静默"
+    assert ex["half-written-run"]["quality"] == "unreadable"
+    assert ex["half-written-run"].get("reason"), "excluded 必须带原因"
+
+
+def test_excluded_rows_carry_a_reason(monkeypatch, tmp_path):
+    """★ excluded 里的每一行都要能回答"为什么被排除"(不允许静默)。"""
+    root = tmp_path / "runs"
+    (root / "broken").mkdir(parents=True)
+    monkeypatch.setenv("CASE01_RUNS_ROOT", str(root))
+    dflt = _call(H.list_all_runs())
+    for item in dflt["excluded"]["runs"]:
+        assert item.get("run_id")
+        assert item.get("quality")
+        assert item.get("reason"), "excluded 行缺原因: {}".format(item)
+
+
 def test_aggregate_reports_quality_on_every_case01_run(monkeypatch):
     """聚合索引必须带质检字段,且与 5002 同源(直接复用 case01.full_context.quality_of)。"""
     for root in _runs_roots():
@@ -120,7 +171,8 @@ def test_aggregate_reports_quality_on_every_case01_run(monkeypatch):
         rows = [r for r in body["runs"] if r.get("source") == "review"]
         assert rows, "{} 下没有 case01 成品记录".format(root)
         for r in rows:
-            assert r["quality"] in ("ok", "questionable", "debug", "deprecated", "unverified"), r
+            assert r["quality"] in ("ok", "questionable", "debug", "deprecated",
+                                    "unverified", "unreadable"), r
             assert "consistency" in r and "branch_source" in r and "debug" in r
 
 

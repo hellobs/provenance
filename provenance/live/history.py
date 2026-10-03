@@ -198,6 +198,26 @@ def _brief_review(run_id: str) -> dict:
     }
 
 
+def _brief_unreadable(run_id: str) -> dict:
+    """**有目录但没有 run.json** 的占位行(2026-10-03 体检加)。
+
+    为什么必须有这一行:原来收集处只有 `if os.path.isfile(.../run.json)`,
+    于是"跑崩了、一个字都没落盘"的目录**既不返回、也不计数、也不报 excluded** ——
+    平台看到的是"少了一条",分不清"没这条"和"这条废了"。实测当时有 15 个这样的
+    目录,契约 §3.1 写的"judge-failed → questionable → 进 excluded"因此**不可达**
+    (没有 run.json 就没有 quality_of 可判)。
+
+    铁律:失败了必须有人知道。这里给它 `quality="unreadable"`,进 `_HIDDEN_QUALITY`
+    (不给平台建单)但**计入 excluded 并报明 run_id 与原因**。
+    """
+    return {"source": "review", "run_id": run_id, "case_id": "case01_mavis",
+            "engine_id": "", "branch": "", "start_date": "", "end_date": "",
+            "n_turns": 0, "n_reflections": 0, "has_graph": False,
+            "quality": "unreadable", "consistency": "unverified",
+            "branch_source": "", "debug": "",
+            "error": "run 目录存在但没有 run.json(该次 run 未跑成或未落盘)"}
+
+
 def _quality_of(rec: dict) -> dict:
     """质检标记:优先用 case01 的判定(单一来源);拿不到就 unverified。
 
@@ -209,6 +229,10 @@ def _quality_of(rec: dict) -> dict:
         q = quality_of(rec)
         return {"quality": q.get("quality", "unverified"),
                 "consistency": q.get("consistency", "unverified"),
+                # reason 也要透出(2026-10-03 补):只给一个 `unverified` 标签,
+                # 平台分不出"没验过"与"验了但判不了",更看不出**为什么**。
+                # `quality_of` 本来就返回 reason,这里以前把它丢了。
+                "reason": q.get("reason", ""),
                 "branch_source": q.get("branch_source", ""),
                 "debug": q.get("debug", ""),
                 # 废弃标记(2026-09-24):索引行里必须带,平台才能自己筛;
@@ -217,7 +241,7 @@ def _quality_of(rec: dict) -> dict:
                 "deprecated_reason": q.get("deprecated_reason", "")}
     except Exception:  # noqa: BLE001 - 引擎侧缺席时不能假装"没问题"
         return {"quality": "unverified", "consistency": "unverified",
-                "branch_source": "", "debug": "",
+                "reason": "取不到 case01 质检判定", "branch_source": "", "debug": "",
                 "deprecated": False, "deprecated_reason": ""}
 
 
@@ -226,7 +250,11 @@ def _quality_of(rec: dict) -> dict:
 #   debug        = 调试跑(内容不完整)
 #   deprecated   = 记录被显式标废弃(样本作废;2026-09-24 加 —— 一条自洽的废弃样本同样是废的,
 #                  以前它只要恰好判成 ok 就会被静默发给平台)
-_HIDDEN_QUALITY = ("questionable", "debug", "deprecated")
+#   unreadable   = **有 run 目录但没有 run.json**(2026-10-03 加):该次 run 压根没跑成,
+#                  以前这类目录既不返回也不计数,平台无从得知(契约 §3.1 的
+#                  "judge-failed → 进 excluded" 因此不可达)。默认不给平台建单,
+#                  但计入 excluded 并报明 run_id 与原因。
+_HIDDEN_QUALITY = ("questionable", "debug", "deprecated", "unreadable")
 
 
 def expert_safe_record(rec: dict) -> dict:
@@ -339,8 +367,15 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     c1_root = _data_root("CASE01_RUNS_ROOT", "case01", "runs")
     if os.path.isdir(c1_root):
         for n in sorted(os.listdir(c1_root)):
-            if os.path.isfile(os.path.join(c1_root, n, "run.json")):
+            d = os.path.join(c1_root, n)
+            if not os.path.isdir(d):
+                continue
+            if os.path.isfile(os.path.join(d, "run.json")):
                 runs.append(_brief_review(n))
+            else:
+                # 没落盘也要**留一行**(2026-10-03):否则失败样本对平台彻底隐形,
+                # 平台分不清"没这条"和"这条废了"。详见 _brief_unreadable。
+                runs.append(_brief_unreadable(n))
 
     comp_root = _data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed")
     if os.path.isdir(comp_root):
@@ -355,7 +390,14 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
         keep = []
         for r in runs:
             if str(r.get("quality") or "unverified") in _HIDDEN_QUALITY:
-                hidden.append({"run_id": r.get("run_id"), "quality": r.get("quality")})
+                # 带上原因:只给 run_id 和类别,平台还是不知道为什么被排除。
+                # 不允许静默 —— 被排除也是一条需要人能看出来的结论。
+                item = {"run_id": r.get("run_id"), "quality": r.get("quality")}
+                if r.get("error"):
+                    item["reason"] = r["error"]
+                if r.get("consistency"):
+                    item["consistency"] = r["consistency"]
+                hidden.append(item)
             else:
                 keep.append(r)
         runs = keep
