@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-"""场景连通性守卫(2026-09-21 深度体检新增)。
+"""场景连通性守卫(2026-09-21 深度体检新增;2026-10-03 静态场景已对齐)。
 
 碰撞本身在(每份场景 maze 有 244 不可走格),但**光有碰撞不够**:碰撞把地图切成几块时,
 落在小碎块里的角色就走不到别人那儿 —— 表现是"这个角色一直原地打转",而日志里什么错都没有。
-本文件把三件事钉死:
+本文件把四件事钉死:
 
 1. 两个在跑的场景(case00 / case01)的 maze:可走区**只有连通的一块**,且每个角色出生点都可走;
-2. 装好的静态场景(`frontend/static/assets/village/maze.json`)目前是碎的(9 块),所以
-   **不允许运行时模块引用它**(只允许存档/体检工具引用)—— 谁把它接进实时链路就红,
-   因为那会让三个角色落进小碎块;
-3. 每份 maze 的碰撞字段必须存在且为布尔(缺字段=引擎按可走处理,是隐性放行)。
+2. 装好的静态场景(`frontend/static/assets/village/maze.json`)必须与在跑场景**字节一致**
+   (2026-10-03 前它是旧版 492 格/350 碰撞/9 碎块,与权威 244 墙分叉;已同步并钉死);
+3. 静态场景仍**不允许运行时模块引用它**(只允许存档/体检工具引用)—— 它是样板存档,
+   实时链路只读 tilemap.json 与各 scenario/maze.json,多一条加载路径就多一份分叉风险;
+4. 每份 maze 的碰撞字段必须存在且为布尔(缺字段=引擎按可走处理,是隐性放行)。
 """
 import io
 import json
@@ -116,18 +117,38 @@ def test_collision_semantics_are_unambiguous(case):
         "{}: 可走+不可走 != 总瓦片".format(case)
 
 
-def test_static_scene_is_not_wired_into_runtime():
-    """装好的静态场景目前是碎的(9 块),因此**只允许**存档/体检工具引用它。
+def test_static_scene_is_connected_and_matches_active_scene():
+    """静态样板必须与在跑场景**字节一致**且自身连通(2026-10-03 起钉死)。
 
-    这不是"容忍脏数据",而是把"它不在实时链路上"变成可检查的事实:
-    哪天有人把 `assets/village/maze.json` 接进运行时,三个角色的出生点会落在小碎块里,
-    表现是"一直原地打转、日志无异常"—— 那种 bug 最难查,所以在这里拦住。
+    历史:它曾是旧版(492 格/350 碰撞/9 碎块),与 tilemap 权威 244 墙分叉,
+    没人运行时读它所以一直没爆;deep_check 的连通性体检把它照了出来。
+    同步后用**字节一致**钉死 —— 语义比对会放过"多一格少一格"的缓慢漂移。
     """
     if not os.path.isfile(STATIC_SCENE):
         pytest.skip("静态场景不存在")
+    static_bytes = io.open(STATIC_SCENE, "rb").read()
+    ref_bytes = io.open(SCENES["case00"][0], "rb").read()
+    assert static_bytes == ref_bytes, (
+        "frontend/static/assets/village/maze.json 与 case00/scenario/maze.json 分叉了; "
+        "样板必须与在跑场景保持一致(2026-10-03 前曾分叉成 492 格/9 碎块)。"
+        "同步后若改地图,三处(case00/case01/static)必须一起换")
+    # 双保险:就算哪天三份被一起换成新地图,新地图本身也必须连通。
     _maze, tiles = _tiles(STATIC_SCENE)
     walk = {c for c, x in tiles.items() if not x.get("collision")}
     sizes = _components(walk)
+    assert len(sizes) == 1, "静态样板可走区裂成 {} 块 {}".format(len(sizes), sizes[:6])
+
+
+def test_static_scene_is_not_wired_into_runtime():
+    """静态样板**只允许**存档/体检工具引用,运行时不得加载它。
+
+    2026-10-03 后它已与在跑场景一致、不再是碎块,这条守卫的意义随之变化:
+    不是"碎了不能接",而是**实时链路只能有一条地图加载路径**(tilemap.json 渲染 +
+    各 scenario/maze.json 寻路)。谁再 `fetch`/读取 static 副本,就多出一条会与权威
+    分叉的路径 —— 那种分叉的典型表现仍是"角色原地打转、日志无异常",所以继续拦住。
+    """
+    if not os.path.isfile(STATIC_SCENE):
+        pytest.skip("静态场景不存在")
 
     allow = ("hc_data_integrity.py", "check_installed_scene.py", "check_collision.py",
              "install_scene.py", "test_scene_connectivity.py")
@@ -148,5 +169,6 @@ def test_static_scene_is_not_wired_into_runtime():
             if "assets/village/maze.json" in txt or "assets\\\\village\\\\maze.json" in txt:
                 offenders.append(os.path.relpath(p, _PKG).replace("\\", "/"))
     assert not offenders, (
-        "这些运行时文件引用了碎片化的静态场景({} 块 {}): {} —— "
-        "接进链路前先把连通性修好".format(len(sizes), sizes[:5], offenders))
+        "这些运行时文件引用了静态样板场景: {} —— "
+        "实时链路只允许读 tilemap.json 与各 scenario/maze.json,"
+        "多一条加载路径就会再次分叉".format(offenders))

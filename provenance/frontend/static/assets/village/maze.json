@@ -6,89 +6,12 @@
     27
   ],
   "map": {
-    "asset": "map",
-    "tileset_groups": {
-      "group_1": [
-        "CuteRPG_Field_B",
-        "CuteRPG_Field_C",
-        "CuteRPG_Harbor_C",
-        "CuteRPG_Village_B",
-        "CuteRPG_Forest_B",
-        "CuteRPG_Desert_C",
-        "CuteRPG_Mountains_B",
-        "CuteRPG_Desert_B",
-        "CuteRPG_Forest_C",
-        "interiors_pt1",
-        "interiors_pt2",
-        "interiors_pt3",
-        "interiors_pt4",
-        "interiors_pt5",
-        "Room_Builder_32x32"
-      ]
-    },
-    "layers": [
-      {
-        "name": "Bottom Ground",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Exterior Ground",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Exterior Decoration L2",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Interior Ground",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Wall",
-        "tileset_group": [
-          "CuteRPG_Field_C",
-          "Room_Builder_32x32"
-        ]
-      },
-      {
-        "name": "Interior Furniture L1",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Interior Furniture L2 ",
-        "tileset_group": "group_1"
-      },
-      {
-        "name": "Foreground L1",
-        "tileset_group": "group_1",
-        "depth": 2
-      },
-      {
-        "name": "Foreground L2",
-        "tileset_group": "group_1",
-        "depth": 2
-      },
-      {
-        "name": "Collisions",
-        "tileset_group": [
-          "blocks"
-        ],
-        "depth": -1,
-        "collision": {
-          "exclusion": [
-            -1
-          ]
-        }
-      }
-    ]
+    "width": 27,
+    "height": 24
   },
   "camera": {
-    "zoom_factor": 1,
-    "zoom_range": [
-      0.3,
-      4,
-      0.01
-    ]
+    "start_x": 0,
+    "start_y": 0
   },
   "tile_address_keys": [
     "world",
@@ -99,17 +22,396 @@
   "tiles": [
     {
       "coord": [
-        4,
-        4
+        0,
+        0
       ],
+      "collision": true
+    },
+    {
+      "coord": [
+        1,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        2,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        3,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        4,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        5,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        6,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        7,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        8,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        9,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        10,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        11,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        12,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        13,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        14,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        15,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        16,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        17,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        18,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        19,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        20,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        21,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        22,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        23,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        24,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        25,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        26,
+        0
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        0,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        1,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        2,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        3,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        4,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        5,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        6,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        7,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        8,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        9,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        10,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        11,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        12,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        13,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        14,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        15,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        16,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        17,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        18,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        19,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        20,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        21,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        22,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        23,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        24,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        25,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        26,
+        1
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        0,
+        2
+      ],
+      "collision": true,
       "address": [
         "Trading Center"
       ]
     },
     {
       "coord": [
-        5,
-        4
+        1,
+        2
       ],
       "collision": true,
       "address": [
@@ -119,8 +421,50 @@
     },
     {
       "coord": [
+        2,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
         6,
-        4
+        2
       ],
       "collision": true,
       "address": [
@@ -131,9 +475,563 @@
     {
       "coord": [
         7,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        2
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        2
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        0,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        6,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        3
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        3
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        0,
         4
       ],
       "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        6,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        4
+      ],
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -144,7 +1042,6 @@
         8,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -155,7 +1052,6 @@
         9,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -166,7 +1062,6 @@
         10,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -177,7 +1072,6 @@
         11,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -188,7 +1082,6 @@
         12,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -200,7 +1093,8 @@
         4
       ],
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -209,7 +1103,8 @@
         4
       ],
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -217,10 +1112,9 @@
         15,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -228,10 +1122,9 @@
         16,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -239,10 +1132,9 @@
         17,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -250,10 +1142,9 @@
         18,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -261,10 +1152,9 @@
         19,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -272,10 +1162,9 @@
         20,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -283,10 +1172,9 @@
         21,
         4
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -294,6 +1182,47 @@
         22,
         4
       ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        4
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        4
+      ],
+      "collision": true,
       "address": [
         "Trading Center"
       ]
@@ -303,37 +1232,49 @@
         0,
         5
       ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
     },
     {
       "coord": [
         1,
         5
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         2,
         5
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         3,
         5
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         4,
         5
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -376,8 +1317,7 @@
       ],
       "address": [
         "Trading Center",
-        "Trading Floor",
-        "Market Screen"
+        "Trading Floor"
       ]
     },
     {
@@ -425,9 +1365,9 @@
         13,
         5
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -435,9 +1375,9 @@
         14,
         5
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -447,8 +1387,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
-        "Sofa"
+        "Trading Floor"
       ]
     },
     {
@@ -458,8 +1397,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
-        "Sofa"
+        "Trading Floor"
       ]
     },
     {
@@ -469,7 +1407,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -479,7 +1417,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
       ]
     },
@@ -490,7 +1428,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
       ]
     },
@@ -501,7 +1439,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
       ]
     },
@@ -512,13 +1450,53 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
       ]
     },
     {
       "coord": [
         22,
+        5
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        5
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        5
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        5
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         5
       ],
       "collision": true,
@@ -528,7 +1506,7 @@
     },
     {
       "coord": [
-        4,
+        0,
         6
       ],
       "collision": true,
@@ -538,14 +1516,55 @@
     },
     {
       "coord": [
-        5,
+        1,
         6
       ],
       "address": [
         "Trading Center",
         "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        6
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        6
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        6
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        6
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -583,12 +1602,11 @@
         9,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Trading Floor",
-        "Seat"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -605,7 +1623,6 @@
         11,
         6
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -616,12 +1633,11 @@
         12,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Trading Floor",
-        "Seat"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -630,7 +1646,8 @@
       ],
       "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -638,9 +1655,9 @@
         14,
         6
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -650,7 +1667,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -658,22 +1675,22 @@
         16,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         17,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -682,7 +1699,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -692,7 +1709,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -700,31 +1717,111 @@
         20,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         21,
         6
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         22,
         6
       ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        6
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        6
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        6
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        6
+      ],
       "collision": true,
       "address": [
         "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        0,
+        7
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -734,7 +1831,8 @@
       ],
       "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -742,11 +1840,11 @@
         5,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -773,22 +1871,22 @@
         8,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
         9,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -815,11 +1913,11 @@
         12,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -828,7 +1926,8 @@
       ],
       "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -836,9 +1935,9 @@
         14,
         7
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -848,7 +1947,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -856,12 +1955,12 @@
         16,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "Trading Terminal"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -871,7 +1970,7 @@
       "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -879,10 +1978,9 @@
         18,
         7
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -892,7 +1990,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "Trading Terminal"
       ]
     },
@@ -901,31 +1999,111 @@
         20,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         21,
         7
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         22,
         7
       ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        7
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        7
+      ],
       "collision": true,
       "address": [
         "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        0,
+        8
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -933,9 +2111,9 @@
         4,
         8
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -954,7 +2132,6 @@
         6,
         8
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -975,7 +2152,6 @@
         8,
         8
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -988,8 +2164,7 @@
       ],
       "address": [
         "Trading Center",
-        "Trading Floor",
-        "Seat"
+        "Trading Floor"
       ]
     },
     {
@@ -1007,7 +2182,6 @@
         11,
         8
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -1020,8 +2194,7 @@
       ],
       "address": [
         "Trading Center",
-        "Trading Floor",
-        "Seat"
+        "Trading Floor"
       ]
     },
     {
@@ -1029,9 +2202,9 @@
         13,
         8
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1039,9 +2212,9 @@
         14,
         8
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1051,7 +2224,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1061,7 +2234,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1069,10 +2242,9 @@
         17,
         8
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1080,10 +2252,9 @@
         18,
         8
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1093,7 +2264,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1103,7 +2274,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1113,12 +2284,52 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         22,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        8
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         8
       ],
       "collision": true,
@@ -1128,12 +2339,52 @@
     },
     {
       "coord": [
-        4,
+        0,
         9
       ],
       "collision": true,
       "address": [
         "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1151,7 +2402,6 @@
         6,
         9
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -1222,9 +2472,9 @@
         13,
         9
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1232,9 +2482,9 @@
         14,
         9
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1244,7 +2494,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1254,7 +2504,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "Trading Terminal"
       ]
     },
@@ -1263,10 +2513,9 @@
         17,
         9
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1274,10 +2523,9 @@
         18,
         9
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1287,7 +2535,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "Trading Terminal"
       ]
     },
@@ -1298,7 +2546,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1308,12 +2556,52 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         22,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        9
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         9
       ],
       "collision": true,
@@ -1323,7 +2611,7 @@
     },
     {
       "coord": [
-        4,
+        0,
         10
       ],
       "collision": true,
@@ -1333,14 +2621,55 @@
     },
     {
       "coord": [
-        5,
+        1,
         10
       ],
       "address": [
         "Trading Center",
         "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        10
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        10
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        10
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -1367,7 +2696,6 @@
         8,
         10
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -1399,7 +2727,6 @@
         11,
         10
       ],
-      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
@@ -1408,92 +2735,91 @@
     {
       "coord": [
         12,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        20,
         10
       ],
       "address": [
         "Trading Center",
         "Trading Floor",
-        "Seat"
-      ]
-    },
-    {
-      "coord": [
-        13,
-        10
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        14,
-        10
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        15,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ]
-    },
-    {
-      "coord": [
-        16,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ]
-    },
-    {
-      "coord": [
-        17,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ]
-    },
-    {
-      "coord": [
-        18,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ]
-    },
-    {
-      "coord": [
-        20,
-        10
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room",
         "File Cabinet"
       ]
     },
@@ -1502,15 +2828,54 @@
         21,
         10
       ],
-      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         22,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        10
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         10
       ],
       "collision": true,
@@ -1520,7 +2885,7 @@
     },
     {
       "coord": [
-        4,
+        0,
         11
       ],
       "collision": true,
@@ -1530,14 +2895,55 @@
     },
     {
       "coord": [
-        5,
+        1,
         11
       ],
       "address": [
         "Trading Center",
         "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        11
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        11
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        11
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        11
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -1564,22 +2970,22 @@
         8,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
         9,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1606,11 +3012,11 @@
         12,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1619,7 +3025,8 @@
       ],
       "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1627,9 +3034,9 @@
         14,
         11
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1639,7 +3046,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1647,22 +3054,22 @@
         16,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         17,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -1671,7 +3078,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1681,7 +3088,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1689,12 +3096,12 @@
         20,
         11
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1704,12 +3111,52 @@
       "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         22,
+        11
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        11
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        11
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        11
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         11
       ],
       "collision": true,
@@ -1719,7 +3166,7 @@
     },
     {
       "coord": [
-        4,
+        0,
         12
       ],
       "collision": true,
@@ -1729,14 +3176,55 @@
     },
     {
       "coord": [
-        5,
+        1,
         12
       ],
       "address": [
         "Trading Center",
         "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        12
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        12
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        12
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        12
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -1763,22 +3251,22 @@
         8,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
         9,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1805,11 +3293,11 @@
         12,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
         "Trading Floor"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1818,7 +3306,8 @@
       ],
       "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1826,9 +3315,9 @@
         14,
         12
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1838,7 +3327,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1846,22 +3335,22 @@
         16,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         17,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
-      ],
-      "collision": true
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
@@ -1870,7 +3359,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1880,7 +3369,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -1888,12 +3377,12 @@
         20,
         12
       ],
+      "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room",
+        "Trading Floor",
         "File Cabinet"
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
@@ -1903,12 +3392,52 @@
       "collision": true,
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         22,
+        12
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        12
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        12
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        12
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
         12
       ],
       "collision": true,
@@ -1918,12 +3447,52 @@
     },
     {
       "coord": [
-        4,
+        0,
         13
       ],
       "collision": true,
       "address": [
         "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        13
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        13
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        13
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        13
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1931,9 +3500,9 @@
         5,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1941,9 +3510,9 @@
         6,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1951,9 +3520,9 @@
         7,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1961,9 +3530,9 @@
         8,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -1971,9 +3540,9 @@
         9,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2001,9 +3570,9 @@
         12,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2011,9 +3580,9 @@
         13,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2021,9 +3590,9 @@
         14,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2031,9 +3600,9 @@
         15,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2043,7 +3612,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -2053,7 +3622,7 @@
       ],
       "address": [
         "Trading Center",
-        "Market Analysis Room"
+        "Trading Floor"
       ]
     },
     {
@@ -2061,9 +3630,9 @@
         18,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2071,9 +3640,9 @@
         19,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2081,9 +3650,9 @@
         20,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2091,9 +3660,9 @@
         21,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2101,9 +3670,9 @@
         22,
         13
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2111,23 +3680,89 @@
         23,
         13
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         24,
         13
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        13
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        13
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        0,
+        14
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        14
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        14
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        14
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         4,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2135,9 +3770,9 @@
         5,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2145,9 +3780,9 @@
         6,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2155,9 +3790,9 @@
         7,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2165,9 +3800,9 @@
         8,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2175,9 +3810,9 @@
         9,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2205,9 +3840,9 @@
         12,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2215,9 +3850,9 @@
         13,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2225,9 +3860,9 @@
         14,
         14
       ],
-      "collision": true,
       "address": [
-        "Trading Center"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
@@ -2235,19 +3870,12 @@
         15,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
     },
     {
       "coord": [
         16,
         14
-      ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
       ],
       "collision": true
     },
@@ -2256,10 +3884,6 @@
         17,
         14
       ],
-      "address": [
-        "Trading Center",
-        "Market Analysis Room"
-      ],
       "collision": true
     },
     {
@@ -2267,50 +3891,49 @@
         18,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
     },
     {
       "coord": [
         19,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
     },
     {
       "coord": [
         20,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
     },
     {
       "coord": [
         21,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
     },
     {
       "coord": [
         22,
         14
       ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
+      "collision": true
+    },
+    {
+      "coord": [
+        23,
+        14
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        24,
+        14
+      ],
+      "collision": true
     },
     {
       "coord": [
@@ -2328,7 +3951,7 @@
     },
     {
       "coord": [
-        4,
+        0,
         15
       ],
       "collision": true,
@@ -2338,12 +3961,52 @@
     },
     {
       "coord": [
+        1,
+        15
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        15
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        15
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        15
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
         5,
         15
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2353,7 +4016,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2363,7 +4026,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2373,7 +4036,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2383,7 +4046,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2393,7 +4056,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2403,7 +4066,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2413,7 +4076,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2423,7 +4086,7 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
@@ -2433,17 +4096,13 @@
       ],
       "address": [
         "Trading Center",
-        "Corridor"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         15,
         15
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
       ],
       "collision": true
     },
@@ -2452,20 +4111,12 @@
         16,
         15
       ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
       "collision": true
     },
     {
       "coord": [
         17,
         15
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
       ],
       "collision": true
     },
@@ -2474,20 +4125,12 @@
         18,
         15
       ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
       "collision": true
     },
     {
       "coord": [
         19,
         15
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
       ],
       "collision": true
     },
@@ -2496,10 +4139,6 @@
         20,
         15
       ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
       "collision": true
     },
     {
@@ -2507,16 +4146,47 @@
         21,
         15
       ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
       "collision": true
     },
     {
       "coord": [
         22,
         15
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        23,
+        15
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        24,
+        15
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        25,
+        15
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        26,
+        15
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        0,
+        16
       ],
       "collision": true,
       "address": [
@@ -2528,1394 +4198,550 @@
         1,
         16
       ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         2,
         16
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         3,
         16
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         4,
         16
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         5,
         16
       ],
-      "collision": true
-    },
-    {
-      "coord": [
-        8,
-        16
-      ],
       "address": [
         "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        9,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        10,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        11,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        12,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        13,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        14,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        15,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        16,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        17,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        18,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        20,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        16
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        25,
-        16
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ]
-    },
-    {
-      "coord": [
-        26,
-        16
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        8,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        9,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        10,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        11,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        12,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        13,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        14,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        15,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        16,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        17,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        18,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        20,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        17
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        17
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        25,
-        17
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        26,
-        17
-      ],
-      "collision": true,
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ]
-    },
-    {
-      "coord": [
-        8,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        9,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        10,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        11,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        12,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        13,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        14,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        15,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        16,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        17,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        18,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        20,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        21,
-        18
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        22,
-        18
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        25,
-        18
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        26,
-        18
-      ],
-      "collision": true,
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ]
-    },
-    {
-      "coord": [
-        8,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        9,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        10,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        11,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        12,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        13,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        14,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        15,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        16,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        17,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        18,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        20,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        21,
-        19
-      ],
-      "address": [
-        "Trading Center",
-        "Corridor"
-      ]
-    },
-    {
-      "coord": [
-        22,
-        19
-      ],
-      "collision": true,
-      "address": [
-        "Trading Center"
-      ]
-    },
-    {
-      "coord": [
-        25,
-        19
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        26,
-        19
-      ],
-      "collision": true,
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ]
-    },
-    {
-      "coord": [
-        8,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        9,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        10,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        11,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        12,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        13,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        14,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        15,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        16,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        17,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        18,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        19,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        20,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        20
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        20
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        26,
-        20
-      ],
-      "collision": true,
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "Trading Floor"
       ]
     },
     {
       "coord": [
         6,
-        21
+        16
       ],
-      "collision": true
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         7,
-        21
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        21
+        16
       ],
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ],
-      "collision": true
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
-        25,
-        21
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        21
+        8,
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
       "coord": [
-        14,
-        22
+        9,
+        16
       ],
+      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
       "coord": [
-        15,
-        22
+        10,
+        16
       ],
       "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
+        "Trading Center",
+        "Trading Floor"
       ]
     },
     {
       "coord": [
-        16,
-        22
+        11,
+        16
       ],
       "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
+        "Trading Center",
+        "Trading Floor"
       ]
-    },
-    {
-      "coord": [
-        17,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        18,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        19,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        20,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ]
-    },
-    {
-      "coord": [
-        21,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        22
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
-      ],
-      "collision": true
     },
     {
       "coord": [
         12,
-        23
+        16
       ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        16
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         14,
-        23
+        16
       ],
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
-      ],
-      "collision": true
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         15,
-        23
-      ],
-      "address": [
-        "奥克山学院宿舍",
-        "Lounge",
-        "宿舍Lounge"
+        16
       ],
       "collision": true
     },
     {
       "coord": [
         16,
-        23
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         17,
-        23
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         18,
-        23
+        16
       ],
-      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         19,
-        23
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         20,
-        23
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         21,
-        23
+        16
       ],
       "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         22,
-        23
+        16
       ],
-      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         23,
-        23
+        16
       ],
-      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         24,
-        23
+        16
       ],
-      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         25,
-        23
+        16
       ],
-      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge"
+        "SECTOR_32174",
+        "ARENA_32141"
       ]
     },
     {
       "coord": [
         26,
-        23
+        16
       ],
+      "collision": true,
       "address": [
-        "奥克山学院宿舍",
-        "Lounge",
+        "SECTOR_32174",
         "宿舍Lounge"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        15
-      ],
-      "address": [
-        "Trading Center",
-        "Break Room",
-        "Bed"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        16
-      ],
-      "address": [
-        "Trading Center",
-        "Break Room",
-        "Bed"
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        4
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        6
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        7
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        8
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        9
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        10
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        11
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        12
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        13
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        14
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        15
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        0,
-        16
-      ],
-      "collision": true
+      ]
     },
     {
       "coord": [
         0,
         17
       ],
+      "collision": true,
+      "address": [
+        "Trading Center"
+      ]
+    },
+    {
+      "coord": [
+        1,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        2,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        3,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        4,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        6,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        17
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        17
+      ],
       "collision": true
+    },
+    {
+      "coord": [
+        16,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        17
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        17
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174"
+      ]
     },
     {
       "coord": [
         0,
         18
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        1,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        1,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        1,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        1,
-        17
       ],
       "collision": true
     },
@@ -3929,49 +4755,7 @@
     {
       "coord": [
         2,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        2,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        2,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        2,
         18
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        3,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        3,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        3,
-        2
       ],
       "collision": true
     },
@@ -3985,35 +4769,7 @@
     {
       "coord": [
         4,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        4,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        4,
         18
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        5,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        5,
-        1
       ],
       "collision": true
     },
@@ -4023,6 +4779,214 @@
         18
       ],
       "collision": true
+    },
+    {
+      "coord": [
+        6,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        18
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        18
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        16,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        18
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        18
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174"
+      ]
     },
     {
       "coord": [
@@ -4033,6 +4997,217 @@
     },
     {
       "coord": [
+        6,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        19
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        19
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        19
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174"
+      ]
+    },
+    {
+      "coord": [
         5,
         20
       ],
@@ -4040,6 +5215,217 @@
     },
     {
       "coord": [
+        6,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        20
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        20
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        20
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174"
+      ]
+    },
+    {
+      "coord": [
         5,
         21
       ],
@@ -4047,118 +5433,483 @@
     },
     {
       "coord": [
-        5,
-        22
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        5,
-        23
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
         6,
-        0
+        21
       ],
-      "collision": true
-    },
-    {
-      "coord": [
-        6,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        6,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        6,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        6,
-        22
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        6,
-        23
-      ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         7,
-        0
+        21
       ],
-      "collision": true
-    },
-    {
-      "coord": [
-        7,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        7,
-        22
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        7,
-        23
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        8,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        8,
-        1
-      ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
         8,
         21
       ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
     },
     {
       "coord": [
-        8,
+        9,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        21
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        21
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        21
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174"
+      ]
+    },
+    {
+      "coord": [
+        5,
         22
       ],
       "collision": true
     },
     {
       "coord": [
+        6,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        7,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        8,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        9,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        10,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        11,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        12,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        13,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        14,
+        22
+      ],
+      "address": [
+        "Trading Center",
+        "Trading Floor"
+      ]
+    },
+    {
+      "coord": [
+        15,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        16,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        17,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        18,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        19,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        20,
+        22
+      ],
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        21,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        22,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        23,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        24,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        25,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "ARENA_32141",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        26,
+        22
+      ],
+      "collision": true,
+      "address": [
+        "SECTOR_32174",
+        "宿舍Lounge"
+      ]
+    },
+    {
+      "coord": [
+        5,
+        23
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        6,
+        23
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
+        7,
+        23
+      ],
+      "collision": true
+    },
+    {
+      "coord": [
         8,
         23
       ],
@@ -4167,20 +5918,6 @@
     {
       "coord": [
         9,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        9,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        9,
         23
       ],
       "collision": true
@@ -4188,35 +5925,7 @@
     {
       "coord": [
         10,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        10,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        10,
         23
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        11,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        11,
-        1
       ],
       "collision": true
     },
@@ -4230,28 +5939,7 @@
     {
       "coord": [
         12,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        12,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        13,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        13,
-        1
+        23
       ],
       "collision": true
     },
@@ -4265,429 +5953,99 @@
     {
       "coord": [
         14,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        14,
-        1
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         15,
-        0
+        23
       ],
-      "collision": true
-    },
-    {
-      "coord": [
-        15,
-        1
-      ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "宿舍Lounge"
+      ]
     },
     {
       "coord": [
         16,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        16,
-        1
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         17,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        17,
-        1
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         18,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        18,
-        1
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         19,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        19,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        19,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        19,
-        3
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         20,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        20,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        20,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        20,
-        3
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         21,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        21,
-        21
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         22,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        22,
-        21
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         23,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        14
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        15
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        23,
-        21
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         24,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        14
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        24,
-        15
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         25,
-        0
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        25,
-        15
+        23
       ],
       "collision": true
     },
     {
       "coord": [
         26,
-        0
+        23
       ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        1
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        2
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        3
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        4
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        5
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        6
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        7
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        8
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        9
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        10
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        11
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        12
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        13
-      ],
-      "collision": true
-    },
-    {
-      "coord": [
-        26,
-        15
-      ],
-      "collision": true
+      "collision": true,
+      "address": [
+        "宿舍Lounge"
+      ]
     }
   ]
 }
