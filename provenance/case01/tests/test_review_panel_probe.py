@@ -52,3 +52,29 @@ def test_expert_face_deeplink_tab_behaviour(tmp_path):
     assert proc.returncode == 0, out
     assert "合计通过" in out, out
     assert "专家面 ?tab=injector" in out, out
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="没有 node,跳过页面 JS 行为检查")
+def test_overview_renders_every_branch_source_label(tmp_path):
+    """概览的"分支来源"一行:五种取值 + 未知值都要渲染成可读标签。
+
+    两个静态源码测试查不出来的运行期回归(2026-10-03 实测):
+    ① judge-failed/rules/unknown 以前落到 "—",和"压根没这个字段"无法区分;
+    ② 标签是写死的可信 HTML,外层误包 esc() 会把 <span> 转义成页面上可见的
+    "&lt;span&gt;…" 文本。探针用 DOM stub 真渲染 PANES.overview 才能抓住。
+    """
+    html = _render("/review")
+    page = tmp_path / "review.html"
+    page.write_text(html, encoding="utf-8")
+    proc = subprocess.run(["node", _PROBE, "--page-file", str(page), "--only-deeplink"],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+    out = proc.stdout + proc.stderr
+    assert proc.returncode == 0, out
+    assert "概览 · 分支来源标签" in out, out
+    for piece in ("source=preset → 实验设计预设",
+                  "source=judge → 由 AI 回答判定",
+                  "source=judge-failed → 判定失败",
+                  "source=rules → 规则判定",
+                  "source=unknown → 来源未记录",
+                  "source=weird-x → 未记录(原值可见)"):
+        assert piece in out, out

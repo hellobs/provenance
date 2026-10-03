@@ -164,6 +164,56 @@ process.on('unhandledRejection', (e) => {
     if (problems.length) { console.log(`  FAIL ${c.name}: ${problems.join('; ')}`); bad++; }
     else { console.log(`  ok   ${c.name}`); }
   }
+
+  // ---- 概览 · 分支来源各取值的运行期渲染(2026-10-03 加) ----
+  // 两类回归都实测过:① judge-failed/rules/unknown 以前落到 "—",和"压根没这个字段"
+  // 无法区分;② 标签是**写死的可信 HTML 片段**,外层误包 esc() 会把 <span> 转义成
+  // 页面上可见的 "&lt;span&gt;…" 文本 —— 源码级断言查不出来,必须真渲染一遍。
+  console.log('\n-- 概览 · 分支来源标签 --');
+  {
+    const sb = makeSandbox({ pathname: '/review' });   // 内部面才显示这一行
+    vm.runInNewContext(m[1] + '\n;globalThis.__to = { PANES };', sb);
+    const ov = sb.__to.PANES.overview;
+    const labelCases = [
+      ['preset', '实验设计预设'],
+      ['judge', '由 AI 回答判定'],
+      ['judge-failed', '判定失败'],
+      ['rules', '规则判定'],
+      ['unknown', '来源未记录'],
+    ];
+    for (const [source, label] of labelCases) {
+      let out = '', err = '';
+      try { out = String(ov({ run_id: 'probe-src', branch_action: { source } })); }
+      catch (e) { err = e.message; }
+      const problems = [];
+      if (err) problems.push('渲染抛异常:' + err);
+      if (!out.includes(label)) problems.push('没渲染出标签「' + label + '」');
+      if (out.includes('&lt;')) problems.push('chip 的 HTML 被转义成可见文本');
+      if (out.includes('undefined')) problems.push('含 undefined');
+      if (problems.length) { console.log(`  FAIL source=${source}: ${problems.join('; ')}`); bad++; }
+      else { console.log(`  ok   source=${source} → ${label}`); }
+    }
+    // 未登记取值要**可见地**报出原值(不许回落 "—"),动态部分仍必须是转义过的。
+    let weird = '', werr = '';
+    try { weird = String(ov({ run_id: 'probe-src', branch_action: { source: 'weird-x' } })); }
+    catch (e) { werr = e.message; }
+    if (!werr && weird.includes('未记录(weird-x)') && !weird.includes('&lt;')) {
+      console.log('  ok   source=weird-x → 未记录(原值可见)');
+    } else {
+      console.log(`  FAIL source=weird-x: 未知取值没有可见地报出(${werr || '文案/转义不对'})`);
+      bad++;
+    }
+    // pending 一行保持原有口径。
+    let pend = '', perr = '';
+    try { pend = String(ov({ run_id: 'probe-src', branch_action: { pending: true } })); }
+    catch (e) { perr = e.message; }
+    if (!perr && pend.includes('judge(待 T0 判定)') && !pend.includes('&lt;')) {
+      console.log('  ok   pending=true → 待 T0 判定');
+    } else {
+      console.log(`  FAIL pending=true: ${perr || '口径变了'}`);
+      bad++;
+    }
+  }
   console.log(bad ? `\n合计未过:${bad} 处` : '\n合计通过:渲染与深链行为都符合契约');
   // 退出码要可信:Node 在某些 Windows 版本上,`process.exit()` 撞上还没关干净的
   // fetch 连接会触发 libuv 断言(win/async.c),进程以 0xC0000409 结束——

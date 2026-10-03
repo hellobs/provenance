@@ -530,6 +530,16 @@ function paneOverview(d) {
   const cs = d.consistency || {};
   const badge = { consistent: ["一致", "low"], inconsistent: ["不一致", "high"],
                   unknown: ["判不了", "medium"] }[cs.verdict];
+  // 各取值的说明必须列全(2026-10-03 补):以前只认两种,其余落到 "—",
+  // 和"压根没这个字段"长得一模一样,看面板的人分不清。
+  // 注释保持中性 —— 维护说明写在 Python 侧,机制名不许进专家面源码(棘轮测试钉着)。
+  const BRANCH_SOURCE_LABEL = {
+    preset: '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定',
+    judge: '<span class="chip k">由 AI 回答判定</span>',
+    "judge-failed": '<span class="chip warn">judge 判定失败</span> 判官未给出 A/B/C',
+    rules: '<span class="chip">规则判定</span> 未用 LLM 判官',
+    unknown: '<span class="chip warn">来源未记录</span> 回填时判不出来',
+  };
   const rows = [
     ["run_id", esc(d.run_id)],
     ["引擎记录", hasInj
@@ -540,9 +550,10 @@ function paneOverview(d) {
     ["判定方式", dash(ba.judge)],
     ["分支来源", ba.pending
       ? '<span class="chip">judge(待 T0 判定)</span> 本次由 AI 的 T0 回答决定,现在还没跑到'
-      : (ba.source === "preset"
-        ? '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定'
-        : (ba.source === "judge" ? '<span class="chip k">由 AI 回答判定</span>' : "—"))],
+      // 标签是**写死的可信 HTML 片段**,不能整体 esc —— 否则 <span> 会变成页面上
+      // 可见的 "&lt;span&gt;" 文本(2026-10-03 实测踩过);只有 fallback 里的原值要转义。
+      : (BRANCH_SOURCE_LABEL[ba.source]
+         || `<span class="chip warn">未记录(${esc(ba.source || "空")})</span>`)],
     ["T0 立场一致性", badge
       ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
       : '<span class="chip">未校验</span>'],
