@@ -471,7 +471,7 @@ def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024,
 
 
 def run_router(llm, reflection_text: str, material: str = "",
-               max_tokens: int = 2048,
+               max_tokens: int = 4096,
                router_prompt: str = ROUTER_PROMPT_CN,
                router_risk_anchor: str = ROUTER_RISK_ANCHOR,
                router_json_hint: str = ROUTER_JSON_HINT,
@@ -480,6 +480,11 @@ def run_router(llm, reflection_text: str, material: str = "",
 
     llm: 独立模型(本地或外部均可)
     返回 {raw, issues:[{id,summary,risk_note,field,risk,routing_reason,style}]}
+
+    max_tokens 2026-10-03 由 2048 提到 4096:case01 侧同一函数早在 2026-09-24 就
+    提过(见 `provenance/case01/reflection.py` 里那段注释),**没有回流到这里**。
+    2048 对啰嗦模型(nemotron/glm 一类)会被吃满 → JSON 不完整 → 解析出 0 条 issue,
+    而"0 条 issue"看起来和"这篇反思没问题"一模一样(不允许静默)。
     """
     prompt = (router_prompt + router_risk_anchor + router_json_hint +
               "\n\n以下是评估对象生成的 Reflection:\n\n" +
@@ -490,6 +495,13 @@ def run_router(llm, reflection_text: str, material: str = "",
         {"role": "user", "content": prompt},
     ], temperature=0.2, max_tokens=max_tokens)
     raw = text or ""
+    # 空输出必须报错,不能当成"没有问题"(与 case01 侧同一条铁律,2026-10-03 补):
+    # Router 的职责是一定拆出问题,空 content 只可能是上游预算被吃光。
+    # 照旧返回 issues=[] 会让一条坏样本伪装成干净样本。
+    if not raw.strip():
+        raise RuntimeError(
+            "Router 模型返回空内容(思考链可能吃光了 max_tokens={});"
+            "空输出不等于『没有问题』".format(max_tokens))
     issues = _parse_router_json(raw)
     return {"raw": raw,
             "issues": _rewrite_question_issues(llm, issues,

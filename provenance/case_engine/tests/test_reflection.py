@@ -146,6 +146,34 @@ def test_run_router_uses_injected_prompt_and_parse():
     assert out["issues"][0]["field"] == "f"
 
 
+def test_run_router_budget_matches_the_fixed_case01_one():
+    """预算不得退回 2048。
+
+    2026-10-03 体检:case01 侧早在 2026-09-24 就把 2048 提到 4096,**没有回流到
+    case_engine**。2048 对啰嗦模型会被吃满 → JSON 不完整 → 解析出 0 条 issue,
+    而"0 条 issue"和"这篇反思没问题"长得一模一样。
+    """
+    import inspect
+
+    sig = inspect.signature(run_router)
+    assert sig.parameters["max_tokens"].default == 4096, \
+        "run_router 的输出预算退回 {} 了,会被啰嗦模型吃满导致假 0 issue".format(
+            sig.parameters["max_tokens"].default)
+
+
+def test_run_router_blank_output_raises_instead_of_reporting_zero_issues():
+    """★ 空输出必须报错,不能当成"没有问题"(不允许静默)。"""
+    import pytest
+
+    class _Blank:
+        def chat(self, msgs, temperature=None, max_tokens=None):
+            return ""
+
+    with pytest.raises(RuntimeError) as ei:
+        run_router(_Blank(), "正文")
+    assert "空" in str(ei.value), str(ei.value)
+
+
 def test_run_router_question_rewritten():
     # 首个疑问句 → 交给 llm 改写 stub 返回改写稿
     class _Rw:
