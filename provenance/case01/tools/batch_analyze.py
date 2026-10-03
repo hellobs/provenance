@@ -72,6 +72,24 @@ def _count(v) -> int:
     return v if isinstance(v, (int, float)) else 0
 
 
+def _consistency_verdict(d: Dict) -> str:
+    """取一致性判定,**两种形状都要吃**:run.json 里是 dict(带 verdict/reason),
+    台账里是扁平字符串("consistent"/"unknown"/"")。
+
+    2026-10-03 实测踩过:`_collect_from_ledger` 会把**台账行**当 run.json 喂给 `_row`
+    (台账存 `consistency: "unknown"`,run.json 存 `consistency: {verdict: ...}`),
+    于是 `(d.get("consistency") or {}).get("verdict")` 直接 AttributeError,
+    **整份分析报告写不出来**。此前没暴露,是因为那会儿 consistency 恒为空串,
+    `"" or {}` 兜住了 —— 一旦有人真的往记录里盖章,这个工具立刻死。
+    """
+    cs = d.get("consistency")
+    if isinstance(cs, dict):
+        return cs.get("verdict") or ""
+    if isinstance(cs, str):
+        return cs
+    return ""
+
+
 def _row(run_id: str, d: Dict) -> Dict:
     refl = d.get("reflection") or {}
     router = d.get("router") or {}
@@ -81,7 +99,7 @@ def _row(run_id: str, d: Dict) -> Dict:
     return {
         "run_id": run_id,
         "branch": d.get("branch") or "",
-        "consistency": ((d.get("consistency") or {}).get("verdict") or ""),
+        "consistency": _consistency_verdict(d),
         "refl_chars": _count(refl.get("text")) or len(refl.get("text") or ""),
         "refl_score": quality.get("score"),
         "refl_status": quality.get("status") or "",
@@ -199,8 +217,12 @@ def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
         top_branch, top_n = max(br.items(), key=lambda kv: kv[1])
     collapse = bool(n >= 10 and top_n / n > 0.60)
 
-    st = _dist([r["refl_status"] or "(无)" for r in rows])
-    cons = _dist([r["consistency"] or "(无)" for r in rows])
+    # 质量门分布必须与同节的均值**同一总体**(2026-10-03 体检修):原来 status_dist
+    # 取全量 rows、而字数/质量均值取 ok_rows,于是 pass 率的分母(43)比它旁边那句
+    # "9 条已排除在上述均值之外"大了一圈,报告自相矛盾(261003-165042 报成 76.7%,
+    # 真实值是 33/34=97.1%)。同一节里两个口径 = 读者必然读错。
+    st = _dist([r["refl_status"] or "(无)" for r in ok_rows])
+    cons = _dist([r["consistency"] or "(无)" for r in ok_rows])
 
     # 失败记录的单列:条数 + 逐条原因,让"没跑成"在报告里看得见
     failed_detail = []
@@ -309,8 +331,9 @@ def _md(a: Dict) -> str:
         "",
         "- issues:合计 {} · 均值 {} · 中位 {}".format(
             r["issues_total"], r["issues_mean"], r["issues_median"]),
-        "- 零 issue 记录:{} 条（占 {:.1%}）".format(
-            r["zero_issue_runs"], r["zero_issue_runs"] / tot),
+        "- 零 issue 记录:{} 条（占 {:.1%}，分母为参与统计的 {} 条）".format(
+            r["zero_issue_runs"],
+            r["zero_issue_runs"] / r["n"] if r["n"] else 0, r["n"]),
         "- 每条记录 issue 数分布:{}".format(
             ", ".join("{}条→{}次".format(k, v)
                       for k, v in sorted(r["issues_dist"].items()))),
@@ -345,8 +368,11 @@ def _md(a: Dict) -> str:
     if a["reflection"]["status_dist"]:
         st = a["reflection"]["status_dist"]
         passed = st.get("pass", 0)
-        concl.append("- 反思质量门 pass 率 {:.1%}（{}/{}）。".format(
-            passed / tot, passed, a["n_runs"]))
+        # 分母 = 参与统计的记录数(status_dist 现在只数未跑成的,见上面的注释),
+        # 与本节均值同口径,并把两个数都打出来,免得读者再猜分母是谁。
+        denom = sum(st.values())
+        concl.append("- 反思质量门 pass 率 {:.1%}（{}/{}，分母已摘除“没跑成”的记录）。".format(
+            passed / denom if denom else 0, passed, denom))
     if r["issues_total"] == 0:
         concl.append("- **Router 零产出**:全批次没有拆出任何 issue,分流环节在"
                      "本批次未生效,需先排查再采信其它指标。")
