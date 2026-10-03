@@ -393,8 +393,16 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
                 # 带上原因:只给 run_id 和类别,平台还是不知道为什么被排除。
                 # 不允许静默 —— 被排除也是一条需要人能看出来的结论。
                 item = {"run_id": r.get("run_id"), "quality": r.get("quality")}
-                if r.get("error"):
-                    item["reason"] = r["error"]
+                # 原因来源有两种,别只认一种(2026-10-03 体检):
+                # - unreadable/读盘失败走 `error` 键;
+                # - review 成品的质检原因(矛盾/判定失败/反思没生成/废弃)走
+                #   quality_of 返回的 `reason` 键 —— 以前只取 error,于是这些记录
+                #   被排除时平台只看得到标签、看不到原因,reason 透了等于没透。
+                why = r.get("error") or r.get("reason") or ""
+                if why:
+                    item["reason"] = why
+                if r.get("deprecated_reason"):
+                    item["deprecated_reason"] = r["deprecated_reason"]
                 if r.get("consistency"):
                     item["consistency"] = r["consistency"]
                 hidden.append(item)

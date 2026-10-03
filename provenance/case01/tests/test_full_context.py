@@ -210,6 +210,44 @@ class TestNoExperimentMetaInExpertText:
         rec.pop("deprecated")
         assert quality_of(rec)["quality"] == "ok"
 
+    def test_reflection_error_is_questionable_even_if_scan_says_unknown(self):
+        """反思没生成的记录,哪怕一致性 quick_scan 是 unknown,也不许落 unverified。
+
+        2026-10-03 实测:batch-261003-125644-main3h-023 / 144923-q8b-014 两条
+        "(反思生成失败)"占位记录被判 unverified —— 而 unverified 默认**照给平台**
+        建专家任务,专家打开只有一句占位文本。同批 q8b-001 只因 quick_scan 恰好
+        inconsistent 才侥幸进了 questionable,三条同类记录三种去向。
+        """
+        from case01.full_context import quality_of
+        rec = {"branch": "B",
+               "branch_action": {"source": "judge"},
+               "consistency": {"verdict": "unknown", "reason": "B 线立场不明确"},
+               "reflection": {"text": "(反思生成失败)",
+                              "quality": {"status": "error", "score": None,
+                                          "error": "TimeoutError: 上游超时"}}}
+        q = quality_of(rec)
+        assert q["quality"] == "questionable", q
+        # 失败原因透出在前,一致性原因附后(两个事实都不丢)
+        assert "TimeoutError" in q["reason"] and "一致性" in q["reason"]
+
+    def test_legacy_failure_placeholder_text_is_questionable(self):
+        """旧版(2026-10-03 前)失败占位没有 quality 块,只剩一句文本 —— 也要兜住。"""
+        from case01.full_context import quality_of
+        rec = {"branch": "B", "branch_action": {"source": "judge"},
+               "consistency": {"verdict": "unknown", "reason": "判不了"},
+               "reflection": {"text": "(反思生成失败)"}}
+        assert quality_of(rec)["quality"] == "questionable"
+
+    def test_reflection_quality_fail_is_still_reviewable(self):
+        """status=fail 是"真反思但质量门未过",不是"没跑成" —— 仍按一致性判,
+        不许藏起来(差反思正是专家该看的;实测 p8b-1234,67 字真文本)。"""
+        from case01.full_context import quality_of
+        rec = {"branch": "B", "branch_action": {"source": "judge"},
+               "consistency": {"verdict": "consistent", "reason": "B 线一致"},
+               "reflection": {"text": "百亿订单是市场情绪的产物,而非事实……(67 字)",
+                              "quality": {"status": "fail", "score": 31}}}
+        assert quality_of(rec)["quality"] == "ok"
+
 
 class TestListAndLoad:
     def test_list_runs_missing_root(self, tmp_path):

@@ -99,7 +99,7 @@ for name, url in faces:
 print("=" * 88)
 print("D. 数据面")
 sys.path.insert(0, PKG)
-from case01.full_context import quality_of                                   # noqa: E402
+from case01.full_context import quality_of, _reflection_failed  # noqa: E402
 
 rows = []
 for p in sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json"))):
@@ -109,10 +109,21 @@ for p in sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json")))
     bad = [i for i in iss if not (i.get("field") or "").strip()
            or not (i.get("risk_note") or "").strip()]
     rows.append((os.path.basename(os.path.dirname(p)), q["quality"],
-                 bool(((d.get("reflection") or {}).get("text") or "").strip()), len(iss), len(bad)))
-say("data", all(r[4] == 0 for r in rows), "{} 条成品:router 缺字段 {} 条".format(
-    len(rows), sum(1 for r in rows if r[4])))
+                 bool(((d.get("reflection") or {}).get("text") or "").strip()),
+                 bool(_reflection_failed(d)),
+                 len(iss), len(bad)))
+say("data", all(r[5] == 0 for r in rows), "{} 条成品:router 缺字段 {} 条".format(
+    len(rows), sum(1 for r in rows if r[5])))
 say("data", all(r[2] for r in rows), "无反思的成品:{} 条".format(sum(1 for r in rows if not r[2])))
+# 2026-10-03 加:反思 text 非空≠有反思 —— "(反思生成失败)"占位曾骗过上面那条检查
+# (实测 3 条占位记录在"无反思:0 条"的报告下混在成品里,其中 2 条还判成
+# unverified 会照发平台)。历史跑废记录允许存在,但**必须**全部被 questionable
+# 隔离;有漏网(leaked)才是当前代码的问题。
+_ref_fail = [(r[0], r[1]) for r in rows if r[3]]
+_leaked = [rid for rid, qq in _ref_fail if qq != "questionable"]
+say("data", not _leaked,
+    "反思未生成记录 {} 条(历史跑废),未隔离漏网 {} 条 {}".format(
+        len(_ref_fail), len(_leaked), _leaked[:6]))
 dist = {}
 for r in rows:
     dist[r[1]] = dist.get(r[1], 0) + 1

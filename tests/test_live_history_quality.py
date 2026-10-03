@@ -163,6 +163,47 @@ def test_excluded_rows_carry_a_reason(monkeypatch, tmp_path):
         assert item.get("reason"), "excluded 行缺原因: {}".format(item)
 
 
+def test_failed_reflection_is_excluded_and_reason_visible(monkeypatch, tmp_path):
+    """★ 反思没生成的占位记录:不建专家任务 + excluded 带得出原因。
+
+    2026-10-03 实测两个串起来的洞:
+    ① `quality_of` 不看反思状态 —— "(反思生成失败)"记录因 quick_scan=unknown
+      落 unverified,而 unverified 默认**照给平台**建专家任务(专家打开只有占位句);
+    ② excluded 组装只认 `error` 键 —— review 行 quality_of 返回的原因在 `reason`
+      键里,于是即便判了 questionable,平台也只看得到标签、看不到原因。
+    真实记录:batch-261003-125644-main3h-023 / 144923-q8b-001 / -014。
+    """
+    root = tmp_path / "runs"
+    d = root / "fx-reflection-error"
+    d.mkdir(parents=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": "fx-reflection-error", "branch": "B",
+        "start_date": "2026-09-01", "end_date": "2026-09-01",
+        "turns": [{"speaker": "ethan", "date": "2026-09-01", "text": "q"}],
+        "branch_action": {"source": "judge"},
+        "consistency": {"verdict": "unknown", "reason": "B 线立场不明确",
+                        "method": "quick_scan"},
+        "reflection": {"text": "(反思生成失败)",
+                       "quality": {"status": "error", "score": None,
+                                   "error": "TimeoutError: 上游超时"}},
+        "router": {"executed": False, "issues": [], "status": "skipped",
+                   "error": "历史记录:反思先生成失败,Router 未执行"},
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("CASE01_RUNS_ROOT", str(root))
+
+    dflt = _call(H.list_all_runs())
+    assert "fx-reflection-error" not in {r["run_id"] for r in dflt["runs"]}
+    ex = {x["run_id"]: x for x in dflt["excluded"]["runs"]}
+    assert "fx-reflection-error" in ex, "占位记录被滤掉却没进 excluded 计数"
+    assert ex["fx-reflection-error"]["quality"] == "questionable"
+    why = ex["fx-reflection-error"].get("reason", "")
+    # 失败原因在前、一致性原因附后;两个事实都不能丢
+    assert "TimeoutError" in why and "一致性" in why, why
+    # 给平台的行里不许混进占位文本
+    assert all("(反思生成失败)" not in json.dumps(r, ensure_ascii=False)
+               for r in dflt["runs"])
+
+
 def test_aggregate_reports_quality_on_every_case01_run(monkeypatch):
     """聚合索引必须带质检字段,且与 5002 同源(直接复用 case01.full_context.quality_of)。"""
     for root in _runs_roots():

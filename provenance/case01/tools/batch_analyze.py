@@ -111,7 +111,14 @@ def _row(run_id: str, d: Dict) -> Dict:
         # 失败/未执行的显式标记(2026-10-03):统计要能把它们摘出去,
         # 否则"没跑成"会被当成"跑出来但很差"混进均值。
         "router_status": router.get("status") or "",
-        "refl_error": (quality.get("error") or "") if quality.get("status") == "error" else "",
+        # 口径与 full_context._reflection_failed 保持一致:error 状态,或旧版
+        # (2026-10-03 前)无 quality 块只剩占位文本,都算"没跑成";
+        # status=fail 不算(那是质量门判真反思差)。
+        "refl_error": ((quality.get("error") or "")
+                       if quality.get("status") == "error"
+                       else ("反思生成失败(旧版失败占位,无 quality 块)"
+                             if (refl.get("text") or "").strip() in ("(反思生成失败)", "(失败)")
+                             else "")),
         "router_error": (router.get("error") or "") if router.get("status") in ("error", "skipped") else "",
     }
 

@@ -263,6 +263,29 @@ def load_run(runs_root: str, run_id: str) -> Optional[dict]:
         return normalize_record(json.load(f))
 
 
+def _reflection_failed(rec: dict) -> str:
+    """反思这一步是不是**没跑成**。返回原因串;没失败返回空串。
+
+    必须和"跑出来但质量差"区分(2026-10-03 体检):
+    - ``quality.status == "error"``:反思压根没生成,text 是"(反思生成失败)"占位,
+      Router 也连带没跑 —— 这种记录不能给平台建专家任务(专家打开看不到反思)。
+    - 旧版落盘(2026-10-03 前)的失败占位**没有 quality 块**,只剩一句占位文本,
+      这里按文本兜住(实测 3 条 batch-261003 记录)。
+    - ``status == "fail"`` **不算失败**:那是质量门判定"这篇真反思写得差",
+      文本是真的,恰恰是专家复核的对象 —— 摘了反而让差反思对平台隐身。
+    """
+    ref = rec.get("reflection")
+    if not isinstance(ref, dict):
+        return ""
+    q = ref.get("quality")
+    if isinstance(q, dict) and q.get("status") == "error":
+        return str(q.get("error") or "反思生成失败(quality.status=error)")
+    text = str(ref.get("text") or "").strip()
+    if text in ("(反思生成失败)", "(失败)"):
+        return "反思生成失败(旧版失败占位,无 quality 块)"
+    return ""
+
+
 def quality_of(rec: dict) -> dict:
     """记录质量标记:分支来源 + T0 立场一致性 + 废弃标记 → 一个给平台看的 `quality` 字段。
 
@@ -276,6 +299,9 @@ def quality_of(rec: dict) -> dict:
       (2026-09-24 体检:此前它只被 `excluded` 之外的口径漏过 —— 只要恰好判成 ok 就会发给平台);
     - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致;或**判定失败**
       (judge 三次都没给出 A/B/C → run 停在 T0,没有时间线,不能直接建专家任务);
+      或**反思压根没生成**(2026-10-03 加:旧口径只看一致性,两条失败占位记录因
+      quick_scan=unknown 落 unverified,而 unverified 默认照发平台 —— 专家打开
+      只有一句"(反思生成失败)");
     - ``quality="debug"``       调试跑(内容不完整);
     - ``quality="unverified"``  判不了(没有 T0 对话 / 旧记录没有一致性戳)。
     """
@@ -283,12 +309,18 @@ def quality_of(rec: dict) -> dict:
     verdict = cs.get("verdict") or ("unverified" if not cs else "unverified")
     source = ((rec.get("branch_action") or {}).get("source")
               or cs.get("branch_source") or "")
+    ref_fail = _reflection_failed(rec)
     if rec.get("deprecated"):
         # 废弃优先于一切:这条样本不该再被用来建任务,也不该拿去训练
         q = "deprecated"
     elif rec.get("debug"):
         # 调试跑(--nodes 截断等):T0 可能被当成最终反馈节点,内容不完整
         q = "debug"
+    elif ref_fail:
+        # 反思没生成 = 专家任务的审核对象不存在。不管 quick_scan 恰好判出什么
+        # (实测同类三条里有一条因 inconsistent 进了 questionable、两条因 unknown
+        # 落 unverified —— 分叉本身就说明这里不能靠一致性口径顺带兜)。
+        q = "questionable"
     elif source == "judge-failed" or str(rec.get("branch") or "").lower() == "undetermined":
         # 判定失败 → run 停在 T0。**必须与"判不了"区分开**:unverified 是默认照给
         # 平台的(见 `_HIDDEN_QUALITY`),而这条是"这次跑废了",给了平台就会拿一条
@@ -301,8 +333,13 @@ def quality_of(rec: dict) -> dict:
         q = "questionable"
     else:
         q = "unverified"
+    # 反思失败时,不能建单的直接原因是"反思不存在",把它放在 reason 最前面;
+    # 一致性原因附在后面,两个事实都不丢。
+    reason = cs.get("reason", "")
+    if ref_fail:
+        reason = ref_fail + (" | 一致性: " + reason if reason else "")
     return {"quality": q, "consistency": verdict or "unverified",
-            "branch_source": source, "reason": cs.get("reason", ""),
+            "branch_source": source, "reason": reason,
             "debug": rec.get("debug", ""),
             # 废弃标记也进索引:平台侧要能自己筛,而不是只靠默认隐藏(2026-09-24)
             "deprecated": bool(rec.get("deprecated")),
