@@ -115,20 +115,33 @@ def _digest(run_id: str) -> Dict:
 
 
 def _ollama_loaded_model(base_url: str = "http://127.0.0.1:11434") -> str:
-    """问 Ollama 当前**实际驻留**的模型名(空=查不到)。
+    """问 Ollama 当前**实际驻留**的 chat 模型名(空=查不到)。
 
     为什么记实测而不是只记请求值:2026-10-03 踩过——`--model qwen3:8b` 请求了 8b,
     但 orchestrator 用无参 `OllamaClient()` 构造,吃签名默认值 4b,环境变量被绕过,
     于是**跑了两小时都是 4b 而台账里写着 8b**。只记请求值会把这件事永久藏起来。
-    实测值能让口径错误在分析阶段就暴露。
+
+    **必须排除 embedding 模型**:检索链路上 qwen3-embedding 会同时驻留,
+    早期版本按"名字最长的当主模型"选,结果把 embedding 记成了 chat 模型
+    (7/21 条误标)。这里按能力字段筛,只认 `completion` 能力的那种。
     """
     try:
         import urllib.request
         with urllib.request.urlopen(base_url + "/api/ps", timeout=5) as r:
             models = json.loads(r.read().decode("utf-8")).get("models") or []
-        names = [m.get("name") for m in models if m.get("name")]
-        # 同一时刻可能驻留多个(chat + embedding);取最大的那个当主模型
-        return max(names, key=lambda n: len(n)) if names else ""
+        chats = [m for m in models
+                 if "completion" in (m.get("capabilities") or [])
+                 and "embedding" not in (m.get("capabilities") or [])]
+        if not chats:
+            # /api/ps 不回 capabilities 时退回按名字排除 embedding
+            chats = [m for m in models
+                     if "embedding" not in (m.get("name") or "").lower()]
+        names = [m.get("name") for m in chats if m.get("name")]
+        # 多个 chat 模型时取 VRAM 最大的(才是真正在干活的那个)
+        if not names:
+            return ""
+        vram = {m.get("name"): m.get("size_vram") or 0 for m in chats}
+        return max(names, key=lambda n: vram.get(n, 0))
     except Exception:  # noqa: BLE001 —— 查不到不影响主流程
         return ""
 

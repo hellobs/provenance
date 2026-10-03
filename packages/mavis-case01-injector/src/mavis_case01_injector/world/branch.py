@@ -8,7 +8,7 @@ M1 提供两种实现:
 """
 import json
 import re
-from typing import Tuple, Dict
+from typing import Optional, Tuple, Dict
 
 JUDGE_PROMPT = (
     "你是 Branch 判定器。只根据 Investment AI 最终给 Ethan 的可执行投资动作分类,"
@@ -32,15 +32,19 @@ JUDGE_PROMPT = (
 class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 
-    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 256,
+    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 512,
                  prompt: str = JUDGE_PROMPT):
         self.llm = llm
         self.prompt = prompt
         # Initial call plus at most two format retries.
         self.max_attempts = max(1, int(max_attempts))
-        # max_tokens 默认 256 对普通 chat 模型够用;推理模型(GLM-4.7/nemotron)
-        # 的思考先烧 token,content 可能被挤空 → 调用方对推理模型应调大
-        # (2026-09-27 实测:GLM 256 时 content 为空)。
+        # max_tokens 是**判定输出的硬上限**:分支只需 {"branch":"X","reason":"..."},
+        # 256 对 8b 这类偏啰嗦的模型太紧 —— 2026-10-03 实测 21 条里 14 条判成
+        # undetermined,原始输出全是**被截断的合法 JSON**(如
+        # '{"branch": "B", "reason": "建议保持观望，避免追涨。市场传言可能引发短期')
+        # ,即判定其实成功却被判失败(假阴性,会污染统计)。提到 512。
+        # 推理模型(GLM-4.7/nemotron)思考先烧 token,content 还可能被挤空,
+        # 调用方对推理模型应调得更大(2026-09-27 实测:GLM 256 时 content 为空)。
         self.max_tokens = max(64, int(max_tokens))
 
     def judge(self, ai_answer: str) -> Tuple[str, dict]:
@@ -92,9 +96,36 @@ class LLMBranchJudge:
                     "A", "B", "C", "undetermined"):
                 reason = data.get("reason", "")
                 return data["branch"], reason if isinstance(reason, str) else ""
-        # 不做正则兜底:无效输出必须走重试(契约:invalid text 3 attempts 后
+        # 3) 输出被 max_tokens 截断时的救回(2026-10-03 加):JSON 没闭合,但
+        # branch 的值模型已明确给出。只救 branch 且**只接受 A/B/C** ——
+        # 不猜 branch(那等于伪造判定),reason 标为截断,让下游知道这段不完整。
+        # 动机:max_tokens 打满时判定其实成功了,判 undetermined 是**假阴性**
+        # (实测 21 条里 14 条如此),会直接污染分支分布统计。
+        salvaged = self._salvage_truncated(raw)
+        if salvaged:
+            return salvaged
+        # 不做其它正则兜底:无效输出必须走重试(契约:invalid text 3 attempts 后
         # undetermined,见 test_judge_invalid_text_never_silently_becomes_c)。
         raise ValueError("Judge output is not valid JSON")
+
+    def _salvage_truncated(self, raw: str) -> Optional[Tuple[str, str]]:
+        """截断 JSON 的救回,**只认「以 JSON 对象开头」的输出**。
+
+        为什么必须先判前缀:契约要求"解释性文字里出现的 branch 不得被当成判定"
+        (test_judge_invalid_text_never_silently_becomes_c —— 那条输入是
+        `Analysis without valid JSON; perhaps "branch":"C"`,从散文里抓 branch
+        等于伪造判定)。截断的判别特征是**以 `{` 开头但没闭合**,据此区分:
+          以 { 开头的未闭合 JSON → 模型确实在输出判定,只是被 token 上限切断
+          其它(散文/空串/代码块)      → 不救,按无效输出走重试
+        只接受 A/B/C;取不到就 None。
+        """
+        if not raw.startswith("{"):
+            return None
+        m = re.search(r'"branch"\s*:\s*"([ABC])"', raw)
+        if not m:
+            return None
+        reason = "[输出被 max_tokens 截断,reason 不完整] " + raw[:200]
+        return m.group(1), reason
 
 
 class RuleBranchRouter:

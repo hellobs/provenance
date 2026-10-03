@@ -175,7 +175,11 @@ def apply_banner(path, rel, date):
 
 SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs", "runs_injector",
-             "runs_archive_20260919", "runs_html")
+             "runs_archive_20260919", "runs_html",
+             # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
+             # 不是本仓文档 —— 记忆文件没有状态块,把它们按项目文档治理会红测试
+             # (test_docs_status)。工具目录与项目文档分开管。
+             ".workbuddy")
 
 
 def md_files(root):

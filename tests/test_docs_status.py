@@ -18,7 +18,10 @@ _PKG = os.path.join(_REPO, "provenance")
 
 SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs",
-             "runs_injector", "runs_html")
+             "runs_injector", "runs_html",
+             # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
+             # 不是项目文档,不该按文档治理要求带状态块。工具侧同见 tools/doc_audit.py。
+             ".workbuddy")
 BANNER = re.compile(r"^>\s*\*\*(状态|Status)\*\*", re.M)
 # 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起);
 # 英文版 README 用英文键 `> **Status**`。
