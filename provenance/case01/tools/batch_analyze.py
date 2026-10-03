@@ -90,7 +90,17 @@ def _row(run_id: str, d: Dict) -> Dict:
         "issues_final": post.get("final_issue_count", _count(issues)),
         "turns": _count(d.get("turns")),
         "events": _count(d.get("events")),
+        # 失败/未执行的显式标记(2026-10-03):统计要能把它们摘出去,
+        # 否则"没跑成"会被当成"跑出来但很差"混进均值。
+        "router_status": router.get("status") or "",
+        "refl_error": (quality.get("error") or "") if quality.get("status") == "error" else "",
+        "router_error": (router.get("error") or "") if router.get("status") in ("error", "skipped") else "",
     }
+
+
+def _is_failed(r: Dict) -> bool:
+    """这条记录的反思或 Router 是不是"没跑成"(而非"跑出来质量差")。"""
+    return bool(r.get("refl_error")) or (r.get("router_status") or "") in ("error", "skipped")
 
 
 def _collect_from_runs(prefix: str = "") -> tuple:
@@ -166,9 +176,15 @@ def _median(vals) -> Optional[float]:
 
 def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
     n = len(rows)
-    scores = [r["refl_score"] for r in rows if isinstance(r["refl_score"], (int, float))]
-    chars = [r["refl_chars"] for r in rows]
-    issues = [r["issues"] for r in rows]
+    # 失败/未执行的记录不进质量与产出统计(2026-10-03):它们的 0 分、0 issue
+    # 不代表"质量差",而是"这一步没跑成"。混进均值会把结论带偏
+    # (此前"反思生成失败"的占位文本就被当成一篇超短反思算进了字数均值)。
+    # 摘出来单独报数 —— 不允许静默:条数与原因都写进结果。
+    failed = [r for r in rows if _is_failed(r)]
+    ok_rows = [r for r in rows if not _is_failed(r)]
+    scores = [r["refl_score"] for r in ok_rows if isinstance(r["refl_score"], (int, float))]
+    chars = [r["refl_chars"] for r in ok_rows]
+    issues = [r["issues"] for r in ok_rows]
 
     fail_reasons: Dict = {}
     for r in rows:
@@ -186,6 +202,12 @@ def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
     st = _dist([r["refl_status"] or "(无)" for r in rows])
     cons = _dist([r["consistency"] or "(无)" for r in rows])
 
+    # 失败记录的单列:条数 + 逐条原因,让"没跑成"在报告里看得见
+    failed_detail = []
+    for r in failed:
+        why = r.get("refl_error") or r.get("router_error") or "(未记录原因)"
+        failed_detail.append({"run_id": r["run_id"], "reason": str(why)[:200]})
+
     return {
         "title": title,
         "n_runs": n,
@@ -194,6 +216,13 @@ def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
         "branch_top": {"branch": top_branch, "count": top_n,
                        "share": round(top_n / n, 3) if n else None,
                        "collapse_warning": collapse},
+        "excluded_failed": {
+            "n": len(failed),
+            "n_scored": len(ok_rows),
+            "note": ("反思或 Router 未跑成的记录已排除在质量/产出统计之外"
+                     "(其 0 分与 0 issue 不代表质量)"),
+            "records": failed_detail[:50],
+        },
         "reflection": {
             "chars_mean": _mean(chars), "chars_median": _median(chars),
             "chars_min": min(chars) if chars else None,
@@ -209,6 +238,7 @@ def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
             "issues_median": _median(issues),
             "zero_issue_runs": sum(1 for c in issues if c == 0),
             "issues_dist": _dist(issues),
+            "n": len(issues),
         },
         "consistency": cons,
         "per_run": rows,
@@ -253,6 +283,21 @@ def _md(a: Dict) -> str:
             "{}={}".format(k, v)
             for k, v in sorted(a["reflection"]["status_dist"].items()))),
     ]
+    ex = a.get("excluded_failed") or {}
+    if ex.get("n"):
+        L += [
+            "",
+            "**⚠️ 反思/Router 未跑成的记录:{} 条,已排除在上述均值之外**"
+            "（计入统计的有效记录 {} 条）。".format(ex["n"], ex["n_scored"]),
+            "",
+            "它们的 0 分与 0 issue 不代表质量,而是这一步没执行 —— 混进均值会把"
+            "结论带偏,故单列于此。逐条原因:",
+            "",
+            "| run | 原因 |",
+            "| --- | --- |",
+        ]
+        for rec in ex.get("records", []):
+            L.append("| {} | {} |".format(rec["run_id"], rec["reason"].replace("|", "\\|")))
     if a["reflection"]["fail_reason_top"]:
         L += ["", "**失败原因 Top N**", "", "| 原因 | 次数 |", "| --- | --- |"]
         for k, v in a["reflection"]["fail_reason_top"].items():

@@ -407,6 +407,9 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     rec.add_state(world.date, _state_snapshot(world))
 
     # ---- 6.5) Reflection + Router(0904:Run 结束、最终反馈后后台触发) ----
+    # 两步各自 try(2026-10-03):原来一个 try 包住两步,Router 一炸,
+    # 末行会把**已经写好的 reflection 覆盖成失败占位** —— 反思本身没毛病,
+    # 却因为下游一步失败被整块丢掉。分开后各坏各的,好数据留着。
     if llm is not None:   # 需要本地模型(Reflection 与判断同源)
         from .reflection import run_reflection, run_router
         try:
@@ -416,29 +419,85 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
                 "material": ref["material"], "text": ref["text"],
                 "quality": ref.get("quality", {})}
             log(ref["text"][:200] + "…" if len(ref["text"]) > 200 else ref["text"])
-            # Router(独立模型:router_llm,缺省回落到本地)
-            rllm = router_llm or llm
-            log("=== Router(问题拆分/分类/风险/路由) ===")
-            router_out = run_router(rllm, ref["text"])
-            rec.data["router"] = {
-                "raw": router_out["raw"],
-                "issues": router_out["issues"],
-                "postprocess": router_out.get("postprocess", {}),
-                "expert_pool_version": router_out.get("expert_pool_version", "")}
-            log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
-            for _iss in router_out["issues"]:
-                log("  - [{}] {} | {} | {}".format(
-                    _iss.get("risk"), _iss.get("field"),
-                    _iss.get("summary", "")[:60], _iss.get("routing_reason", "")[:40]))
         except Exception as _re:
-            log("[warn] Reflection/Router 失败: {}".format(_re))
-            rec.data["reflection"] = {"material": "", "text": "(失败)"}
+            log("[warn] Reflection 失败: {}".format(_re))
+            rec.data["reflection"] = _failed_reflection(_re)
+
+        # Router(独立模型:router_llm,缺省回落到本地)
+        # reflection 失败时没有正文可拆,Router 直接标"未执行"而不是再抛一次。
+        rllm = router_llm or llm
+        if rec.data["reflection"].get("quality", {}).get("status") == "error":
+            log("[warn] Router 跳过:反思未生成,无正文可拆")
+            rec.data["router"] = _failed_router(
+                RuntimeError("上游反思未生成,Router 未执行"), executed=False)
+        else:
+            try:
+                log("=== Router(问题拆分/分类/风险/路由) ===")
+                router_out = run_router(rllm, rec.data["reflection"]["text"])
+                rec.data["router"] = {
+                    "raw": router_out["raw"],
+                    "issues": router_out["issues"],
+                    "postprocess": router_out.get("postprocess", {}),
+                    "expert_pool_version": router_out.get("expert_pool_version", "")}
+                log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
+                for _iss in router_out["issues"]:
+                    log("  - [{}] {} | {} | {}".format(
+                        _iss.get("risk"), _iss.get("field"),
+                        _iss.get("summary", "")[:60], _iss.get("routing_reason", "")[:40]))
+            except Exception as _re:
+                log("[warn] Router 失败: {}".format(_re))
+                rec.data["router"] = _failed_router(_re)
 
     # ---- 7) 审计与落盘 ----
     rec.data["audit"] = world.audit()
     p = rec.save()
     log("recorded -> " + p)
     return rec
+
+
+# ---- 失败占位:结构齐全 + 可辨(2026-10-03)----
+def _failed_reflection(exc: Exception) -> dict:
+    """反思生成失败时的记录占位。
+
+    为什么不能只写 `{"text": "(失败)"}`(原实现,踩过两个坑):
+
+    1. **九块是平台契约**。完整性守卫逐块查 `reflection` 与 `router`,
+       少写 `router` 就是"契约破损",而不是"这一步没跑成"。
+    2. **失败不是 0 分**。质量分填 0 会被统计当成"一篇质量极差的反思"
+       混进均值;真相是"这篇反思根本没生成"。所以 `score` 留 `None`
+       (不可算)、`status="error"`(可辨),由 batch_analyze 摘出去单独计数。
+    3. **异常原文要留**。`error` 字段写明类型与消息 —— 不允许静默那条铁律
+       要求的"出事后谁能知道?",就答在这一行上。
+    """
+    detail = "{}: {}".format(type(exc).__name__, exc)
+    return {
+        "material": "",
+        "text": "(反思生成失败)",
+        "quality": {
+            "version": "1.0", "score": None, "max_score": 100,
+            "status": "error", "components": {}, "dimensions": [],
+            "matched_case_anchors": [],
+            "failure_reasons": ["反思生成失败"],
+            "manual_review_required": [],
+            "error": detail,
+        },
+    }
+
+
+def _failed_router(exc: Exception, executed: bool = True) -> dict:
+    """Router 失败/未执行时的记录占位(理由同 `_failed_reflection`)。
+
+    `executed=False` 表示"因为上游没成功,压根没调用" —— 与"调用了但失败"
+    分开,否则统计会把没跑的当跑了。
+    """
+    detail = "{}: {}".format(type(exc).__name__, exc)
+    return {
+        "raw": "", "issues": [], "postprocess": {},
+        "expert_pool_version": "",
+        "status": "skipped" if not executed else "error",
+        "executed": bool(executed),
+        "error": detail,
+    }
 
 
 # ---- 常量与固定文本(no-llm 降级/可读性) ----
