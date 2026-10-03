@@ -180,13 +180,16 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     timeline: None=自动判定;A/B/C=强制
     rules: no_llm 时是否用规则判定(Branch C 无解析 → placeholder)
     """
-    from .agents.llm import OllamaClient, OpenRouterClient
+    from .agents.llm import OllamaClient, OpenRouterClient, local_client_from_env
     from .agents.financial import FinancialData
     from .agents.investment_ai import InvestmentAI
     from .agents.ethan import Ethan
 
     if llm is None and not no_llm:
-        llm = OllamaClient()
+        # 走 local_client_from_env 而不是 OllamaClient():后者是无参默认构造,
+        # 吃签名里的默认模型(4b),**完全绕过 CASE01_LLM_MODEL 环境变量** ——
+        # 表现为设了 8b 却仍跑 4b(实测 Ollama 驻留 4b、台账 cmd 里也无模型参数)。
+        llm = local_client_from_env()
     ethan_llm = ethan_llm or llm
     router_llm = router_llm or llm
     run_id = run_id or time.strftime("run-%Y%m%d-%H%M%S")
