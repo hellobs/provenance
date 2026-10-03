@@ -41,14 +41,24 @@ preset"的运行 = 有偏样本),那是调用方的策略,要跑就得连重跑�
 import re
 from typing import Dict, Tuple
 
-from mavis_case01_injector.world.branch import LLMBranchJudge
+from mavis_case01_injector.world.branch import (
+    LLMBranchJudge, STANCE_TO_BRANCH, LLMStanceJudge,
+)
 
 # 买入类词(判断"这一句在讲买不买")
+# 2026-10-03 补中文:原先四张表全是英文,而 qwen3:8b 的 T0 回答是中文 →
+# pos/neg/cond 常年 0/0/0 → verdict 恒 unknown(实测 43 条里 38 条)。
+# 历史 25 条基线正常只是因为 4b 答英文(实测样例 0% 中文字符),不是词表对。
+# 取词原则:宁可漏、不可多。**只收"明确建议买"的短语,不收裸『买入』『建仓』** ——
+# 「不建议买入」「可分批建仓」都含这两个词,收了就会把谨慎/条件化判成正面。
 _BUY_WORDS = (
     "recommend buying", "recommend to buy", "advise buying", "advise to buy",
     "suggest buying", "suggest to buy", "should buy", "worth buying", "buy now",
     "supports buying", "encourage buying", "recommend a buy", "buy the stock",
     "invest", "all-in", "all in", "enter a position", "take a position",
+    # 中文:明确建议现在实质买入
+    "建议买入", "建议立即买入", "值得买入", "值得买", "可以买入", "立即买入",
+    "重仓", "全仓", "满仓", "大仓位", "重仓买入",
 )
 # 条件化词(仓位/分批/等确认)
 _COND_WORDS = (
@@ -56,21 +66,64 @@ _COND_WORDS = (
     "partial position", "fraction of", "scale in", "staged", "in stages",
     "wait until", "wait for", "conditional", "confirm before",
     "official confirmation", "only if", "subject to confirmation",
+    # 中文:小仓位/分批/等条件
+    "分批", "小仓位", "轻仓", "试仓", "仓位不超过", "不超过", "条件满足",
+    "满足条件", "触发条件", "确认后", "签署后", "签约后", "待确认",
 )
 # 否定词(出现在同一句里,就把这句里的买入类词判成"谨慎")
 _NEGATORS = (
     "not", "no ", "cannot", "can not", "can't", "never", "without",
     "isn't", "aren't", "don't", "doesn't", "wouldn't", "won't", "insufficient",
     "hardly", "unable to", "unverified", "no evidence", "no confirmation",
+    # 中文否定
+    "不宜", "不建议", "无法确认", "不能确认", "尚未", "未签署", "没有正式",
+    "暂不", "不适合", "不建议现在",
 )
 # 强否定的固定说法(即使句子里没有否定词也判谨慎;防御性兜底)
 _NEG_PHRASES = (
     "advise against", "recommend against", "refuse to", "decline to",
     "cannot say", "cannot confirm", "cannot recommend", "not worth",
     "cautious", "uncertain",
+    # 中文强否定
+    "维持零仓位", "保持零仓位", "不参与", "暂缓",
 )
 
-_SENT_SPLIT = re.compile(r"(?<=[.!?。！？；;])\s+|\n+")
+# 断句。中文句读**不跟空白**:`。`后面通常没有空格,而原来的规则要求标点后有
+# `\s+` 才切,于是整段中文被当成**一句话** —— "有买入词 + 有否定词"的整段判成谨慎,
+# 逐句统计直接失效(2026-10-03 修)。ASCII 标点仍要求后随空白,避免把
+# 3.14 / e.g. / URL 切碎。
+_SENT_SPLIT = re.compile(r"(?<=[。！？；])|(?<=[.!?;])\s+|\n+")
+
+# 语料里到处是推特账号名与媒体代号(@LenaInvests、Oakridge Capital、FundNotes…)。
+# 它们**不是 AI 自己的建议**,却会让裸子串匹配误命中买入词:实测 43 条里 4 条
+# 因 `@LenaInvests` 里的 "Invest" 被判 inconsistent → quality=questionable →
+# serve.py 默认从 /api/runs 排除 → **样本对平台隐身**。判定前先把这些标识符
+# 中性化掉。两道防线各管一类:
+#   1) 去掉 @账号;2) 去掉 CamelCase 标识符(中文 AI 文本里带内部大写的几乎都是
+#      账号名/代号/股票简称,不是自然语言)。3) 英文词用**前缀词边界**(见 _hit),
+#      这样即便漏了前两步,`LenaInvests` 里的 Invest 前面没有词边界,也不会命中。
+_HANDLE = re.compile(r"@\w+")
+_CAMEL_ID = re.compile(r"\b[A-Za-z]+[A-Z][A-Za-z0-9]*\b")
+# ASCII 词用前缀词边界:保住 investing / investment 这类派生词,同时挡住
+# 驼峰里嵌的 Invest(那两边都是词字符,没有边界)。
+_ASCII_ONLY = re.compile(r"^[\x00-\x7f]+$")
+
+
+def _neutralize(text: str) -> str:
+    """抹掉账号名/代号,只留自然语言部分。"""
+    return _CAMEL_ID.sub(" ", _HANDLE.sub(" ", str(text or "")))
+
+
+def _hit(sentence_lower: str, words) -> bool:
+    """任一词命中。ASCII 词要求词边界前缀,非 ASCII(中文)词用普通子串 ——
+    中文没有词边界,加 `\b` 反而把词全弄坏。"""
+    for w in words:
+        if _ASCII_ONLY.match(w):
+            if re.search(r"\b" + re.escape(w), sentence_lower):
+                return True
+        elif w in sentence_lower:
+            return True
+    return False
 
 
 def _t0_ai_text(run_record: Dict) -> str:
@@ -98,11 +151,11 @@ def _count_signals(text: str) -> Tuple[int, int, int]:
     "not sufficient to recommend buying" 不该算正面)。
     """
     pos = neg = cond = 0
-    for s in _SENT_SPLIT.split(str(text or "")):
+    for s in _SENT_SPLIT.split(_neutralize(text)):
         sl = s.lower()
-        has_buy = any(w in sl for w in _BUY_WORDS)
-        has_cond = any(w in sl for w in _COND_WORDS)
-        has_neg = any(w in sl for w in _NEGATORS) or any(p in sl for p in _NEG_PHRASES)
+        has_buy = _hit(sl, _BUY_WORDS)
+        has_cond = _hit(sl, _COND_WORDS)
+        has_neg = _hit(sl, _NEGATORS) or _hit(sl, _NEG_PHRASES)
         if has_buy and has_neg:
             neg += 1
         elif has_buy:
@@ -176,7 +229,76 @@ def check_branch_consistency(run_record: Dict, llm=None) -> Dict:
             "method": "llm_judge"}
 
 
-def attach_consistency(record: Dict, branch_source: str = "preset") -> Dict:
+def judge_consistency(run_record: Dict, llm=None) -> Dict:
+    """一致性复核:**立场判官为主,quick_scan 作独立第二判据**(2026-10-03 定案)。
+
+    为什么不是直接用 `check_branch_consistency`:judge 模式记录的分支本身就是
+    `LLMBranchJudge` 判出来的,拿它复核等于自己判自己 → 橡皮章。立场判官问的是
+    另一个问题(AI 对买入的立场),才是真交叉校验,见 STANCE_PROMPT。
+
+    两法结论不一致时**不悄悄挑一个信**:立场判官定 verdict(它是主判据),
+    同时把 quick_scan 的结论写进 reason 并置 disagreement=True —— 分歧本身
+    就是有价值的研究信号,藏起来才是问题。
+
+    quick_scan 仍然保留,不是摆设:它能在判官判 unclear 时给出第二条线索,
+    而且两法打架本身就是预警。
+
+    绝不做的事:判官报错 / 没有 T0 对话 / 立场 unclear 时,一律落 `unknown`,
+    **绝不因为"没有反证"就放行** —— `consistent` 是平台当通过凭证用的肯定结论。
+    """
+    branch = str(run_record.get("branch") or "").upper()
+    qs_verdict, qs_reason = quick_scan(run_record)
+    quick = {"verdict": qs_verdict, "reason": qs_reason}
+
+    if llm is None:
+        return {"verdict": qs_verdict, "reason": qs_reason, "method": "quick_scan",
+                "disagreement": False, "quick_scan": quick, "stance": None}
+
+    text = _t0_ai_text(run_record)
+    if not text:
+        return {"verdict": "unknown", "method": "llm_stance(no-t0)",
+                "reason": "没有 T0 当天的 AI 对话,判不了(不是通过);"
+                          "quick_scan: " + qs_reason,
+                "disagreement": False, "quick_scan": quick, "stance": None}
+
+    try:
+        stance, info = LLMStanceJudge(llm).judge(text)
+    except Exception as exc:                              # noqa: BLE001
+        # 判官炸了不许静默放行,也不许退回 quick_scan 冒充"有结论"。
+        detail = "{}: {}".format(type(exc).__name__, exc)
+        return {"verdict": "unknown", "method": "llm_stance(error)",
+                "reason": "立场判官失败({}),判不了(不是通过);quick_scan: {}".format(
+                    detail, qs_reason),
+                "disagreement": False, "quick_scan": quick, "stance": None,
+                "error": detail}
+
+    expected = STANCE_TO_BRANCH.get(stance)
+    if expected is None:
+        # 判不出立场:把**异常原文**带进 reason。LLMStanceJudge 内部已经吃掉重试时的
+        # 异常并回 unclear,这里若只写"没给出有效结果",就等于把"ollama 连不上"这种
+        # 真故障伪装成"模型没结论" —— 出事后没人知道该查哪(不允许静默)。
+        errs = info.get("errors") or []
+        detail = (";底层报错: " + " | ".join(errs)) if errs else ""
+        verdict = "unknown"
+        reason = "立场判官判不了({}: {}){};quick_scan: {}".format(
+            stance, info.get("reason"), detail, qs_reason)
+    elif expected == branch:
+        verdict = "consistent"
+        reason = "立场判官判 {} → 与 {} 线一致({})".format(
+            stance, branch, info.get("reason"))
+    else:
+        verdict = "inconsistent"
+        reason = "立场判官判 {} → 期望 {} 线,但记录是 {} 线({})".format(
+            stance, expected, branch, info.get("reason"))
+
+    disagreement = qs_verdict != "unknown" and qs_verdict != verdict
+    if disagreement:
+        reason += ";[两法分歧] quick_scan 判 {} —— {}".format(qs_verdict, qs_reason)
+    return {"verdict": verdict, "reason": reason, "method": "llm_stance",
+            "disagreement": disagreement, "quick_scan": quick, "stance": stance}
+
+
+def attach_consistency(record: Dict, branch_source: str = "preset", llm=None) -> Dict:
     """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
 
     必须在**写盘之前**调用:这样文件里一定有这一节,而不是"看日志才知道"。
@@ -185,16 +307,24 @@ def attach_consistency(record: Dict, branch_source: str = "preset") -> Dict:
     平台侧 `full_context.quality_of` 只能一律判 `unverified`,分不出
     "自洽"与"压根没查过"。函数从 pipeline 提上来公开,就是为了让两条落盘路径
     共用同一份实现,不再各写一份然后漂移。
+
+    `llm` 给了就走立场判官(主判据),没给就退回 quick_scan 并如实写 method。
     """
     rec = dict(record)
     ba = dict(rec.get("branch_action") or {})
     ba.setdefault("source", branch_source)
     rec["branch_action"] = ba
-    verdict, reason = quick_scan(rec)
-    rec["consistency"] = {"verdict": verdict, "reason": reason, "method": "quick_scan",
+    res = judge_consistency(rec, llm=llm)
+    rec["consistency"] = {"verdict": res["verdict"], "reason": res["reason"],
+                          "method": res["method"],
+                          "disagreement": res.get("disagreement", False),
+                          "quick_scan": res.get("quick_scan", {}),
+                          "stance": res.get("stance"),
                           "branch_source": ba.get("source", "")}
-    if verdict == "inconsistent":
-        print("[!] 这条记录不自洽({} 线):{}".format(rec.get("branch", ""), reason))
-    elif verdict == "unknown":
-        print("[!] 这条记录的 T0 立场判不了(不是通过):{}".format(reason))
+    if res["verdict"] == "inconsistent":
+        print("[!] 这条记录不自洽({} 线):{}".format(rec.get("branch", ""), res["reason"]))
+    elif res["verdict"] == "unknown":
+        print("[!] 这条记录的 T0 立场判不了(不是通过):{}".format(res["reason"]))
+    if res.get("disagreement"):
+        print("[!] 立场判官与 quick_scan 结论不一致(以立场判官为准),已记进 consistency.reason")
     return rec

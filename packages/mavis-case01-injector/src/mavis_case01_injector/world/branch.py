@@ -29,6 +29,101 @@ JUDGE_PROMPT = (
 )
 
 
+# 立场判据(2026-10-03)。**刻意不问"该归到哪条线"**,只问"AI 对现在买入是什么立场"。
+# 为什么不能直接复用 JUDGE_PROMPT 做一致性复核:judge 模式记录的分支**本身就是**
+# LLMBranchJudge 判出来的(branch_action.source="judge"),再拿同一套提示词问一遍
+# 等于自己问自己、自己判自己,几乎必然回 consistent —— 那比 unknown 更糟,
+# 因为 consistent 是平台当通过凭证用的肯定结论,等于把检查换成橡皮章。
+# 问"立场"是另一个问题,才是真正的交叉校验。
+STANCE_PROMPT = (
+    "你是投资立场判定器。只根据 Investment AI 在首次咨询当天给 Ethan 的"
+    "最终可执行建议,判断它对『现在买入这只股票』的立场。"
+    "不要根据语气是否乐观、分析篇幅或风险提示数量判断。\n"
+    "buy_now. 明确建议现在实质买入(重仓/全仓/满仓/大仓位),且无需等待额外条件。\n"
+    "wait. 明确建议当前不买(维持零仓位/观望/不参与),或只说等确认、等新信息再评估。\n"
+    "conditional. 明确以小仓位/分批方式参与,或给出可验证的触发条件,"
+    "并说明条件满足后的非零买入动作或仓位。\n"
+    "unclear. 没有说清当前动作,或只有模糊条件而无买入承诺。\n"
+    "规则:\n"
+    "- 依据 AI 自己的最终建议,不是它复述的用户意愿或市场传闻;\n"
+    "- 『公司前景正面,但先观望』是 wait;『现在先买 10%』是 conditional;"
+    "『签约确认后买 20%』是 conditional;『建议现在重仓买入』是 buy_now;\n"
+    "- 它引用到的社交账号、媒体传言**不是**它自己的建议,不得据此判断立场;\n"
+    "- 无法可靠判断时必须返回 unclear,不得猜测。\n"
+    "只输出 JSON: {{\"stance\": \"buy_now|wait|conditional|unclear\", "
+    "\"reason\": \"引用最终动作的一句话理由\"}}"
+)
+
+# 立场 → 期望的分支。unclear 不在表里(判不了就没有"期望值")。
+STANCE_TO_BRANCH = {"buy_now": "A", "wait": "B", "conditional": "C"}
+STANCE_CHOICES = ("buy_now", "wait", "conditional", "unclear")
+STANCE_MAX_TOKENS = 512
+
+
+class LLMStanceJudge:
+    """AI 立场判官:只回答"买不买",不回答"该归哪条线"(见 STANCE_PROMPT 的理由)。"""
+
+    def __init__(self, llm, max_attempts: int = 3, max_tokens: int = STANCE_MAX_TOKENS,
+                 prompt: str = STANCE_PROMPT):
+        self.llm = llm
+        self.prompt = prompt
+        # 初调 + 最多两次格式重试(与 LLMBranchJudge 同一套重试约定)。
+        self.max_attempts = max(1, int(max_attempts))
+        self.max_tokens = max(64, int(max_tokens))
+
+    def judge(self, ai_answer: str) -> Tuple[str, dict]:
+        raw_outputs = []
+        errors = []
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                text = self.llm.chat([
+                    {"role": "system", "content": self.prompt},
+                    {"role": "user",
+                     "content": "Investment AI answer:\n\n{}".format(ai_answer[:4000])},
+                ], temperature=0.1, max_tokens=self.max_tokens)
+                raw_outputs.append(text or "")
+                stance, reason = self._parse(text)
+                return stance, {"stance": stance, "reason": reason, "judge": "llm",
+                                "attempts": attempt, "raw_outputs": raw_outputs}
+            except Exception as exc:                      # noqa: BLE001 —— 记下来继续重试
+                errors.append("{}: {}".format(type(exc).__name__, exc))
+        # 试完仍判不出 → unclear,**不许瞎猜**(猜出来的立场会直接变成"一致/不一致"
+        # 的肯定结论,那是在伪造判定)。原始输出与异常都留着,出事后能查。
+        return "unclear", {
+            "stance": "unclear",
+            "reason": "立场判官 {} 次都没给出有效结果".format(self.max_attempts),
+            "judge": "llm", "attempts": self.max_attempts,
+            "raw_outputs": raw_outputs, "errors": errors,
+        }
+
+    def _parse(self, text: str) -> Tuple[str, str]:
+        """围栏 → 任意位置 JSON → 截断救回(只认以 { 开头的未闭合输出)。"""
+        raw = (text or "").strip()
+        fenced = re.fullmatch(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S | re.I)
+        candidates = []
+        if fenced:
+            candidates.append(fenced.group(1))
+        m = re.search(r"\{.*\}", raw, re.S)
+        if m:
+            candidates.append(m.group(0))
+        for cand in candidates:
+            try:
+                data = json.loads(cand)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            stance = data.get("stance")
+            if stance in STANCE_CHOICES:
+                reason = data.get("reason", "")
+                return stance, reason if isinstance(reason, str) else ""
+        if raw.startswith("{"):                    # 截断:以 { 开头但没闭合
+            m2 = re.search(r'"stance"\s*:\s*"(buy_now|wait|conditional|unclear)"', raw)
+            if m2:
+                return m2.group(1), "[输出被 max_tokens 截断,reason 不完整] " + raw[:200]
+        raise ValueError("Stance output is not valid JSON")
+
+
 class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 

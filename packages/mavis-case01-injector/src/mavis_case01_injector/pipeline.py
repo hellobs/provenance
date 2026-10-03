@@ -66,16 +66,19 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     return record
 
 
-def _attach_consistency(record: dict, branch_source: str = "preset") -> dict:
+def _attach_consistency(record: dict, branch_source: str = "preset", llm=None) -> dict:
     """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
 
     实现已上移到 `consistency.attach_consistency`(2026-10-03):case01 编排器那条
     落盘路径也要盖同一枚戳,两份实现必然漂移,故只保留一处。本函数保留为薄壳,
     免得改动既有的调用点与测试里的 monkeypatch 目标。
+
+    `llm` 是**显式**传入的判官 client,不是这里临时造的:调用方若没给就走
+    quick_scan(诚实降级),绝不在单测/dry-run 里悄悄发起真实 LLM 请求。
     """
     from mavis_case01_injector.consistency import attach_consistency
 
-    return attach_consistency(record, branch_source=branch_source)
+    return attach_consistency(record, branch_source=branch_source, llm=llm)
 
 
 def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
@@ -159,7 +162,8 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                 "reflection/router:生成失败({}),本条为不完整记录".format(msg))
 
     # 一致性戳:在写盘之前盖(所以文件里一定有这一节,不是"看日志才知道")
-    record = _attach_consistency(record, branch_source=branch_source)
+    # 只传**显式的** router_llm:调用方没给就退回 quick_scan,不在这偷偷发请求。
+    record = _attach_consistency(record, branch_source=branch_source, llm=router_llm)
     if require_consistent and record["consistency"]["verdict"] != "consistent":
         # opt-in 的"落盘闸门":只有调用方明确要求时才拦(默认不拦,免得静默丢弃样本;
         # 而且"丢弃重跑"会引入筛选偏差 —— 只保留恰好同意 preset 的运行)
