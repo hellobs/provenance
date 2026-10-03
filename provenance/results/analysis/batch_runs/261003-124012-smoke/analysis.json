@@ -1,0 +1,94 @@
+{
+  "title": "261003-124012-smoke",
+  "n_runs": 4,
+  "n_unreadable": 0,
+  "branches": {
+    "B": 4
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 4,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "reflection": {
+    "chars_mean": 2541.0,
+    "chars_median": 2477.5,
+    "chars_min": 2293,
+    "chars_max": 2916,
+    "score_mean": 100.0,
+    "score_median": 100.0,
+    "score_n": 4,
+    "status_dist": {
+      "pass": 4
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 18,
+    "issues_mean": 4.5,
+    "issues_median": 4.5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 2,
+      "4": 2
+    }
+  },
+  "consistency": {
+    "(无)": 4
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261003-124012-smoke-001",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 2623,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13
+    },
+    {
+      "run_id": "batch-261003-124012-smoke-002",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 2332,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13
+    },
+    {
+      "run_id": "batch-261003-124012-smoke-003",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 2916,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13
+    },
+    {
+      "run_id": "batch-261003-124012-smoke-004",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 2293,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13
+    }
+  ]
+}

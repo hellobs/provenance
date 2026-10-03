@@ -1,0 +1,39 @@
+{
+  "batch": "261003-144623-probe",
+  "finished_at": "2026-10-03 14:48:54",
+  "settings": {
+    "model": "qwen3:8b",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 8.0,
+    "disable_thinking": true,
+    "python": "D:\\zzr\\mavis\\.venv\\Scripts\\python.exe"
+  },
+  "counts": {
+    "done": 1,
+    "ok": 1,
+    "failed": 0,
+    "ledger_rows": 1
+  },
+  "branches": {
+    "B": 1
+  },
+  "reflection": {
+    "n": 1,
+    "chars_mean": 1137.0,
+    "chars_min": 1137,
+    "chars_max": 1137,
+    "score_mean": 95.0,
+    "score_n": 1,
+    "status_dist": {
+      "pass": 1
+    }
+  },
+  "router": {
+    "issues_mean": 3.0,
+    "issues_total": 3,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 150.1,
+  "seconds_total": 150.1
+}

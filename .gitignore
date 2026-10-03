@@ -230,3 +230,8 @@ provenance/frontend/static/assets/village/maze.json.bak*
 # 审计/共享临时目录(工作区里有,但不入库)
 .audit-tmp/
 .trae-html-share-packages/
+
+# workbuddy 记忆目录(2026-10-03 补):它已被 doc_audit.py / test_docs_status.py
+# 的 SKIP_DIRS 跳过,但漏了 gitignore,于是每次 `git status` 都冒出来。
+# 记忆文件是本机工作状态,不是项目约定,不入库。
+.workbuddy/

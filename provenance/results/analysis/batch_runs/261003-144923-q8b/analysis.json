@@ -1,0 +1,421 @@
+{
+  "title": "261003-144923-q8b",
+  "n_runs": 21,
+  "n_unreadable": 0,
+  "branches": {
+    "undetermined": 14,
+    "B": 7
+  },
+  "branch_top": {
+    "branch": "undetermined",
+    "count": 14,
+    "share": 0.667,
+    "collapse_warning": true
+  },
+  "excluded_failed": {
+    "n": 2,
+    "n_scored": 19,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": [
+      {
+        "run_id": "batch-261003-144923-q8b-001",
+        "reason": "历史记录:旧实现写入的失败占位(未记录原因)"
+      },
+      {
+        "run_id": "batch-261003-144923-q8b-014",
+        "reason": "历史记录:旧实现写入的失败占位(未记录原因)"
+      }
+    ]
+  },
+  "reflection": {
+    "chars_mean": 1777.8,
+    "chars_median": 1697,
+    "chars_min": 1370,
+    "chars_max": 2627,
+    "score_mean": 93.6,
+    "score_median": 95,
+    "score_n": 19,
+    "status_dist": {
+      "error": 2,
+      "pass": 11,
+      "review": 8
+    },
+    "fail_reason_top": {
+      "未提出可执行的后续改进动作": 8,
+      "反思生成失败": 2
+    }
+  },
+  "router": {
+    "issues_total": 85,
+    "issues_mean": 4.5,
+    "issues_median": 5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 12,
+      "4": 4,
+      "3": 3
+    },
+    "n": 19
+  },
+  "consistency": {
+    "(无)": 21
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261003-144923-q8b-001",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 8,
+      "refl_score": null,
+      "refl_status": "error",
+      "refl_fail_reasons": [
+        "反思生成失败"
+      ],
+      "issues": 0,
+      "issues_final": 0,
+      "turns": 4,
+      "events": 13,
+      "router_status": "skipped",
+      "refl_error": "历史记录:旧实现写入的失败占位(未记录原因)",
+      "router_error": "历史记录:反思先生成失败,Router 未执行"
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-003",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1674,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-002",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1485,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-006",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1653,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-005",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1751,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-004",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1370,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-008",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1505,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-007",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1697,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-009",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1778,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-010",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1633,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-012",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1558,
+      "refl_score": 88,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-014",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 8,
+      "refl_score": null,
+      "refl_status": "error",
+      "refl_fail_reasons": [
+        "反思生成失败"
+      ],
+      "issues": 0,
+      "issues_final": 0,
+      "turns": 4,
+      "events": 13,
+      "router_status": "skipped",
+      "refl_error": "历史记录:旧实现写入的失败占位(未记录原因)",
+      "router_error": "历史记录:反思先生成失败,Router 未执行"
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-011",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 2627,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-015",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 2246,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-013",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1958,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-016",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1742,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-018",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 2241,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-017",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1457,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-019",
+      "branch": "B",
+      "consistency": "",
+      "refl_chars": 1748,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-021",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 2181,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261003-144923-q8b-020",
+      "branch": "undetermined",
+      "consistency": "",
+      "refl_chars": 1474,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}

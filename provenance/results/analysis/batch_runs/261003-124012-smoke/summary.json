@@ -1,0 +1,39 @@
+{
+  "batch": "261003-124012-smoke",
+  "finished_at": "2026-10-03 12:48:29",
+  "settings": {
+    "model": "qwen3:8b",
+    "timeline": "auto",
+    "lanes": 2,
+    "duration_min": 6.0,
+    "disable_thinking": true,
+    "python": "D:\\zzr\\mavis\\.venv\\Scripts\\python.exe"
+  },
+  "counts": {
+    "done": 4,
+    "ok": 4,
+    "failed": 0,
+    "ledger_rows": 4
+  },
+  "branches": {
+    "B": 4
+  },
+  "reflection": {
+    "n": 4,
+    "chars_mean": 2541.0,
+    "chars_min": 2293,
+    "chars_max": 2916,
+    "score_mean": 100.0,
+    "score_n": 4,
+    "status_dist": {
+      "pass": 4
+    }
+  },
+  "router": {
+    "issues_mean": 4.5,
+    "issues_total": 18,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 224.0,
+  "seconds_total": 896.0
+}
