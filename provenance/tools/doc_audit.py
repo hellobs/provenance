@@ -7,6 +7,13 @@
 用法(在 provenance/provenance 下):
     python tools/doc_audit.py                 # 只列
     python tools/doc_audit.py --banner        # 给缺状态行的 md 补一个**待填**状态行
+    python tools/doc_audit.py --banner --check  # 只读:报告有几份 md 待规范化,不写盘
+                                                 # (有待修时退出码 1;deep_check 用它,体检永不改工作树)
+
+更新口径(2026-10-03 修):**状态值与说明没变就一个字都不写** —— 哪怕「最后核对」
+日期是旧的。旧实现每次跑都用当天日期重建全部状态块,于是"每天第一次体检"必然
+改动几十个 md(日期被刷成今天 = 谎报"今天核对过",还把工作树弄脏)。只有这几种
+情况才重写:缺块、块重复(历史 bug 叠了多份)、状态/说明与 STATUS 表不一致。
 """
 import argparse
 import io
@@ -50,6 +57,7 @@ STATE_PARA_RE = re.compile(
 STATUS = {
     # —— 现行(权威) ——
     "docs/IVD不变量.md": ("现行", "IVD 硬约束:决策必须由 agent 产生,场景/运行方式不得替它判断"),
+    "docs/GTC研究边界声明.md": ("现行", "本文是给 GTC 评委和合作方的**证据边界速查**。每一个\"我们主张什么\"都附\"依据是什么\"和\"我们不主张什么\"。数据来源见 `case01/docs/内化与敏感性_定量分析_20260924.md`。"),
     "docs/架构总览与对接指南.md": ("现行", "**治理平台对接的权威口径**(§11 嵌入面与数据接口;2026-09-21)"),
     "docs/实施规格_组合运行展示与数据界面.md": ("现行", "组合—运行—展示链路与统一数据界面的实施规格"),
     "docs/case00_case01_并列说明.md": ("现行", "两个案例并列时的口径(谁冻结、谁在推进)"),
@@ -145,12 +153,21 @@ def banner_text(rel, date):
             "> **说明**:{}\n").format(state, date, note)
 
 
-def apply_banner(path, rel, date):
-    """把状态块插在第一个标题行之后;已有状态行**全部**清掉再插(幂等)。"""
-    with io.open(path, encoding="utf-8", errors="replace") as f:
-        txt = f.read()
+def _banner_fields(txt):
+    """从文件头提取现有的 (状态行列表, 规范日期行列表, 说明行列表)。
+
+    只看前 1500 字符 —— 状态块按约定就在标题正下方。
+    """
+    head = txt[:1500]
+    states = re.findall(r"^>\s*\*\*(?:状态|Status)\*\*:\s*(.+?)\s*$", head, re.M)
+    dates = re.findall(r"^>\s*\*\*最后核对\*\*:\s*(\d{4}-\d{2}-\d{2})\s*$", head, re.M)
+    notes = re.findall(r"^>\s*\*\*说明\*\*:\s*(.+?)\s*$", head, re.M)
+    return states, dates, notes
+
+
+def normalize_banner(txt, rel, date):
+    """把状态块规范化(旧块整段删、在标题后插一块),返回新文本(纯函数,不写盘)。"""
     block = banner_text(rel, date).rstrip("\n")
-    had = bool(BANNER_RE.search(txt))
     txt2 = STATE_PARA_RE.sub("", txt)                 # 旧的「状态」键**连续行**整段删
     txt2 = BANNER_RE.sub("", txt2)                    # 其余旧状态行(可能叠了好几份)全删
     txt2 = re.sub(r"\n{3,}", "\n\n", txt2)            # 别留下大片空行
@@ -165,12 +182,43 @@ def apply_banner(path, rel, date):
         lines.pop(ins)
     # 状态块后面也补一个空行:否则它和正文第一段会被看成同一段(2026-10-01)
     lines[ins:ins] = [""] + block.split("\n") + [""]
-    txt3 = "\n".join(lines)
-    if txt3 != txt:
+    return "\n".join(lines)
+
+
+def needs_banner(txt, rel):
+    """判断这份 md 的状态块是否**真的需要**重写(2026-10-03 改口径)。
+
+    旧逻辑是"重建后的文本与现状不同就要写",而重建必然带上当天日期,于是每份带
+    日期的文档**每天**都被判成要改 —— 体检脚本因此天天弄脏工作树、还谎报核对日期。
+
+    新口径:
+    - 普通文档:现有块恰好一份(状态/日期/说明各一键行),且状态值、说明与 STATUS 表
+      一致 → 不需要改,**旧日期保留**(日期只在人工/工具真改状态时才随重写刷新);
+    - README(无日期的固定块):规范化文本与现状逐字一致才不需要改;
+    - 缺块、块重复(键行多出来)、值不一致 → 需要重写。
+    """
+    if rel in README_BANNER:
+        return normalize_banner(txt, rel, "") != txt
+    states, _dates, notes = _banner_fields(txt)
+    tgt_state, tgt_note = _status_for(rel)
+    if len(states) != 1 or len(notes) != 1:
+        return True                       # 缺块或叠了多份
+    return states[0] != tgt_state or notes[0] != tgt_note
+
+
+def rewrite_if_needed(path, rel, date, write):
+    """需要规范化就重建;write=True 落盘。返回"是否(会)被改动"。"""
+    with io.open(path, encoding="utf-8", errors="replace") as f:
+        txt = f.read()
+    if not needs_banner(txt, rel):
+        return False
+    txt3 = normalize_banner(txt, rel, date)
+    if txt3 == txt:
+        return False
+    if write:
         with io.open(path, "w", encoding="utf-8", newline="") as f:
             f.write(txt3)
-        return True
-    return False
+    return True
 
 
 SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
@@ -240,6 +288,9 @@ def git_last_dates(here):
 def main():
     ap = argparse.ArgumentParser(description=".md 文档体检(列清单 / 补状态行)")
     ap.add_argument("--banner", action="store_true", help="按 STATUS 表给 md 补/更新状态块")
+    ap.add_argument("--check", action="store_true",
+                    help="与 --banner 同口径但**只读**:报告待规范化的 md 数,不写盘;"
+                         "有待修时退出码 1(供体检/CI;永不改工作树)")
     ap.add_argument("--index", action="store_true", help="生成 docs/文档索引.md(状态一览)")
     ap.add_argument("--banner-all", action="store_true",
                     help="连同 `--banner`:把没在 STATUS 表里的也补上「待核对」状态块")
@@ -268,12 +319,21 @@ def main():
         print("{:<58} {:<10} {:>7.1f} {:<6} {}".format(
             path[:58], date, size / 1024.0, "是" if has else "-", head))
 
-    if args.banner:
+    if args.banner or args.check:
         today = time.strftime("%Y-%m-%d")
-        n = 0
+        write = not args.check
+        changed_paths = []
         for path, _label, _date, _size, _head, _has in rows:
-            if apply_banner(os.path.join(here, path), path, today):
-                n += 1
+            if rewrite_if_needed(os.path.join(here, path), path, today, write):
+                changed_paths.append(path)
+        n = len(changed_paths)
+        if args.check:
+            print("\n待更新 {} 个 md 的状态块(只读 --check,未写盘;跑 --banner 修复)".format(n))
+            for p in changed_paths[:20]:
+                print("  · {}".format(p))
+            if len(changed_paths) > 20:
+                print("  · … 其余 {} 个".format(len(changed_paths) - 20))
+            return 1 if n else 0
         print("\n已更新 {} 个 md 的状态块(状态取自 STATUS 表 / 模式兜底)".format(n))
 
     if args.index:
@@ -318,4 +378,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main())

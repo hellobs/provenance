@@ -81,14 +81,20 @@ for name, paths, cwd in suites:
         say("tests", False, "{}: junit 解析失败 {}: {}".format(name, type(exc).__name__, exc))
 
 print("=" * 88)
-print("C. 服务面(5004 已退役、5020 无启动脚本,不再探活)")
+print("C. 服务面(按约定平时关闭;5004 已退役、5020 无启动脚本)")
+# 口径(2026-10-03):服务**平时就是关的**(用户明确要求,演示/对拍时才手动起),
+# 所以"连不上"不是故障、不进结论里的 ⚠ —— 旧版体检必然刷 4 条服务警告,把真正
+# 该看的问题淹了。在线就记 ✓,离线只做中性说明;要查"服务必须在线"请起服务后单探。
 faces = [("5010 实时面", "http://127.0.0.1:5010/health"),
          ("5002 契约", "http://127.0.0.1:5002/api/runs"),
          ("5003 case00 存档", "http://127.0.0.1:5003/api/runs"),
          ("8060 配置工具", "http://127.0.0.1:8060/engines")]
 for name, url in faces:
     code, body = http(url)
-    say("service", code == 200, "{}: HTTP {}".format(name, code))
+    if code == 200:
+        say("service", True, "{}: 在线".format(name))
+    else:
+        print("  · [service] {}: 未运行(HTTP {},按约定平时关闭)".format(name, code))
 
 print("=" * 88)
 print("D. 数据面")
@@ -173,8 +179,17 @@ say("ivd", not code_hits,
     "mavis 真代码里的业务词:{} 处;注释/文档串 {} 处(允许)".format(len(code_hits), len(doc_hits)))
 rev = sh('git grep -n -E "case01|case_engine|provenance" -- mavisframework/', MAVIS)
 say("ivd", not rev.strip(), "mavis 反向依赖案例层:{} 处".format(len(rev.splitlines())))
-ct = sh('git grep -c -E "provenance|case_engine" -- config_tool/', MAVIS)
-say("ivd", not ct.strip(), "config_tool 反向依赖(已知未收口):{} 个文件命中".format(len(ct.splitlines())))
+# 2026-10-03 改口径:棘轮(test_mavis_purity)只扫 **.py**,基线 1 文件/4 处(engine_bridge.py)。
+# 旧写法 git grep 全文件,把 README/HTML 模板里的提及也算成"文件命中",永远报 4 个 ⚠,
+# 与测试口径对不上 —— 体检数字和守卫数字必须同源,否则两个都不可信。
+ct = sh('git grep -c -E "case_engine|provenance" -- "config_tool/*.py" "config_tool/**/*.py"', MAVIS)
+ct_files = [l for l in ct.splitlines() if l.strip()]
+ct_hits = sum(int(l.rsplit(":", 1)[1]) for l in ct_files if l.rsplit(":", 1)[1].isdigit())
+ct_doc = sh('git grep -l -E "case_engine|provenance" -- config_tool/ ":!*.py"', MAVIS)
+n_doc = len([l for l in ct_doc.splitlines() if l.strip()])
+say("ivd", len(ct_files) <= 1 and ct_hits <= 4,
+    "config_tool .py 反向依赖(棘轮基线 1 文件/4 处):{} 文件 / {} 处;另有文档/模板提及 {} 个(不计入棘轮)".format(
+        len(ct_files), ct_hits, n_doc))
 say("ivd", os.path.isfile(os.path.join(PKG, "case_engine", "tests", "test_ivd_invariants.py")),
     "IVD 不变量守卫存在")
 
@@ -208,9 +223,15 @@ guards = [
 ]
 node = sh("node --version")
 say("guard", node.strip().startswith("v"), "node 可用:{}".format(node.strip()[:12]))
-g1 = sh('node "{}" "http://127.0.0.1:8060/scenario"'.format(
-    os.path.join(PKG, "case01", "tools", "check_inline_js.js")))
-say("guard", "OK" in g1 and "语法错误" not in g1, "配置工具内联 JS 语法")
+# 2026-10-03 改:8060 按要求常年关着,旧版硬连端口,连不上就把"服务没起"误报成"JS 语法错"。
+# 先探活:在线查渲染页,不在线就离线扫模板文件(check_inline_js.js 两种参数都支持)。
+_scn_code, _ = http("http://127.0.0.1:8060/scenario", timeout=2)
+_scn_tpl = os.path.join(MAVIS, "config_tool", "templates", "scenario.html")
+_js_target = "http://127.0.0.1:8060/scenario" if _scn_code else _scn_tpl
+g1 = sh('node "{}" "{}"'.format(os.path.join(PKG, "case01", "tools", "check_inline_js.js"),
+                                 _js_target))
+say("guard", "OK" in g1 and "语法错误" not in g1 and "失败" not in g1,
+    "配置工具内联 JS 语法({})".format("8060 在线" if _scn_code else "离线扫模板"))
 g2 = sh('node "{}" "{}"'.format(os.path.join(PKG, "case01", "tools", "test_engine_toggle.js"),
                                 os.path.join(MAVIS, "config_tool", "templates", "scenario.html")))
 say("guard", "全部通过" in g2, "引擎显隐逻辑(三态)")
@@ -368,10 +389,12 @@ print("  · 代码量:案例侧遗留(4 模块)约 {} 行 vs 通用层 case_engi
 
 print("=" * 88)
 print("J. 工具幂等 / 未收口")
-a = sh('"{}" -X utf8 "{}" --banner'.format(PY, os.path.join(PKG, "tools", "doc_audit.py")))
-b = sh('"{}" -X utf8 "{}" --banner'.format(PY, os.path.join(PKG, "tools", "doc_audit.py")))
-say("tool", "已更新 0 个" in b, "doc_audit --banner 幂等(第二遍: {})".format(
-    b.strip().splitlines()[-1] if b.strip() else "?"))
+# 2026-10-03 改:这里以前**实跑两遍** `doc_audit --banner` 来验证幂等 —— 第一遍就会把
+# 几十个 md 的状态块(含日期)重写进工作树,与本脚本"只做事实收集"的承诺矛盾,实测一次
+# 体检改脏了 64 份 md、还把多行状态块改坏。改成只读 --check:不写盘也能得出"几份待修"。
+c = sh('"{}" -X utf8 "{}" --check'.format(PY, os.path.join(PKG, "tools", "doc_audit.py")))
+c_last = c.strip().splitlines()[-1] if c.strip() else "?"
+say("tool", "待更新 0 个" in c, "doc_audit --check 只读体检:{}".format(c_last))
 mavis_dirty = len([l for l in sh("git status --short", MAVIS).splitlines() if l.strip()])
 say("open", mavis_dirty == 0, "mavis 仓未提交 {} 个文件(config_tool 与那位 agent 的在途改动)".format(
     mavis_dirty))
