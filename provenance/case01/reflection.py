@@ -806,6 +806,14 @@ def run_router(llm, reflection_text: str, material: str = "",
         {"role": "user", "content": prompt},
     ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
+    # 空输出**必须报错**,不能当成"反思里没有问题"(2026-10-03 实测 9/41 条如此):
+    # Router 的职责是一定拆出问题,空 content 只可能是上游 thinking 吃光了预算。
+    # 过去这里返回 issues=[] 且不抛,记录看起来是"干净样本",专家侧却无单可建 ——
+    # 一条坏样本被伪装成好样本。抛出去由调用方写失败占位(status=error),统计可摘除。
+    if not raw.strip():
+        raise RuntimeError(
+            "Router 模型返回空内容(思考链可能吃光了 max_tokens={});"
+            "空输出不等于『没有问题』".format(max_tokens))
     issues = _parse_router_json(raw, expert_pool=expert_pool,
                                 reflection_text=reflection_text,
                                 evidence_sentences=sentence_map)

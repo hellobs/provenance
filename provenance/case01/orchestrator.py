@@ -25,6 +25,7 @@ import time
 from .atomicio import write_json_atomic, write_text_atomic
 from .world.state import World, WorldConfig
 from .world.timelines import build_timeline
+from .consistency import attach_consistency
 from .world.branch import (LLMBranchJudge, RuleBranchRouter,
                            ConditionPlanParser, derive_trigger,
                            evaluate_trigger)
@@ -275,6 +276,16 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         branch, action = router.route(answer)
         log("=== Branch (rules): {} ===".format(branch))
 
+    # 分支从哪来:forced=运行参数指定,judge=由 T0 回答判定,judge-failed=判官三次都没
+    # 给出 A/B/C(单列,否则"判失败"会被当成"判出 B")。这一项必须进记录
+    # (branch_action.source),否则下面的一致性戳分不清预设与判定。
+    if forced:
+        branch_source = "preset"
+    elif router_llm is not None:
+        branch_source = "judge-failed" if branch == "undetermined" else "judge"
+    else:
+        branch_source = "rules"
+
     # Branch C:把条件化建议解析成仓位(0904:程序决定事实,不让 Ethan 自定)
     c_plan = None
     if branch == "C" and router_llm is not None:
@@ -450,6 +461,10 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
 
     # ---- 7) 审计与落盘 ----
     rec.data["audit"] = world.audit()
+    # 一致性戳:落盘**之前**盖,所以文件里一定有这一节(2026-10-03)。原来这条路径
+    # 直接 rec.save()、绕过了 mavis pipeline 的盖章,批量样本 43 条全无 consistency,
+    # 平台侧一律判 unverified —— 分不出"自洽"与"压根没查过"。
+    rec.data = attach_consistency(rec.data, branch_source=branch_source)
     p = rec.save()
     log("recorded -> " + p)
     return rec

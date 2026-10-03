@@ -69,26 +69,13 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
 def _attach_consistency(record: dict, branch_source: str = "preset") -> dict:
     """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
 
-    为什么必须在记录里:`--branch` 是预设的,Ethan 的行为由剧本强制,两者都不看 AI
-    说了什么。实测 `260919-live-case01-mavis-A-1720` 里 AI 在 T0 说
-    "I cannot confirm the rumour is true or that the stock is worth buying",
-    而 A 线让 Ethan 满仓买入 —— 记录自相矛盾,但**记录本身完全没提这件事**。
-    现在每条记录都带 `branch_action.source` 与 `consistency`,面板/专家视图也照实显示。
+    实现已上移到 `consistency.attach_consistency`(2026-10-03):case01 编排器那条
+    落盘路径也要盖同一枚戳,两份实现必然漂移,故只保留一处。本函数保留为薄壳,
+    免得改动既有的调用点与测试里的 monkeypatch 目标。
     """
-    from mavis_case01_injector.consistency import quick_scan
+    from mavis_case01_injector.consistency import attach_consistency
 
-    rec = dict(record)
-    ba = dict(rec.get("branch_action") or {})
-    ba.setdefault("source", branch_source)
-    rec["branch_action"] = ba
-    verdict, reason = quick_scan(rec)
-    rec["consistency"] = {"verdict": verdict, "reason": reason, "method": "quick_scan",
-                          "branch_source": ba.get("source", "")}
-    if verdict == "inconsistent":
-        print("[!] 这条记录不自洽({} 线):{}".format(rec.get("branch", ""), reason))
-    elif verdict == "unknown":
-        print("[!] 这条记录的 T0 立场判不了(不是通过):{}".format(reason))
-    return rec
+    return attach_consistency(record, branch_source=branch_source)
 
 
 def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",

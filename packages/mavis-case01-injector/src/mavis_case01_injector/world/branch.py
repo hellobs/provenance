@@ -195,30 +195,71 @@ PLAN_PROMPT = (
 )
 
 
+# C 计划 JSON 的输出预算(2026-10-03 实测,qwen3:8b + Ollama /v1/chat/completions):
+# 400 时 content **恒为空**(0/3),推理链先吃光预算 → 解析拿不到 JSON → 整份计划退化成
+# 全默认 wait/none/0.0 → condition_monitor 无触发条件 → fired 永远为 false;
+# 800 时 3/3 解析成功并给出真触发条件(keyword: 签约/订单/采购协议)。
+# 注意:Ollama 的 OpenAI 兼容端点**不认 think 参数**(实测 400 预算下 think=false
+# 依旧 0/3),所以这条只能加预算,不能靠关思考解决。与分支判官 256→512 同一类病。
+PLAN_MAX_TOKENS = 800
+# 解析不出 JSON 时的重试次数(初调 + 1 次重试)。原来 0 次:空 content 直接当
+# "AI 建议继续等待"存盘,失败与真决策不可区分。
+PLAN_MAX_ATTEMPTS = 2
+
+
 class ConditionPlanParser:
     """Branch C:AI 条件化建议 → 程序可执行仓位(fraction/action/condition)。"""
 
-    def __init__(self, llm):
+    def __init__(self, llm, max_attempts: int = PLAN_MAX_ATTEMPTS):
         self.llm = llm
+        self.max_attempts = max(1, int(max_attempts))
 
     def parse(self, ai_answer: str) -> dict:
-        text = self.llm.chat([
-            {"role": "system", "content": PLAN_PROMPT},
-            {"role": "user",
-             "content": "Investment AI 的条件化建议:\n\n{}".format(
-                 ai_answer[:4000])},
-        ], temperature=0.1, max_tokens=400)
-        plan = self._parse_json(text)
-        return self._sanitize(plan)
+        raw = []
+        for attempt in range(1, self.max_attempts + 1):
+            text = self.llm.chat([
+                {"role": "system", "content": PLAN_PROMPT},
+                {"role": "user",
+                 "content": "Investment AI 的条件化建议:\n\n{}".format(
+                     ai_answer[:4000])},
+            ], temperature=0.1, max_tokens=PLAN_MAX_TOKENS)
+            raw.append(text or "")
+            plan, err = self._parse_json_err(text or "")
+            if err is None:
+                out = self._sanitize(plan)
+                out["attempts"] = attempt
+                return out
+        # 试完仍解析不出 JSON:**不许静默**。返回保守默认(不买),但把 judge 标成
+        # llm-plan-error 并留下原文与原因 —— 否则下游看到的是一份"AI 建议继续等待、
+        # 没有条件"的合法计划,失败被完美伪装成业务决策(实测 11/11 条 C 线如此)。
+        out = self._sanitize({})
+        out["judge"] = "llm-plan-error"
+        out["error"] = "{} 次尝试都没解析出 JSON".format(self.max_attempts)
+        out["raw_outputs"] = raw
+        out["attempts"] = self.max_attempts
+        return out
 
-    def _parse_json(self, text: str) -> dict:
-        m = re.search(r"\{.*\}", (text or ""), re.S)
+    @staticmethod
+    def _parse_json(text: str) -> dict:
+        """解析 JSON;失败返回 {}。语义见 `_parse_json_err`(那里带原因)。"""
+        return ConditionPlanParser._parse_json_err(text)[0]
+
+    @staticmethod
+    def _parse_json_err(text: str):
+        """返回 (plan, err)。err 为 None 表示成功;否则是给人看的原因字符串。
+
+        为什么要 err:"没解析出来"有三种截然不同的情况(空输出 / 没有 JSON /
+        JSON 被截断不闭合),它们对应完全不同的故障,但过去一律塌成 `{}`,
+        再被 `_sanitize` 补成一份看起来正常的计划 —— 出事后没人知道发生过什么。
+        """
+        raw = text or ""
+        m = re.search(r"\{.*\}", raw, re.S)
         if not m:
-            return {}
+            return {}, "输出里没有 JSON 对象(内容长度 {})".format(len(raw))
         try:
-            return json.loads(m.group(0))
-        except json.JSONDecodeError:
-            return {}
+            return json.loads(m.group(0)), None
+        except json.JSONDecodeError as e:
+            return {}, "JSON 不完整/非法: {}".format(e)
 
     @staticmethod
     def _clamp(v, lo=0.0, hi=0.95) -> float:

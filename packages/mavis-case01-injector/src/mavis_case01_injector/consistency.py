@@ -174,3 +174,27 @@ def check_branch_consistency(run_record: Dict, llm=None) -> Dict:
             "detected_branch": detected, "preset_branch": branch,
             "reason": "LLM 判定为 {} 线({})".format(detected, judge_reason),
             "method": "llm_judge"}
+
+
+def attach_consistency(record: Dict, branch_source: str = "preset") -> Dict:
+    """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
+
+    必须在**写盘之前**调用:这样文件里一定有这一节,而不是"看日志才知道"。
+    2026-10-03 实测踩过的坑:`case01` 编排器路径(orchestrator.run_case01)直接
+    `rec.save()` 落盘、绕过了 mavis pipeline,43 条批量样本**全都没有这一节** ——
+    平台侧 `full_context.quality_of` 只能一律判 `unverified`,分不出
+    "自洽"与"压根没查过"。函数从 pipeline 提上来公开,就是为了让两条落盘路径
+    共用同一份实现,不再各写一份然后漂移。
+    """
+    rec = dict(record)
+    ba = dict(rec.get("branch_action") or {})
+    ba.setdefault("source", branch_source)
+    rec["branch_action"] = ba
+    verdict, reason = quick_scan(rec)
+    rec["consistency"] = {"verdict": verdict, "reason": reason, "method": "quick_scan",
+                          "branch_source": ba.get("source", "")}
+    if verdict == "inconsistent":
+        print("[!] 这条记录不自洽({} 线):{}".format(rec.get("branch", ""), reason))
+    elif verdict == "unknown":
+        print("[!] 这条记录的 T0 立场判不了(不是通过):{}".format(reason))
+    return rec

@@ -84,9 +84,15 @@ class _ChatMixin:
                 choice = obj["choices"][0]
                 self._note_truncation(choice.get("finish_reason"), max_tokens)
                 return choice["message"]["content"]
-            except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
+            except (urllib.error.URLError, KeyError, json.JSONDecodeError,
+                    TimeoutError) as e:
+                # TimeoutError 必须在这里(2026-10-03):urlopen 超时抛的是
+                # socket.timeout(=TimeoutError),它**不是** URLError 的子类,
+                # 原先漏掉 → 8b 单次生成超 120s 时不重试、直接冒泡把整条 run 打死
+                # (批次 261003-165042 的 014 就是这样,run.json 全丢)。
                 last_err = e
-                time.sleep(2 * (attempt + 1))
+                if attempt + 1 < self.retries:   # 末轮不白睡
+                    time.sleep(2 * (attempt + 1))
         raise RuntimeError("{} chat failed after {} retries: {}".format(
             type(self).__name__, self.retries, last_err))
 
@@ -128,9 +134,11 @@ class OllamaClient(_ChatMixin):
                 if embs:
                     return embs[0]
                 return None
-            except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
+            except (urllib.error.URLError, KeyError, json.JSONDecodeError,
+                    TimeoutError) as e:
                 last_err = e
-                time.sleep(2 * (attempt + 1))
+                if attempt + 1 < self.retries:   # 末轮不白睡
+                    time.sleep(2 * (attempt + 1))
         raise RuntimeError("Ollama embed failed after {} retries: {}".format(
             self.retries, last_err))
 
@@ -181,9 +189,11 @@ class OllamaClient(_ChatMixin):
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     obj = json.loads(resp.read().decode("utf-8"))
                 return obj["message"]["content"]
-            except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
+            except (urllib.error.URLError, KeyError, json.JSONDecodeError,
+                    TimeoutError) as e:
                 last_err = e
-                time.sleep(2 * (attempt + 1))
+                if attempt + 1 < self.retries:   # 末轮不白睡
+                    time.sleep(2 * (attempt + 1))
         raise RuntimeError("Ollama native_chat failed after {} retries: {}".format(
             self.retries, last_err))
 
@@ -242,9 +252,10 @@ class VLLMClient(_ChatMixin):
                     obj = json.loads(resp.read().decode("utf-8"))
                 return obj["data"][0]["embedding"]
             except (urllib.error.URLError, KeyError, IndexError,
-                    json.JSONDecodeError) as exc:
+                    json.JSONDecodeError, TimeoutError) as exc:
                 last_err = exc
-                time.sleep(2 * (attempt + 1))
+                if attempt + 1 < self.retries:   # 末轮不白睡
+                    time.sleep(2 * (attempt + 1))
         raise RuntimeError("VLLM embed failed after {} retries: {}".format(
             self.retries, last_err))
 

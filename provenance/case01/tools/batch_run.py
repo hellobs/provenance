@@ -176,6 +176,25 @@ def _run_with_probe(cmd, cwd: str, env: Dict, log_path: str, timeout: int,
         return -1, seen
 
 
+def _failure_tail(log_path: str, limit: int = 3000) -> str:
+    """失败日志里**真正解释失败的那一段**。
+
+    原来固定取文件末尾 1500 字符,踩过的坑(2026-10-03 批次 261003-165042/014):
+    重试机制会在 traceback **之后**继续写正常输出,于是尾部 1500 字里根本没有
+    `TimeoutError` —— 台账里只看到 rc=1,失败原因得翻原始 .log 才知道,
+    等于失败原因在批处理层丢了。这里改成从**最后一个 Traceback 起点**截到文末;
+    找不到 traceback 就退回文件末尾。
+    """
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError:
+        return ""
+    idx = text.rfind("Traceback (most recent call last)")
+    tail = text[idx:] if idx >= 0 else text[-limit:]
+    return tail[-limit:]
+
+
 def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
     """跑一条案例。返回台账行;失败不抛异常(一条崩不带走整批)。"""
     env = dict(os.environ)
@@ -228,13 +247,7 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
         _log("  ⚠️ 模型不符:请求 {} 实测 {} —— {}".format(
             rec["model_requested"], rec["model_actual"], run_id))
     if not rec["ok"]:
-        tail = ""
-        try:
-            with open(log_path, encoding="utf-8", errors="replace") as f:
-                tail = f.read()[-1500:]
-        except OSError:
-            pass
-        rec["log_tail"] = tail
+        rec["log_tail"] = _failure_tail(log_path)
     _append_jsonl(os.path.join(out_dir, "ledger.jsonl"), rec)
     if not rec["ok"]:
         _append_jsonl(os.path.join(out_dir, "failures.jsonl"), rec)
