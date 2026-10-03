@@ -175,7 +175,13 @@ def test_pipeline_require_consistent_blocks_writing(tmp_path):
 
 
 def test_backfill_tool_adds_stamp_without_touching_others(tmp_path):
-    """回填工具只加两个字段,不动反思/分流。"""
+    """回填工具只加两个字段,不动反思/分流。
+
+    注意 source 的取值:2026-10-03 之前这里是无条件 `setdefault("source","preset")`,
+    那是**误标** —— judge 模式(LLM 判分支)的记录被标成 preset,而实测 185 份记录里
+    134 份属此类。现在改成从 branch_action 的特征反推;**判不出来就诚实回
+    "unknown"**,不谎报一个具体来源(宁可标不知道,也不骗下游)。
+    """
     import json
 
     from case01.tools.backfill_consistency import backfill
@@ -187,6 +193,49 @@ def test_backfill_tool_adds_stamp_without_touching_others(tmp_path):
     p.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
     before, after, _reason = backfill(str(p), write=True)
     got = json.loads(p.read_text(encoding="utf-8"))
-    assert before == (None, None) and after == ("preset", "consistent")
+    # 这条记录里没有任何分支来源的证据 → 诚实标 unknown,而不是默认 preset。
+    assert before == (None, None) and after == ("unknown", "consistent")
     assert got["reflection"]["text"] == "反思原文"
     assert got["router"]["issues"][0]["id"] == "issue-1"
+    # 写盘必须留 .bak 且内容是**改动前**那份(runs/ 不入库,没备份就不可回滚)
+    bak = tmp_path / "run.json.bak"
+    assert bak.exists(), "回填写盘必须先备份"
+    assert json.loads(bak.read_text(encoding="utf-8")).get("consistency") is None, \
+        ".bak 里必须是改动前的原始内容,不是改后的"
+
+
+def test_backfill_detects_judge_mode_instead_of_relabelling_it_preset(tmp_path):
+    """★ 回归:judge 模式的记录**不能**被回填成 preset(实测会错标 134/185)。"""
+    import json
+
+    from case01.tools.backfill_consistency import backfill, detect_branch_source
+
+    ba_judge = {"judge": "llm", "attempts": 2, "raw_outputs": ["", "{}"]}
+    ba_preset = {"timeline": "B"}
+    ba_rules = {"judge": "rules"}
+    assert detect_branch_source(ba_judge) == "judge"
+    assert detect_branch_source(ba_preset) == "preset"
+    assert detect_branch_source(ba_rules) == "rules"
+    assert detect_branch_source({}) == "unknown"
+
+    p = tmp_path / "run.json"
+    rec = _rec("B", "I would not recommend buying now.")
+    rec["branch_action"] = ba_judge
+    p.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    _before, after, _reason = backfill(str(p))
+    assert after[0] == "judge", "judge 记录被误标成 {} 了".format(after[0])
+
+
+def test_backfill_never_overwrites_an_existing_source(tmp_path):
+    """已有 source 是当初跑的时候写下的事实,回填不该改写它。"""
+    import json
+
+    from case01.tools.backfill_consistency import backfill
+
+    p = tmp_path / "run.json"
+    rec = _rec("B", "I would not recommend buying now.")
+    rec["branch_action"] = {"judge": "llm", "attempts": 1, "source": "judge-failed"}
+    p.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    backfill(str(p))
+    got = json.loads(p.read_text(encoding="utf-8"))
+    assert got["branch_action"]["source"] == "judge-failed", "已有来源被回填改写了"

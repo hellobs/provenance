@@ -23,19 +23,59 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from case01.consistency import quick_scan  # noqa: E402
 
 
+def detect_branch_source(ba: dict) -> str:
+    """从 branch_action 反推分支来源,**不靠猜**(2026-10-03 体检修)。
+
+    原来是无条件 `setdefault("source", "preset")` —— 那只对"分支由运行参数指定"
+    的老记录成立。现在批量跑出来的记录是 **judge 模式**(分支由 T0 回答判定),
+    实测 185 份 run.json 里 134 份没写 source 且全带 judge 特征,照原样回填会
+    把 72% 的记录**误标成 preset**:preset 与 judge 在平台侧是不同语义,标错了
+    研究者会以为这些样本是预设分支跑的。
+
+    判据(按可靠性排序):
+      - `judge` 字段以 llm 开头  → judge(它就是那个判官写的)
+      - 有 `attempts`/`raw_outputs` → judge(只有判官路径才会留这两样)
+      - 有 `timeline` → preset(judge 模式下**不能**用它当判据:实测存在
+        `source=judge` 却同时带 `timeline=B` 的记录)
+    判不出来就返回 "unknown" —— 宁可标"不知道",也不谎报一个具体来源。
+    """
+    judge = str(ba.get("judge") or "")
+    if judge.startswith("llm"):
+        return "judge"
+    if judge == "judge-failed":
+        return "judge-failed"
+    # 编排器强制分支时写的是 judge="forced"(那是运行参数指定的,属 preset 侧);
+    # 规则判定器写的是 judge="rules"。
+    if judge == "forced":
+        return "preset"
+    if judge == "rules":
+        return "rules"
+    if ba.get("attempts") is not None or ba.get("raw_outputs") is not None:
+        return "judge"
+    if ba.get("timeline"):
+        return "preset"
+    return "unknown"
+
+
 def backfill(path, write=False):
     with io.open(path, encoding="utf-8") as f:
-        rec = json.load(f)
+        original = f.read()
+    rec = json.loads(original)
     before = (rec.get("branch_action") or {}).get("source"), (rec.get("consistency") or {}).get("verdict")
     ba = dict(rec.get("branch_action") or {})
-    # 旧记录的分支都是运行参数指定的 → preset;judge 模式是后来才有的
-    ba.setdefault("source", "preset")
+    # 已有 source 就**不覆盖**:那是当初跑的时候写下的事实,回填不该改写它。
+    if not ba.get("source"):
+        ba["source"] = detect_branch_source(ba)
     rec["branch_action"] = ba
     verdict, reason = quick_scan(rec)
     rec["consistency"] = {"verdict": verdict, "reason": reason, "method": "quick_scan",
                           "branch_source": ba.get("source")}
     after = (ba["source"], verdict)
     if write:
+        # 先把**原始内容**备份再写(runs/ 不入库,写坏了没法从 git 回滚 —— 同
+        # backfill_failed_stages.py:153 的做法)。备份的是改动前那份,不是改后的。
+        with io.open(path + ".bak", "w", encoding="utf-8") as f:
+            f.write(original)
         with io.open(path, "w", encoding="utf-8") as f:
             json.dump(rec, f, ensure_ascii=False, indent=2)
     return before, after, reason
