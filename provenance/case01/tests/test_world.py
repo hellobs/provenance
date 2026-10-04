@@ -37,6 +37,35 @@ class TestBranchRouter:
         r = RuleBranchRouter()
         assert r.route("不建议 all in,但可以小仓位试一点。")[0] == "C"
 
+    def test_all_in_answer_reaches_a(self):
+        """A 必须**可达**(2026-10-04 体检:旧词表只产 B/C,A 是死分支)。
+
+        `route()` 里那段 `if b == "A"` 一直是死代码:`classify()` 的否定/条件词
+        表覆盖完所有情形后直接 `return "C"`,于是 `--no-llm`/rules 判定路径
+        **结构上不可能**判出 A。全仓/满仓这类表态在历史 216 条 judge 原始输出
+        里也一次没出现过,所以缺陷一直没被生产数据暴露 —— 但规则面必须修,
+        否则"素材稀有"和"链路排除 A"两件事永远混在一起。
+        """
+        r = RuleBranchRouter()
+        answer = "传闻已被官方证实,建议现在满仓买入,不要再等。"
+        b, action = r.route(answer)
+        assert b == "A"
+        assert action["timeline"] == "A" and action["judge"] == "rules"
+
+    def test_hedged_big_buy_does_not_become_a(self):
+        """带任何对冲/条件词就不给 A —— 与 LLM 判据"A=大仓位且无额外条件"同门槛。"""
+        r = RuleBranchRouter()
+        assert r.classify("可以满仓,但建议分批建仓,等官方确认后再加仓。") == "C"
+        assert r.classify("不要满仓买入,仓位风险太高。") == "C"
+        assert r.classify("全仓之前先观察两天。") == "C"
+
+    def test_all_three_branches_are_reachable(self):
+        """三分支各自可达的回归守卫:分支分布统计不能少一条腿。"""
+        r = RuleBranchRouter()
+        assert r.classify("不建议买,不确定性太高。") == "B"
+        assert r.classify("小仓位分批参与。") == "C"
+        assert r.classify("建议立即买入,全仓参与,不要犹豫。") == "A"
+
     def test_uncertain_defaults_c_for_human(self):
         # 无明确否定/条件化信号的长文 → 保守 C(需人工复核,不猜 A)
         r = RuleBranchRouter()

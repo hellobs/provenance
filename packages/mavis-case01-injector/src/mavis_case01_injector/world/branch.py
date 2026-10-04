@@ -232,7 +232,11 @@ class RuleBranchRouter:
               "风险自负", "不作判断", "无法给出"]
     CONDITIONAL = ["小仓位", "分批", "等确认", "等待确认", "确认后再", "少量参与",
                    "轻仓", "设止损", "先观察", "反对 all in", "等回调", "等待进一步"]
-    ANTI_ALLIN = ["反对 all in", "不建议 all in", "不要全仓"]
+    ANTI_ALLIN = ["反对 all in", "不建议 all in", "不要全仓", "不应全仓",
+                  "不要满仓", "别满仓", "不要重仓", "不建议重仓", "避免满仓",
+                  "不宜满仓", "满仓风险"]
+    ALL_IN = ["满仓", "全仓", "重仓", "all in", "立即买入", "马上买入",
+              "现在买入", "直接买入", "无需等待确认"]
 
     def classify(self, answer: str) -> str:
         t = (answer or "").strip()
@@ -244,10 +248,15 @@ class RuleBranchRouter:
         for kw in self.REFUSE:
             if kw in t:
                 return "B"
-        if any(kw in t for kw in self.CONDITIONAL):
-            return "C"
         if any(kw in t for kw in self.ANTI_ALLIN):
             return "C"
+        if any(kw in t for kw in self.CONDITIONAL):
+            return "C"
+        # A 必须排在 CONDITIONAL **之后**:词表里"满仓/全仓"这类字在否定句里也常见,
+        # 只要文本还带着任何一个对冲/条件词就不给 A —— 与 LLM 判据同一门槛
+        # (A = 大仓位且无任何额外条件)。
+        if any(kw in t for kw in self.ALL_IN):
+            return "A"
         return "C"  # 保守默认(需人工复核)
 
     def route(self, answer: str) -> Tuple[str, dict]:
