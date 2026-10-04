@@ -31,6 +31,9 @@
 ----
 - **只统计真实存在的 run.json**;解析失败的单独计数,不混进分布。
 - 反思字数按 `reflection.text` 长度;质量分取 `reflection.quality.score`。
+- 台账行(`--batch`)是扁平摘要:字数/质量分/status/失败原因/issue 计数以
+  `reflection_*`、`issues*` 为准,run.json 在场时仍以明细覆盖 —— 两条链
+  (`--batch` 与 `--scan-runs`)必须给同一份 row。
 - 基线数字来自 `results/analysis/答辩速查表.md`(25 条,4b 本地模型),
   与本批次(8b)**不是同口径**,对比只作量级参照,不宣称显著性。
 """
@@ -96,14 +99,15 @@ def _row(run_id: str, d: Dict) -> Dict:
     quality = refl.get("quality") or {}
     post = router.get("postprocess") or {}
     issues = router.get("issues") or []
-    return {
+    reasons = quality.get("failure_reasons") or []
+    row = {
         "run_id": run_id,
         "branch": d.get("branch") or "",
         "consistency": _consistency_verdict(d),
         "refl_chars": _count(refl.get("text")) or len(refl.get("text") or ""),
         "refl_score": quality.get("score"),
         "refl_status": quality.get("status") or "",
-        "refl_fail_reasons": quality.get("failure_reasons") or [],
+        "refl_fail_reasons": reasons,
         "issues": _count(issues),
         "issues_final": post.get("final_issue_count", _count(issues)),
         "turns": _count(d.get("turns")),
@@ -121,6 +125,27 @@ def _row(run_id: str, d: Dict) -> Dict:
                              else "")),
         "router_error": (router.get("error") or "") if router.get("status") in ("error", "skipped") else "",
     }
+    # 台账行是**扁平摘要**(`reflection_chars/_score/_status/_failure_reasons`
+    # 与 `issues/issues_final`,见 batch_run._digest),run.json 是嵌套结构。
+    # 原先只吃嵌套侧,台账自带的这些字段全被丢掉、只能靠回读 run.json 补;
+    # 一旦 run.json 不在(目录被清、换机分析、事后删档),这条记录就带着
+    # refl_chars=0 / issues=0 溜进均值,报出来的是"模型写了一篇 0 字反思、
+    # Router 一条 issue 都没挑",而不是"这条的明细读不到"。
+    # 现在:嵌套侧给不出东西时以扁平台账字段为准。
+    for key, flat_key in (("refl_chars", "reflection_chars"),
+                          ("refl_score", "reflection_score"),
+                          ("refl_status", "reflection_status"),
+                          ("refl_fail_reasons", "reflection_failure_reasons"),
+                          ("issues", "issues"),
+                          ("issues_final", "issues_final")):
+        if row[key] in (None, "", 0, []):
+            v = d.get(flat_key)
+            if v not in (None, ""):
+                row[key] = v
+    if not row["refl_error"] and row["refl_status"] == "error":
+        row["refl_error"] = (";".join(str(x) for x in (row["refl_fail_reasons"] or []))
+                             or "反思生成失败(台账只记了 status=error)")
+    return row
 
 
 def _is_failed(r: Dict) -> bool:
@@ -166,10 +191,12 @@ def _collect_from_ledger(batch: str) -> tuple:
                 continue          # 只留成功且未重复的
             seen.add(run_id)
             rows.append(_row(run_id, rec))
-    # 台账摘要缺 quality 组件的,回读 run.json 补全(保证与扫目录同口径)
+    # 台账摘要之外再回读 run.json 补全(与扫目录同口径)。
+    # 2026-10-04 修:原先只在 `refl_status` 为空时回读,那是"台账没有质量字段"
+    # 时的代理判断;一旦 _row 开始吃扁平字段,这个代理就永远为真、回读整段变成死代码,
+    # 而 router.status(error/skipped)只有 run.json 里有 —— 不读就摘不出"Router 没跑成"。
+    # 现在恒回读:文件在场就以明细为准,不在场就以台账摘要为准。
     for r in rows:
-        if r.get("refl_status"):
-            continue
         d2 = _load_run(os.path.join(RUNS_DIR, r["run_id"], "run.json"))
         if d2:
             full = _row(r["run_id"], d2)
