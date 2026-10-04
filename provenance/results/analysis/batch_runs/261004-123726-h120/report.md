@@ -150,3 +150,67 @@
 
 *口径说明(第一至七节):统计源为 `results/analysis/batch_runs/261004-123726-h120/ledger.jsonl` 与 `case01/runs/<run_id>/run.json`,全部只读;批前基线 = 242 条全库 − 本批 39 条 = 203 条,与 12:33 实测的 97/25/80/1 完全吻合。分析用的临时统计脚本未落仓库,算完即删,`git status` 除本批次目录外干净。*
 
+
+## 九、第二轮:CI 修复与"取数/自查层"体检(2026-10-04 下午)
+
+第一至八节是**只读**体检;本节起的五项是按第八节线索改代码 + 补测试,已分别入库。
+
+**1. CI 红的那条不是产品问题,是测试的平台盲区(b04a1d7)。**
+`test_run_text_...` 的控制组只认 Windows 的坏法:`-X utf8` 下 `text=True` 严格解码遇 GBK 字节,
+Windows 走读取线程 → 异常被吞 → `communicate()` 交回 `stdout=None`;ubuntu-latest 走 select 路径、
+没有读取线程 → 直接 `UnicodeDecodeError` 抛在父进程。改成按平台各自断"严格解码必须出事",
+产品侧 `run_text(errors="replace")` 两边本来就对。CI 转绿。
+
+**2. `batch_analyze` 取数层丢弃台账自带摘要(2957bf1)。**
+每份报告的数字都从 `_row`/`_collect_from_ledger` 出来,而这一层此前没有测试:只吃 run.json 的
+嵌套形状,台账(`batch_run._digest` 写的)扁平摘要里 `reflection_chars/_score/_status/
+_failure_reasons/issues/issues_final` **整段被丢**,全靠回读 run.json 兜。于是 run.json 不在
+(清目录、换机分析、事后删档 —— 本仓已有 12 个这样的目录)时,那条记录带着 `refl_chars=0`、
+`issues=0` 进均值,报出来是"模型写过一篇 0 字反思、Router 一条 issue 没挑",而不是"明细读不到"。
+另外回读 gate 用 `refl_status` 判"台账有没有质量字段",而 `router.status`(error/skipped)只有
+明细里有 —— gate 一旦生效,Router 炸过的记录会被算成"干净 0 issue"。已改为恒回读。
+**已核对本批:重算结果与入库 `analysis.json` 逐字段一致(本报告口径不变)**;台账链与目录链
+对三个批次端到端同口径(0 字段差)。
+
+**3. `summary` 的耗时口径与结尾说明互相打脸(ac94104)。**
+分支/反思/Router 三节的总体是"成功读到 run.json 的行",耗时一节统计的是**台账全部行**(失败
+尝试同样烧 GPU 时间)。数字没错,错在结尾只写一句"只统计成功读到 run.json 的记录":
+261003-165042 的 summary.md 里同一份文件并存 44 行的耗时均值与 43 条的质量均值。
+现补 `seconds_n`,并把两类总体各自写明(既有数值不改)。
+
+**4. 评审前自查工具无视记录上的戳(abb7e4f)—— 这条直接影响本批的科研信号。**
+`case01/tools/consistency_report.py` 对每条记录现算 `quick_scan`,不读 `consistency.verdict`。
+本批 39 条里 **13 条与戳不符**:`-016 / -025 / -039` 立场判官盖的是 `inconsistent`(正是第三、五节
+要交给专家复核的 3 条分歧样本),现算快筛却说 `consistent` —— 自查表会把它们**藏起来**;另 11 条
+判官判了 `consistent`、快筛只能 `unknown`,于是这个"可当门禁"的退出码在一批合格记录上无故亮红。
+现在:有戳读戳、无戳才现算兜底,并新增"判定口径"列与"N 条读戳 / M 条现算"汇总行。
+修后自查表准确列出本批 3 条分歧及其判官理由。
+
+**5. 反思截断检测的绿灯形状(bfe39d4)。**
+`reflection_audit._ends_complete` 为跳过落款会把文末短行一路 pop,pop 到空时原先判"完整"——
+于是**列表体在 max_tokens 处切断**这种形状永远亮不了灯,而第四节已说明 `manifest_warnings` 未接通时
+"疑似截断 N 条"是文件侧唯一的截断证据。改为"没有正文末句可判 = 不完整";退出码与 `--clean`
+解耦(清理开场白不会让截断消失,原先 `--clean` 跑完给绿灯 = 门禁把问题咽下去);单个坏 run.json
+不再带走整轮体检,但显式计为"读不了"并计入退出码。
+**收紧后复算全库 255 条(242 + 归档 13):仍 0 条疑似截断** —— 第四节"截断未验证"的结论不变,
+但现在这个 0 是在更严的判据下得到的,且不再依赖被 pop 光的短行。
+
+**6. 平台面与评审面的"默认隐藏集合"分叉(1f6ed63)。**
+`live/history._HIDDEN_QUALITY` 注释写的是"与 5002 serve.list_runs 同口径",实测两处差一类:
+serve 的局部 `hidden` 少 `unreadable`(有目录没 run.json)。今天 serve 造不出这一类,是哑弹;
+一旦索引层透传占位行,平台就会拿一条没跑成的 run 建专家任务,而专家面把它藏着 —— 同一批记录
+两个总数。已补齐,`openapi.yaml` 的"默认少给"从两类补成四类、`quality` enum 补 `deprecated`
+(代码 2026-09-24 就有,文档一直没更)。
+
+**7. 第八节第 5 条(30 条差额)口径更新。**
+本轮把 `serve.list_runs` 本体当函数直接调(不起服务、不占端口):242 条 → 默认 213 / excluded 29 /
+全量 242,与文件侧扫描**完全一致**。所以差额不在算法,而是 12:33 那份基线对应的是**当时的文件状态**;
+全库任何存放点的 `run.json` 合计只有 257 个(`case01/runs` 242 + 归档 13 + 其它 2),仍凑不出 272。
+该基线至今不可复现,维持原样留档、不并入本批结论。
+
+*第二轮测试合计:新增 `case01/tests/test_batch_analyze_ledger.py` 15 条、
+`test_batch_summary_stats.py` 8 条、`test_consistency_report_source.py` 10 条、
+`test_reflection_audit_tail.py` 15 条、`test_quality_visibility_contract.py` 13 条;
+`case01/tests` 全量 575 passed,`case_engine/tests` 201 passed + 1 skipped,
+injector 包 4 passed,`tools/doc_audit.py --check` 待更新 0(只读)。
+CI(ubuntu-latest / py3.12)对上述 6 个提交全绿。*
