@@ -47,9 +47,14 @@ paths:
       description: |-
         全部已完成 Run 的索引(简短字段;branch 仅供平台内部关联使用)。
 
-        **默认会少给两类记录**(2026-09-20 起):
-        - `quality=questionable`:预设分支与 Investment AI 的 T0 立场自相矛盾的记录;
-        - `quality=debug`:调试跑(如 `--nodes` 截断,内容不完整)。
+        **默认会少给四类记录**(2026-09-20 起,2026-09-24 加 deprecated,2026-10-04 与
+        评审侧 `live/history._HIDDEN_QUALITY` 对齐加 unreadable):
+        - `quality=questionable`:预设分支与 Investment AI 的 T0 立场自相矛盾、判定失败(停在 T0)、
+          或反思压根没生成的记录;
+        - `quality=debug`:调试跑(如 `--nodes` 截断,内容不完整);
+        - `quality=deprecated`:记录被显式标废弃(样本作废);
+        - `quality=unreadable`:有 run 目录但 `run.json` 不在(该次 run 未落盘)。
+          本接口今天取不到这一类(索引只吃落盘记录),列在这里是为了两处口径一致。
         少给了什么**不静默**:响应里的 `excluded` 会给出计数、run_id 与原因。
         需要全量时加 `?include_questionable=1`。
         `quality=unverified`(旧记录没有一致性戳)照常返回 —— 判不了 ≠ 有问题。
@@ -61,7 +66,7 @@ paths:
         schema:
           type: boolean
           default: false
-        description: true = 连 questionable/debug 一起返回(默认 false)。
+        description: true = 连 questionable/debug/deprecated/unreadable 一起返回(默认 false)。
       responses:
         '200':
           description: Successful Response
@@ -292,12 +297,14 @@ components:
           description: Run 标识。
         quality:
           type: string
-          enum: [ok, questionable, debug, unverified]
+          enum: [ok, questionable, debug, unverified, deprecated]
           description: |-
             质检标记(2026-09-20 加,加法字段)。
-            ok=分支与 T0 立场一致(或由 T0 判定);questionable=预设分支与 T0 立场矛盾;
-            debug=调试跑(内容不完整);unverified=旧记录没有一致性戳。
-            默认只返回 ok / unverified。
+            ok=分支与 T0 立场一致(或由 T0 判定);questionable=预设分支与 T0 立场矛盾、
+            判定失败(停在 T0)或反思未生成;debug=调试跑(内容不完整);
+            deprecated=记录被显式标废弃(样本作废);unverified=旧记录没有一致性戳。
+            默认只返回 ok / unverified;另有 `unreadable`(有 run 目录但 run.json 不在)
+            也在默认排除之列,它由评审侧的占位行造出,本接口当前取不到。
         consistency:
           type: string
           enum: [consistent, inconsistent, unknown, unverified]
