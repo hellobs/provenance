@@ -7,6 +7,12 @@
   (0904 规定 Investment AI 必须本地 Ollama 运行)。
 
 chat(): 文本补全,支持 temperature/max_tokens;重试 + 超时(指数退避)。
+
+seed(采样种子,2026-10-04 加):**默认不设**——不设就是原来的非确定行为,
+一条记录的输出和源设定都不因这段代码改变。设了才进请求体(Ollama/vLLM 走
+`seed`,`LocalHFClient` 走 `torch.manual_seed`),并同时应被 `manifest.seed` 记下。
+它只把"同机同版本的逐字重生成"变成大概率可复现,**不等于**跨机逐字一致
+(见 docs/复现说明_三档口径.md §五),客户端也不自己造默认值。
 """
 import json
 import os
@@ -14,6 +20,30 @@ import time
 import urllib.request
 import urllib.error
 from typing import List, Optional
+
+
+def parse_seed(value) -> Optional[int]:
+    """把 seed 配置收成 int;空/None → None(= 不设种子)。
+
+    非法值**抛 ValueError**,不静默当成"没设":`CASE01_LLM_SEED=abc` 若被吞掉,
+    记录里就是 seed=null,而调用方以为自己固定过种子了。
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text, 10)
+    except ValueError:
+        raise ValueError("seed 必须是整数,收到:{!r}".format(value))
+
+
+def seed_from_env() -> Optional[int]:
+    """环境里的采样种子(`CASE01_LLM_SEED`);没设就是 None。"""
+    return parse_seed(os.environ.get("CASE01_LLM_SEED"))
 
 
 def _openrouter_key() -> str:
@@ -72,6 +102,9 @@ class _ChatMixin:
         ctx = num_ctx or getattr(self, "num_ctx", None)
         if ctx:
             body["options"] = {"num_ctx": ctx}
+        seed = getattr(self, "seed", None)
+        if seed is not None:
+            body["seed"] = seed
         data = json.dumps(body).encode("utf-8")
         last_err = None
         for attempt in range(self.retries):
@@ -102,7 +135,8 @@ class OllamaClient(_ChatMixin):
                  chat_model: str = "qwen3:4b-instruct-2507-q4_K_M",
                  embed_model: str = "qwen3-embedding:0.6b-q8_0",
                  timeout: float = 120.0, retries: int = 3,
-                 num_ctx: int = 32768, think: Optional[bool] = None):
+                 num_ctx: int = 32768, think: Optional[bool] = None,
+                 seed: Optional[int] = None):
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_model = embed_model
@@ -110,6 +144,7 @@ class OllamaClient(_ChatMixin):
         self.retries = retries
         self.num_ctx = num_ctx
         self.think = think
+        self.seed = seed
 
     def _chat_url(self) -> str:
         return self.base_url + "/v1/chat/completions"
@@ -168,11 +203,14 @@ class OllamaClient(_ChatMixin):
         None=沿用构造时的 `self.think`(再缺省则模型默认)。
         """
         url = self.base_url + "/api/chat"
+        options = {"num_ctx": num_ctx, "temperature": temperature,
+                   "num_predict": max_tokens}
+        if self.seed is not None:
+            options["seed"] = self.seed
         body = {
             "model": self.chat_model,
             "messages": messages,
-            "options": {"num_ctx": num_ctx, "temperature": temperature,
-                        "num_predict": max_tokens},
+            "options": options,
             "stream": False,
         }
         if think is None:
@@ -204,7 +242,8 @@ class VLLMClient(_ChatMixin):
     def __init__(self, base_url: str, chat_model: str,
                  embed_base_url: str = "", embed_model: str = "",
                  api_key: str = "", timeout: float = 120.0, retries: int = 3,
-                 extra_body: Optional[dict] = None):
+                 extra_body: Optional[dict] = None,
+                 seed: Optional[int] = None):
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_base_url = (embed_base_url or base_url).rstrip("/")
@@ -212,6 +251,7 @@ class VLLMClient(_ChatMixin):
         self.api_key = api_key
         self.timeout = timeout
         self.retries = retries
+        self.seed = seed
         # Qwen3 等混合思考模型可在客户端级固定 chat-template 参数。
         # 判定/路由这类结构化任务通常应关闭 thinking，避免 reasoning 挤占
         # max_tokens 后 content 为空；调用级 extra_body 仍可覆盖这里。
@@ -268,13 +308,19 @@ class VLLMClient(_ChatMixin):
             return False
 
 
-def local_client_from_env(retries: int = 3):
+def local_client_from_env(retries: int = 3, seed=None):
     """Select a local backend from environment variables; default to Ollama."""
     provider = os.environ.get("CASE01_LLM_PROVIDER", "ollama").strip().lower()
     chat_model = os.environ.get(
         "CASE01_LLM_MODEL", "qwen3:4b-instruct-2507-q4_K_M").strip()
     embed_model = os.environ.get(
         "CASE01_EMBED_MODEL", "qwen3-embedding:0.6b-q8_0").strip()
+    # 显式传的 seed 优先;其次 CASE01_LLM_SEED;都没有 = 不设(保持原非确定行为)
+    # (0 是合法种子值,所以只把 None/空串当"没给")
+    if seed is None or (isinstance(seed, str) and not seed.strip()):
+        seed = seed_from_env()
+    else:
+        seed = parse_seed(seed)
     if provider == "ollama":
         base_url = os.environ.get(
             "CASE01_LLM_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
@@ -289,6 +335,7 @@ def local_client_from_env(retries: int = 3):
         return OllamaClient(
             base_url=base_url,
             chat_model=chat_model, embed_model=embed_model, retries=retries,
+            seed=seed,
             think=False if think in ("0", "false", "no", "off") else None)
     if provider == "vllm":
         base_url = os.environ.get("CASE01_LLM_BASE_URL", "").strip()
@@ -302,6 +349,7 @@ def local_client_from_env(retries: int = 3):
             embed_base_url=os.environ.get("CASE01_EMBED_BASE_URL", "").strip(),
             embed_model=embed_model,
             api_key=os.environ.get("CASE01_LLM_API_KEY", "").strip(), retries=retries,
+            seed=seed,
             extra_body={"chat_template_kwargs": {"enable_thinking": False}}
             if disable_thinking else None)
     raise ValueError("CASE01_LLM_PROVIDER must be ollama or vllm")
@@ -319,13 +367,15 @@ class LocalHFClient:
                  device: str = "",
                  embed_device: str = "",
                  max_input_tokens: int = 32768,
-                 embed_max_length: int = 8192):
+                 embed_max_length: int = 8192,
+                 seed: Optional[int] = None):
         self.chat_model_path = chat_model_path
         self.embed_model_path = embed_model_path
         self.device = device
         self.embed_device = embed_device or device
         self.max_input_tokens = max_input_tokens
         self.embed_max_length = embed_max_length
+        self.seed = seed
         self.chat_model = None
         self.chat_tokenizer = None
         self.embed_model = None
@@ -399,6 +449,9 @@ class LocalHFClient:
             "max_new_tokens": max_tokens,
             "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
         }
+        if self.seed is not None:
+            # 本地权重没有"请求体",种子只能设在 torch 的采样上(贪心路径本就不随机)
+            torch.manual_seed(int(self.seed))
         if temperature and temperature > 0:
             gen_kwargs.update({
                 "do_sample": True,

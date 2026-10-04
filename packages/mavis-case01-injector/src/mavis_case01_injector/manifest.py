@@ -23,7 +23,12 @@
       记录里同时有 `branch_mode` 说明它没被调用过;
     - `temperature`:判定 0.1、反思 0.4、路由 0.2(反思/路由取 `case01.reflection`
       里的常量,同一来源,不两处写数);`judge=rules` 时判定温度记 `null` ——
-      规则没有温度,填 0.1 等于谎报调过模型。
+      规则没有温度,填 0.1 等于谎报调过模型;
+    - `seed`:这次固定没固定采样种子。`null` = **没固定**(默认行为,不保证逐字
+      重生成),这不是"取不到",所以不进 `manifest_warnings`;有值时取自客户端自己
+      声明的 `client.seed`,不另读环境变量(否则清单会与实跑漂移)。即便有值也只买到
+      "同机同版本大概率逐字一致",跨机逐字复现仍不成立(模型只记 tag、推理平台版本
+      不进清单)—— 见 `docs/复现说明_三档口径.md` §五。
 """
 import hashlib
 import os
@@ -35,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 __all__ = [
     "MANIFEST_VERSION", "REQUIRED_KEYS", "JUDGE_TEMPERATURE",
     "attach_manifest", "build_manifest", "collect_run_meta",
-    "default_financial_data_dir", "detect_git_commit", "file_sha256",
+    "default_financial_data_dir", "detect_git_commit", "detect_seed", "file_sha256",
     "dir_content_sha256", "text_sha256", "sha256_12",
 ]
 
@@ -52,6 +57,7 @@ REQUIRED_KEYS = (
     "judge_model",
     "judge_prompt_version",
     "temperature",
+    "seed",
     "scenario_sha256",
     "financial_data_version",
     "prompt_versions",
@@ -347,6 +353,22 @@ def detect_temperature(client: Any, default: float = JUDGE_TEMPERATURE) -> float
     return round(float(default), 4)
 
 
+def detect_seed(client: Any) -> Optional[int]:
+    """这次用的采样种子:客户端自己声明的才算,**不读环境变量**。
+
+    读环境变量会造出一个"清单说固定了种子、客户端其实没固定"的假证据(和
+    `judge_model` 必须取自真拿到的客户端是同一条理由)。没声明 → null,含义是
+    **这次没固定种子、逐字重生成不保证**,而不是"取不到"(所以不进 warnings)。
+    """
+    val = getattr(client, "seed", None)
+    if val is None or (isinstance(val, str) and not val.strip()):
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                      branch_mode: str = "", judge_llm: Any = None,
                      backend_kind: str = "",
@@ -380,6 +402,8 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
         meta["branch_source"] = (branch_source or meta.get("branch_source")
                                  or raw.get("branch_source", "") or "")
         meta["judge_model"] = meta.get("judge_model") or ""
+        if meta.get("seed") is None:
+            meta["seed"] = detect_seed(judge_llm)
         return meta
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
@@ -412,6 +436,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     # 真的调过模型。规则路径记 null,由 build_manifest 落一条 warnings 说明。
     meta["temperature"] = {"judge": None if kind == "rules"
                                      else detect_temperature(judge_llm)}
+    meta["seed"] = None if kind == "rules" else detect_seed(judge_llm)
     return meta
 
 
@@ -522,6 +547,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "judge_model": meta.get("judge_model") or None,
         "judge_prompt_version": judge_prompt_version,
         "temperature": temp,
+        "seed": meta.get("seed"),
         "scenario_path": sp or "",
         "scenario_sha256": scenario_sha,
         "financial_data_dir": fd or "",

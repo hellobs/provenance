@@ -8,7 +8,7 @@ commit / 哪种判定后端 / 哪份检索资料 / 哪版提示词"的指纹 —
 答不上来,反思是否被 max_tokens 截断也因此拿不到直接证据。
 
 这里钉的是**新加的那一段接线**,不重复 `test_run_manifest.py` 已覆盖的共享实现:
-1. 落盘前挂,盘上的 run.json 一定带 manifest,且 13 个必备键齐全;
+1. 落盘前挂,盘上的 run.json 一定带 manifest,且 `REQUIRED_KEYS` 一个不缺;
 2. `engine_id` 区分两条路(不能都自称 injector);
 3. 三种分支来源(preset / judge / rules)各自的后端、模型名、温度如实;**没有模型客户端时
    不许按"本地 Ollama 默认"去猜**;规则路径的采样温度记 null 而不是 0.1;
@@ -60,7 +60,7 @@ def _run(tmp_path, monkeypatch, run_id="probe", **kw):
 
 # ---------------------------------------------------------------- 盘上结构
 def test_record_on_disk_carries_full_manifest(tmp_path, monkeypatch):
-    """落盘文件里 manifest 必须齐 13 个必备键 —— 不能只在内存里挂好。"""
+    """落盘文件里 manifest 必须齐 `REQUIRED_KEYS` 全部必备键 —— 不能只在内存里挂好。"""
     _rec, saved = _run(tmp_path, monkeypatch, "m-keys", timeline="B")
     m = saved.get("manifest")
     assert isinstance(m, dict), "生产路径没挂 manifest(整段缺失)"

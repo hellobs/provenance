@@ -38,9 +38,23 @@ def main():
                     help="本地 embedding 模型目录;也可用 CASE01_HF_EMBED_MODEL")
     ap.add_argument("--hf-device", default=os.environ.get("CASE01_HF_DEVICE", ""),
                     help="本地 HF 推理设备,如 cuda/cuda:0/cpu")
+    ap.add_argument("--seed", default=os.environ.get("CASE01_LLM_SEED", ""),
+                    help="采样种子(整数);缺省不设=保持非确定行为。"
+                         "设了会由 manifest.seed 记下,只保证同机同版本大概率可逐字复现")
     ap.add_argument("--reflect-only", action="store_true",
                     help="只对已存在的 run 触发 Reflection+Router(不重跑对话)")
     args = ap.parse_args()
+
+    from case01.agents.llm import parse_seed
+    try:
+        seed = parse_seed(args.seed)
+    except ValueError as e:
+        print(str(e))
+        sys.exit(2)
+    if seed is not None:
+        # 单一来源:orchestrator 与反思/判官都经 local_client_from_env() 建客户端,
+        # 在这里落定比逐个传参少一处"某个客户端漏了种子"的口径分叉。
+        os.environ["CASE01_LLM_SEED"] = str(seed)
 
     def _local_hf_client():
         if not args.hf_chat_model:
@@ -51,6 +65,7 @@ def main():
             chat_model_path=args.hf_chat_model,
             embed_model_path=args.hf_embed_model,
             device=args.hf_device,
+            seed=seed,
         )
 
     if args.reflect_only:
@@ -64,7 +79,7 @@ def main():
         rec_data = _json.load(open(p, encoding="utf-8"))
         from case01.agents.llm import OllamaClient, OpenRouterClient
         from case01.reflection import run_reflection, run_router
-        local = _local_hf_client() if args.local_hf else OllamaClient()
+        local = _local_hf_client() if args.local_hf else OllamaClient(seed=seed)
         router = OpenRouterClient() if args.external_ethan else local
         print("=== Reflection ===")
         ref = run_reflection(local, rec_data)

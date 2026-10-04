@@ -215,6 +215,11 @@ def _child_env(args_ns) -> Dict:
         env["CASE01_LLM_DISABLE_THINKING"] = "1"
     else:
         env.pop("CASE01_LLM_DISABLE_THINKING", None)
+    # 采样种子:整批同一个值(缺省不写这一栏 = 每条都不固定)。逐条不同种子
+    # 会让"这批跑的是什么设定"变成 39 个答案,而清单只有一栏可对照。
+    seed = getattr(args_ns, "seed", None)
+    if seed is not None and str(seed).strip() != "":
+        env["CASE01_LLM_SEED"] = str(seed).strip()
     return env
 
 
@@ -439,7 +444,17 @@ def main(argv=None) -> int:
     ap.add_argument("--python", default=DEFAULT_PYTHON,
                     help="跑 case01.run 的解释器(须装有 mavisframework)")
     ap.add_argument("--tag", default="", help="批次标签(默认用批次号)")
+    ap.add_argument("--seed", default="",
+                    help="采样种子(整数,整批同一个值);缺省不固定 = 现有非确定行为")
     args = ap.parse_args(argv)
+
+    from case01.agents.llm import parse_seed
+    try:
+        args.seed = parse_seed(args.seed)
+    except ValueError as e:
+        # 在起跑前就拒,不烧掉一整批才发现种子没生效
+        print(str(e), file=sys.stderr)
+        return 2
 
     python = shutil.which(args.python) or args.python
     if not os.path.exists(python):
