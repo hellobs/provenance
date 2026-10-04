@@ -241,18 +241,24 @@ temperature={judge:0.1, reflection:0.4, router:0.2} / manifest_warnings=[]`,
 
 **边界(不许粉饰)**:
 - **本批 39 条不回填**。截至本次核对,`case01/runs/*/run.json` 仍是 **5/242** 带 manifest。
-- 第八节第 1 条点名的 6 个静默退化点里,**只有第 6 个本轮补了**:生产路径走 quick_scan 时
-  现在和 pipeline 一样往 `manifest_warnings` 写那句"立场判官未启用……verdict 来自关键词快筛"
-  (此前只 print 一次就消失)。其余 5 个**没动**,而且分两类要分清:
+- 第八节第 1 条点名的 6 个静默退化点里,**补了 2 个**(同日两轮):
+  - **第 6 个** —— 生产路径走 quick_scan 时现在和 pipeline 一样往 `manifest_warnings`
+    写那句"立场判官未启用……verdict 来自关键词快筛"(此前只 print 一次就消失);
+  - **第 2 个** —— 质检口径(`case01/full_context.quality_of`)现在透出
+    `manifest_status`(absent/clean/noted/error/unverified)、`manifest_warning_count`、
+    `manifest_warnings`,5002 的 `/api/runs`、`/api/runs/{run_id}` 与 5010 的评审索引同口径。
+    **口径是"只透出、不改判定"**:警告大半是如实描述(规则判定没有采样温度、preset 没配后端、
+    历史记录压根没清单),当质量问题用会把降级跑一律推进默认排除集 → 平台静默少给数据,
+    与"失败了必须有人知道"相反。所以平台要筛"复现指纹不可信"看 `manifest_status=error`,
+    而不是等 `quality` 变色。
+  其余 4 个**没动**,而且分两类要分清:
   - **设计如此,不该"修"**:`live/history.expert_safe_record` 的白名单剥掉 manifest
-    (契约 §3.2 —— 清单里有 `branch`/判定后端,进专家视图等于递底牌)。
-    平台内部面板 `/api/review/run/{id}` 默认裸视图与 `?raw=1` 读得到这一段。
-  - **确实是没接,本轮未动**:质检(`live/history.py:221-245`)只看 consistency/reflection,
-    从不看 `manifest_warnings`,import 失败仍整块吞成 `unverified`;`reflection_audit` 仍用文本
-    启发式判截断(历史记录没有清单,它也只能如此);`batch_run` 统计对缺字段不告警;
-    `pipeline.py` 的 rerun_router_only 对旧记录不补挂。
-  **结论:数据侧接上了,警告侧没有** —— 平台今天不会因为 `manifest_warnings` 非空而亮灯,
-  要人去看 run.json 或内部面板。
+    (契约 §3.2 —— 清单里有 `branch`/判定后端,进专家视图等于递底牌)。新透出的三个索引字段
+    同样只在平台面,`?safe=1` 不给(有守卫盯着原文不透出)。
+  - **确实是没接,本轮未动**:`reflection_audit` 仍用文本启发式判截断(历史记录没有清单,
+    它也只能如此);`batch_run` 统计对缺字段不告警;`pipeline.py` 的 rerun_router_only
+    对旧记录不补挂;`live/history._quality_of` 的 import 失败仍整块吞成 `unverified`
+    (现在至少如实写 `manifest_status=unverified`,不再冒充"没有警告")。
 - 因此**本批的截断口径仍未拿到直接证据**:第四节"不能报无截断"与第八节第 5 条的结论不变,
   文件侧那个"收紧判据后 0 条疑似截断"仍是唯一的截断证据。新跑的记录才两法都有。
 - 判据生效与否可核对:`manifest_warnings` 为空只说明"这次跑的没缺项",不等于跑得好。
@@ -263,5 +269,13 @@ no-llm ⇒ rules 三件套、quick_scan 的 manifest 留痕 + 有判官时不该
 preset/judge 两种后端的字段流、资料目录哈希与移动后变化、
 真客户端模型名、builder 抛错仍落 `manifest_error`、已有 manifest 不被覆盖)
 与 `test_runs_root_env_parity.py` 6 条(环境变量优先级、写侧与读侧同根、端到端落盘位置)。
-本轮复跑:`case01/tests` 全量 595 passed,root `tests` 184 passed,`tools/doc_audit.py --check` 待更新 0(只读)。
+第四轮(警告侧)再加 `case01/tests/test_manifest_warning_channel.py` 13 条:四种 `manifest_status`
++ 超出上限只截断显示不截断总数、**有警告不改 quality 且不进默认排除集**、两个面键集一致、
+兜底分支写 `unverified` 而不是冒充 absent、5002 详情直接可见、no-llm 真跑端到端在索引里 noted、
+历史 absent 记录结论不变;`test_serve.py` 另加一条契约漂移守卫 —— 顺带查出
+`reason` / `deprecated` / `deprecated_reason` 早在 9-24 与 10-03 就进了索引,
+静态 `case01_api.openapi.yaml` 一直没有,本次补齐并钉住"索引发的键契约必须逐个写"。
+本轮复跑:`case01/tests` 全量 609 passed,root `tests` 184 passed,
+`case_engine/tests` 186 passed + 1 skipped,injector 包 4 passed,
+`tools/doc_audit.py --check` 待更新 0(只读)。
 CI run 37190243604(f942a0c)与 #269(dae4934)均 completed/success(ubuntu-latest / py3.12)。

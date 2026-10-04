@@ -17,6 +17,10 @@
 #            `/api/runs` 默认排除 quality=questionable 与 debug,并在 excluded 里报明
 #            (要全量加 ?include_questionable=1)。专家全文(full-context)**不受影响**:
 #            它仍然不含任何分支/判定/预设等实验元信息。
+#   2026-10-04 变更:索引与详情**仅追加** manifest_status / manifest_warning_count /
+#            manifest_warnings 三个字段(读侧透出 run.json 的 manifest.manifest_warnings)。
+#            它们**不参与 quality 判定、不改变默认排除集**;警告原文含"规则判定没有采样温度"
+#            这类如实描述,当质量问题用会把降级跑一律藏掉。同 manifest 本体一样**不得进专家视图**。
 openapi: 3.1.0
 info:
   title: GTC Case 01 · Run 只读数据服务
@@ -58,6 +62,8 @@ paths:
         少给了什么**不静默**:响应里的 `excluded` 会给出计数、run_id 与原因。
         需要全量时加 `?include_questionable=1`。
         `quality=unverified`(旧记录没有一致性戳)照常返回 —— 判不了 ≠ 有问题。
+        `manifest_status`/`manifest_warnings`(2026-10-04 加,仅追加)**不在这四类里**:
+        有警告≠该条不能用,历史无清单的记录记 `absent`。
       operationId: list_runs_api_runs_get
       parameters:
       - name: include_questionable
@@ -315,6 +321,37 @@ components:
         debug:
           type: string
           description: 调试跑说明(空串=正式跑);用于解释 quality=debug 的原因。
+        reason:
+          type: string
+          description: |-
+            质检判定理由(2026-10-03 加,本文件此前漏记 —— 平台照 YAML 实现时读不到它)。
+            `quality=unverified` 时分得出"没验过"与"验了但判不了",并给出为什么。
+        deprecated:
+          type: boolean
+          description: 记录是否被显式标废弃(样本作废);平台要能自己筛,不能只靠默认隐藏。
+        deprecated_reason:
+          type: string
+          description: 废弃原因原文(空串表示未标废弃)。
+        manifest_status:
+          type: string
+          enum: [absent, clean, noted, error, unverified]
+          description: |-
+            运行清单(manifest)的警告状态(2026-10-04 加,仅追加;**不影响 quality**)。
+            absent=这条记录没有清单段(2026-10-04 之前的历史产物);
+            clean=有清单且零警告;noted=有警告(原文见 manifest_warnings);
+            error=清单自身生成失败(manifest_error),即这条记录的复现指纹不可信;
+            unverified=质检取不到判定,连清单状态也判不了(≠ absent)。
+        manifest_warning_count:
+          type: integer
+          description: 警告总条数(全量,不受 manifest_warnings 的展示条数上限影响)。
+        manifest_warnings:
+          type: array
+          description: |-
+            警告原文,最多透出 8 条(超出部分只进 count)。给平台**内部**排查用:
+            "判官未启用""资料目录读不到""后端判不出来"这类事实以前只在日志里,
+            现在这条索引能看到。不得进专家视图(与 manifest 本体同一边界)。
+          items:
+            type: string
         start_date:
           type: string
           description: 开始日期。

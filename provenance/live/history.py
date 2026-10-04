@@ -238,11 +238,18 @@ def _quality_of(rec: dict) -> dict:
                 # 废弃标记(2026-09-24):索引行里必须带,平台才能自己筛;
                 # 只靠"默认隐藏"是不够的(一条自洽的废弃样本以前会被判 ok 发出去)。
                 "deprecated": bool(q.get("deprecated")),
-                "deprecated_reason": q.get("deprecated_reason", "")}
+                "deprecated_reason": q.get("deprecated_reason", ""),
+                # 清单警告(2026-10-04 接进质检):以前这里逐键挑,新键会被静默丢掉
+                "manifest_status": q.get("manifest_status", "unverified"),
+                "manifest_warning_count": q.get("manifest_warning_count", 0),
+                "manifest_warnings": q.get("manifest_warnings", [])}
     except Exception:  # noqa: BLE001 - 引擎侧缺席时不能假装"没问题"
         return {"quality": "unverified", "consistency": "unverified",
                 "reason": "取不到 case01 质检判定", "branch_source": "", "debug": "",
-                "deprecated": False, "deprecated_reason": ""}
+                "deprecated": False, "deprecated_reason": "",
+                # 读不到判定 ≠ 清单是空的:如实写 unverified,免得平台把"没查"当"没警告"
+                "manifest_status": "unverified", "manifest_warning_count": 0,
+                "manifest_warnings": []}
 
 
 # 默认不给平台的质检类别(与 5002 `serve.list_runs` 同口径):

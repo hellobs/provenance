@@ -252,6 +252,20 @@ class TestOpenApiStaticDriftGuard:
         biz = actual_paths - _EXCLUDED_PATHS
         assert yaml_paths == biz
 
+    def test_static_yaml_documents_every_field_quality_of_emits(self):
+        """索引里有的键,契约必须逐个写说明 —— 平台照 YAML 实现,漏一个就是少一个字段。
+
+        2026-10-04 实测到的漂移:`reason` / `deprecated` / `deprecated_reason` 早在
+        9-24 与 10-03 就进了索引,静态 YAML 一直没有它们;新增 `manifest_*` 三键时
+        一并补齐,并把这条比对钉死(以后加字段忘了写契约就是红)。
+        """
+        import yaml
+        full = yaml.safe_load(open(YAML_PATH, encoding="utf-8"))
+        props = set(full["components"]["schemas"]["RunSummary"]["properties"])
+        emitted = set(serve.fc.quality_of({"run_id": "x"}))
+        missing = emitted - props
+        assert not missing, "quality_of 会发出但契约没写的键: {}".format(sorted(missing))
+
     def test_static_yaml_risk_enum_matches_code(self):
         import yaml
         from case01.reflection import _ROUTER_RISKS

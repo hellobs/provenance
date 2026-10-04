@@ -286,6 +286,41 @@ def _reflection_failed(rec: dict) -> str:
     return ""
 
 
+# 索引里最多透出几条清单警告(实测一条记录最多 3~4 条;上限只是防失控)
+_MANIFEST_WARNING_CAP = 8
+
+
+def manifest_view(rec: dict) -> dict:
+    """把运行清单的"这次跑缺了什么"透出成索引字段(**不参与 quality 判定**)。
+
+    为什么必须有(2026-10-04):manifest 从这天起进了生产路径的落盘结构,里面
+    `manifest_warnings` 记的就是"判官没上班 / 后端判不出来 / 资料目录读不到"这类
+    事实。但质检原先只看 consistency/reflection,清单非空也照发平台 —— 数据侧接上了、
+    警告侧没人读,等于把"不许静默"又做回成静默。
+
+    为什么不改 `quality`:警告大半是**如实描述**(规则判定没有采样温度、preset 模式没配
+    判定后端),把它们当质量问题会把降级跑一律推成 `questionable` → 进默认排除集 →
+    平台静默少给数据,与"不许静默"正好相反。所以只加标签、不改值域:
+
+    - `absent`  这条记录压根没有清单(2026-10-04 之前的历史产物,不是缺陷);
+    - `clean`   有清单且零警告;
+    - `noted`   有清单且有警告(原样透出,平台自己决定要不要看);
+    - `error`   清单自身生成失败 —— 这条记录的复现指纹不可信,警告首位是失败原因。
+    """
+    m = rec.get("manifest")
+    if not isinstance(m, dict) or not m:
+        status, warnings = "absent", []
+    elif m.get("manifest_error"):
+        status = "error"
+        warnings = ["manifest 生成失败:{}".format(m["manifest_error"])]
+    else:
+        warnings = [str(w) for w in (m.get("manifest_warnings") or [])]
+        status = "clean" if not warnings else "noted"
+    return {"manifest_status": status,
+            "manifest_warning_count": len(warnings),
+            "manifest_warnings": warnings[:_MANIFEST_WARNING_CAP]}
+
+
 def quality_of(rec: dict) -> dict:
     """记录质量标记:分支来源 + T0 立场一致性 + 废弃标记 → 一个给平台看的 `quality` 字段。
 
@@ -343,7 +378,9 @@ def quality_of(rec: dict) -> dict:
             "debug": rec.get("debug", ""),
             # 废弃标记也进索引:平台侧要能自己筛,而不是只靠默认隐藏(2026-09-24)
             "deprecated": bool(rec.get("deprecated")),
-            "deprecated_reason": str(rec.get("deprecated_reason") or "")}
+            "deprecated_reason": str(rec.get("deprecated_reason") or ""),
+            # 清单警告(2026-10-04):只透出,不参与上面的 quality 分支
+            **manifest_view(rec)}
 
 
 def list_runs(runs_root: str, exclude_questionable: bool = False) -> list:
