@@ -163,14 +163,21 @@ def test_child_env_utf8_lands_the_char_intact(tmp_path):
 # ---------------------------------------------------------------------------
 # 5. 反方向咬人:`-X utf8` 下取外部命令输出不能交回 None
 # ---------------------------------------------------------------------------
-def test_run_text_survives_gbk_bytes_where_text_true_gives_none(tmp_path):
-    """先复现旧写法拿到 None,再证明 run_text 拿到字符串。
+def test_run_text_survives_gbk_bytes_where_strict_decode_breaks(tmp_path):
+    """先复现旧写法失效,再证明 run_text 拿到字符串。
 
-    子进程按 GBK 写中文 → 父进程若用 `text=True` + 严格 UTF-8 解码,读取线程抛
-    UnicodeDecodeError 后 `communicate()` 交回 **None**;`re.search(pat, None)`
-    就是 TypeError,`(proc.stdout or "")` 则是把诊断输出静默吞光。
-    复现放在**孙进程**里做:否则那条线程异常会被 pytest 的 threadexception
-    钩子抓成警告,测试噪音盖过结论(异常本身正是我们要的证据)。
+    子进程按 GBK 写中文 → 父进程若用 `text=True` + 严格 UTF-8 解码,两边都坏,
+    只是坏法不同:
+    - Windows:`communicate()` 用读取线程收字节,线程里抛 UnicodeDecodeError
+      被静默吞掉,`communicate()` 交回 **None**;`re.search(pat, None)` 是
+      TypeError,`(proc.stdout or "")` 则把诊断输出静默吞光(live_switch 老坑)。
+    - Linux:走 select 路径没有读取线程,解码异常直接从 `_translate_newlines`
+      抛给调用方 —— 拿到的是崩溃而不是 None。
+
+    所以控制组只断言"严格解码一定出事",平台各按各的坏法验;真正的契约
+    (run_text 永远返回 str、不抛、保留 returncode)两边共用同一条断言。
+    复现放在**孙进程**里做:否则那条异常会被 pytest 的钩子抓成警告或直接把
+    测试打挂,噪音盖过结论(异常本身正是我们要的证据)。
     """
     probe = tmp_path / "probe_naive.py"
     probe.write_text(
@@ -182,8 +189,13 @@ def test_run_text_survives_gbk_bytes_where_text_true_gives_none(tmp_path):
         "print('STDOUT_TYPE=' + type(p.stdout).__name__)\n",
         encoding="utf-8")
     naive = run_text([sys.executable, str(probe)], env=_env("utf-8"))
-    assert "STDOUT_TYPE=NoneType" in naive.stdout, \
-        "复现失败:这条控制组必须给出 None,否则守卫白加\n" + naive.stderr[-400:]
+    if sys.platform.startswith("win"):
+        assert "STDOUT_TYPE=NoneType" in naive.stdout, \
+            "复现失败:Windows 控制组必须给出 None,否则守卫白加\n" + naive.stderr[-400:]
+    else:
+        assert naive.returncode != 0, \
+            "复现失败:Linux 严格解码必须抛,否则守卫白加\n" + naive.stdout[-400:]
+        assert "UnicodeDecodeError" in naive.stderr, naive.stderr[-400:]
 
     got = run_text([sys.executable, "-c", "print('中文表头')"], env=_env("gbk"))
     assert isinstance(got.stdout, str) and got.stdout, "必须是字符串且非空"
