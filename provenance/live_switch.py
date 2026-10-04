@@ -75,13 +75,27 @@ LOG_DIR = os.path.join(os.environ.get("TEMP", HERE), "dsh_srv")
 # ---------------------------------------------------------------------------
 # 进程/端口发现
 # ---------------------------------------------------------------------------
+def _run_stdout(cmd, timeout):
+    """跑外部命令并**保证返回字符串**(取不到就空串,绝不返回 None)。
+
+    为什么要显式指定 encoding/errors:中文 Windows 上 netstat/PowerShell 的输出是
+    GBK(codepage 936),而本脚本常以 `-X utf8` 运行 —— text=True 的严格 utf-8 解码
+    会在读取线程里抛 UnicodeDecodeError,`communicate()` 于是把 stdout 交回 **None**,
+    调用方再拿它做正则匹配就 TypeError(2026-10-04 实测:`--start` 服务**已经起来了**,
+    自检却崩在 `_pids_by_port`,退出码非 0,看起来像"没起来")。
+    errors="replace" 保留了 PID/端口这些 ASCII 字符,中文表头换成 U+FFFD 不影响判断。
+    """
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=timeout).stdout
+    except Exception:  # noqa: BLE001
+        return ""
+    return out or ""
+
+
 def _pids_by_port(port):
     """Windows:从 netstat 拿监听该端口的 PID(不依赖 psutil)。"""
-    try:
-        out = subprocess.run(["netstat", "-ano", "-p", "TCP"], capture_output=True,
-                             text=True, timeout=10).stdout
-    except Exception:  # noqa: BLE001
-        return set()
+    out = _run_stdout(["netstat", "-ano", "-p", "TCP"], 10)
     pat = re.compile(r"^\s*TCP\s+\S+:%d\s+\S+\s+LISTENING\s+(\d+)\s*$" % port, re.M)
     return {int(m) for m in pat.findall(out)}
 
@@ -98,11 +112,7 @@ def _procs_by_cmdline(needle):
     script = ("Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
               "Where-Object { $_.CommandLine -like '*" + needle + "*' } | "
               "ForEach-Object { '{0},{1}' -f $_.ProcessId, $_.ParentProcessId }")
-    try:
-        out = subprocess.run(["powershell", "-NoProfile", "-Command", script],
-                             capture_output=True, text=True, timeout=25).stdout
-    except Exception:  # noqa: BLE001
-        return {}
+    out = _run_stdout(["powershell", "-NoProfile", "-Command", script], 25)
     return {int(a): int(b) for a, b in re.findall(r"(\d+),(\d+)", out)}
 
 
@@ -409,17 +419,14 @@ def _all_lan_ips() -> list:
     routed = _lan_ip()
     if routed:
         ips.append(routed)
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "(Get-NetIPAddress -AddressFamily IPv4).IPAddress"],
-            capture_output=True, text=True, timeout=10)
-        for line in (out.stdout or "").splitlines():
-            ip = line.strip()
-            if ip and ip not in ips and not ip.startswith(("127.", "169.254.")):
-                ips.append(ip)
-    except Exception:  # noqa: BLE001 —— 列不全只影响提示,不该让起服务失败
-        pass
+    # 列不全只影响提示,不该让起服务失败:helper 出错就回空串,循环自然跳过
+    out = _run_stdout(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+         "(Get-NetIPAddress -AddressFamily IPv4).IPAddress"], 10)
+    for line in out.splitlines():
+        ip = line.strip()
+        if ip and ip not in ips and not ip.startswith(("127.", "169.254.")):
+            ips.append(ip)
     return ips
 
 

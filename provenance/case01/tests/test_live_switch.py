@@ -84,3 +84,41 @@ def test_lan_ip_list_never_advertises_loopback_or_link_local():
     for ip in ips:
         assert not ip.startswith("127.") and not ip.startswith("169.254."), ip
     assert len(ips) == len(set(ips)), "候选地址不该重复"
+
+
+def test_run_stdout_survives_gbk_output():
+    """外部命令输出不是 utf-8 时也必须交回字符串(2026-10-04 踩到:netstat 走 GBK,
+    `-X utf8` 下严格解码在读取线程抛错 → stdout=None → `_pids_by_port` TypeError,
+    服务明明起来了却自检崩溃、退出码非 0,看起来像"没起来")。"""
+    import sys
+
+    from live_switch import _run_stdout
+
+    # 子进程写 GBK 字节(“活动连接”的 codepage 936 编码)+ 一行 ASCII 数字。
+    # 用 chr(10) 拼换行,免得测试源码里的反斜杠转义再被外层引号吃掉。
+    code = ("import sys; sys.stdout.buffer.write("
+            "'活动连接'.encode('gbk') + chr(10).encode() + b'4321')")
+    out = _run_stdout([sys.executable, "-c", code], 30)
+    assert isinstance(out, str), "helper 把 None 交回调用方就是没修干净"
+    assert "4321" in out, "PID/端口这类 ASCII 必须照常可读"
+
+
+def test_pids_by_port_finds_pid_and_tolerates_noise(monkeypatch):
+    """端口归属判断:命中 LISTENING 行的 PID;命令取不到就回空集合,不抛。"""
+    import live_switch
+
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: (
+        "  TCP    127.0.0.1:5010         0.0.0.0:0              LISTENING       11112\n"
+        "  TCP    127.0.0.1:5010         127.0.0.1:51176        TIME_WAIT       0\n"))
+    assert live_switch._pids_by_port(5010) == {11112}, "只认 LISTENING,连接态不算"
+
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: "")
+    assert live_switch._pids_by_port(5010) == set(), "取不到就空集合,不许崩"
+
+
+def test_real_netstat_parsing_does_not_raise():
+    """真调 netstat:在中文 Windows 上跑通(这条就是崩溃点本身)。"""
+    from live_switch import _pids_by_port
+
+    assert isinstance(_pids_by_port(5010), set)
+    assert isinstance(_pids_by_port(1), set)
