@@ -129,6 +129,8 @@ celerybeat.pid
 # 外部 API key 落盘位置(case01/.secrets.json 已由嵌套 .gitignore 兜住;
 # 这条是"换目录放也不漏"的兜底 —— 2026-09-27 体检补)
 .secrets.json
+# 配置工具的本机目录覆盖设置(由“运行方式”页写入)
+provenance/config_tool/.config_tool_dirs.json
 .venv
 env/
 venv/

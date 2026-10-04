@@ -7,9 +7,12 @@
 所以这里除了断言"按卡删",还要断言**转义形态**,并调用 check_inline_js.js 做真正的语法检查。
 """
 import io
+import os
 import re
 
-P = r"D:\zzr\mavis\config_tool\templates\scenario.html"
+P = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "config_tool", "templates", "scenario.html")
 t = io.open(P, encoding="utf-8").read()
 
 escaped = t.count("closest(\\'.sbxcard\\').remove()")

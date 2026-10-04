@@ -70,7 +70,7 @@ STATUS = {
     "../../mavis/README_zh.md": ("现行", "mavis 框架说明(中文)"),
     "../../mavis/docs/tutorial-extension.md": ("现行", "接入方可依赖的稳定扩展面(与 1.2.1 对齐)"),
     "../../mavis/docs/tutorial-extension-en.md": ("现行", "扩展面教程(英文)"),
-    "../../mavis/config_tool/README.md": ("现行", "角色/场景配置工具说明(**注意:该工具当前反向依赖 provenance,见 IVD 不变量·历史疤痕**)"),
+    "config_tool/README.md": ("现行", "provenance 内置的角色/场景/运行方式配置工具说明"),
     # —— 仓库根 / 本地包 / 工具(2026-09-27 起纳入治理) ——
     # 这 12 份此前在 PKG 之外,既无状态块也不在索引里(见 0923 体检报告之后的补检)。
     # 只给结论明确的标状态;仓库根 docs/ 那 7 份需人工判断归属,先留「待核对」由索引点名。

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}运行方式 · MAVIS 配置工具{% endblock %}
+{% block content %}
+<h1>运行方式</h1>
+<p class="hint" style="margin-top:-4px;">
+  场景是数据,运行方式决定这一局怎么跑。下面是从运行方式注册表读到的当前可用项,以及它们各自能跑哪些场景。
+  要把某个场景和某种运行方式配成一份可重复使用的运行记录,去「<a href="/composition">组合</a>」页。
+</p>
+
+{% if not available %}
+<div class="section" style="border-color:#e6c200; background:#fffbe6;">
+  <b>运行方式功能不可用:</b>{{ reason or "原因未知" }}<br>
+  在下面「目录设置」里填一次引擎包目录即可(会存到本地设置文件,重启生效);
+  也可设环境变量 <code>CASE_ENGINE_DIR</code>,或把本工具放到平台仓旁让它自动发现。
+</div>
+{% else %}
+<div class="hint" style="margin-bottom:10px;">
+  引擎目录:<code>{{ dir }}</code>　<span class="hint">(来源:{{ source or "—" }})</span>
+</div>
+{% endif %}
+
+<div class="section">
+  <b>目录设置</b>
+  <div class="hint" style="margin:4px 0 8px;">
+    解析顺序:环境变量 → 本地设置文件 → 自动发现。这里填的值写入
+    <code>{{ settings_file }}</code>(不入库),重启本工具后生效。
+  </div>
+  <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:13px;">
+    <div style="flex:1; min-width:260px;">
+      <div class="hint">引擎包目录(含 <code>case_engine/</code>)</div>
+      <input id="dir-engine" style="width:100%; padding:4px 6px; box-sizing:border-box;"
+             value="{{ dir or '' }}" placeholder="如 D:\\zzr\\provenance\\provenance">
+    </div>
+    <div style="flex:1; min-width:260px;">
+      <div class="hint">平台仓根(含 <code>frontend/</code>、<code>cases/</code>)</div>
+      <input id="dir-platform" style="width:100%; padding:4px 6px; box-sizing:border-box;"
+             value="{{ platform_dir or '' }}" placeholder="如 D:\\zzr\\provenance\\provenance">
+    </div>
+  </div>
+  <div style="margin-top:8px;">
+    <button style="padding:4px 12px;" onclick="saveDirs()">保存</button>
+    <span id="dir-msg" class="hint" style="margin-left:10px;"></span>
+  </div>
+  {% if platform_reason %}<div class="hint" style="margin-top:6px; color:#b8860b;">{{ platform_reason }}</div>{% endif %}
+</div>
+
+<script>
+function saveDirs() {
+  var body = {engine: document.getElementById("dir-engine").value.trim(),
+              platform: document.getElementById("dir-platform").value.trim()};
+  fetch("/api/dirs", {method: "POST", headers: {"Content-Type": "application/json"},
+                      body: JSON.stringify(body)})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      document.getElementById("dir-msg").textContent =
+        j.ok ? ("已保存 → " + j.path + ";重启本工具后生效")
+             : ("失败:" + (j.errors || []).join("; "));
+    })
+    .catch(function (e) { document.getElementById("dir-msg").textContent = "失败:" + e; });
+}
+</script>
+{% for e in engines %}
+<div class="section">
+  <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+    <b style="font-size:15px;">{{ e.name }}</b>
+    <span class="hint" style="font-family:Consolas,monospace;">{{ e.id }}</span>
+    {% if e.version %}<span class="hint">v{{ e.version }}</span>{% endif %}
+  </div>
+  {% if e.summary %}<div style="margin-top:6px; font-size:13px; color:#333;">{{ e.summary }}</div>{% endif %}
+  {% if e.primitives %}<div class="hint" style="margin-top:4px;">原语:{{ e.primitives }}</div>{% endif %}
+  {% if e.output %}<div class="hint">产物:{{ e.output }}</div>{% endif %}
+
+  {% if e.components %}
+  <div style="margin-top:10px;">
+    <span class="hint">由这些部件构成:</span>
+    {% for c in e.components %}<code style="margin-right:8px;">{{ c }}</code>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div style="margin-top:10px;">
+    <span class="hint">可跑场景:</span>
+    {% if e.scenarios %}
+      {% for s in e.scenarios %}<span style="margin-right:10px;">{{ s }}</span>{% endfor %}
+    {% else %}
+      <span class="hint">当前没有可用该运行方式的场景</span>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<h2>场景 × 运行方式 一览</h2>
+<div class="section">
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead>
+      <tr style="text-align:left; color:#666;">
+        <th style="padding:6px 8px; border-bottom:1px solid #e0e0e0;">场景</th>
+        <th style="padding:6px 8px; border-bottom:1px solid #e0e0e0;">默认运行方式</th>
+        <th style="padding:6px 8px; border-bottom:1px solid #e0e0e0;">可用运行方式</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in scenarios %}
+      <tr>
+        <td style="padding:6px 8px; border-bottom:1px solid #f2f2f2;">
+          {{ s.name }}<span class="hint" style="margin-left:6px;">{{ s.case_id }}</span>
+        </td>
+        <td style="padding:6px 8px; border-bottom:1px solid #f2f2f2;">{{ s.engine or "—" }}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #f2f2f2;">
+          {{ s.supported|join(" / ") if s.supported else "—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not scenarios %}<div class="hint">没发现场景。</div>{% endif %}
+</div>
+{% endblock %}

@@ -7,6 +7,7 @@
 `app.scenario_assets_dir`),绝不写真实仓库。
 """
 import io
+import asyncio
 import json
 import os
 import sys
@@ -16,7 +17,7 @@ import pytest
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 _PKG = os.path.join(_REPO, "provenance")
-_MAVIS_TOOL = os.path.join(os.path.dirname(_REPO), "mavis", "config_tool")
+_CONFIG_TOOL = os.path.join(_PKG, "config_tool")
 
 # 引擎目录自 2026-09-22 起**只认显式声明**(config_tool 不再探测兄弟目录,也不再拿平台根顶替):
 # 本测试显式声明引擎包所在目录;资产落盘目录仍由用例另行重定向到 tmp。
@@ -26,12 +27,12 @@ for p in (_PKG, os.path.dirname(_REPO)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-pytestmark = pytest.mark.skipif(not os.path.isdir(_MAVIS_TOOL), reason="mavis 仓不在预期位置")
+pytestmark = pytest.mark.skipif(not os.path.isdir(_CONFIG_TOOL), reason="provenance/config_tool 不存在")
 
 
 def _tool_app():
-    if _MAVIS_TOOL not in sys.path:
-        sys.path.insert(0, _MAVIS_TOOL)
+    if _CONFIG_TOOL not in sys.path:
+        sys.path.insert(0, _CONFIG_TOOL)
     import app as app_mod          # config_tool/app.py
     return app_mod
 
@@ -141,19 +142,31 @@ def test_saved_agents_carry_initial_tendency(tmp_path, monkeypatch):
 class TestHTTPLayerFormIntegrity:
     """HTTP 层表单完整性(2026-09-27 体检):_json_body 曾自递归,
     所有 POST 的表单字段被静默丢成 {} —— e2e 直接调内部函数绕过了 HTTP 层,
-    CI 全绿但真实保存全空。此测试走 TestClient 真打端点。"""
+    CI 全绿但真实保存全空。此测试通过 ASGI transport 真打端点。"""
+
+    @staticmethod
+    def _post(app, path, form):
+        """通过 ASGI transport 走完整 HTTP 层，避开当前环境 TestClient 线程死锁。"""
+        import httpx
+
+        async def request():
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                    transport=transport, base_url="http://config-tool.test") as client:
+                return await client.post(path, json=form)
+
+        return asyncio.run(request())
 
     def test_save_preserves_form_fields(self, tmp_path, monkeypatch):
         app_mod = _tool_app()
         monkeypatch.setattr(app_mod, "_PLATFORM_DIR", str(tmp_path))
-        from fastapi.testclient import TestClient
-        c = TestClient(app_mod.app)
+        monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", str(tmp_path / "cases"))
         form = {"case_id": "http_integrity_case",
                 "name": "HTTP 层完整性场景",
                 "engine": "experiment-eval",
                 "description": "表单字段必须活着到达落盘",
                 "start_date": "2026-09-01", "end_date": "2026-09-30"}
-        r = c.post("/api/scenario/save", json=form)
+        r = self._post(app_mod.app, "/api/scenario/save", form)
         assert r.status_code == 200, r.text
         body = r.json()
         # 关键断言:字段活着(case_id/name 不能退化成默认值)
@@ -167,10 +180,9 @@ class TestHTTPLayerFormIntegrity:
 
     def test_preview_reflects_fields(self, tmp_path):
         app_mod = _tool_app()
-        from fastapi.testclient import TestClient
-        c = TestClient(app_mod.app)
-        r = c.post("/api/scenario/preview",
-                   json={"case_id": "pv_case", "name": "预览场景",
-                         "engine": "experiment-eval"})
+        r = self._post(
+            app_mod.app, "/api/scenario/preview",
+            {"case_id": "pv_case", "name": "预览场景",
+             "engine": "experiment-eval"})
         assert r.status_code == 200
         assert "pv_case" in r.json().get("yaml", ""), "预览未收到表单字段"

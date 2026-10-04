@@ -172,8 +172,8 @@ python live_switch.py --start case01        # 5010 是唯一实时入口(case00/
 ```
 
 浏览器打开 http://127.0.0.1:5010/ 。只读面 `python -m case00.serve --port 5003` /
-`python -m case01.serve --port 5002`;配置工具在**框架仓**:`cd ../mavis/config_tool && python app.py`(8060),
-它会自动发现平台仓,**无需设环境变量**(见 mavis 的 config_tool README)。
+`python -m case01.serve --port 5002`;配置工具在本仓 `provenance/config_tool`:
+`cd provenance/config_tool && python app.py`(8060),默认直接发现同仓平台目录,无需设环境变量。
 
 **专家/评审看结果**先读 `provenance/docs/专家导览_怎么看provenance.md`:
 结论边界、面归属(哪些页面只在 case01/case00 面)、两个只读数据口、字段读法、
@@ -181,10 +181,10 @@ python live_switch.py --start case01        # 5010 是唯一实时入口(case00/
 
 ## 5. 角色配置
 
-角色/关系/剧情通过网页表单配置(免手写 JSON)。工具位于框架仓库:
+角色/关系/剧情通过网页表单配置(免手写 JSON)。工具位于本仓库:
 
 ```bash
-cd ../mavis/config_tool
+cd provenance/config_tool
 python app.py
 ```
 
@@ -195,7 +195,7 @@ python app.py
 - `/story` — 剧情录入(追加到 story.json)
 - `/agents` — 已配置角色列表
 
-字段清单见 `../mavis/config_tool/角色字段清单.md`。config_tool 产物默认写入本平台的
+字段清单见 `provenance/config_tool/角色字段清单.md`。config_tool 产物默认写入本平台的
 `provenance/frontend/static/assets/village/agents/` 与 `provenance/scenarios/`
 (可通过环境变量 `MAVIS_ASSETS_ROOT` / `MAVIS_SCENARIOS_DIR` 覆盖)。
 新增角色后,重启仿真服务器(5010)即可让新角色进入模拟。
@@ -310,7 +310,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 - **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;运行方式测试在 mavis 仓库 `tests/`
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
-- **角色/场景配置工具**:角色、关系、剧情事件通过表单式工具 `config_tool` 生成(独立进程,端口 **8060**,位于 [mavis](https://github.com/hellobs/mavis) 仓库 `config_tool/` 目录);产物直接写入本平台的 `agents/` 与 `scenarios/` 目录(详见 `config_tool/README.md`)
+- **角色/场景配置工具**:角色、关系、剧情事件通过本仓 `provenance/config_tool/` 的表单式工具生成(独立进程,端口 **8060**);产物直接写入本平台的 `agents/`、`scenarios/` 与 `cases/` 目录
 
 ## 10. 修改地图
 

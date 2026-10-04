@@ -252,14 +252,14 @@ say("guard", node.strip().startswith("v"), "node 可用:{}".format(node.strip()[
 # 2026-10-03 改:8060 按要求常年关着,旧版硬连端口,连不上就把"服务没起"误报成"JS 语法错"。
 # 先探活:在线查渲染页,不在线就离线扫模板文件(check_inline_js.js 两种参数都支持)。
 _scn_code, _ = http("http://127.0.0.1:8060/scenario", timeout=2)
-_scn_tpl = os.path.join(MAVIS, "config_tool", "templates", "scenario.html")
+_scn_tpl = os.path.join(PKG, "config_tool", "templates", "scenario.html")
 _js_target = "http://127.0.0.1:8060/scenario" if _scn_code else _scn_tpl
 g1 = sh('node "{}" "{}"'.format(os.path.join(PKG, "case01", "tools", "check_inline_js.js"),
                                  _js_target))
 say("guard", "OK" in g1 and "语法错误" not in g1 and "失败" not in g1,
     "配置工具内联 JS 语法({})".format("8060 在线" if _scn_code else "离线扫模板"))
 g2 = sh('node "{}" "{}"'.format(os.path.join(PKG, "case01", "tools", "test_engine_toggle.js"),
-                                os.path.join(MAVIS, "config_tool", "templates", "scenario.html")))
+                                _scn_tpl))
 say("guard", "全部通过" in g2, "引擎显隐逻辑(三态)")
 g3 = sh('"{}" "{}"'.format(PY, os.path.join(PKG, "case01", "tools", "check_sbx_delete_guard.py")))
 say("guard", "PASS" in g3, "沙盒卡片删除+引号转义")

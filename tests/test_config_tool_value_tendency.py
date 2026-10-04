@@ -5,7 +5,7 @@
 而是调用 `case_engine.config.value_tendency_plan()` 的 materialize 结果。
 本测试直接拿 case00 的真实声明比对两边,谁改了单边就红。
 
-注:config_tool 在 **mavis 仓**,这里用 sys.path 把它 import 进来(只读,不改它)。
+注:config_tool 与 case_engine 同属 provenance,这里直接从本仓导入。
 """
 import io
 import json
@@ -17,7 +17,7 @@ import pytest
 _HERE = os.path.dirname(os.path.abspath(__file__))          # D:\zzr\provenance\tests
 _REPO = os.path.dirname(_HERE)                              # D:\zzr\provenance
 _PKG = os.path.join(_REPO, "provenance")                    # provenance/provenance
-_MAVIS_TOOL = os.path.join(os.path.dirname(_REPO), "mavis", "config_tool")
+_CONFIG_TOOL = os.path.join(_PKG, "config_tool")
 
 # 引擎目录自 2026-09-22 起**只认显式声明**(config_tool 不再探测兄弟目录):
 # 本测试显式声明引擎包所在目录,走工具的唯一入口。
@@ -48,11 +48,11 @@ def _yaml_to_dict(path):
         return yaml.safe_load(f)
 
 
-@pytest.mark.skipif(not os.path.isdir(_MAVIS_TOOL),
-                    reason="mavis 仓不在预期位置(本机有则跑)")
+@pytest.mark.skipif(not os.path.isdir(_CONFIG_TOOL),
+                    reason="provenance/config_tool 不存在")
 def test_config_tool_uses_the_engine_mapping():
-    if _MAVIS_TOOL not in sys.path:
-        sys.path.insert(0, _MAVIS_TOOL)
+    if _CONFIG_TOOL not in sys.path:
+        sys.path.insert(0, _CONFIG_TOOL)
     try:
         import scenario_builder                                    # noqa: F401
     except Exception as exc:                                       # noqa: BLE001
@@ -70,15 +70,15 @@ def test_config_tool_uses_the_engine_mapping():
         "config_tool 生成的 governance 与引擎映射不一致(单一来源被破坏)"
 
 
-@pytest.mark.skipif(not os.path.isdir(_MAVIS_TOOL), reason="mavis 仓不在预期位置")
+@pytest.mark.skipif(not os.path.isdir(_CONFIG_TOOL), reason="provenance/config_tool 不存在")
 def test_config_tool_payload_is_declaration_based():
     """config_tool 生成的是**声明派生**的治理(不是仓里那份可能已被干预改过的资产)。
 
     这条以前拿"真实 governance.json"当基准 —— 本轮体检发现该文件会被运行时专家干预改写,
     所以基准改成声明;资产的偏离由 case_engine 的单一来源测试用"审计解释"来管。
     """
-    if _MAVIS_TOOL not in sys.path:
-        sys.path.insert(0, _MAVIS_TOOL)
+    if _CONFIG_TOOL not in sys.path:
+        sys.path.insert(0, _CONFIG_TOOL)
     try:
         import scenario_builder                                    # noqa: F401
     except Exception as exc:                                       # noqa: BLE001

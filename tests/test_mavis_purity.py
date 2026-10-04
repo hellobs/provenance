@@ -6,8 +6,7 @@
 1. `mavisframework/**` 的**真代码**里不得出现业务词(注释与文档字符串允许 —— 
    它们解释"为什么这样设计",反而是有价值的);用 tokenize 精确区分 docstring 与代码;
 2. `mavisframework/**` 不得 import/reference 案例层(case01 / case_engine / provenance);
-3. **棘轮**:mavis 仓 `config_tool/` 对 provenance/case_engine 的反向依赖是已知欠债,
-   只准减少不准增加(数量超基线就红)—— 这样它不会在无人察觉时继续长。
+配置工具已迁入 provenance,不再把案例层工具算作 mavis 的反向依赖欠债。
 """
 import io
 import json
@@ -28,13 +27,6 @@ BIZ = re.compile("投资|股票|治理|审批|案例|HCM|Ethan|Investment AI")
 REVERSE = re.compile(r"^\s*(from|import)\s+(case01|case_engine|mavis_vizkit|live)\b")
 
 pytestmark = pytest.mark.skipif(not os.path.isdir(_FW), reason="mavis 仓不在预期位置")
-
-# 反向依赖基线:只准降不准升
-# 2026-09-21 实测:5 个文件 / 60 处(接触点散在 app/scenario_builder/engine_runner/compositions)
-# 2026-09-22 收口:1 个文件 / 4 处(全部收进 config_tool/engine_bridge.py;mavis 侧
-#   tests/test_engine_bridge.py 另有一条同口径的严格棘轮)
-REVERSE_BASELINE = {"files": 1, "hits": 4}
-
 
 def _py_files(root):
     for dirpath, dirs, files in os.walk(root):
@@ -83,23 +75,3 @@ def test_no_reverse_imports_of_case_layer():
             if REVERSE.search(line):
                 bad.append((os.path.relpath(p, _MAVIS).replace("\\", "/"), i, line.strip()[:70]))
     assert not bad, "mavisframework 反向依赖案例层: {}".format(bad)
-
-
-def test_config_tool_reverse_dependency_does_not_grow():
-    """棘轮:mavis 仓 config_tool 对 case 层的引用只准减少。"""
-    tool = os.path.join(_MAVIS, "config_tool")
-    if not os.path.isdir(tool):
-        pytest.skip("config_tool 不在")
-    files, hits = set(), 0
-    pat = re.compile(r"case_engine|provenance")
-    for p in _py_files(tool):
-        src = io.open(p, encoding="utf-8", errors="replace").read()
-        n = len(pat.findall(src))
-        if n:
-            files.add(os.path.relpath(p, _MAVIS).replace("\\", "/"))
-            hits += n
-    assert len(files) <= REVERSE_BASELINE["files"], \
-        "反向依赖的文件数涨了: {} > {}".format(len(files), REVERSE_BASELINE["files"])
-    assert hits <= REVERSE_BASELINE["hits"], \
-        "反向依赖的引用数涨了: {} > {}(欠债只准减)。当前分布: {}".format(
-            hits, REVERSE_BASELINE["hits"], sorted(files))
