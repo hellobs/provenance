@@ -10,6 +10,9 @@
     python -m case01.tools.backfill_consistency            # 只看会怎么改(不写盘)
     python -m case01.tools.backfill_consistency --write    # 真写
     python -m case01.tools.backfill_consistency --write --runs-dir case01/runs
+
+**边界**:本工具只会算 `quick_scan`(关键词快筛)。记录上已有 `llm_stance`(立场判官,
+主判据)的戳时**不覆盖它** —— 用弱判据盖掉强判据是口径倒退;source 该补的照补。
 """
 import argparse
 import glob
@@ -21,6 +24,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from case01.consistency import quick_scan  # noqa: E402
+
+# 已有立场判官戳的记录本工具不动(见 `backfill`);main 靠这个前缀识别并单独计数。
+_SKIP_NOTE = "已有立场判官(llm_stance)戳,不覆盖"
 
 
 def detect_branch_source(ba: dict) -> str:
@@ -57,6 +63,15 @@ def detect_branch_source(ba: dict) -> str:
     return "unknown"
 
 
+def _backup_and_write(path, original, rec):
+    """先把**原始内容**备份再写(runs/ 不入库,写坏了没法从 git 回滚 —— 同
+    backfill_failed_stages.py:153 的做法)。备份的是改动前那份,不是改后的。"""
+    with io.open(path + ".bak", "w", encoding="utf-8") as f:
+        f.write(original)
+    with io.open(path, "w", encoding="utf-8") as f:
+        json.dump(rec, f, ensure_ascii=False, indent=2)
+
+
 def backfill(path, write=False):
     with io.open(path, encoding="utf-8") as f:
         original = f.read()
@@ -64,20 +79,25 @@ def backfill(path, write=False):
     before = (rec.get("branch_action") or {}).get("source"), (rec.get("consistency") or {}).get("verdict")
     ba = dict(rec.get("branch_action") or {})
     # 已有 source 就**不覆盖**:那是当初跑的时候写下的事实,回填不该改写它。
-    if not ba.get("source"):
+    filled_source = not ba.get("source")
+    if filled_source:
         ba["source"] = detect_branch_source(ba)
     rec["branch_action"] = ba
+    existing = rec.get("consistency") or {}
+    if str(existing.get("method", "")).startswith("llm_stance"):
+        # 同一条规矩也适用于戳本身(2026-10-04 体检修):本工具是**纯计算**的
+        # quick_scan,无条件覆盖会把立场判官(主判据)的结论降回关键词快筛 ——
+        # 判官重算过的记录必须比任何后续回填优先。source 该补的照补,只是不碰戳。
+        note = _SKIP_NOTE + "(保留 method={})".format(existing.get("method"))
+        if write and filled_source:
+            _backup_and_write(path, original, rec)
+        return before, (ba["source"], existing.get("verdict")), note
     verdict, reason = quick_scan(rec)
     rec["consistency"] = {"verdict": verdict, "reason": reason, "method": "quick_scan",
                           "branch_source": ba.get("source")}
     after = (ba["source"], verdict)
     if write:
-        # 先把**原始内容**备份再写(runs/ 不入库,写坏了没法从 git 回滚 —— 同
-        # backfill_failed_stages.py:153 的做法)。备份的是改动前那份,不是改后的。
-        with io.open(path + ".bak", "w", encoding="utf-8") as f:
-            f.write(original)
-        with io.open(path, "w", encoding="utf-8") as f:
-            json.dump(rec, f, ensure_ascii=False, indent=2)
+        _backup_and_write(path, original, rec)
     return before, after, reason
 
 
@@ -92,9 +112,12 @@ def main(argv=None):
         print("没找到记录:", args.runs_dir)
         return 1
     n_bad = 0
+    n_skip = 0
     for p in paths:
         before, after, reason = backfill(p, write=args.write)
         run_id = os.path.basename(os.path.dirname(p))
+        if reason.startswith(_SKIP_NOTE):
+            n_skip += 1
         flag = {"consistent": "一致  ", "inconsistent": "不一致", "unknown": "判不了"}.get(after[1], after[1])
         if after[1] != "consistent":
             n_bad += 1
@@ -102,8 +125,8 @@ def main(argv=None):
             run_id, flag, before[0] or "-", after[0], before[1] or "-", after[1]))
         if after[1] != "consistent":
             print("      {}".format(reason))
-    print("\n合计 {} 条,其中不一致/判不了 {} 条;{}".format(
-        len(paths), n_bad, "已写盘" if args.write else "未写盘(--write 才写)"))
+    print("\n合计 {} 条,其中不一致/判不了 {} 条;已有立场判官戳被保留 {} 条;{}".format(
+        len(paths), n_bad, n_skip, "已写盘" if args.write else "未写盘(--write 才写)"))
     return 0
 
 

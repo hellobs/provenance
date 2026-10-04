@@ -239,3 +239,35 @@ def test_backfill_never_overwrites_an_existing_source(tmp_path):
     backfill(str(p))
     got = json.loads(p.read_text(encoding="utf-8"))
     assert got["branch_action"]["source"] == "judge-failed", "已有来源被回填改写了"
+
+
+def test_backfill_does_not_downgrade_an_llm_stance_stamp(tmp_path):
+    """★ 回归(2026-10-04 体检):回填工具只会 quick_scan,**不能**盖掉立场判官的戳。
+
+    弱判据覆盖强判据是口径倒退:判官重算过之后如果再跑一次回填,
+    `llm_stance` 的结论会被换成关键词快筛,而 method 字段还"看起来正常"。
+    source 的补填不受影响(该补照补,只是不碰戳)。
+    """
+    import json
+
+    from case01.tools.backfill_consistency import backfill
+
+    p = tmp_path / "run.json"
+    rec = _rec("B", "I would not recommend buying now.")
+    rec["branch_action"] = {"judge": "llm", "attempts": 1}   # 缺 source,该被补成 judge
+    rec["consistency"] = {"verdict": "inconsistent", "method": "llm_stance",
+                          "reason": "立场判官判 buy_now → 期望 A 线,但记录是 B 线",
+                          "stance": "buy_now"}
+    p.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    before, after, reason = backfill(str(p), write=True)
+
+    got = json.loads(p.read_text(encoding="utf-8"))
+    assert got["consistency"]["method"] == "llm_stance", "立场判官戳被回填降成了 {}".format(
+        got["consistency"]["method"])
+    assert got["consistency"]["verdict"] == "inconsistent"
+    assert got["consistency"]["stance"] == "buy_now", "判官的细节被抹掉了"
+    assert after == ("judge", "inconsistent"), after
+    assert "llm_stance" in reason
+    # source 确实补上了,且备份是改动前那份(没有 source)
+    bak = json.loads((tmp_path / "run.json.bak").read_text(encoding="utf-8"))
+    assert not (bak.get("branch_action") or {}).get("source")
