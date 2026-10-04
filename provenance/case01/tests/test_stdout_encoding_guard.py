@@ -24,7 +24,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01 import run as run_cli  # noqa: E402
-from case01.safestream import tolerant_stdout  # noqa: E402
+from case01.safestream import run_text, tolerant_stdout, utf8_env  # noqa: E402
 from case01.tools import batch_run  # noqa: E402
 
 # 模型真吐过的字符:台账里那条 run 就是死在它上面
@@ -119,12 +119,17 @@ REPO = os.path.dirname(os.path.dirname(
 _PROTECT = "from case01.safestream import tolerant_stdout; tolerant_stdout(); "
 
 
+def _env(io_encoding):
+    """够用的最小子进程环境:编码口径由参数钉死,跨平台都能复现同一条结论。"""
+    return {"SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+            "PATH": os.environ.get("PATH", ""),
+            "PYTHONIOENCODING": io_encoding, "PYTHONPATH": REPO}
+
+
 def _child(tmp_path, name, code, io_encoding):
     """跑子进程,stdout 落进文件;用 PYTHONIOENCODING 强制 locale,跨平台可复现。"""
     log = tmp_path / name
-    env = {"SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
-           "PATH": os.environ.get("PATH", ""),
-           "PYTHONIOENCODING": io_encoding, "PYTHONPATH": REPO}
+    env = _env(io_encoding)
     with open(log, "wb") as fh:
         rc = subprocess.call([sys.executable, "-c", code], stdout=fh,
                              stderr=subprocess.STDOUT, env=env, cwd=str(tmp_path))
@@ -153,3 +158,85 @@ def test_child_env_utf8_lands_the_char_intact(tmp_path):
                     "utf-8")
     assert rc == 0, raw.decode("utf-8", "replace")[-500:]
     assert UNGBK in raw.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# 5. 反方向咬人:`-X utf8` 下取外部命令输出不能交回 None
+# ---------------------------------------------------------------------------
+def test_run_text_survives_gbk_bytes_where_text_true_gives_none(tmp_path):
+    """先复现旧写法拿到 None,再证明 run_text 拿到字符串。
+
+    子进程按 GBK 写中文 → 父进程若用 `text=True` + 严格 UTF-8 解码,读取线程抛
+    UnicodeDecodeError 后 `communicate()` 交回 **None**;`re.search(pat, None)`
+    就是 TypeError,`(proc.stdout or "")` 则是把诊断输出静默吞光。
+    复现放在**孙进程**里做:否则那条线程异常会被 pytest 的 threadexception
+    钩子抓成警告,测试噪音盖过结论(异常本身正是我们要的证据)。
+    """
+    probe = tmp_path / "probe_naive.py"
+    probe.write_text(
+        "import os, subprocess, sys\n"
+        "inner = dict(os.environ); inner['PYTHONIOENCODING'] = 'gbk'\n"
+        "p = subprocess.run([sys.executable, '-c', \"print('中文表头')\"],\n"
+        "                   capture_output=True, text=True, encoding='utf-8',\n"
+        "                   errors='strict', env=inner)\n"
+        "print('STDOUT_TYPE=' + type(p.stdout).__name__)\n",
+        encoding="utf-8")
+    naive = run_text([sys.executable, str(probe)], env=_env("utf-8"))
+    assert "STDOUT_TYPE=NoneType" in naive.stdout, \
+        "复现失败:这条控制组必须给出 None,否则守卫白加\n" + naive.stderr[-400:]
+
+    got = run_text([sys.executable, "-c", "print('中文表头')"], env=_env("gbk"))
+    assert isinstance(got.stdout, str) and got.stdout, "必须是字符串且非空"
+    assert got.returncode == 0
+
+
+def test_run_text_with_utf8_env_round_trips_chinese():
+    """映射子进程配上 utf8_env 后:中文与 ▶ 原样回到看护进程。"""
+    got = run_text([sys.executable, "-c", "print('{}')".format(UNGBK)],
+                   env=utf8_env())
+    assert UNGBK in got.stdout, got.stderr[-300:]
+
+
+def test_utf8_env_pins_key_without_touching_os_environ():
+    before = os.environ.get("PYTHONIOENCODING", "<unset>")
+    env = utf8_env()
+    assert env["PYTHONIOENCODING"] == "utf-8"
+    assert os.environ.get("PYTHONIOENCODING", "<unset>") == before
+    assert utf8_env({"A": "1"})["A"] == "1", "给定的 base 必须被继承"
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="netstat 是 Windows 路径")
+def test_port_listening_returns_bool_instead_of_raising():
+    """看护进程的端口探活:取不到也只能给 bool,不能 TypeError。"""
+    from case01.tools import map_after_run
+
+    assert map_after_run._port_listening(59999) in (True, False)
+
+
+# ---------------------------------------------------------------------------
+# 6. 接线守卫:同族调用点必须都走同一份实现(两处一漂移就是又一批假数据)
+# ---------------------------------------------------------------------------
+def test_capture_call_sites_use_the_shared_helper():
+    from case01.tools import map_after_run
+    from case01.vizkit import live_run
+
+    for fn, name in ((map_after_run._port_listening, "map_after_run._port_listening"),
+                     (map_after_run.run_mapping, "map_after_run.run_mapping"),
+                     (live_run._map_run, "live_run._map_run")):
+        src = inspect.getsource(fn)
+        assert "run_text(" in src, \
+            "{} 必须用 safestream.run_text 取外部输出".format(name)
+        assert "subprocess.run(" not in src, \
+            "{} 不该再自己裸调 subprocess.run(严格解码会把输出变成 None)".format(name)
+
+
+def test_all_cli_entrypoints_install_the_stdout_guard():
+    from case01.tools import map_after_run
+    from case01.vizkit import live_run
+
+    for fn, name in ((run_cli.main, "case01.run"),
+                     (batch_run.main, "batch_run"),
+                     (map_after_run.main, "map_after_run"),
+                     (live_run.main, "live_run")):
+        assert "tolerant_stdout()" in inspect.getsource(fn), \
+            "{} 入口必须挂 stdout 编码守卫".format(name)

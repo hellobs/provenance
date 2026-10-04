@@ -24,7 +24,6 @@ roles / alias / scenario / 前端资源根 作为参数喂给它,并把 case01 �
 import argparse
 import json
 import os
-import subprocess
 import sys
 import threading
 import time
@@ -33,6 +32,7 @@ import mavis_vizkit
 from ..injector.bridge import DEFAULT_ROLES, MavisBridge
 from ..injector.nodes import default_nodes
 from ..run_naming import live_run_id, unique_run_id
+from ..safestream import run_text, tolerant_stdout, utf8_env
 
 # case01 业务侧的角色贴图别名与前端根(属于 case01,不属于 mavis-vizkit)
 ROLE_TEXTURE_ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
@@ -122,6 +122,9 @@ def _map_run(run_id, branch, raw_out):
     而且映射完 `<run_id>/run.json` 一落盘,面板那边 `/api/review/live` 就会
     报 live=false + mapped=true,自动切到成品记录并弹绿条。
     映射失败**不静默**:打印退出码、输出尾部与手工重跑命令。
+    取输出必须走 `safestream.run_text`:`-X utf8` 下子进程(不带
+    `PYTHONIOENCODING`)写的是 GBK 字节,严格解码失败后 stdout 交回 None,
+    于是这句承诺恰恰会以"什么都打不出来"的形式落空。
     """
     out = os.path.join("case01", "runs", run_id, "run.json")
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
@@ -129,7 +132,7 @@ def _map_run(run_id, branch, raw_out):
            "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
     print("  正在映射成品记录(约 1-2 分钟)…")
     t0 = time.time()
-    proc = subprocess.run(cmd, cwd=PKG_ROOT, capture_output=True, text=True)
+    proc = run_text(cmd, cwd=PKG_ROOT, env=utf8_env())
     tail = (proc.stdout or "").strip()[-800:]
     if tail:
         print(tail)
@@ -144,6 +147,7 @@ def _map_run(run_id, branch, raw_out):
 
 
 def main(argv=None):
+    tolerant_stdout()
     ap = argparse.ArgumentParser(description="case01 单一界面:实时小镇 + 结果记录")
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"],
                     help="兜底分支:judge 模式下只有在判不出来时才用它")

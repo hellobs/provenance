@@ -51,7 +51,7 @@ import threading
 import time
 from typing import Dict, List, Optional
 
-from case01.safestream import tolerant_stdout
+from case01.safestream import tolerant_stdout, utf8_env
 
 HERE = os.path.dirname(os.path.abspath(__file__))          # .../case01/tools
 CASE01_DIR = os.path.dirname(HERE)                        # .../case01
@@ -206,8 +206,7 @@ def _child_env(args_ns) -> Dict:
     兜底,失败原因糊成一片(实测批次 261004-123726-h120/-035 的 retry 段)。
     钉死 utf-8 后,GBK 下会抛 UnicodeEncodeError 的 `▶` 之类字符也一并安全落地。
     """
-    env = dict(os.environ)
-    env["PYTHONIOENCODING"] = "utf-8"
+    env = utf8_env()
     if args_ns.model:
         env["CASE01_LLM_MODEL"] = args_ns.model
     if args_ns.embed_model:

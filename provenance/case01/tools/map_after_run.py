@@ -34,10 +34,11 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 from datetime import datetime
+
+from case01.safestream import run_text, tolerant_stdout, utf8_env
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.dirname(os.path.dirname(HERE))          # provenance/provenance
@@ -60,10 +61,14 @@ def log(msg: str) -> None:
 
 
 def _port_listening(port: int) -> bool:
-    """Windows:netstat 看该端口是否还有 LISTENING。取不到就当作 True(保守)。"""
+    """Windows:netstat 看该端口是否还有 LISTENING。取不到就当作 True(保守)。
+
+    必须走 `safestream.run_text`:`-X utf8` 下 netstat 的 GBK 字节会让
+    `text=True` 严格解码失败并把 stdout 交回 None,`re.search(pat, None)`
+    于是 TypeError —— 看护进程**直接崩**,而崩的位置看起来像"端口检查失败"。
+    """
     try:
-        out = subprocess.run(["netstat", "-ano", "-p", "TCP"], capture_output=True,
-                             text=True, timeout=10).stdout
+        out = run_text(["netstat", "-ano", "-p", "TCP"], timeout=10).stdout
     except Exception:  # noqa: BLE001
         return True
     return bool(re.search(r"^\s*TCP\s+\S+:%d\s+\S+\s+LISTENING\s+\d+\s*$" % port,
@@ -122,7 +127,7 @@ def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> 
         cmd.append("--reflect")
     log("映射命令: " + " ".join(cmd))
     t0 = time.time()
-    proc = subprocess.run(cmd, cwd=PKG_ROOT, capture_output=True, text=True)
+    proc = run_text(cmd, cwd=PKG_ROOT, env=utf8_env())
     dt = time.time() - t0
     tail = (proc.stdout or "").strip()
     if tail:
@@ -144,6 +149,7 @@ def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> 
 
 
 def main(argv=None) -> int:
+    tolerant_stdout()
     ap = argparse.ArgumentParser(description="实跑跑完自动映射成成品记录")
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
