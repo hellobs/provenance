@@ -13,6 +13,9 @@
     python -m case01.tools.reflection_audit                    # 只体检(不写)
     python -m case01.tools.reflection_audit --runs-dir case01/runs
     python -m case01.tools.reflection_audit --clean --write    # 剥掉客套开场白并写盘
+
+退出码:0 = 没有"疑似截断"也没有读不了的文件;1 = 二者至少有一种(**与 --clean 无关**,
+可以当门禁用)。
 """
 import argparse
 import glob
@@ -48,7 +51,11 @@ def _ends_complete(text: str) -> bool:
             continue
         break
     if not lines:
-        return True
+        # 短行/落款一路 pop 到空 = **没有任何正文末句可判**,这不能算"写得完了"。
+        # 2026-10-04 体检打的洞:原先这里 return True,于是一条列表体被切断的反思
+        # ("改进方向:\n- 核对公告\n- 标注证据等级")整段被 pop 光反而判成完整 ——
+        # 截断检测在这种形状上是永远亮不了的绿灯。
+        return False
     return lines[-1].endswith(_OK_TAIL)
 
 
@@ -78,11 +85,21 @@ def main(argv=None):
     if not paths:
         print("没找到记录:", args.runs_dir)
         return 1
-    n_opener = n_trunc = n_changed = 0
+    n_opener = n_trunc = n_changed = n_unreadable = 0
     for p in paths:
         run_id = os.path.basename(os.path.dirname(p))
-        with io.open(p, encoding="utf-8") as f:
-            rec = json.load(f)
+        try:
+            with io.open(p, encoding="utf-8") as f:
+                rec = json.load(f)
+        except Exception as e:  # noqa: BLE001 —— 一个坏文件不许带走整轮体检
+            n_unreadable += 1
+            print("{:<42}  读不了: {}".format(run_id, e))
+            continue
+        if not isinstance(rec, dict):
+            n_unreadable += 1
+            print("{:<42}  读不了: run.json 顶层不是对象({})".format(
+                run_id, type(rec).__name__))
+            continue
         info = audit_one(rec)
         flags = []
         if info["has_opener"]:
@@ -104,10 +121,14 @@ def main(argv=None):
             if args.write:
                 with io.open(p, "w", encoding="utf-8") as f:
                     json.dump(rec, f, ensure_ascii=False, indent=2)
-    print("\n{} 条:客套开头 {} / 疑似截断 {}".format(len(paths), n_opener, n_trunc))
+    print("\n{} 条:客套开头 {} / 疑似截断 {} / 读不了 {}".format(
+        len(paths), n_opener, n_trunc, n_unreadable))
     if args.clean:
         print("已清理 {} 条;{}".format(n_changed, "已写盘" if args.write else "未写盘(--write 才写)"))
-    return 1 if (n_trunc and not args.clean) else 0
+    # 退出码与 --clean 无关:清理开场白不会让截断消失。原先写成
+    # `1 if (n_trunc and not args.clean)`,于是 `--clean` 跑完即使还挂着
+    # 5 条疑似截断也给绿光 —— 当门禁用就等于把问题咽下去。读不了同理。
+    return 1 if (n_trunc or n_unreadable) else 0
 
 
 if __name__ == "__main__":
