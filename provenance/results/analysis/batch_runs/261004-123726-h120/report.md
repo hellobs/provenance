@@ -129,7 +129,7 @@
 **1. `manifest` 缺失的根因确认:批量生产路径压根不经过 manifest 代码。**
 生产链是 `case01/tools/batch_run.py:226` 起子进程 → `case01/run.py:96` → `case01/orchestrator.py`,落盘字段全集由 `RunRecorder`(orchestrator:106-116)初始化再补 condition_monitor/reflection/router/audit/consistency —— **orchestrator 全文对 "manifest" 零提及(含注释,大小写不敏感 grep 无匹配)**。挂 manifest 的是另一条链:`packages/mavis-case01-injector/src/mavis_case01_injector/pipeline.py:144-148`(`collect_run_meta` + `attach_manifest`),所以只有走 injector/映射的产物有这一段。13 个 REQUIRED_KEYS(manifest.py:42-56)对批量记录一个都不生效。
 6 个**静默退化点**(缺字段不报错、也不告警):`live/history.py:260-285` 的 safe 视图白名单本就不含 manifest;`live/history.py:221-245` 的质检只看 consistency/reflection,从不看 `manifest_warnings`,且 import 失败整块 except 吞成 `unverified`;`case01/tools/reflection_audit.py:62-66` 的注释声称"截断落进 manifest_warnings",实际用文本启发式判截断、根本不读 manifest;`batch_run.py` 的统计对缺失不告警;`pipeline.py:248`(rerun_router_only)对无 manifest 的旧记录写回时不补挂;orchestrator:468 走 quick_scan 时只 print,不像 pipeline:190-193 那样记进 `manifest_warnings`。**结论:平台侧看不见"截断/判官降级"这类警告,不是概率问题,是链路没接。** 未修。
-**【状态更新(2026-10-04 17:0x,commit f942a0c):链路已接上,生产路径落盘前挂 manifest;本小节对"批量路径压根不经过 manifest 代码"的根因分析是对修复前状态的记录,仍然成立。本批 39 条不回填,详见第九节。】**
+**【状态更新(2026-10-04,commit f942a0c + dae4934):写侧链路已接上 —— 生产路径落盘前挂 manifest,本小节点名的 6 个退化点里只有第 6 个(quick_scan 只 print)一并补了,其余 5 个仍在,性质见第九节。本小节对"批量路径压根不经过 manifest 代码"的根因分析是对修复前状态的记录,仍然成立;本批 39 条不回填。】**
 
 **2. 分支 A=0 要拆成两件事看,其中一件是确凿缺陷(已修)。**
 - 规则判定路径(`case01/world/branch.py` shim → `mavis_case01_injector/world/branch.py:226-251`,由 `orchestrator.py:275` 在 no-llm/rules 模式调用)**结构上不可能判出 A**:`classify()` 只有 NO_BUY/REFUSE→B、CONDITIONAL/ANTI_ALLIN→C,兜底 `return "C"`,`route()` 里那段 `if b == "A"` 是死代码。实证:三条明确的"满仓买入/直接 all in"文本全部被判成 C。→ 已修(新增 ALL_IN 词表并把 A 判在 CONDITIONAL 之后,带任何对冲词仍不给 A;`case01/tests/test_world.py` 加 4 条守卫,含"A 可达"回归)。
@@ -218,7 +218,7 @@ CI(ubuntu-latest / py3.12)对上述 6 个提交全绿。*
 
 ---
 
-## 九、manifest 链路补记(第八节第 1 条已修,17:0x)
+## 九、manifest 链路补记(第八节第 1 条:写侧已接上,其余如实留着)
 
 **修了什么。** 生产路径 `case01/orchestrator.py` 现在在落盘前(`p = rec.save()`)调用
 `attach_manifest(rec.data, collect_run_meta(...), financial_dir=FIN_DIR(), engine_id="case01-run")`,
@@ -264,4 +264,4 @@ preset/judge 两种后端的字段流、资料目录哈希与移动后变化、
 真客户端模型名、builder 抛错仍落 `manifest_error`、已有 manifest 不被覆盖)
 与 `test_runs_root_env_parity.py` 6 条(环境变量优先级、写侧与读侧同根、端到端落盘位置)。
 本轮复跑:`case01/tests` 全量 595 passed,root `tests` 184 passed,`tools/doc_audit.py --check` 待更新 0(只读)。
-CI run 37190243604(f942a0c)completed/success;本次 quick_scan 留痕的追加提交另起一轮 CI。
+CI run 37190243604(f942a0c)与 #269(dae4934)均 completed/success(ubuntu-latest / py3.12)。
