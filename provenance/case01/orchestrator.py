@@ -518,7 +518,15 @@ def _failed_router(exc: Exception, executed: bool = True) -> dict:
 
 
 # ---- 常量与固定文本(no-llm 降级/可读性) ----
-RUNS_ROOT = lambda: os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")  # noqa: E731
+def RUNS_ROOT():  # noqa: N802 —— 函数形态不能改:run.py 与多处测试 monkeypatch 这个名字
+    """与读侧(`case01/serve.py`、`live/history._data_root`)同一优先级:环境变量优先。
+
+    踩过一次的口径分叉(2026-10-04 实测):`CASE01_RUNS_ROOT` 只有读侧认,写侧写死
+    `case01/runs`。用覆盖根做演示时,新跑的记录落在默认根,界面正好看不到它 ——
+    表现为"跑成功了但演示里没这条"。
+    """
+    return (os.environ.get("CASE01_RUNS_ROOT")
+            or os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"))
 FIN_DIR = lambda: os.path.join(os.path.dirname(os.path.abspath(__file__)),  # noqa: E731
                                "data", "financial")
 
