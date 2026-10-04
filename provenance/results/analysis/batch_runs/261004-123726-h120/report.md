@@ -122,4 +122,31 @@
 
 ---
 
-*口径说明:统计源为 `results/analysis/batch_runs/261004-123726-h120/ledger.jsonl` 与 `case01/runs/<run_id>/run.json`,全部只读;批前基线 = 242 条全库 − 本批 39 条 = 203 条,与 12:33 实测的 97/25/80/1 完全吻合。分析用的临时统计脚本未落仓库,算完即删,`git status` 除本批次目录外干净。*
+## 八、体检补记(批次收口后的只读延伸,15:3x)
+
+以下由本批暴露的两个疑点展开,全部只读排查;已修项给了 commit 归属,未修项如实留着。
+
+**1. `manifest` 缺失的根因确认:批量生产路径压根不经过 manifest 代码。**
+生产链是 `case01/tools/batch_run.py:226` 起子进程 → `case01/run.py:96` → `case01/orchestrator.py`,落盘字段全集由 `RunRecorder`(orchestrator:106-116)初始化再补 condition_monitor/reflection/router/audit/consistency —— **orchestrator 全文对 "manifest" 零提及(含注释,大小写不敏感 grep 无匹配)**。挂 manifest 的是另一条链:`packages/mavis-case01-injector/src/mavis_case01_injector/pipeline.py:144-148`(`collect_run_meta` + `attach_manifest`),所以只有走 injector/映射的产物有这一段。13 个 REQUIRED_KEYS(manifest.py:42-56)对批量记录一个都不生效。
+6 个**静默退化点**(缺字段不报错、也不告警):`live/history.py:260-285` 的 safe 视图白名单本就不含 manifest;`live/history.py:221-245` 的质检只看 consistency/reflection,从不看 `manifest_warnings`,且 import 失败整块 except 吞成 `unverified`;`case01/tools/reflection_audit.py:62-66` 的注释声称"截断落进 manifest_warnings",实际用文本启发式判截断、根本不读 manifest;`batch_run.py` 的统计对缺失不告警;`pipeline.py:248`(rerun_router_only)对无 manifest 的旧记录写回时不补挂;orchestrator:468 走 quick_scan 时只 print,不像 pipeline:190-193 那样记进 `manifest_warnings`。**结论:平台侧看不见"截断/判官降级"这类警告,不是概率问题,是链路没接。** 未修。
+
+**2. 分支 A=0 要拆成两件事看,其中一件是确凿缺陷(已修)。**
+- 规则判定路径(`case01/world/branch.py` shim → `mavis_case01_injector/world/branch.py:226-251`,由 `orchestrator.py:275` 在 no-llm/rules 模式调用)**结构上不可能判出 A**:`classify()` 只有 NO_BUY/REFUSE→B、CONDITIONAL/ANTI_ALLIN→C,兜底 `return "C"`,`route()` 里那段 `if b == "A"` 是死代码。实证:三条明确的"满仓买入/直接 all in"文本全部被判成 C。→ 已修(新增 ALL_IN 词表并把 A 判在 CONDITIONAL 之后,带任何对冲词仍不给 A;`case01/tests/test_world.py` 加 4 条守卫,含"A 可达"回归)。
+- LLM 判定路径上 A=0 仍属**素材侧事实**:216 条留有 `raw_outputs` 的记录里,把所有 attempt 的原始输出抽出 `"branch":"X"` 得到 B 168 / C 38,**模型自己在任何一次尝试中都没吐过 A**;本批 39 条 stance 只有 wait 24 / conditional 15,`buy_now` 与 `unclear` 均 0,说明不是判官失败被兜底。历史 2 条 A 记录(`260919-live-case01-mavis-A-1720`、`260922-live-case01-mavis-A-0958`)都是 `--timeline A` 人工强制,`judge="preset"`、quick_scan 还判它们 inconsistent。
+- 仍缺的证据:判官**输入侧**的召回率(这 39 条 T0 回答全文里到底有没有"立即/重仓买入"措辞)。`case01/tools/branch_judge_eval.py` 能做,但它要调 LLM 且往 `results/analysis/branch_judge_eval/` 写产物,本轮按只读约束没跑。
+
+**3. 同类编码缺陷在另外 3 个调用点(已修)。**
+本仓约定一律 `-X utf8`,而 `subprocess.run(..., text=True)` 此时按严格 UTF-8 解码:netstat/未钉 `PYTHONIOENCODING` 的自家子进程写的都是 GBK 字节,读取线程抛异常后 `communicate()` 交回 **stdout=None**(本机实测复现)。命中 `case01/tools/map_after_run.py` 的端口探活(旧写法会把 `re.search(pat, None)` 炸成 TypeError,看护进程直接崩)与映射取输出(整段诊断被 `(proc.stdout or "")` 静默吞光)、`case01/vizkit/live_run.py:132` 同一姿势。已统一走 `case01/safestream.py` 的 `run_text()` / `utf8_env()` / `tolerant_stdout()` 单一实现;`live_switch.py` 当年修的那份局部实现保持不动(它已在文档里记账)。
+
+**4. 台账之外还丢过多少条,没有账。**
+`case01/runs/` 共 254 个目录,其中 **12 个没有 run.json**(建了目录、记录没落盘)。只有 `batch-261003-165042-014` 在批次台账里留下 `ok=false / rc=1` 的对应行,其余 11 个(261003 三批的 lane 目录 + `v8b-1436` + `vrfy8b-1434`)**不在任何批次台账中**,今天已经说不出它们当时为什么没写成。`list_runs` 靠 `os.path.exists` 过滤跳过,所以这 12 个目录既不进统计也不报错 —— 行为正确,但"丢过 11 条"这件事目前无处可查。
+
+**5. 平台索引口径:文件侧重算与批前基线对不上,未解释。**
+只读函数口径(`list_runs`,不起服务):全库 242 条 → `/api/runs` 默认(隐藏 questionable/debug/deprecated)应返回 **213**,excluded **29**(questionable 28 + deprecated 1),`include_questionable=1` 全量 **242**。批前基线记的是 count=234 / excluded=38 / 全量 272 —— **差 30 条**。已知存放点最多凑出 25(归档 `runs_archive_20260919` 13 条 + 半成品目录 12 个),仍差 5 条;基线那两个数字来自 12:33 那轮的服务侧聚合,本轮按约束不起服务,因此**无法复现也无法证伪**,原样留此,不并入本批结论。
+
+**6. 红线复核**:`interventions.json` 仍 34 条(可比 12 条),本轮修的是判定链路与编码链路,**没有**新增任何内化证据;可主张范围与第一节相同(状态级内化、反思层证据),行为级改变依旧不可主张。
+
+*补记口径:新增测试合计 `case01/tests/test_stdout_encoding_guard.py` 16 条 + `test_world.py` 4 条;`case01/tests` 全量 513 passed,injector 包 4 passed,`tools/doc_audit.py --check` 待更新 0(只读)。*
+
+*口径说明(第一至七节):统计源为 `results/analysis/batch_runs/261004-123726-h120/ledger.jsonl` 与 `case01/runs/<run_id>/run.json`,全部只读;批前基线 = 242 条全库 − 本批 39 条 = 203 条,与 12:33 实测的 97/25/80/1 完全吻合。分析用的临时统计脚本未落仓库,算完即删,`git status` 除本批次目录外干净。*
+
