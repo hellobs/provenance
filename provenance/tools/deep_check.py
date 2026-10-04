@@ -131,6 +131,10 @@ say("data", True, "质检分布:{}".format(dist))
 
 print("=" * 88)
 print("E. 契约面")
+# 2026-10-04 修:这一段以前在服务没起时被 `if code == 200` 整段跳过,既不报 ⚠
+# 也不报"没测到",结论里只剩一条 YAML 文本检查的 ✓ —— 于是"契约面全绿"其实是
+# "契约面今天没验证"。服务按约定平时关闭(不进 ⚠),但**未验证必须显式说出来**。
+_e_skipped = []
 code, body = http("http://127.0.0.1:5010/api/runs")
 if code == 200:
     j = json.loads(body)
@@ -138,11 +142,15 @@ if code == 200:
         x.get("quality") in ("questionable", "debug") for x in j["runs"])),
         "5010 聚合:count={} excluded={} filter={}".format(
             j.get("count"), (j.get("excluded") or {}).get("count"), "filter" in j))
+else:
+    _e_skipped.append("5010 聚合(filter/excluded)")
 code, body = http("http://127.0.0.1:5010/api/runs?include_questionable=1")
 if code == 200:
     j2 = json.loads(body)
     say("contract", j2.get("count", 0) >= j.get("count", 0),
         "include_questionable=1 → count={}".format(j2.get("count")))
+else:
+    _e_skipped.append("5010 include_questionable 口径")
 sample = sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json")))[-1]
 rid = os.path.basename(os.path.dirname(sample))
 code, body = http("http://127.0.0.1:5010/api/run-detail/review/{}".format(rid))
@@ -152,14 +160,21 @@ if code == 200:
             if k in (j.get("data") or {})]
     say("contract", j.get("view") == "expert-safe" and not leak,
         "run-detail 默认视图={} 泄漏={}".format(j.get("view"), leak or "无"))
+else:
+    _e_skipped.append("5010 run-detail expert-safe 泄漏面")
 code, body = http("http://127.0.0.1:5002/api/runs/{}/full-context".format(rid))
 if code == 200:
     bad = [k for k in ("分支来源", "预设分支", "injector", "branch_action") if k in body]
     say("contract", not bad, "full-context 实验元信息:{}".format(bad or "无"))
+else:
+    _e_skipped.append("5002 full-context 实验元信息")
 yaml_p = os.path.join(PKG, "case01", "docs", "case01_api.openapi.yaml")
 y = io.open(yaml_p, encoding="utf-8").read() if os.path.isfile(yaml_p) else ""
 say("contract", all(k in y for k in ("quality", "include_questionable", "excluded")),
     "契约 YAML 含 quality/include_questionable/excluded")
+if _e_skipped:
+    print("  · [contract] **未验证 {} 项**(5010/5002 未运行,按约定平时关闭;起服务后重跑才能验):{}"
+          .format(len(_e_skipped), ", ".join(_e_skipped)))
 
 print("=" * 88)
 print("F. IVD 纯度")
