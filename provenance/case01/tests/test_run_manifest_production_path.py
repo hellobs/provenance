@@ -128,6 +128,18 @@ def test_rules_run_is_labeled_rules_not_preset_or_judge(tmp_path, monkeypatch):
     assert m["judge"] == "rules"
 
 
+def test_quick_scan_fallback_leaves_a_trace_in_the_manifest(tmp_path, monkeypatch):
+    """判官没上班这件事要留在 manifest_warnings,而不是只在日志里闪一次。
+
+    第八节点名过的退化点:生产路径走 quick_scan 时只 print,不像 pipeline 那样
+    记进清单 —— 平台侧读不到"这条 verdict 来自关键词快筛"。
+    """
+    _rec, saved = _run(tmp_path, monkeypatch, "m-qs", timeline="A")
+    assert saved["consistency"]["method"] == "quick_scan", saved["consistency"]
+    ws = saved["manifest"]["manifest_warnings"]
+    assert any("立场判官未启用" in w for w in ws), ws
+
+
 def test_judged_run_records_the_client_backend_and_model(tmp_path, monkeypatch):
     """分支真由客户端判出来时,后端/模型名/温度都取自那个客户端自己声明的值。"""
     stub = StubJudgeClient("local", "qwen3:8b", temperature=0.15)
@@ -139,6 +151,9 @@ def test_judged_run_records_the_client_backend_and_model(tmp_path, monkeypatch):
     assert m["judge"] == "local" and m["judge_model"] == "qwen3:8b", m
     assert m["temperature"]["judge"] == 0.15, m["temperature"]
     assert m["judge_backend_reason"] == "client.backend_kind='local'", m
+    # 判官在场时不该有"未启用"那句(有客户端 = 真判过,不是快筛)
+    assert saved["consistency"]["method"] == "llm_stance", saved["consistency"]
+    assert not any("立场判官未启用" in w for w in m["manifest_warnings"]), m["manifest_warnings"]
 
 
 def test_api_backend_records_api(tmp_path, monkeypatch):

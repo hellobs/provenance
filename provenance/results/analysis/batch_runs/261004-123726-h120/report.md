@@ -115,7 +115,7 @@
 ## 七、下一步建议
 
 1. **补子进程 stdout 编码**:在 `case01/tools/batch_run.py` 组装子进程 env 处加 `PYTHONIOENCODING=utf-8`(或子命令统一带 `-X utf8`),并对 `case01/orchestrator.py` 的 `log()` 走容错编码,让 `▶` 这类字符不再单条报废一次重试机会。这是本次唯一的代码级事故,优先级最高。
-2. **把 `manifest` 段落进 `case01/run` 的 run.json**(与 injector pipeline 的落盘对齐),否则 `manifest_warnings` / 截断口径在生产样本上永远读不到,而这是"截断是否影响 Router"的唯一直接证据。
+2. **把 `manifest` 段落进 `case01/run` 的 run.json**(与 injector pipeline 的落盘对齐),否则 `manifest_warnings` / 截断口径在生产样本上永远读不到,而这是"截断是否影响 Router"的唯一直接证据。**【已修,见第九节;本批 39 条不回填。】**
 3. **专门验一次分支 A 的可达性**:构造或挑几条 AI 明确表态"立即买入"的素材跑 `--timeline auto`,确认判据映射不是结构性排除 A;在此之前,报告与答辩里**不要**把 A=0 解释成"当事人行为如此"。
 4. **科研口径保持红线**:本批 39 条补的是**量与质量分布**,可作为"状态级内化 + 反思层证据"的样本池;`interventions.json` 仍只有 34 条(可比 12 条),**批量样本增多不等于内化证据变多**,2 小时窗内行动文本位移与底噪同量级,**行为级改变不可主张**。
 5. **可直接入库的产物**:本批 questionable 3 条(016/025/039)连同 `[两法分歧]` 的 reason 原文整块保留给专家复核,不摘除;`analysis.json` / `analysis.md` / `summary.*` / 台账与逐条日志已在批次目录,本报告为 `report.md`。
@@ -129,6 +129,7 @@
 **1. `manifest` 缺失的根因确认:批量生产路径压根不经过 manifest 代码。**
 生产链是 `case01/tools/batch_run.py:226` 起子进程 → `case01/run.py:96` → `case01/orchestrator.py`,落盘字段全集由 `RunRecorder`(orchestrator:106-116)初始化再补 condition_monitor/reflection/router/audit/consistency —— **orchestrator 全文对 "manifest" 零提及(含注释,大小写不敏感 grep 无匹配)**。挂 manifest 的是另一条链:`packages/mavis-case01-injector/src/mavis_case01_injector/pipeline.py:144-148`(`collect_run_meta` + `attach_manifest`),所以只有走 injector/映射的产物有这一段。13 个 REQUIRED_KEYS(manifest.py:42-56)对批量记录一个都不生效。
 6 个**静默退化点**(缺字段不报错、也不告警):`live/history.py:260-285` 的 safe 视图白名单本就不含 manifest;`live/history.py:221-245` 的质检只看 consistency/reflection,从不看 `manifest_warnings`,且 import 失败整块 except 吞成 `unverified`;`case01/tools/reflection_audit.py:62-66` 的注释声称"截断落进 manifest_warnings",实际用文本启发式判截断、根本不读 manifest;`batch_run.py` 的统计对缺失不告警;`pipeline.py:248`(rerun_router_only)对无 manifest 的旧记录写回时不补挂;orchestrator:468 走 quick_scan 时只 print,不像 pipeline:190-193 那样记进 `manifest_warnings`。**结论:平台侧看不见"截断/判官降级"这类警告,不是概率问题,是链路没接。** 未修。
+**【状态更新(2026-10-04 17:0x,commit f942a0c):链路已接上,生产路径落盘前挂 manifest;本小节对"批量路径压根不经过 manifest 代码"的根因分析是对修复前状态的记录,仍然成立。本批 39 条不回填,详见第九节。】**
 
 **2. 分支 A=0 要拆成两件事看,其中一件是确凿缺陷(已修)。**
 - 规则判定路径(`case01/world/branch.py` shim → `mavis_case01_injector/world/branch.py:226-251`,由 `orchestrator.py:275` 在 no-llm/rules 模式调用)**结构上不可能判出 A**:`classify()` 只有 NO_BUY/REFUSE→B、CONDITIONAL/ANTI_ALLIN→C,兜底 `return "C"`,`route()` 里那段 `if b == "A"` 是死代码。实证:三条明确的"满仓买入/直接 all in"文本全部被判成 C。→ 已修(新增 ALL_IN 词表并把 A 判在 CONDITIONAL 之后,带任何对冲词仍不给 A;`case01/tests/test_world.py` 加 4 条守卫,含"A 可达"回归)。
@@ -214,3 +215,53 @@ serve 的局部 `hidden` 少 `unreadable`(有目录没 run.json)。今天 serve 
 `case01/tests` 全量 575 passed,`case_engine/tests` 201 passed + 1 skipped,
 injector 包 4 passed,`tools/doc_audit.py --check` 待更新 0(只读)。
 CI(ubuntu-latest / py3.12)对上述 6 个提交全绿。*
+
+---
+
+## 九、manifest 链路补记(第八节第 1 条已修,17:0x)
+
+**修了什么。** 生产路径 `case01/orchestrator.py` 现在在落盘前(`p = rec.save()`)调用
+`attach_manifest(rec.data, collect_run_meta(...), financial_dir=FIN_DIR(), engine_id="case01-run")`,
+两条路(生产 run / injector 映射)共用同一份 manifest 实现与同一组 13 个 REQUIRED_KEYS,
+靠 `engine_id` 区分记录来源(`case01-run` vs `case01-injector`)。共享实现顺带补了三处口径:
+`collect_run_meta` 认 `branch_source` 参数;后端为 `rules` 时 `temperature.judge` 写 `null`
+而不是编一个 0.1(规则判定没有采样温度);后端探测的"怎么判出来的"(类名/backend_kind 声明)
+不再被丢掉,会落进 `judge_backend_reason`。`branch_mode` 仍只认 01 §六 定义的 preset/judge,
+规则路由记成 `rules` 并同时写 warning,不新增设定。
+
+**实机核对(qwen3:8b,临时 runs 根,跑完即删)**:
+`engine_id=case01-run / branch_mode=judge / branch_source=judge / judge=local /
+judge_model=qwen3:8b / judge_backend_reason="class OllamaClient" /
+temperature={judge:0.1, reflection:0.4, router:0.2} / manifest_warnings=[]`,
+同一条记录 `consistency.method` 为 `llm_stance`。
+
+**同一轮的另一个缺陷(f09fe45)**:写侧 `RUNS_ROOT()` 原先写死 `case01/runs`,只有读侧认
+`CASE01_RUNS_ROOT` —— 用覆盖根做演示时,新跑的记录落在默认根、界面正好看不到,表现为
+"跑成功了但演示里没这条"。现改为环境变量优先,与 `case01/serve.py`、`live/history._data_root` 同口径。
+
+**边界(不许粉饰)**:
+- **本批 39 条不回填**。截至本次核对,`case01/runs/*/run.json` 仍是 **5/242** 带 manifest。
+- 第八节第 1 条点名的 6 个静默退化点里,**只有第 6 个本轮补了**:生产路径走 quick_scan 时
+  现在和 pipeline 一样往 `manifest_warnings` 写那句"立场判官未启用……verdict 来自关键词快筛"
+  (此前只 print 一次就消失)。其余 5 个**没动**,而且分两类要分清:
+  - **设计如此,不该"修"**:`live/history.expert_safe_record` 的白名单剥掉 manifest
+    (契约 §3.2 —— 清单里有 `branch`/判定后端,进专家视图等于递底牌)。
+    平台内部面板 `/api/review/run/{id}` 默认裸视图与 `?raw=1` 读得到这一段。
+  - **确实是没接,本轮未动**:质检(`live/history.py:221-245`)只看 consistency/reflection,
+    从不看 `manifest_warnings`,import 失败仍整块吞成 `unverified`;`reflection_audit` 仍用文本
+    启发式判截断(历史记录没有清单,它也只能如此);`batch_run` 统计对缺字段不告警;
+    `pipeline.py` 的 rerun_router_only 对旧记录不补挂。
+  **结论:数据侧接上了,警告侧没有** —— 平台今天不会因为 `manifest_warnings` 非空而亮灯,
+  要人去看 run.json 或内部面板。
+- 因此**本批的截断口径仍未拿到直接证据**:第四节"不能报无截断"与第八节第 5 条的结论不变,
+  文件侧那个"收紧判据后 0 条疑似截断"仍是唯一的截断证据。新跑的记录才两法都有。
+- 判据生效与否可核对:`manifest_warnings` 为空只说明"这次跑的没缺项",不等于跑得好。
+
+**守卫(第三轮测试)**:新增 `case01/tests/test_run_manifest_production_path.py` 14 条
+(必备键全集、attach 在 save 之前的顺序、`BRANCH_MODE_BY_SOURCE` 与 orchestrator 源码 token 对齐、
+no-llm ⇒ rules 三件套、quick_scan 的 manifest 留痕 + 有判官时不该有这句、
+preset/judge 两种后端的字段流、资料目录哈希与移动后变化、
+真客户端模型名、builder 抛错仍落 `manifest_error`、已有 manifest 不被覆盖)
+与 `test_runs_root_env_parity.py` 6 条(环境变量优先级、写侧与读侧同根、端到端落盘位置)。
+本轮复跑:`case01/tests` 全量 595 passed,root `tests` 184 passed,`tools/doc_audit.py --check` 待更新 0(只读)。
+CI run 37190243604(f942a0c)completed/success;本次 quick_scan 留痕的追加提交另起一轮 CI。
