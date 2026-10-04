@@ -14,9 +14,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01.orchestrator import run_case01
+from case01.safestream import tolerant_stdout
 
 
 def main():
+    tolerant_stdout()
     ap = argparse.ArgumentParser(description="GTC Case 01 完整 Run")
     ap.add_argument("--timeline", choices=["A", "B", "C"], default=None,
                     help="强制 Branch(跳过自动判定)")

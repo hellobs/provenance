@@ -51,6 +51,8 @@ import threading
 import time
 from typing import Dict, List, Optional
 
+from case01.safestream import tolerant_stdout
+
 HERE = os.path.dirname(os.path.abspath(__file__))          # .../case01/tools
 CASE01_DIR = os.path.dirname(HERE)                        # .../case01
 PROV_DIR = os.path.dirname(CASE01_DIR)                    # .../provenance
@@ -195,9 +197,17 @@ def _failure_tail(log_path: str, limit: int = 3000) -> str:
     return tail[-limit:]
 
 
-def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
-    """跑一条案例。返回台账行;失败不抛异常(一条崩不带走整批)。"""
+def _child_env(args_ns) -> Dict:
+    """组装子进程(`python -m case01.run`)的环境。
+
+    `PYTHONIOENCODING=utf-8` 是必须的,不是美化:日志文件由本进程按 utf-8 打开并
+    交给子进程当 stdout,而子进程默认按 Windows locale(GBK)编码文本流 —— 中文
+    回答进了 .log 就是乱码,`_failure_tail` 再按 utf-8 读回来时靠 errors=replace
+    兜底,失败原因糊成一片(实测批次 261004-123726-h120/-035 的 retry 段)。
+    钉死 utf-8 后,GBK 下会抛 UnicodeEncodeError 的 `▶` 之类字符也一并安全落地。
+    """
     env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
     if args_ns.model:
         env["CASE01_LLM_MODEL"] = args_ns.model
     if args_ns.embed_model:
@@ -206,6 +216,12 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
         env["CASE01_LLM_DISABLE_THINKING"] = "1"
     else:
         env.pop("CASE01_LLM_DISABLE_THINKING", None)
+    return env
+
+
+def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
+    """跑一条案例。返回台账行;失败不抛异常(一条崩不带走整批)。"""
+    env = _child_env(args_ns)
 
     cmd = [args_ns.python, "-m", "case01.run", "--run-id", run_id]
     if args_ns.timeline:
@@ -395,6 +411,7 @@ def _summarize(out_dir: str, batch: str, stats: Dict, args_ns) -> Dict:
 
 
 def main(argv=None) -> int:
+    tolerant_stdout()
     ap = argparse.ArgumentParser(description="批量跑 case01 案例(多路并发)")
     ap.add_argument("--duration-min", type=float, default=180.0,
                     help="最长运行分钟数(到点自停;默认 180)")
