@@ -357,6 +357,11 @@ def _summarize(out_dir: str, batch: str, stats: Dict, args_ns) -> Dict:
     secs = [r.get("seconds", 0) for r in rows]
     summary["seconds_mean"] = _mean(secs)
     summary["seconds_total"] = round(sum(secs), 1)
+    # 耗时的总体是**台账全部行(含失败尝试)**,与上面分布类的总体不同:
+    # 失败那条同样烧了 GPU 时间,把它剔掉等于把成本藏起来。但差异必须写明 ——
+    # 结尾那句"只统计成功读到 run.json 的记录"以前也把这里一起盖掉了
+    # (261003-165042:44 行的耗时均值 vs 43 条的质量均值,同一个文件两个分母)。
+    summary["seconds_n"] = len(secs)
 
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
@@ -399,10 +404,11 @@ def _summarize(out_dir: str, batch: str, stats: Dict, args_ns) -> Dict:
         "",
         "## 耗时",
         "",
-        "- 单条均值 {}s · 累计 {}s".format(
-            summary["seconds_mean"], summary["seconds_total"]),
+        "- 单条均值 {}s · 累计 {}s(总体 = 台账全部 {} 行,含失败尝试:失败也烧时间)".format(
+            summary["seconds_mean"], summary["seconds_total"], summary["seconds_n"]),
         "",
-        "> 口径:只统计成功读到 `run.json` 的记录;`read_ok=false` 的不计入分布。",
+        "> 口径:分支/反思/Router 三节只统计成功读到 `run.json` 的记录"
+        "(`read_ok=false` 与失败行不计入);耗时一节统计台账全部行。",
     ]
     with open(os.path.join(out_dir, "summary.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(md) + "\n")
