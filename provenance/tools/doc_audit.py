@@ -114,6 +114,7 @@ STATUS = {
     "case01/docs/case01_可插拔可视化设计.md": ("参考", "可插拔可视化设计(仍有效)"),
     "case01/docs/框架层级图_LLM接入节点.md": ("参考", "框架层级与 LLM 接入节点;仍有效"),
     "case01/injector/scenario/README.md": ("现行", "注入器场景(生成物)说明"),
+    "docs/复现说明_三档口径.md": ("现行", "外部专家/对接方的复现口径:①产物级复算能跑哪些命令、②设定级靠 manifest、③逐字重生成现在做不到"),
     "scenarios/investment/README.md": ("可能过时", "旧业务层场景说明;场景声明已迁到 `cases/*/scenario.yaml`(待核对是否还需保留)"),
 }
 

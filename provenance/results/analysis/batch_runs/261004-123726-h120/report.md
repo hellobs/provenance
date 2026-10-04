@@ -115,7 +115,7 @@
 ## 七、下一步建议
 
 1. **补子进程 stdout 编码**:在 `case01/tools/batch_run.py` 组装子进程 env 处加 `PYTHONIOENCODING=utf-8`(或子命令统一带 `-X utf8`),并对 `case01/orchestrator.py` 的 `log()` 走容错编码,让 `▶` 这类字符不再单条报废一次重试机会。这是本次唯一的代码级事故,优先级最高。
-2. **把 `manifest` 段落进 `case01/run` 的 run.json**(与 injector pipeline 的落盘对齐),否则 `manifest_warnings` / 截断口径在生产样本上永远读不到,而这是"截断是否影响 Router"的唯一直接证据。**【已修,见第九节;本批 39 条不回填。】**
+2. **把 `manifest` 段落进 `case01/run` 的 run.json**(与 injector pipeline 的落盘对齐),否则 `manifest_warnings` / 截断口径在生产样本上永远读不到,而这是"截断是否影响 Router"的唯一直接证据。**【已修,见第十节;本批 39 条不回填。】**
 3. **专门验一次分支 A 的可达性**:构造或挑几条 AI 明确表态"立即买入"的素材跑 `--timeline auto`,确认判据映射不是结构性排除 A;在此之前,报告与答辩里**不要**把 A=0 解释成"当事人行为如此"。
 4. **科研口径保持红线**:本批 39 条补的是**量与质量分布**,可作为"状态级内化 + 反思层证据"的样本池;`interventions.json` 仍只有 34 条(可比 12 条),**批量样本增多不等于内化证据变多**,2 小时窗内行动文本位移与底噪同量级,**行为级改变不可主张**。
 5. **可直接入库的产物**:本批 questionable 3 条(016/025/039)连同 `[两法分歧]` 的 reason 原文整块保留给专家复核,不摘除;`analysis.json` / `analysis.md` / `summary.*` / 台账与逐条日志已在批次目录,本报告为 `report.md`。
@@ -129,7 +129,7 @@
 **1. `manifest` 缺失的根因确认:批量生产路径压根不经过 manifest 代码。**
 生产链是 `case01/tools/batch_run.py:226` 起子进程 → `case01/run.py:96` → `case01/orchestrator.py`,落盘字段全集由 `RunRecorder`(orchestrator:106-116)初始化再补 condition_monitor/reflection/router/audit/consistency —— **orchestrator 全文对 "manifest" 零提及(含注释,大小写不敏感 grep 无匹配)**。挂 manifest 的是另一条链:`packages/mavis-case01-injector/src/mavis_case01_injector/pipeline.py:144-148`(`collect_run_meta` + `attach_manifest`),所以只有走 injector/映射的产物有这一段。13 个 REQUIRED_KEYS(manifest.py:42-56)对批量记录一个都不生效。
 6 个**静默退化点**(缺字段不报错、也不告警):`live/history.py:260-285` 的 safe 视图白名单本就不含 manifest;`live/history.py:221-245` 的质检只看 consistency/reflection,从不看 `manifest_warnings`,且 import 失败整块 except 吞成 `unverified`;`case01/tools/reflection_audit.py:62-66` 的注释声称"截断落进 manifest_warnings",实际用文本启发式判截断、根本不读 manifest;`batch_run.py` 的统计对缺失不告警;`pipeline.py:248`(rerun_router_only)对无 manifest 的旧记录写回时不补挂;orchestrator:468 走 quick_scan 时只 print,不像 pipeline:190-193 那样记进 `manifest_warnings`。**结论:平台侧看不见"截断/判官降级"这类警告,不是概率问题,是链路没接。** 未修。
-**【状态更新(2026-10-04,commit f942a0c + dae4934):写侧链路已接上 —— 生产路径落盘前挂 manifest,本小节点名的 6 个退化点里只有第 6 个(quick_scan 只 print)一并补了,其余 5 个仍在,性质见第九节。本小节对"批量路径压根不经过 manifest 代码"的根因分析是对修复前状态的记录,仍然成立;本批 39 条不回填。】**
+**【状态更新(2026-10-04,commit f942a0c + dae4934):写侧链路已接上 —— 生产路径落盘前挂 manifest,本小节点名的 6 个退化点里只有第 6 个(quick_scan 只 print)一并补了,其余 5 个仍在,性质见第十节。本小节对"批量路径压根不经过 manifest 代码"的根因分析是对修复前状态的记录,仍然成立;本批 39 条不回填。】**
 
 **2. 分支 A=0 要拆成两件事看,其中一件是确凿缺陷(已修)。**
 - 规则判定路径(`case01/world/branch.py` shim → `mavis_case01_injector/world/branch.py:226-251`,由 `orchestrator.py:275` 在 no-llm/rules 模式调用)**结构上不可能判出 A**:`classify()` 只有 NO_BUY/REFUSE→B、CONDITIONAL/ANTI_ALLIN→C,兜底 `return "C"`,`route()` 里那段 `if b == "A"` 是死代码。实证:三条明确的"满仓买入/直接 all in"文本全部被判成 C。→ 已修(新增 ALL_IN 词表并把 A 判在 CONDITIONAL 之后,带任何对冲词仍不给 A;`case01/tests/test_world.py` 加 4 条守卫,含"A 可达"回归)。
@@ -218,7 +218,7 @@ CI(ubuntu-latest / py3.12)对上述 6 个提交全绿。*
 
 ---
 
-## 九、manifest 链路补记(第八节第 1 条:写侧已接上,其余如实留着)
+## 十、manifest 链路补记(第八节第 1 条:写侧已接上,其余如实留着)
 
 **修了什么。** 生产路径 `case01/orchestrator.py` 现在在落盘前(`p = rec.save()`)调用
 `attach_manifest(rec.data, collect_run_meta(...), financial_dir=FIN_DIR(), engine_id="case01-run")`,
@@ -261,6 +261,26 @@ temperature={judge:0.1, reflection:0.4, router:0.2} / manifest_warnings=[]`,
     (现在至少如实写 `manifest_status=unverified`,不再冒充"没有警告")。
 - 因此**本批的截断口径仍未拿到直接证据**:第四节"不能报无截断"与第八节第 5 条的结论不变,
   文件侧那个"收紧判据后 0 条疑似截断"仍是唯一的截断证据。新跑的记录才两法都有。
+
+**演示记录包(2026-10-04 晚,动作 1)与"复现"这条线的实测口径。** 为 15 号交付新跑 4 条
+`demo1015-{auto,A,B,C}`,落在**仓外** `D:\zzr\demo-case01-20261015\runs`(靠 f09fe45 那个环境变量才做得到),
+仓库 `case01/runs` 保持 242 条不变、`git status` 干净。四条 `manifest` 19 键齐全、
+`manifest_warnings` 全空、`consistency.method` 全为 `llm_stance`、`git_commit=d45fcc6`、
+`scenario_sha256`/`financial_data_version` 与本机现算值逐字相同;`auto` 是 `judge` 主路径(判出 C),
+另三条是 `--timeline` 指定的 `preset` 对照,其中 A/C 因与 T0 立场(`wait`)冲突落成 `questionable`,
+`/api/runs` 默认只回 2 条并把这两条列进 `excluded.by_kind.questionable`。**这正是要给平台看的那半边证据:
+门在拦,而且拦了什么看得见。** 逐条内容与"哪些能复现/哪些不能"见 `docs/复现说明_三档口径.md`。
+
+写这份说明时把文档里每条命令都在本机跑了一遍,顺出三处**没接的**(本轮只记账、未动代码):
+- `case01.tools.reflection_audit` **没有 `--check` 开关**(只有 `--runs-dir/--clean/--write`),
+  且默认值是相对路径 `case01/runs`,**不认** `CASE01_RUNS_ROOT` —— 指记录包必须显式给 `--runs-dir`,
+  否则它对着当前目录报"没找到记录"。`consistency_report` 同样有 `--runs-dir`,这两条可用。
+- `case01.tools.router_review`、`case01.tools.reflection_review`、`case01.tools.batch_analyze --scan-runs`
+  把 `case01/runs` **写死在源码里**,既不吃环境变量也没有开关:对着记录包跑它们不报错,
+  **只导出一张空表**。这与第八节第 1 条是同一类病(口径分叉不吭声),只是发生在分析工具侧。
+- `case01.tools.internalization_metrics`、`case01.tools.behavior_follow` 读 `results/checkpoints/`,
+  那份逐分钟轨迹**不入库也不在记录包里**,所以"① 产物级复算"覆盖不到这两个工具的定量结果;
+  另外两者默认往 `results/analysis/` 写盘,复算时要 `--out-root` 指到临时目录。
 - 判据生效与否可核对:`manifest_warnings` 为空只说明"这次跑的没缺项",不等于跑得好。
 
 **守卫(第三轮测试)**:新增 `case01/tests/test_run_manifest_production_path.py` 14 条
