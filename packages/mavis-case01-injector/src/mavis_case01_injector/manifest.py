@@ -16,11 +16,14 @@
 
 语义口径(与 GTC 源文档一致,不新增设定):
     - `branch_mode`:preset(可控对照,分支由运行参数定) / judge(T0 回答判定,01 §六);
+      跑规则判定的场合(no-llm 自检)记 `rules`,并留一条 warnings ——
+      源里没有第三种模式,不能把它打扮成 preset 或 judge;
     - `judge`:`local`(本地 Ollama/HF 权重) / `api`(OpenRouter 等外部 API) / `rules`
       (关键词规则,不调 LLM);preset 模式下写的是"这次配置里实际的判定后端",
       记录里同时有 `branch_mode` 说明它没被调用过;
     - `temperature`:判定 0.1、反思 0.4、路由 0.2(反思/路由取 `case01.reflection`
-      里的常量,同一来源,不两处写数)。
+      里的常量,同一来源,不两处写数);`judge=rules` 时判定温度记 `null` ——
+      规则没有温度,填 0.1 等于谎报调过模型。
 """
 import hashlib
 import os
@@ -346,11 +349,15 @@ def detect_temperature(client: Any, default: float = JUDGE_TEMPERATURE) -> float
 
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                      branch_mode: str = "", judge_llm: Any = None,
-                     backend_kind: str = "") -> Dict[str, Any]:
+                     backend_kind: str = "",
+                     branch_source: str = "") -> Dict[str, Any]:
     """从原始记录/调用参数里抽"这次运行是什么"的全部输入(纯提取,不做哈希)。
 
     raw:injector 原始记录(或已映射记录);空表示"由调用方直接给参数"。
     backend_kind:显式覆盖后端类型(测试/离线场景;不走客户端探测)。
+    branch_source:调用方直接给的分支来源(preset/judge/rules);生产路径
+        (`case01/orchestrator`)把它记在 `branch_action.source` 里而不是顶层字段,
+        所以需要一个显式入口,否则清单里的 branch_source 会留空。
     单一来源:raw 里已经带了 `manifest_meta` 时**直接沿用**(那是最贴近真实调用点
     的一份:桥自己记的判定后端),不再让映射器重新猜一遍。
     """
@@ -361,21 +368,23 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     if isinstance(cached, dict) and cached.get("judge") and not backend_kind:
         meta = dict(cached)
         meta.setdefault("temperature", {})
+        cached_judge = (cached.get("temperature") or {}).get(
+            "judge", None if cached.get("judge") == "rules" else JUDGE_TEMPERATURE)
         meta["temperature"] = {**(cached.get("temperature") or {}),
-                               "judge": detect_temperature(judge_llm,
-                                                           (cached.get("temperature") or {})
-                                                           .get("judge", JUDGE_TEMPERATURE))}
+                               "judge": None if cached.get("judge") == "rules"
+                                        else detect_temperature(judge_llm, cached_judge)}
         if branch:
             meta["branch"] = branch
         if branch_mode:
             meta["branch_mode"] = branch_mode
-        meta.setdefault("branch_source", raw.get("branch_source", "") or "")
+        meta["branch_source"] = (branch_source or meta.get("branch_source")
+                                 or raw.get("branch_source", "") or "")
         meta["judge_model"] = meta.get("judge_model") or ""
         return meta
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
         "branch_mode": branch_mode or raw.get("branch_mode", "") or "preset",
-        "branch_source": raw.get("branch_source", "") or "",
+        "branch_source": branch_source or raw.get("branch_source", "") or "",
         "judge_info": dict(raw.get("judge_info") or {}),
         "mode": raw.get("mode", "") or "",
     }
@@ -390,23 +399,31 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
         # 没给客户端 ≠ 后端未知:真跑路径的兜底就是本地 Ollama(见 _DEFAULT_BACKEND_REASON)。
         kind, why = _DEFAULT_BACKEND_KIND, _DEFAULT_BACKEND_REASON
     else:
-        kind, _note, why = detect_backend_kind(judge_llm)
+        kind, note, why = detect_backend_kind(judge_llm)
     meta["judge"] = kind
-    meta["judge_backend_reason"] = why
+    # 探测成功时也记下"是怎么判出来的"(客户端声明的 backend_kind / 类名映射),
+    # 事后核对指纹时不用猜是客户端自报的还是我们认类名认出来的。
+    meta["judge_backend_reason"] = why or note
     model = detect_judge_model(judge_llm)
     if not model and kind == "local" and judge_llm is None:
         model = DEFAULT_JUDGE_MODEL                # 没给客户端时,OllamaClient 的默认模型
     meta["judge_model"] = model
-    meta["temperature"] = {"judge": detect_temperature(judge_llm)}
+    # 规则判定没有采样温度:写 0.1 会让"judge=rules + temperature=0.1"读起来像
+    # 真的调过模型。规则路径记 null,由 build_manifest 落一条 warnings 说明。
+    meta["temperature"] = {"judge": None if kind == "rules"
+                                     else detect_temperature(judge_llm)}
     return meta
 
 
 def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
                    financial_dir: str = "", created_at: str = "",
-                   git_commit: str = "") -> dict:
+                   git_commit: str = "",
+                   engine_id: str = ENGINE_ID) -> dict:
     """产出一段 manifest。缺项一律 `null`(+ warnings),绝不静默省略。
 
     git_commit 显式传入时按传入值记(便于重放/测试);传 "unknown" 视为取不到。
+    engine_id:哪个引擎跑出来的。默认注入器;生产路径(`case01/run` → orchestrator)
+        必须传自己的值,否则清单一律自称 injector,事后分不清两条路。
     """
     meta = dict(run_meta or {})
     warnings: List[str] = []
@@ -496,7 +513,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "created_at": created_at,
         "git_commit": commit or "unknown",
         "git_commit_source": commit_source,
-        "engine_id": ENGINE_ID,
+        "engine_id": engine_id,
         "branch": meta.get("branch", "") or "",
         "branch_mode": branch_mode,
         "branch_source": meta.get("branch_source", "") or "",
@@ -513,14 +530,18 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "manifest_warnings": warnings,
     }
     if not temp.get("judge") and temp.get("judge") != 0:
-        warnings.append("temperature.judge=null:判不出判定温度")
+        warnings.append(
+            "temperature.judge=null:{}".format(
+                "后端是 rules,规则判定没有采样温度" if judge_kind == "rules"
+                else "判不出判定温度"))
         manifest["manifest_warnings"] = warnings
     return manifest
 
 
 def attach_manifest(record: dict, run_meta: Optional[dict] = None,
                     scenario_path: str = "", financial_dir: str = "",
-                    created_at: str = "", git_commit: str = "") -> dict:
+                    created_at: str = "", git_commit: str = "",
+                    engine_id: str = ENGINE_ID) -> dict:
     """把 manifest 挂到记录上。**任何失败都要留痕**(产出 manifest_error 段)。
 
     返回挂好 manifest 的记录(就地改也返回)。已有 manifest 时不覆盖(单一来源:
@@ -535,12 +556,13 @@ def attach_manifest(record: dict, run_meta: Optional[dict] = None,
         record["manifest"] = build_manifest(run_meta, scenario_path=scenario_path,
                                             financial_dir=financial_dir,
                                             created_at=created_at,
-                                            git_commit=git_commit)
+                                            git_commit=git_commit,
+                                            engine_id=engine_id)
     except Exception as e:                      # noqa: BLE001 - 降级也必须有声
         record["manifest"] = {
             "manifest_version": MANIFEST_VERSION,
             "created_at": created_at or time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "engine_id": ENGINE_ID,
+            "engine_id": engine_id,
             "manifest_error": "{}: {}".format(type(e).__name__, e),
             "manifest_warnings": ["manifest 生成失败,清单内容不可信:{}:{}".format(
                 type(e).__name__, e)],

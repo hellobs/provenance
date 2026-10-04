@@ -26,15 +26,26 @@ from .atomicio import write_json_atomic, write_text_atomic
 from .world.state import World, WorldConfig
 from .world.timelines import build_timeline
 from .consistency import attach_consistency
+from .injector.manifest import attach_manifest, collect_run_meta
 from .world.branch import (LLMBranchJudge, RuleBranchRouter,
                            ConditionPlanParser, derive_trigger,
                            evaluate_trigger)
+
+# manifest 里的 engine_id:生产路径与注入器路径共用同一份清单实现,但必须分得清
+# 这条记录是哪条路跑出来的(两条路的判定后端、节点序列并不相同)。
+RUN_ENGINE_ID = "case01-run"
 
 # 03 第四节:A 线 Ethan 预设动作(接近满仓买入价/退出日与价)
 BUY_PRICE_A = 45.20
 EXIT_PRICE_A = 27.40
 EXIT_DATE_A = "2026-09-07"
 FINAL_DATE = "2026-09-15"
+
+# branch_action.source → manifest 的 branch_mode(01 §六 只定义 preset/judge 两种)。
+# judge-failed 仍是"试图用判定"的那次运行,归 judge;rules 只存在于 no-llm 自检路径,
+# 源里没有第三种,照实记 rules 让清单自己落 warning,不冒充 preset 或 judge。
+BRANCH_MODE_BY_SOURCE = {"preset": "preset", "judge": "judge",
+                         "judge-failed": "judge", "rules": "rules"}
 
 # Ethan 隐藏背景(未披露前不进入任何 LLM context;03 第五节)
 HIDDEN_CONTEXT_A = (
@@ -467,6 +478,22 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     # 判官 client 用 router_llm(与分支判定同一套),没有就退回 quick_scan 诚实降级。
     rec.data = attach_consistency(rec.data, branch_source=branch_source,
                                   llm=router_llm or llm)
+    # 运行清单:同样在**落盘之前**挂,与 injector 路径同口径。这一段是"这条记录
+    # 当时用哪个 commit / 哪种判定后端 / 哪份检索资料 / 哪版提示词"的唯一指纹;
+    # 2026-10-04 之前生产路径直接 rec.save() 不带它,于是历史记录无法自证跑在什么
+    # 环境上(反思是否被截断也因此查不动)。
+    # backend_kind:no-llm 路径一个模型客户端都没有(llm/router_llm 均 None)。此时不能
+    # 让清单按"未给客户端 → 本地 Ollama 默认"去猜(那是注入器真跑路径的兜底,这里不成立),
+    # 照实记 rules —— 这次运行里唯一的判定机器就是关键词规则表。
+    judge_client = router_llm or llm
+    rec.data = attach_manifest(
+        rec.data,
+        collect_run_meta(rec.data, branch=branch,
+                         branch_mode=BRANCH_MODE_BY_SOURCE.get(branch_source, ""),
+                         branch_source=branch_source,
+                         judge_llm=judge_client,
+                         backend_kind="" if judge_client is not None else "rules"),
+        financial_dir=FIN_DIR(), engine_id=RUN_ENGINE_ID)
     p = rec.save()
     log("recorded -> " + p)
     return rec
