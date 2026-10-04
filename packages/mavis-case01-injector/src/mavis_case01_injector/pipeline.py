@@ -122,12 +122,18 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
 
     # 原始记录里的分支才是**实际跑出来的**分支(judge 模式:跑完 T0 才判定;
     # 映射时必须以它为准,否则记录的 branch 字段会跟实际跑的市场世界对不上),
-    # 分支来源同理(judge / preset / preset-fallback)。
+    # 分支来源与分支模式同理(judge / preset / preset-fallback;judge / preset)。
+    # 2026-10-04 实测:`branch_mode` 以前不在这里取,而映射 CLI 的 `--branch-mode`
+    # 默认 preset —— 于是 live 那一局真实由 LLM 判了分支(raw 里 branch_mode=judge
+    # 且带 judge_info),映射出的成品记录清单却写着 preset,把"可控对照"与
+    # "AI 判定"两种性质混成同一个值,看清单的人无从分辨。
     if isinstance(raw, dict):
         if raw.get("branch"):
             branch = raw["branch"]
         if raw.get("branch_source"):
             branch_source = raw["branch_source"]
+        if raw.get("branch_mode"):
+            branch_mode = raw["branch_mode"]
 
     record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
@@ -162,8 +168,30 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                 "reflection/router:生成失败({}),本条为不完整记录".format(msg))
 
     # 一致性戳:在写盘之前盖(所以文件里一定有这一节,不是"看日志才知道")
-    # 只传**显式的** router_llm:调用方没给就退回 quick_scan,不在这偷偷发请求。
-    record = _attach_consistency(record, branch_source=branch_source, llm=router_llm)
+    #
+    # 判据与反思**同源**(2026-10-04 修正):以前只有显式传了 router_llm 才走立场判官,
+    # 而 live 的映射路径(`_map_run` 起的 `python -m case01.injector.pipeline
+    # --from-record … --reflect`)从不传 —— 于是同一次落盘里出现了两套口径:反思/Router
+    # 已经真发过大模型请求(`_attach_reflection` 内部自己 `local_client_from_env()`),
+    # 一致性却静默退回关键词 quick_scan。实测 203/203 条成品全是 quick_scan,
+    # 立场判官的修复(b800d31)在演示主路径上一条都没被验证过。
+    #
+    # 仍然保留"不在试跑里悄悄发请求":dry_run 且调用方没给 client 时照旧 quick_scan
+    # 并如实写 method —— 降级可以,**明着降**,不在真跑记录里暗降。
+    judge_llm = router_llm or llm
+    if judge_llm is None and reflect and not dry_run:
+        from mavis_case01_injector.llm import local_client_from_env
+        try:
+            judge_llm = local_client_from_env()
+        except Exception as exc:  # noqa: BLE001 —— 建不出 client 要说出来,不是当没这回事
+            print("[!] 立场判官的本地后端建不出来,本条一致性明着退回 quick_scan:{}"
+                  .format(exc))
+    record = _attach_consistency(record, branch_source=branch_source, llm=judge_llm)
+    if record["consistency"]["method"] == "quick_scan" and reflect and not dry_run:
+        # 真跑却仍是 quick_scan = 调用方显式没给后端,这条事实必须留在记录上
+        record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
+            "consistency: 立场判官未启用(本次未提供判官后端),verdict 来自关键词快筛")
+        print("[!] 一致性走的是 quick_scan(本次没给立场判官后端),已记进 manifest_warnings")
     if require_consistent and record["consistency"]["verdict"] != "consistent":
         # opt-in 的"落盘闸门":只有调用方明确要求时才拦(默认不拦,免得静默丢弃样本;
         # 而且"丢弃重跑"会引入筛选偏差 —— 只保留恰好同意 preset 的运行)
