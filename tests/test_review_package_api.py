@@ -1,12 +1,49 @@
 """通过 ASGI 请求验证 5010 审核交接包；不需要 LLM、真实 Run 或运行中的服务。"""
 import asyncio
 import json
+import os
+import subprocess
 
 import httpx
 import pytest
 from fastapi import FastAPI
 
 from live.history import router
+
+
+def _link_dir(target, link):
+    """造一个"看起来在目录里、实则指向别处"的链接,用来试路径穿越防线。
+
+    2026-10-05(GLM 新访客测试 F1 + 本机复核):原实现直接 `symlink_to`,踩到两个坑:
+
+    ① 没开开发者模式的 Windows 上它抛 `WinError 1314客户端没有所需的特权`
+      ⇒ **新访客照README 跑自检第一条就红**,而这份红与项目质量无关
+      (CI 是 ubuntu 所以绿)。
+    ② 更隐蔽:开了开发者模式时它**不抛**,但 Windows 把 `os.symlink` 当 junction 处理,
+      `os.path.islink()` 为 False、`os.path.realpath()` **不解析它** ——
+      于是"链接指向根外"这个前提**根本没成立**,`realpath + commonpath` 那道防线
+      无从触发,这条测试在 Windows 上一直是**假绿**(404 只是因为
+      `escape/run.json` 不存在,不是穿越被挡住了)。
+
+    所以顺序是:**Windows 优先用目录联接(junction)**,它 `mklink /J` 建、不需要特权、
+    且 `realpath` 同样解析它(实测 realpath 指向目标目录);其他平台用符号链接。
+    两者都造不出才skip 并说明原因 —— 但**不许**在 Windows 上悄悄退化成 symlink,
+    那正是上面 ② 那个假绿。返回 kind 供调用方自证样本真的造出来了。
+    """
+    if os.name == "nt":
+        try:
+            p = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
+                               capture_output=True)
+            if p.returncode == 0:
+                return "junction"
+        except OSError:
+            pass
+        return ""            # Windows 上没有junction 就老实说造不出,不退回 symlink
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return "symlink"
+    except (OSError, NotImplementedError, AttributeError):
+        return ""
 
 
 def request(path, method="GET"):
@@ -71,8 +108,13 @@ def test_missing_and_path_escape(source, tmp_path):
     outside = tmp_path.parent / (tmp_path.name + "_outside")
     outside.mkdir()
     (outside / "run.json").write_bytes(source[0].read_bytes())
-    (tmp_path / "escape").symlink_to(outside, target_is_directory=True)
+    kind = _link_dir(str(outside), str(tmp_path / "escape"))
+    if not kind:
+        pytest.skip("本环境既不能建符号链接也不能建目录联接,无法造路径穿越样本")
     assert request("/api/review-package/escape").status_code == 404
+    # 顺带钉住"链接确实造到了根外":否则这条断言可能因为拿不到样本而假绿。
+    assert os.path.realpath(str(tmp_path / "escape")) == os.path.realpath(str(outside)), \
+        "{} 没把路径解析到根外,穿越场景没被造出来".format(kind)
 
 
 def test_openapi_exposes_get_contract(source):
