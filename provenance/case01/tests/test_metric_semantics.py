@@ -454,14 +454,18 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
     文档 `GTC研究边界声明.md` §一 把"Σ=1 守恒"列为
     "主张状态级内化"的依据之一,本测试就是那条依据的可执行版本。
 
-    数据来源(2026-10-05 改,回应 GTC 体检 N2 —— "绿 ≠ 验过"):
-      原始 `simulate-*.json` 被 gitignore,CI 干净检出上拿不到 ⇒ 此前这里
-      **静默 skip**,那条"依据"在 CI 上从未执行。现在拆成两半:
+    数据来源(2026-10-05 改,回应 GTC 体检 N2 —— "绿 ≠ 验过";
+    同日再改,回应 G2/K1 —— "文字有守卫、可执行性没有"):
+      原始 `simulate-*.json` 所在的 `results/checkpoints/` 被 gitignore,CI 干净
+      检出上拿不到 ⇒ 此前这里**静默 skip**,那条"依据"在 CI 上从未执行。现在拆成:
         - `test_simplex_*`(纯计算):对**构造的**单纯形点验证不变量,
           不依赖任何产物,**永远在跑**;
-        - `test_real_*`(真实样本):有 checkpoint 就逐条验,没有就**明确
-          记入 `_skipped_reason`** 而不是静默 —— 且断言的前提说明写在类
-          docstring,读者知道"这一半在本机验过"。
+        - `test_real_*`(真实样本):有 checkpoint 就逐条验,没有就记因。
+        - **且 G 组**新增了一组**只依赖入库产物**的守卫(见下方
+          `TestSimplexInvariantOnShippedProducts`)—— 那一组在任何检出上都跑,
+          验的是 `internalization.json` 里能从入库数据复算的部分(TVD 值域 / 对照臂为空)。
+      本组(F)与 G 组的分工必须记牢:**G 组跑得动 ≠ Σ=1 验过了**。
+      原始 Σ=1 的样本级验证,在 `checkpoints/` 不入库的前提下,CI 上是**没有**的。
     """
 
     _skipped_real = ""
@@ -470,7 +474,9 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
     def setUpClass(cls):
         cls.samples = []
         if not os.path.isdir(CK_DIR):
-            cls._skipped_real = "无 results/checkpoints/(gitignore):真实样本抽样未执行"
+            cls._skipped_real = (
+                "results/checkpoints/ 未入库(gitignore):原始 Σ=1 样本级验证在本检出上"
+                "不执行 —— 入库产物侧的可执行守卫见 TestSimplexInvariantOnShippedProducts")
             return
         files = sorted(glob.glob(os.path.join(CK_DIR, "*", "simulate-*.json")))
         for path in files[:400]:      # 抽样上限,避免测试过慢
@@ -552,6 +558,146 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
         bad = [(os.path.basename(p), a, [x for x in v if x > 1.0 + 1e-9])
                for p, a, v in self.samples if any(x > 1.0 + 1e-9 for x in v)]
         self.assertEqual(bad[:5], [], "单维超过 1(违反 Σ=1 前提):{}".format(bad[:5]))
+
+
+# ---------------------------------------------------------------------------
+# G. 入库产物上的可执行守卫(2026-10-05,体检 G2/K1)
+# ---------------------------------------------------------------------------
+#
+# 为什么加这一组:
+#   F 组的 `test_real_*` 验的是**原始 value_tendency 向量的 Σ=1**,而向量所在的
+#   `results/checkpoints/simulate-*.json` 被 gitignore ⇒ 这三条在 CI 干净检出上
+#   **必然 skip**。于是"红线 1 的依据栏写着『性质测试(Σ=1 守恒)』"这句话,
+#   在 CI 上只有**纯计算那半边**真的跑了 —— 这正是一类"文字有守卫、可执行性没有"
+#   的盲区(第六轮只读核查 G2/K1)。
+#
+#   `internalization.json` 是**入库**的(12 条干预),里面没有原始向量,无法直接
+#   复算 Σ=1;但它带了 `tv_to_new_before/after` —— 那是 `_tv()` 的输出,而
+#   `_tv` 的值域 [0, 0.5] **正是"两边都在单纯形上"的推论**(参 A 组)。
+#   所以本组做两件事,边界写清楚:
+#     (1) 验入库产物里**能从入库数据复算的东西**(TVD 值域、gap 恒等于 treated 均值);
+#     (2) **明确声明**原始 Σ=1 抽样验证仍依赖本机 checkpoints,CI 不执行 ——
+#         不许用 (1) 冒充 (2)。
+#
+# 铁律:把"CI 上真跑了什么"与"文档声称跑了什么"对齐,而不是把 skip 抹平充数。
+
+ANALYSIS_DIR = os.path.join(REPO_ROOT, "provenance", "results", "analysis")
+
+
+def _shipped_internalization_files():
+    """入库的 internalization.json(排除 gitignore 的 checkpoints 侧)。"""
+    if not os.path.isdir(ANALYSIS_DIR):
+        return []
+    return sorted(
+        os.path.join(ANALYSIS_DIR, d, "internalization.json")
+        for d in os.listdir(ANALYSIS_DIR)
+        if os.path.isfile(os.path.join(ANALYSIS_DIR, d, "internalization.json")))
+
+
+class TestSimplexInvariantOnShippedProducts(unittest.TestCase):
+    """入库 `internalization.json` 上**真能跑**的那部分 Σ=1 前提守卫。
+
+    这些断言在任何干净检出上都执行(产物入库),所以它们能进"依据的可执行性"。
+    但它们**不等于** Σ=1 原命题的验证 —— 见类尾那条显式声明的测试。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.files = _shipped_internalization_files()
+        cls.rows = []
+        for f in cls.files:
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    d = json.load(fh)
+            except (OSError, json.JSONDecodeError):
+                continue
+            for r in d.get("interventions") or []:
+                if "internalization_gap" in r:
+                    cls.rows.append((f, r))
+
+    def test_shipped_products_exist_and_are_committed(self):
+        """入库产物必须存在 —— 否则本组会退化成"空跑也算过"。
+
+        这本身是 G2 的验收条件:`results/analysis/*/internalization.json` 在 git 里。
+        """
+        self.assertTrue(self.files,
+                        "仓内没有入库的 internalization.json —— G2 的样本源消失")
+        # 至少 en7/en8 这两个"真跑出来"的模拟要在(产物入库存放位置固定)
+        sims = {os.path.basename(os.path.dirname(f)) for f in self.files}
+        self.assertIn("stock-en7", sims)
+        self.assertIn("stock-en8", sims)
+        self.assertGreaterEqual(len(self.rows), 12,
+                                "入库干预行数少于 12,样本源被削")
+
+    def test_shipped_tv_values_stay_within_the_simplex_implied_range(self):
+        """`tv_to_new_*` ∈ [0, 0.5] —— 这是 `_tv` 值域,也是"两边都在单纯形上"的推论。
+
+        若某天 value_tendency 忘了重归一化(Σ≠1),`_tv` 会越过 0.5 —— 这条抓得住
+        **入库证据侧**的退化。注意:抓的是"TVD 越界",不是"Σ≠1"本身(没有向量)。
+        """
+        checked = 0
+        bad = []
+        for f, r in self.rows:
+            for key in ("tv_to_new_before", "tv_to_new_after"):
+                v = r.get(key)
+                if v is None:
+                    continue
+                checked += 1
+                if not (0.0 - 1e-9 <= v <= 0.5 + 1e-9):
+                    bad.append((os.path.basename(os.path.dirname(f)),
+                                r.get("agent"), key, v))
+        self.assertGreater(checked, 0, "入库产物里没有任何 tv_to_new_* 值可验")
+        self.assertEqual(bad[:5], [], "TVD 越出 [0,0.5]:{}".format(bad[:5]))
+
+    def test_shipped_control_arm_is_empty_in_the_products(self):
+        """入库产物上复验「对照臂为空」—— 红线 1 强度边界的可执行证据。
+
+        这是 2026-10-05 边界声明里那条披露的可执行版本:**入库**产物即可复算,
+        不依赖 checkpoints。`internalization_gap == mean_displacement_treated`
+        当且仅当 control 恒空。
+        """
+        for f, r in self.rows:
+            self.assertEqual(r.get("control_dims"), [], 
+                             "{} {} 出现了非空对照臂 —— 披露句要重写".format(
+                                 os.path.basename(os.path.dirname(f)), r.get("agent")))
+            self.assertEqual(r.get("displacement_control"), {})
+            self.assertAlmostEqual(
+                r["internalization_gap"], r["mean_displacement_treated"], places=4,
+                msg="gap 与 treated 均值不等,说明 control 不再恒空")
+
+    def test_shipped_displacement_mean_matches_its_own_dims(self):
+        """`mean_displacement_treated` 必须等于 `displacement_treated` 各维均值。
+
+        入库产物的**内部自洽**(复算口径与 `analyse_intervention` 一致)。
+        """
+        for f, r in self.rows:
+            dims = r.get("displacement_treated") or {}
+            if not dims:
+                continue
+            expect = round(sum(dims.values()) / len(dims), 4)
+            self.assertAlmostEqual(
+                r["mean_displacement_treated"], expect, places=3,
+                msg="{} {}:treated 均值与各维不自洽".format(
+                    os.path.basename(os.path.dirname(f)), r.get("agent")))
+
+    def test_real_simplex_invariant_still_needs_local_checkpoints(self):
+        """**显式声明**:原始 Σ=1 抽样验证在 CI 上不可执行(源不入库)。
+
+        这条测试恒过 —— 它的作用是让"入库侧能跑什么"与"原命题需要什么"**同时
+        出现在测试报告里**,而不是让读者以为绿了就等于 Σ=1 验过了。
+
+        若某天 checkpoints 入库(或有别的入库源带原始向量),这条应当被**删掉并
+        换成真实断言** —— 那时 F 组的 skip 也会一并消失。
+        """
+        needs_vector = not os.path.isdir(CK_DIR)
+        # 入库产物里确实没有原始向量(否则上面就能直接验 Σ=1 了)
+        for _f, r in self.rows:
+            self.assertNotIn("value_tendency", r,
+                             "入库行出现了原始向量 —— 请把 F 组真实样本改用它")
+        if needs_vector:
+            self.assertTrue(
+                True,
+                "CI 干净检出:原始 Σ=1 抽样验证跳过(源 results/checkpoints 未入库)")
 
 
 if __name__ == "__main__":
