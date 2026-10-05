@@ -121,6 +121,38 @@ def _load_corpus_rows():
     return rows
 
 
+ANALYSIS_DIR = os.path.join(REPO_ROOT, "provenance", "results", "analysis")
+
+
+def _load_committed_rows():
+    """从**入库产物** `results/analysis/*/internalization.json` 读逐条结果。
+
+    为什么要这条路(2026-10-05,回应 GTC 体检 N2):
+      上面 `_load_corpus_rows()` 依赖 `results/checkpoints/`(被 gitignore),
+      于是 B/F 两组断言**只在作者机器上跑**,CI 干净检出上静默 skip ——
+      而《GTC研究边界声明》把"性质测试(Σ=1 守恒)"列为依据。**"绿"不等于"验过"**。
+      `internalization.json` 是**入库**的(逐条含 `control_dims` /
+      `internalization_gap` / `mean_displacement_treated`),足够支撑 B 组的事实断言。
+      返回 None 表示产物不存在(真没有,不是被忽略)。
+    """
+    if not os.path.isdir(ANALYSIS_DIR):
+        return None
+    rows = []
+    for sim in sorted(os.listdir(ANALYSIS_DIR)):
+        p = os.path.join(ANALYSIS_DIR, sim, "internalization.json")
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        for row in d.get("interventions") or []:
+            if "internalization_gap" in row:
+                rows.append((sim, row))
+    return rows or None
+
+
 class TestControlDegeneratesToEmpty(unittest.TestCase):
     """真实干预都是**同维度集重归一化**,故 control 恒空,gap ≡ mean_treated。
 
@@ -133,15 +165,23 @@ class TestControlDegeneratesToEmpty(unittest.TestCase):
     文档 `case01/docs/内化与敏感性_定量分析_20260924.md` §一-2 已诚实披露
     ("对照维度位移恒为 0")。本测试把这条**从散文变成可执行判据**,
     防止后人照着字段名把 `gap` 读成"相对未干预维度的增益"。
+
+    数据来源(2026-10-05 改,回应 GTC 体检 N2):优先本机重算(数据最全),
+    拿不到 `checkpoints/` 就退到**入库产物** `internalization.json` ——
+    此前这里 `skipTest`,导致本组断言在 CI 上**从未执行过**,而它正是
+    "对照臂为空"这条披露的证据。现在**不再静默跳过**:两条路都拿不到就失败。
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.rows = _load_corpus_rows()
-
-    def setUp(self):
-        if not self.rows:
-            self.skipTest("无 interventions.json 或 checkpoint 数据(产物不入库)")
+        live = _load_corpus_rows()
+        cls.rows = live or _load_committed_rows()
+        cls.source = "本机重算" if live else "入库产物"
+        assert cls.rows, (
+            "拿不到干预逐条结果:既没有 results/checkpoints/ 可重算,"
+            "也没有入库的 results/analysis/*/internalization.json。\n"
+            "本测试**故意不 skip** —— 它是「对照臂为空」这条披露的可执行证据,"
+            "在干净检出上必须也能跑(产物已入库)。")
 
     def test_control_is_always_empty_on_real_data(self):
         """真实数据上 control 集恒空 —— 若将来有干预增删维度,这条会红并提醒复核。"""
@@ -411,16 +451,27 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
       - 若某天 Σ ≠ 1(如更新后忘了重归一化),上述解释全部失效 ——
         而统计量**不会报错**,只会静默给出无意义的数。
 
-    文档 `GTC研究边界声明.md` §一 line 13 把"Σ=1 守恒"列为
+    文档 `GTC研究边界声明.md` §一 把"Σ=1 守恒"列为
     "主张状态级内化"的依据之一,本测试就是那条依据的可执行版本。
+
+    数据来源(2026-10-05 改,回应 GTC 体检 N2 —— "绿 ≠ 验过"):
+      原始 `simulate-*.json` 被 gitignore,CI 干净检出上拿不到 ⇒ 此前这里
+      **静默 skip**,那条"依据"在 CI 上从未执行。现在拆成两半:
+        - `test_simplex_*`(纯计算):对**构造的**单纯形点验证不变量,
+          不依赖任何产物,**永远在跑**;
+        - `test_real_*`(真实样本):有 checkpoint 就逐条验,没有就**明确
+          记入 `_skipped_reason`** 而不是静默 —— 且断言的前提说明写在类
+          docstring,读者知道"这一半在本机验过"。
     """
+
+    _skipped_real = ""
 
     @classmethod
     def setUpClass(cls):
-        if not os.path.isdir(CK_DIR):
-            cls.samples = []
-            return
         cls.samples = []
+        if not os.path.isdir(CK_DIR):
+            cls._skipped_real = "无 results/checkpoints/(gitignore):真实样本抽样未执行"
+            return
         files = sorted(glob.glob(os.path.join(CK_DIR, "*", "simulate-*.json")))
         for path in files[:400]:      # 抽样上限,避免测试过慢
             try:
@@ -433,22 +484,71 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
                 vals = [v for v in vt.values() if isinstance(v, (int, float))]
                 if vals:
                     cls.samples.append((path, agent, vals))
+        if not cls.samples:
+            cls._skipped_real = "checkpoints 目录在但无 value_tendency 样本"
 
-    def setUp(self):
+    # --- 纯计算不变量:构造单纯形点,不依赖产物,CI 上也跑 -------------
+
+    @staticmethod
+    def _normalize(raw):
+        """把任意正权重归一成单纯形点(这正是引擎侧该做的事)。"""
+        tot = sum(raw)
+        return [x / tot for x in raw]
+
+    def test_simplex_normalization_yields_sum_one(self):
+        for raw in ([3, 1, 1], [0.35, 0.25, 0.25, 0.15], [7, 2], [1, 1, 1, 1, 1]):
+            v = self._normalize(raw)
+            self.assertAlmostEqual(sum(v), 1.0, places=12)
+            self.assertTrue(all(x >= 0 for x in v))
+
+    def test_displacement_is_bounded_on_the_simplex(self):
+        """单纯形上两点的 |差| 每维 ∈ [0,1] ⇒ displacement 有界,可比。"""
+        tb = self._normalize([0.35, 0.25, 0.25, 0.15])
+        ta = self._normalize([0.58, 0.42])
+        dims = ["a", "b"]
+        before = dict(zip(dims, tb[:2]))
+        after = dict(zip(dims, ta))
+        target = dict(zip(dims, ta))
+        d = im.displacement(before, after, target)
+        for k, v in d.items():
+            self.assertLessEqual(abs(v), 1.0 + 1e-9, "{} 位移越界:{}".format(k, v))
+
+    def test_tv_stays_in_zero_half_range(self):
+        """`_tv` 的值域是 [0, 0.5] —— 且**上界只在这维数为 2 时达到**。
+
+        这是"除以 `2*len(common)`"的直接推论:两维相反点得 0.5,
+        三维相反点只得 1/3 —— 说明它随维度数**缩小**,跨维度数不可比
+        (这正是 A 类钉的口径)。这里把上界与"维度数缩小"一并钉住。
+        """
+        two = dict(zip("ab", self._normalize([1, 0])))
+        two_opp = dict(zip("ab", self._normalize([0, 1])))
+        self.assertAlmostEqual(_tv_replica(two, two_opp), 0.5, places=9)
+        three = dict(zip("abc", self._normalize([1, 0, 0])))
+        three_opp = dict(zip("abc", self._normalize([0, 1, 0])))
+        self.assertAlmostEqual(_tv_replica(three, three_opp), 1.0 / 3.0, places=9)
+        self.assertLess(_tv_replica(three, three_opp), _tv_replica(two, two_opp),
+                        "维度数一多,值反而变小 —— 跨维度数不可比")
+        self.assertEqual(_tv_replica(two, two), 0.0)
+
+    # --- 真实样本抽样:有数据才验,并**明确记因**,不静默 -------------
+
+    def test_real_samples_sum_to_one(self):
         if not self.samples:
-            self.skipTest("无 checkpoint 数据(产物不入库)")
-
-    def test_sum_is_exactly_one(self):
+            self.skipTest(self._skipped_real)
         bad = [(os.path.basename(p), a, sum(v)) for p, a, v in self.samples
                if abs(sum(v) - 1.0) > 1e-6]
         self.assertEqual(bad[:5], [], "存在 Σ≠1 的 value_tendency:{}".format(bad[:5]))
 
-    def test_all_non_negative(self):
+    def test_real_samples_are_non_negative(self):
+        if not self.samples:
+            self.skipTest(self._skipped_real)
         bad = [(os.path.basename(p), a, [x for x in v if x < 0])
                for p, a, v in self.samples if any(x < 0 for x in v)]
         self.assertEqual(bad[:5], [], "出现负权重(不再是单纯形点):{}".format(bad[:5]))
 
-    def test_each_dim_within_unit_interval(self):
+    def test_real_samples_each_dim_within_unit_interval(self):
+        if not self.samples:
+            self.skipTest(self._skipped_real)
         bad = [(os.path.basename(p), a, [x for x in v if x > 1.0 + 1e-9])
                for p, a, v in self.samples if any(x > 1.0 + 1e-9 for x in v)]
         self.assertEqual(bad[:5], [], "单维超过 1(违反 Σ=1 前提):{}".format(bad[:5]))
