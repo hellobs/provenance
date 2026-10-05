@@ -276,3 +276,41 @@ def test_prompt_hash_is_content_bound():
     # 已经是哈希的直接截前 12 位,不二次哈希(否则与原始哈希对不上)
     full = text_sha256("abc")
     assert sha256_12(full) == full[:12]
+
+
+# ----------------------------------------------------------------------
+# 6) 截断计数进清单(2026-10-05 体检 §七:此前只活在 lane 日志里)
+# ----------------------------------------------------------------------
+def test_truncations_are_surfaced_in_manifest():
+    """客户端记了截断 → 清单里既有顶层 truncations 也有 warnings 一条。
+
+    为什么必须留痕:`finish_reason == "length"` 截断的输出与完整输出**外观一致**,
+    事后只看文本分不出来。此前该计数只在 provider 里 print 一次(32 次截断只活在
+    lane 日志),台账/清单读不到。
+    """
+    judge = FakeJudge("local", "qwen3:8b")
+    judge.truncations = 3
+    m = build_manifest(collect_run_meta({}, judge_llm=judge))
+    assert m["truncations"] == 3
+    assert any("truncations=3" in w for w in m["manifest_warnings"]), \
+        m["manifest_warnings"]
+
+
+def test_zero_truncations_does_not_add_a_warning():
+    """没截断是常态:顶层记 0,但不占位 warnings。"""
+    judge = FakeJudge("local", "qwen3:8b")
+    judge.truncations = 0
+    m = build_manifest(collect_run_meta({}, judge_llm=judge))
+    assert m["truncations"] == 0
+    assert not any("truncations" in w for w in m["manifest_warnings"])
+
+
+def test_truncations_absent_on_client_reads_as_zero():
+    """客户端没有这个属性(老替身/规则后端)→ 记 0,不报错、不编造。"""
+    m = build_manifest(collect_run_meta({}, judge_llm=FakeJudge("local", "x")))
+    assert m["truncations"] == 0
+
+
+def test_truncations_is_a_required_manifest_key():
+    """truncations 是必备键:缺它就算清单不合格(守卫按 REQUIRED_KEYS 核对)。"""
+    assert "truncations" in REQUIRED_KEYS

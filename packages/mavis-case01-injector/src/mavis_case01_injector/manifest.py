@@ -58,6 +58,7 @@ REQUIRED_KEYS = (
     "judge_prompt_version",
     "temperature",
     "seed",
+    "truncations",
     "scenario_sha256",
     "financial_data_version",
     "prompt_versions",
@@ -369,6 +370,21 @@ def detect_seed(client: Any) -> Optional[int]:
         return None
 
 
+def _detect_truncations(client: Any) -> int:
+    """这次运行里被 max_tokens 截断的输出条数(0 表示没有 / 客户端不记账)。
+
+    客户端(`_ChatMixin` / `Case01SafeProvider`)在 `finish_reason == "length"`
+    时给实例的 `.truncations` 加一。取不到就返回 0 —— 0 与"没有该属性"在
+    warnings 里语义相同(都不告警),但真发生截断时**必须**在清单里留痕,
+    否则"截断的输出与完整输出长得一模一样",事后无从分辨(2026-10-05 体检 §七)。
+    """
+    val = getattr(client, "truncations", 0)
+    try:
+        return int(val or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                      branch_mode: str = "", judge_llm: Any = None,
                      backend_kind: str = "",
@@ -404,6 +420,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
         meta["judge_model"] = meta.get("judge_model") or ""
         if meta.get("seed") is None:
             meta["seed"] = detect_seed(judge_llm)
+        meta.setdefault("truncations", _detect_truncations(judge_llm))
         return meta
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
@@ -437,6 +454,11 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     meta["temperature"] = {"judge": None if kind == "rules"
                                      else detect_temperature(judge_llm)}
     meta["seed"] = None if kind == "rules" else detect_seed(judge_llm)
+    # 截断计数:客户端(_ChatMixin/Case01SafeProvider)把"输出被 max_tokens 截断"
+    # 记在实例的 .truncations 上。此前这个数只 print 一次就没了 —— 32 次截断只活在
+    # lane 日志里,台账/清单读不到(2026-10-05 体检 §七)。这里把它抽进 meta,
+    # 由 build_manifest 升级成 manifest_warnings 的一条(读侧一律按嵌套路径取)。
+    meta["truncations"] = _detect_truncations(judge_llm)
     return meta
 
 
@@ -533,6 +555,14 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     if branch_mode not in ("preset", "judge"):
         warnings.append("branch_mode={!r} 不在 preset/judge 之内".format(branch_mode))
 
+    # 截断计数:此前只活在 lane 日志/一次 print 里,清单读不到(2026-10-05 体检 §七)。
+    # 非零才进 warnings —— 0 是常态,不占位。
+    truncations = int(meta.get("truncations") or 0)
+    if truncations:
+        warnings.append(
+            "truncations={}:本次有 {} 条输出被 max_tokens 截断(截断文本与完整文本"
+            "外观一致,引用其内容前需人工核对)".format(truncations, truncations))
+
     manifest = {
         "manifest_version": MANIFEST_VERSION,
         "created_at": created_at,
@@ -548,6 +578,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "judge_prompt_version": judge_prompt_version,
         "temperature": temp,
         "seed": meta.get("seed"),
+        "truncations": int(meta.get("truncations") or 0),
         "scenario_path": sp or "",
         "scenario_sha256": scenario_sha,
         "financial_data_dir": fd or "",
