@@ -2,8 +2,8 @@
 """case00 只读服务(FastAPI,端口 5003)。
 
 case00 = provenance 原有的 6 角色投资咨询场景(最一开始那套多 agent 设定)。
-它的实时可视化仍是平台入口 `live_fastapi.py`(**5001**);本文件只提供**只读**的
-运行存档浏览面,与 case01 的 `case01/serve.py`(**5002**)形状对称。
+它的实时可视化走平台入口 `live_switch.py --start case00`(**5010**,与 case01 互斥共用);
+本文件只提供**只读**的运行存档浏览面,与 case01 的 `case01/serve.py`(**5002**)形状对称。
 
 为什么不做成 5002 那样的"契约服务":
 - case00 的存档是 checkpoints(每步一个 `simulate-*.json` 快照 + `decisions.json` +
@@ -130,8 +130,8 @@ def index():
 <main>
  <div class="note">
   case00 = 仓库原有的 6 角色投资咨询场景，<b>已冻结、后续不维护</b>。
-  实时可视化仍是 <code>live_fastapi.py</code>（5001）；本服务（5003）只读
-  <code>results/checkpoints/</code>，存档不复制。
+  实时可视化走 <code>live_switch.py --start case00</code>（<b>5010</b>，与 case01 互斥共用）；
+  本服务（5003）只读 <code>results/checkpoints/</code>，存档不复制。
  </div>
  <h2 style="font-size:14px;color:#456;">可用存档（{count} 个）</h2>
  <ul>{rows}</ul>
