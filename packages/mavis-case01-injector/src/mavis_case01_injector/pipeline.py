@@ -215,8 +215,8 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     Router prompt 加 risk_note 要求之前跑的。重跑整条流水线会连反思一起重生成(浪费且改了原文),
     所以这里只重跑 Router;写回时留 `.bak`,并打印旧→新的字段完整度。
     """
-    from mavis_case01_injector.llm import OllamaClient, OpenRouterClient
-    from mavis_case01_injector._providers import import_reflection
+    from mavis_case01_injector.llm import (OpenRouterClient,
+                                           local_client_from_env)
 
     with open(path, encoding="utf-8") as f:
         rec = json.load(f)
@@ -224,7 +224,13 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     if not text:
         print("这条记录没有反思正文,不重跑 Router:", path)
         return rec
-    router = router_llm or (OpenRouterClient() if external_router else OllamaClient())
+    # 走 local_client_from_env() 而不是无参 OllamaClient():
+    # 后者吃签名默认模型(4b)并**绕过** CASE01_LLM_MODEL / CASE01_LLM_SEED,
+    # 于是"按环境变量在 8b 上补跑"实际跑的是 4b,且结果不可复现。
+    # 与 orchestrator(2026-10-03)、branch_judge_eval / run --reflect-only
+    # (2026-10-05)是同一形态的坑,本处是第三次复现。
+    router = router_llm or (OpenRouterClient() if external_router
+                            else local_client_from_env())
     old = ((rec.get("router") or {}).get("issues")) or []
     rout = run_router(router, text)
     rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or [],

@@ -77,9 +77,13 @@ def main():
             print("run not found:", run_id)
             sys.exit(1)
         rec_data = _json.load(open(p, encoding="utf-8"))
-        from case01.agents.llm import OllamaClient, OpenRouterClient
+        from case01.agents.llm import OpenRouterClient
         from case01.reflection import run_reflection, run_router
-        local = _local_hf_client() if args.local_hf else OllamaClient(seed=seed)
+        # 与主路径同源:走 local_client_from_env() 而不是 OllamaClient(seed=seed)。
+        # 后者在 seed 为 None(未显式传)时会**丢掉** CASE01_LLM_SEED,
+        # 于是"同一批带 seed 的记录补跑反思"反而不可复现(2026-10-05 修)。
+        from case01.agents.llm import local_client_from_env
+        local = _local_hf_client() if args.local_hf else local_client_from_env()
         router = OpenRouterClient() if args.external_ethan else local
         print("=== Reflection ===")
         ref = run_reflection(local, rec_data)

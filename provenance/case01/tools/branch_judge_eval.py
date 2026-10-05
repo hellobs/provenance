@@ -73,8 +73,12 @@ def make_llm(which: str, max_tokens: int):
             extra_body={"thinking": {"type": "disabled"}})
         return _Retry429(inner)
     if which == "ollama":
-        from case01.agents.llm import OllamaClient
-        return OllamaClient()
+        # 走 local_client_from_env() 而不是无参 OllamaClient():
+        # 后者吃签名默认模型(4b)并**绕过** CASE01_LLM_MODEL / CASE01_LLM_SEED,
+        # 于是"按环境变量评测 8b"实际跑的是 4b,且结果不可复现(2026-10-05 修,
+        # 与 orchestrator 同一形态的坑 —— 那里 2026-10-03 已修过一次)。
+        from case01.agents.llm import local_client_from_env
+        return local_client_from_env()
     if which == "vllm":
         from case01.agents.llm import VLLMClient
         return VLLMClient(
