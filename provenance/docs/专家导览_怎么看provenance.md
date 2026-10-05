@@ -133,14 +133,20 @@ python live_switch.py --start case01 --review-only
 - `results/analysis/<sim>/behavior_follow.json` / `.md`:权重位移与行为位移的相关,
   以及底噪对照——**第一个如实结果为"未观测到行为级效应"的那份材料**;
 - `results/analysis/router_sensitivity/`:同一反思换模型的敏感性(条数稳定、风险校准不同);
-- `results/analysis/router_review/router_review_sheet.csv`:109 条 Router issue 的人工标注表,
+- `results/analysis/router_review/router_review_sheet.csv`:Router issue 的人工标注表,
   每条填三列——`field_ok`(路由到的问题域是否合适)、`expected_risk`(专家认定的风险等级)、
-  `summary_ok`(概述是否为行为陈述句且忠于原文);表内前两行是填法说明与示例;
-  填完用 `python -m case01.tools.router_review --score <填好的.csv>` 得到
-  **路由一致率 / 行为句率 / 风险校准率**三个指标;
-- `results/analysis/reflection_review/reflection_review_sheet.csv`:24 条反思的质量标注表,
+  `summary_ok`(概述是否为行为陈述句且忠于原文);**表内第二行是填法说明**(以 `#` 开头,
+  评分时会被自动跳过,不是数据行);填完用
+  `python -m case01.tools.router_review --score <填好的.csv>` 得到
+  **路由一致率 / 行为句率 / 风险校准率**三个指标。
+  ⚠ **行数会随跑随增,以上不给具体数字**,要当前条数就重新导出后数:
+  `python -m case01.tools.router_review --export`。表里除真issue 行外还有
+  **Router 未产出(error/skipped)的占位行**(summary 写明"Router 未产出"),
+  它们不在评分分母内,也**不要读成"没有问题"**;
+- `results/analysis/reflection_review/reflection_review_sheet.csv`:反思的质量标注表,
   标 `dim1..dim8`(八维是否实质覆盖)、`relevance`(切题度)、`fidelity`(1 = 未编造事实)、
-  `style_ok`(1 = 无客套/追问/emoji);同样用 `--export` / `--score` 两个子命令。
+  `style_ok`(1 = 无客套/追问/emoji);同样用 `--export` / `--score` 两个子命令,
+  **第二行是八维定义说明**(`#` 开头,评分自动跳过)。行数同样以现导出的表为准。
 
 配套三份文档:`内化与敏感性_定量分析_20260924.md`(证据全貌与答辩口径)、
 `转接_给下一棒_20260926.md`(当前基线与四个方向)、`LoRA预准备_20260924.md`(管道与运行手册)。
