@@ -39,9 +39,15 @@ def _sha256(path: str) -> str:
     return h.hexdigest()
 
 
-def compare(package: str) -> tuple:
-    """返回 (missing, diff, n_same)。missing/diff 为 (run, file, 说明) 列表。"""
-    in_repo = os.path.join(PKG_ROOT, "case01", "runs")
+def compare(package: str, repo_runs: str = "") -> tuple:
+    """返回 (missing, diff, n_same)。missing/diff 为 (run, file, 说明) 列表。
+
+    `repo_runs` 默认取仓内 `case01/runs`。**可覆盖**是为了让守卫自测能
+    把两侧都指向 tmp 目录 —— 否则这条测试会隐式依赖"仓内正好有 demo 记录",
+    而 `case01/runs/` 是 gitignored 的(CI 干净检出上必然没有),
+    守卫自测就会在 CI 上红(2026-10-05 实测踩过:CI run 37297898731)。
+    """
+    in_repo = repo_runs or os.path.join(PKG_ROOT, "case01", "runs")
     pkg_runs = os.path.join(package, "runs")
     missing, diff, same = [], [], 0
     for run in RUNS:

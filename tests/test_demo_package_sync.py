@@ -3,7 +3,11 @@
 
 仓内 `case01/runs/demo1015-*` 与交付包 `demo-case01-20261015/runs/demo1015-*`
 必须逐字节相同。两者都可能不在场(CI 干净检出:仓内 runs 被 gitignore、包是仓外的),
-所以本测试在缺数据时**明确 skip 并说明理由**,不静默。
+所以**依赖真实数据的两条**在缺数据时明确 skip 并说明理由,不静默。
+
+**守卫自测**(`test_compare_detects_a_real_difference`)不依赖真实数据 ——
+它把"仓内侧"与"包侧"都指向 tmp,**在 CI 上照样跑**(2026-10-05 修:初版让它读
+真实仓内 runs,于是 CI 干净检出上必然红,run 37297898731)。
 
 对照:`tools/verify_demo_sync.py` 是可复跑命令,本文件把它接进测试面。
 """
@@ -43,16 +47,61 @@ def test_package_side_matches_repo_side():
 
 
 def test_compare_detects_a_real_difference(tmp_path):
-    """守卫自测:构造一份被改动的包,`compare` 必须报差异(不是恒绿的摆设)。"""
+    """守卫自测:两侧都指向 tmp,内容不同时 `compare` 必须报差异(不是恒绿的摆设)。
+
+    **不读仓内真实 runs** —— 那会让本测试在 CI 干净检出上必红(P2-2 初版的错)。
+    这里自己造齐两侧:一侧原样,一侧内容被改,断言 compare 报出差异且 same==0。
+    """
+    repo = tmp_path / "repo_runs"
     pkg = tmp_path / "pkg"
-    runs = pkg / "runs"
     for run in vds.RUNS:
-        d = runs / run
-        d.mkdir(parents=True)
+        rd = repo / run
+        pd = pkg / "runs" / run
+        rd.mkdir(parents=True)
+        pd.mkdir(parents=True)
         for name in vds.FILES:
-            # 用一个"故意与仓内不同"的内容
-            (d / name).write_text("mismatch-{}".format(run), encoding="utf-8")
-    missing, diff, same = vds.compare(str(pkg))
-    assert not missing, "所有文件都在,不该报缺:{}".format(missing)
+            (rd / name).write_text("original-{}".format(run), encoding="utf-8")
+            # 包侧内容**故意不同** —— compare 必须逐字节比出来
+            (pd / name).write_text("mismatch-{}".format(run), encoding="utf-8")
+    missing, diff, same = vds.compare(str(pkg), repo_runs=str(repo))
+    assert not missing, "两侧文件都齐,不该报缺:{}".format(missing)
     assert diff, "内容全都不同却报无差异 —— 守卫失效"
     assert same == 0
+
+
+def test_compare_reports_identical_sides_as_same(tmp_path):
+    """反向:两侧逐字节相同时 `compare` 必须报 same==total、无 diff(不是恒红的摆设)。"""
+    repo = tmp_path / "repo_runs"
+    pkg = tmp_path / "pkg"
+    for run in vds.RUNS:
+        rd = repo / run
+        pd = pkg / "runs" / run
+        rd.mkdir(parents=True)
+        pd.mkdir(parents=True)
+        for name in vds.FILES:
+            (rd / name).write_text("same-{}".format(run), encoding="utf-8")
+            (pd / name).write_text("same-{}".format(run), encoding="utf-8")
+    missing, diff, same = vds.compare(str(pkg), repo_runs=str(repo))
+    assert not missing and not diff, (missing, diff)
+    assert same == len(vds.RUNS) * len(vds.FILES)
+
+
+def test_compare_flags_a_missing_package_file(tmp_path):
+    """包侧少一个文件时必须报缺(不能因为"仓内也没有"就蒙混过去)。"""
+    repo = tmp_path / "repo_runs"
+    pkg = tmp_path / "pkg"
+    for run in vds.RUNS:
+        rd = repo / run
+        pd = pkg / "runs" / run
+        rd.mkdir(parents=True)
+        pd.mkdir(parents=True)
+        for name in vds.FILES:
+            (rd / name).write_text("x", encoding="utf-8")
+            (pd / name).write_text("x", encoding="utf-8")
+    # 删掉包侧一个文件
+    victim = os.path.join(str(pkg), "runs", vds.RUNS[0], vds.FILES[0])
+    os.unlink(victim)
+    missing, diff, same = vds.compare(str(pkg), repo_runs=str(repo))
+    assert missing, "包侧缺文件却没报缺 —— 覆盖不完整"
+    assert len(missing) == 1
+    assert missing[0][0] == vds.RUNS[0] and missing[0][1] == vds.FILES[0]
