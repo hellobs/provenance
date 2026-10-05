@@ -41,10 +41,27 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 记录根:默认 case01/runs。可用 CASE01_REVIEW_RUNS_DIR 覆盖——测试指向入库的
-# tests/fixtures/records,因为 case01/runs/ 是 gitignored、CI 的全新 checkout 里没有它。
-# 这与 case01/viz.py 的 load_run(run_id, runs_dir=...) 是同一个道理。
-RUNS_DIR = os.environ.get("CASE01_REVIEW_RUNS_DIR") or os.path.join(BASE_DIR, "runs")
+
+
+def _resolve_runs_dir() -> str:
+    """记录根:环境变量优先(**须绝对**),否则 case01/runs。
+
+    可覆盖是因为 case01/runs/ 是 gitignored、CI 的全新 checkout 里没有它,
+    测试要指向入库的 tests/fixtures/records —— 这与 case01/viz.py 的
+    `load_run(run_id, runs_dir=...)` 是同一个道理。
+
+    2026-10-05 补(GTC 体检 P2-1):此前是模块级裸读
+    `os.environ.get("CASE01_REVIEW_RUNS_DIR") or ...`,相对值时按 cwd 解释、
+    且在 import 期求值一次(错得静默)。现改为函数 + 绝对路径守卫,
+    与 `case01/orchestrator.RUNS_ROOT()`、`live/history._data_root` 同语义。
+    仍保留模块级 `RUNS_DIR` 名字,因为多处测试 monkeypatch 它(见 `_runs_dir`)。
+    """
+    from case_engine.paths import resolve_root
+    return resolve_root("CASE01_REVIEW_RUNS_DIR", os.path.join(BASE_DIR, "runs"),
+                        what="CASE01_REVIEW_RUNS_DIR")
+
+
+RUNS_DIR = _resolve_runs_dir()
 
 # 当前正在实跑的 run_id(由起服务的人告知,如 case01/vizkit/live_run.py)。
 # 用途只有一个:实跑还没跑完时,面板上明确写"这次还在跑/还没生成成品记录",

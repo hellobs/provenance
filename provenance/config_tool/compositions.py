@@ -8,7 +8,8 @@
   引擎不可用时判不了,放宽为引擎 id 非空),保证记录的是"真能去跑"的组合。
 - 唯一键:组合 id = f"{case_id}::{engine_id}",稳定、可读、天然唯一。
 
-数据文件:默认 <config_tool>/compositions.json,可用环境变量 COMPOSITIONS_FILE 覆盖。
+数据文件:默认 <config_tool>/compositions.json,可用环境变量 COMPOSITIONS_FILE 覆盖
+(**须绝对路径**,2026-10-05 补)。
 """
 import json
 import os
@@ -21,8 +22,19 @@ DEFAULT_FILE = "compositions.json"
 
 
 def _file() -> str:
-    return os.environ.get("COMPOSITIONS_FILE") or os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), DEFAULT_FILE)
+    """组合清单落点:环境变量优先(**须绝对**),否则用本目录下的默认文件。
+
+    2026-10-05 补(GTC 体检 P2-1):此前裸读 `os.environ.get("COMPOSITIONS_FILE")`,
+    相对值时 `load` 按 cwd 读、`save` 按 cwd 写 —— 同一配置在读写两侧给出不同落点,
+    且写入的是"用户以为不是那儿"的目录。现走 `engine_bridge.env_abs_path`
+    (不能直接引引擎层的 paths 模块:本模块只准经 `engine_bridge` 接触引擎包,
+    见文件头架构棘轮),与 `case01/orchestrator.RUNS_ROOT()`、
+    `live/history._data_root` 同语义。
+    """
+    raw = os.environ.get("COMPOSITIONS_FILE")
+    if raw:
+        return engine_bridge.env_abs_path(raw, what="COMPOSITIONS_FILE")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), DEFAULT_FILE)
 
 
 def _cases_roots(platform_dir: str) -> list:
