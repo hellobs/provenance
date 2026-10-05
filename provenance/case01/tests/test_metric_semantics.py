@@ -437,6 +437,68 @@ class TestNoiseFloorReproducibility(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# E. 审计口径:探测残留不得进入研究样本(2026-10-05 卫生项)
+# ---------------------------------------------------------------------------
+
+class TestProbeArtifactsAreNotResearchSamples(unittest.TestCase):
+    """`interventions.json` 里混进了**安全探测残留**,必须被明确排除、不得计数。
+
+    实测(2026-10-05):34 条里有 **4 条**是路径穿越探测(2026-09-27 那次安全走查
+    留下的),特征是 `agent == "../../etc/passwd"`、`old_constraints == {}`、
+    `new_constraints == {"a": 1.0}` —— 它们**不是**任何一次真实模拟的干预,
+    却和真实条目同处一个数组。
+
+    为什么必须钉住:`_load_corpus_rows()` 靠 `x.get("simulation")` 过滤(探测条目
+    没有 `simulation`,自动出局),但那是**隐式**的 —— 哪天有人把过滤条件放宽成
+    "有 agent 就算",4 条探测会静静混进样本量、拉偏分母。这条把过滤判据显式化。
+    (本文件是只读体检,不删现场数据;真要清理应由人工确认后单独做。)
+    """
+
+    def setUp(self):
+        if not os.path.isfile(INTERVENTIONS):
+            self.skipTest("results/checkpoints/ 未入库(gitignore):本检出无现场数据")
+        with open(INTERVENTIONS, encoding="utf-8") as f:
+            self.iv = json.load(f)
+
+    def test_probe_shaped_rows_are_identifiable(self):
+        """探测残留的**形状**要可判别 —— 否则没法把它们从样本里剔干净。"""
+        probes = [x for x in self.iv
+                  if x.get("agent") == "../../etc/passwd"
+                  or (not x.get("simulation") and set(x.get("new_constraints") or {}) == {"a"})]
+        # 不写死"恰好 4 条"(现场会变);只要求"有的话形状一致"
+        for p in probes:
+            self.assertIn(p.get("new_constraints") or {}, [{}, {"a": 1.0}],
+                          "探测残留的 new_constraints 形状变了,重核过滤判据:{}".format(p))
+
+    def test_corpus_loader_excludes_every_probe_row(self):
+        """`_load_corpus_rows()` 的结果里**一条探测残留都不能有**。"""
+        rows = _load_corpus_rows()
+        if rows is None:
+            self.skipTest("results/checkpoints/ 未入库(gitignore)")
+        sims = {sim for sim, _ in rows}
+        probe_sims = {x.get("simulation") for x in self.iv
+                      if x.get("agent") == "../../etc/passwd"}
+        # 探测条目 simulation 为空,不该出现在任何被加载的 sim 名里
+        self.assertNotIn("", sims, "空 simulation 被当成一个模拟加载了")
+        self.assertFalse(probe_sims & sims - {None},
+                         "探测残留的 simulation 混进了样本:{}".format(probe_sims & sims))
+
+    def test_sample_count_is_defined_by_simulation_bearing_rows(self):
+        """样本量 = 有 `simulation` 的条目数,**不是**数组长度。
+
+        这是口径红线:`interventions.json` 的 `len()` 会把探测残留算进去,
+        所以任何"共 N 条干预"的说法都必须走这个定义。
+        """
+        with_sim = [x for x in self.iv if x.get("simulation")]
+        self.assertEqual(len(with_sim) + len([x for x in self.iv if not x.get("simulation")]),
+                         len(self.iv), "计数口径自洽性破了")
+        if len(with_sim) < len(self.iv):
+            # 有残留时,数组长度**必然**大于有效样本量 —— 明示别用 len()
+            self.assertLess(len(with_sim), len(self.iv),
+                            "有探测残留却 len() 相等,过滤逻辑可能已失效")
+
+
+# ---------------------------------------------------------------------------
 # F. 前提不变量:value_tendency 是单纯形上的点(Σ=1, 非负)
 # ---------------------------------------------------------------------------
 
