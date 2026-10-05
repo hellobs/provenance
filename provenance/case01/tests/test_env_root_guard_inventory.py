@@ -264,24 +264,55 @@ def test_tests_never_construct_real_game_without_checkpoints_root():
 
     判据用 AST 找 `Game(` 的**真实调用**(排除 `_FakeGame(`、类定义、注释),
     再看它所在的测试函数有没有 `setenv("MAVIS_CHECKPOINTS_ROOT")`。这样新增测试
-    忘了设根会立刻报红,而不是等下一轮体检从skip 文案里反推。
+    忘了设根会立刻报红,而不是等下一轮体检从 skip 文案里反推。
+
+    **扫描根必须自己证明覆盖到位**(第十二轮 4.1 订正):第一版三个根里第三个
+    算成了 `provenance/tests` —— **该目录不存在**,而真正的外层套件在**仓根**
+    `tests/`(30 个 `test_*.py`,CI 第一步跑的就是它)。配合 `if not isdir: continue`
+    就是**静默空扫**:守卫全绿,而外层新增一个不设根就构造真 Game 的测试它拦不住。
+    两处一起改:
+      ① 根改成从 `__file__` 逐级数到**仓库根**再拼 `tests`(仓根布局变时会fail,
+         而不是悄悄扫空);
+      ② 根不存在一律 **fail**,不再 `continue` —— 清册式守卫"全绿"本身必须
+         可信,扫面为空就该报红而不是放过。
+    另补 `packages/mavis-case01-injector/tests`(CI 第二步跑它,而
+    `bridge.py:447` 真的构造 `Game`)。
     """
     import ast
 
-    tests_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    tests_root = os.path.join(os.path.dirname(os.path.abspath(__file__))
+    )
+    # tests_root = <repo>/provenance/case01/tests ⇒ 上溯 2 级到 <repo>/provenance,
+    # 上溯 3 级到 <repo>。两个层级的目录各在哪:case_engine 与 case01 平级,
+    # 仓根 tests 与 packages 在 <repo> 下。原先这两个根各算错一次(第十二轮 4.1)。
+    prov_root = os.path.dirname(os.path.dirname(tests_root))
+    repo_root = os.path.dirname(prov_root)
     scan_roots = [
-        tests_root,
-        os.path.join(os.path.dirname(tests_root), "case_engine", "tests"),
-        os.path.join(os.path.dirname(os.path.dirname(tests_root)), "tests"),
+        tests_root,                                        # case01/tests
+        os.path.join(prov_root, "case_engine", "tests"),
+        os.path.join(repo_root, "tests"),                   # 仓根外层套件(CI 第一步)
+        os.path.join(repo_root, "packages",
+                     "mavis-case01-injector", "tests"),     # CI 第二步
     ]
+    missing = [r for r in scan_roots if not os.path.isdir(r)]
+    assert not missing, (
+        "存档根守卫的扫描根不存在:{}。"
+        "根算错会让本守卫**静默空扫**(全绿而没扫到任何东西)。"
+        "目录真的被移走了才允许改这条断言,并要同步更新本docstring。\\n"
+        "  当前推导: tests_root={} ⇒ repo_root={}".format(missing, tests_root, repo_root))
     offenders, checked = [], 0
+    per_root = {}            # 每根的真实 Game( 命中数(诊断用)
+    per_root_files = {}      # 每根扫到的 .py 文件数(自证判据,见下)
     for root in scan_roots:
-        if not os.path.isdir(root):
-            continue
+        # 根存在性已在上方断言,这里不再 `if not isdir: continue` ——
+        # 那正是本条守卫第一版"全绿而没扫到"的原因(见 docstring)。
+        per_root[root] = 0
+        per_root_files[root] = 0
         for dirpath, _dirs, files in os.walk(root):
             for fn in files:
                 if not fn.endswith(".py"):
                     continue
+                per_root_files[root] += 1
                 path = os.path.join(dirpath, fn)
                 with io.open(path, encoding="utf-8") as fh:
                     src = fh.read()
@@ -304,6 +335,7 @@ def test_tests_never_construct_real_game_without_checkpoints_root():
                             "_FakeGame(", "").replace("class Game", "")):
                         continue
                     checked += 1
+                    per_root[root] += 1
                     # 判据必须是**真实的 setenv 调用**,不能是"函数体里出现过这个字符串"。
                     # 第一版用后者,结果自家 docstring 里那句"必须设 MAVIS_CHECKPOINTS_ROOT"
                     # 就把违规函数判成了合规 —— 变异验证时才发现(守卫放过了刚被回退的修复)。
@@ -323,4 +355,35 @@ def test_tests_never_construct_real_game_without_checkpoints_root():
         "provenance/results/checkpoints/ 留下空目录,并让 Σ=1 那3 条 skip 打印"
         "错误的理由:\n  " + "\n  ".join(offenders))
     assert checked, ("扫描面没抓到任何 Game( 调用点 —— 本守卫已失效:"
-                     "要么 Game( 改了写法,要么测试目录挪了位置)")
+                     "要么 Game( 改了写法,要么测试目录挪了位置")
+    # ---- 扫描面**逐根**自证(第十二轮 4.1)----
+    # 第一版三个根里一个算成了不存在的 `provenance/tests`,配 `if not isdir: continue`
+    # 就是**静默空扫**:总数照样 > 0,守卫全绿而仓根外层套件从未被扫过。
+    #
+    # 判据用**扫到的 .py 文件数**而不是 `Game(` 命中数:命中数会把
+    # "扫到了、里面确实只有 _FakeGame("(外层套件就是这种)和
+    # "路径错、根本没扫到"混成同一个 0,豁免机制随即把两者一起放过 ——
+    # 变异验证实测:去掉本段断言,守卫照样全绿(等于没加)。
+    # 文件数能区分这两者:根存在且被walk 过,文件数就 > 0。
+    empty_roots = sorted(r for r, n in per_root_files.items() if n == 0)
+    assert not empty_roots, (
+        "这些扫描根一个 .py 都没扫到 —— 路径算错了(或根被清空):\n  {}\n"
+        "外层套件在**仓根** tests/、case_engine/tests 在 provenance/ 下、"
+        "injector 包在 packages/ 下;推导见上方 prov_root/repo_root。"
+        .format("\\n  ".join(empty_roots)))
+    # 每个根扫到的文件数下限:防止"根算错成某个子目录"这类**部分**扫描。
+    # 数字取自2026-10-05 实测,只当"明显偏少"的哨兵,不要求精确(测试文件会增删)。
+    MIN_FILES = {
+        os.path.join(repo_root, "tests"): 20,
+        os.path.join(prov_root, "case_engine", "tests"): 5,
+    }
+    thin = ["{}: 只扫到 {} 个 .py(下限 {})".format(r, n, MIN_FILES[r])
+            for r, n in per_root_files.items() if r in MIN_FILES and n < MIN_FILES[r]]
+    assert not thin, (
+        "这些根扫到的文件数明显偏少,多半是算成了子目录或路径漂了:\n  {}"
+        .format("\\n  ".join(thin)))
+    # 外层套件必须真的被扫到(它是 CI 第一步,且这条洞就是它引起的)
+    outer = os.path.join(repo_root, "tests")
+    assert per_root_files.get(outer, 0) >= MIN_FILES[outer], (
+        "仓根外层套件没被有效扫描(扫到 {} 个 .py)—— 这正是第十二轮 4.1 的洞"
+        .format(per_root_files.get(outer, 0)))
