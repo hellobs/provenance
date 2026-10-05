@@ -70,17 +70,60 @@ _PLATFORM_DIR = _platform_dir()
 # 引擎目录:显式声明(CASE_ENGINE_DIR)→ 设置文件 → 自动发现
 # (不拿平台根顶替:两者概念不同,可分别部署)
 _ENGINE_DIR = engine_bridge.engine_dir()
-VILLAGE_ROOT = os.environ.get("MAVIS_ASSETS_ROOT") or (
+
+
+def _abs_or_empty(raw: str) -> str:
+    """环境变量给的路径:空 → 空串;绝对 → 规范化;相对 → 抛错(语义随 cwd 漂移)。
+
+    2026-10-05:此前相对值被静默按 cwd 解释,换个工作目录启动就指向别处。
+    """
+    if not raw:
+        return ""
+    return engine_bridge.env_abs_path(raw, what="环境变量路径")
+
+
+# 这几个根的**来源**要能报出来(相对路径配置会抛 AmbientePathError),
+# 界面横幅与启动日志用 `path_config_problems()` 显示原因,不静默。
+_ENV_PATHS = {
+    "MAVIS_ASSETS_ROOT": "village 静态资源根",
+    "MAVIS_SCENARIOS_DIR": "场景目录",
+    "MAVIS_MAZE_PATH": "地图文件",
+}
+
+
+def _env_path(name: str) -> str:
+    raw = os.environ.get(name)
+    if not raw:
+        return ""
+    return engine_bridge.env_abs_path(
+        raw, what="{} (环境变量 {})".format(_ENV_PATHS.get(name, ""), name))
+
+
+def path_config_problems() -> list:
+    """逐个检查上述环境变量,回 [{var, problem}];都正常回空列表。供界面横幅显示。"""
+    problems = []
+    for name in _ENV_PATHS:
+        raw = os.environ.get(name)
+        if not raw:
+            continue
+        try:
+            _env_path(name)
+        except Exception as exc:  # noqa: BLE001 —— 原因就是要给人看的
+            problems.append({"var": name, "problem": "{}: {}".format(type(exc).__name__, exc)})
+    return problems
+
+
+VILLAGE_ROOT = _env_path("MAVIS_ASSETS_ROOT") or (
     os.path.join(_PLATFORM_DIR, "frontend", "static", "assets", "village")
     if _PLATFORM_DIR else "")
-SCENARIOS_DIR = os.environ.get("MAVIS_SCENARIOS_DIR") or (
+SCENARIOS_DIR = _env_path("MAVIS_SCENARIOS_DIR") or (
     os.path.join(_PLATFORM_DIR, "scenarios") if _PLATFORM_DIR else "")
 # 地图默认指向 case00 实际使用的新地图(地址树与运行时一致,替代旧的 village 小图);
 # 旧 village 图仅作兜底,缺省时优先取 case00/scenario/maze.json。
 _CASE00_MAZE = (os.path.join(_PLATFORM_DIR, "case00", "scenario", "maze.json")
                 if _PLATFORM_DIR else "")
 _FALLBACK_MAZE = os.path.join(VILLAGE_ROOT, "maze.json") if VILLAGE_ROOT else ""
-MAZE_PATH = os.environ.get("MAVIS_MAZE_PATH") or (
+MAZE_PATH = _env_path("MAVIS_MAZE_PATH") or (
     _CASE00_MAZE if _CASE00_MAZE and os.path.isfile(_CASE00_MAZE) else _FALLBACK_MAZE)
 
 

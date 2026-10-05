@@ -291,13 +291,22 @@ def dump_scenario_yaml(cfg: dict) -> str:
 
 
 def cases_dir(platform_dir: str) -> str:
-    """场景根目录:平台 <platform_dir>/cases。
+    """场景根目录:平台 <platform_dir>/cases;环境变量可覆盖。**返回值恒为绝对路径或空串。**
 
     平台目录(其来源见 app.py 的显式声明)未提供时返回空串 —— 调用方必须据此
     **明确报错**,而不是把场景写进当前工作目录。
+
+    2026-10-05 修:此前环境变量若给**相对路径**,非空即放行 → `save_scenario`
+    真的把场景 `makedirs` 进了进程 cwd,绕过上面那条防线(该防线只挡住空串)。
+    现在环境变量走 `engine_bridge.env_abs_path`:**相对值直接抛错**,
+    不存在"写进当前工作目录"这条路径。
     """
-    return (os.environ.get("CASE_ENGINE_CASES_ROOT")
-            or (os.path.join(platform_dir, "cases") if platform_dir else ""))
+    raw = os.environ.get("CASE_ENGINE_CASES_ROOT")
+    if raw:
+        return engine_bridge.env_abs_path(raw, what="CASE_ENGINE_CASES_ROOT")
+    if platform_dir:
+        return os.path.join(platform_dir, "cases")
+    return ""
 
 
 def save_scenario(platform_dir: str, cfg: dict) -> str:

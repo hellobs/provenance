@@ -21,9 +21,14 @@ def default_cases_root() -> str:
     """定位 cases 根目录:case_engine/ 上一级(provenance/provenance)下的 cases;环境变量可覆盖。
 
     供 cli/serve 复用的唯一取根入口,避免各处重复定位漂移。
+
+    **环境变量必须是绝对路径**(2026-10-05 修):此前相对值原样透传,行为随进程
+    cwd 漂移(同一 `cases` 从仓库根启动找不到、从 `provenance/provenance` 启动找得到)。
+    现在走 `case_engine.paths.resolve_root`,相对值直接报可读错误。
     """
+    from case_engine.paths import resolve_root
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.environ.get("CASE_ENGINE_CASES_ROOT", os.path.join(base, "cases"))
+    return resolve_root("CASE_ENGINE_CASES_ROOT", os.path.join(base, "cases"))
 
 
 @dataclass

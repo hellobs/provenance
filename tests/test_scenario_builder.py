@@ -154,3 +154,22 @@ def test_save_writes_to_cases_and_loads_back(monkeypatch, tmp_path):
     assert loaded.case_id == "case03_test"
     assert loaded.engine == "experiment-eval"
     assert len(loaded.roles) == 2
+
+
+@needs_case_engine
+def test_relative_cases_root_is_rejected_not_written_to_cwd(monkeypatch, tmp_path):
+    """相对根路径必须报错,而**不是**把场景写进进程 cwd。
+
+    2026-10-05:此前 `CASE_ENGINE_CASES_ROOT=cases` 非空即放行,
+    `save_scenario` 真的 `makedirs` 到 cwd —— 绕过作者特意写下的
+    "不能把场景写进当前工作目录"那条防线(它只挡住了空串)。
+    """
+    monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", "cases")
+    with pytest.raises(ValueError) as ei:
+        scenario_builder.cases_dir("")
+    assert "绝对路径" in str(ei.value)
+    # 兜底:真调落盘也必须是"拒绝",不能在 cwd 造出目录
+    cfg = scenario_builder.build_scenario(_sample_form(case_id="leaked_case"))
+    with pytest.raises(ValueError):
+        scenario_builder.save_scenario("", cfg)
+    assert not os.path.isdir(os.path.join(os.getcwd(), "cases", "leaked_case"))

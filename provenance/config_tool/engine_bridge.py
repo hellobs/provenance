@@ -153,7 +153,8 @@ def _load(directory: str):
             sys.path.insert(0, directory)
         result = ({"engines": importlib.import_module(PKG + ".engines"),
                    "config": importlib.import_module(PKG + ".config"),
-                   "scenarios": importlib.import_module(PKG + ".scenarios")}, "")
+                   "scenarios": importlib.import_module(PKG + ".scenarios"),
+                   "paths": importlib.import_module(PKG + ".paths")}, "")
     except Exception as exc:  # noqa: BLE001 —— 失败原因如实回传,由调用方显示
         result = (None, "导入引擎包失败({}): {}: {}".format(
             directory, type(exc).__name__, exc))
@@ -351,3 +352,29 @@ def default_cases_root(explicit: str = "") -> str:
         return a["scenarios"].default_cases_root()
     except Exception:  # noqa: BLE001
         return ""
+
+
+def env_abs_path(value: str, what: str = "") -> str:
+    """校验"配置来源的路径"是绝对路径;相对/空值抛 ValueError(可读原因)。
+
+    2026-10-05 新增:本仓一票 `*_ROOT`/`*_DIR` 环境变量原样透传,相对值的行为
+    随进程 cwd 漂移且不报错(同一 `cases` 从仓库根启动读不到、从子目录读得到;
+    更坏的是 `save_scenario` 会把场景写进当前工作目录)。现统一要求绝对路径。
+
+    放在 bridge 里转发,是为了守住"引擎包名只准出现在本文件"这条架构棘轮 ——
+    config_tool 的其它文件不该直接 import 引擎内部模块。
+    """
+    a, _ = _resolve("")
+    if a is None:
+        # 引擎不可用时不引入新的失败模式:交给调用方既有的"无引擎"分支处理
+        return value
+    return a["paths"].require_abs_path(value, what=what)
+
+
+def path_problem(value: str, what: str = "") -> str:
+    """校验上述路径并只回**可读原因**(正常返回空串),供界面横幅显示。"""
+    try:
+        env_abs_path(value, what=what)
+        return ""
+    except Exception as exc:  # noqa: BLE001 —— 原因就是要给人看的
+        return "{}: {}".format(type(exc).__name__, exc)

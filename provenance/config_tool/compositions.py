@@ -26,14 +26,29 @@ def _file() -> str:
 
 
 def _cases_roots(platform_dir: str) -> list:
-    """候选场景根:平台目录(若显式声明)+ CASE_ENGINE_CASES_ROOT。"""
+    """候选场景根:平台目录(若显式声明)+ CASE_ENGINE_CASES_ROOT。
+
+    环境变量是相对路径时**跳过并记因**(此函数只回候选列表,不进异常);
+    原因是"配置写错了",由 `_roots_problem()` 供界面显示。
+    """
     roots = []
     if platform_dir:
         roots.append(os.path.join(platform_dir, "cases"))
     extra = os.environ.get("CASE_ENGINE_CASES_ROOT")
     if extra:
-        roots.append(extra)
+        try:
+            roots.append(engine_bridge.env_abs_path(extra, what="CASE_ENGINE_CASES_ROOT"))
+        except Exception:  # noqa: BLE001 —— 非法值不参与候选,原因见 _roots_problem()
+            pass
     return roots
+
+
+def _roots_problem() -> str:
+    """CASE_ENGINE_CASES_ROOT 非法时的可读原因;正常返回空串。"""
+    extra = os.environ.get("CASE_ENGINE_CASES_ROOT")
+    if not extra:
+        return ""
+    return engine_bridge.path_problem(extra, what="CASE_ENGINE_CASES_ROOT")
 
 
 def _engine_is_known(engine_id: str, platform_dir: str = "") -> bool:

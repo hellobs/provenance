@@ -33,8 +33,16 @@ def _data_root(env_var: str, *parts: str) -> str:
     `tests/test_live_history_quality.py` 又要断言"至少有一条",于是 CI 必红。
     现在:CI 用 `CASE01_RUNS_ROOT` 指向签入的夹具(`tests/fixtures/case01_runs`),
     真实代码路径照样跑;异地部署换数据盘也不用改代码。
+
+    **环境变量必须是绝对路径**(2026-10-05 修):此前环境变量给相对值时按 cwd
+    解释,行为随进程 cwd 漂移 —— 同一个 `runs` 从仓库根启动读不到、从子目录启动
+    读得到。现在走 `case_engine.paths.require_abs_path`,相对值当场报错。
     """
-    return os.environ.get(env_var) or os.path.join(BASE_DIR, *parts)
+    raw = os.environ.get(env_var)
+    if raw:
+        from case_engine.paths import require_abs_path
+        return require_abs_path(raw, what=env_var)
+    return os.path.join(BASE_DIR, *parts)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend/templates"))
 # 顶栏外部工具链接:mavis 仓的 config_tool 是**独立进程**(默认 8060),
 # 地址可用环境变量 MAVIS_CONFIG_TOOL_URL 覆盖(换机/换端口)。
@@ -58,8 +66,16 @@ def _fmt_ckpt_dt(t: str) -> str:
 # ---------------------------------------------------------------------------
 # 场景 / 引擎元数据(供菜单按"场景 · 引擎"分层,而非单一 case01 中心化)
 # ---------------------------------------------------------------------------
-_CASES_ROOT = os.environ.get(
-    "CASE_ENGINE_CASES_ROOT", os.path.join(BASE_DIR, "cases"))
+def _cases_root() -> str:
+    """场景根:环境变量优先(须绝对),否则仓库内 `cases/`。
+
+    2026-10-05 由模块级常量改为函数:原来 import 期就求值一次,
+    之后再设 `CASE_ENGINE_CASES_ROOT` 完全不生效(测试/换盘都要重启进程),
+    且与 `case_engine.scenarios.default_cases_root()` 的"每次实时读"口径不一致。
+    现在两处同走 `case_engine.paths.resolve_root`,不再可能给出不同答案。
+    """
+    from case_engine.paths import resolve_root
+    return resolve_root("CASE_ENGINE_CASES_ROOT", os.path.join(BASE_DIR, "cases"))
 
 
 def _scenario_meta() -> dict:
@@ -68,7 +84,7 @@ def _scenario_meta() -> dict:
         from case_engine.scenarios import discover
         from case_engine.engines import ENGINES
         out = {}
-        for s in discover(_CASES_ROOT):
+        for s in discover(_cases_root()):
             eng = s.engine or ""
             out[s.case_id] = {
                 "name": s.name or s.case_id,
@@ -85,8 +101,9 @@ _META_CACHE = {"v": None, "data": {}}
 
 
 def _scenario_meta_cached() -> dict:
-    if _META_CACHE["v"] != _CASES_ROOT:
-        _META_CACHE["v"] = _CASES_ROOT
+    root = _cases_root()
+    if _META_CACHE["v"] != root:
+        _META_CACHE["v"] = root
         _META_CACHE["data"] = _scenario_meta()
     return _META_CACHE["data"]
 
