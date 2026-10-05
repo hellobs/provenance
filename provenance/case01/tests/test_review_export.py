@@ -90,6 +90,30 @@ def test_missing_id_is_reported_distinctly_from_duplicate(record):
     assert not out["task_candidates"]
 
 
+def test_all_keys_are_unique_for_platform_dedup(record):
+    """平台按 key 去重（见《平台对接契约》）：candidates 与 triage 的 key 必须全局唯一。
+
+    位置占位键（invalid-issue-N）保证撞名/缺 id 的逐条 triage 不会因 issue_id 相同而互相覆盖；
+    若两条 triage 的 key 相同，平台去重会静默丢一条。这条把该契约钉住。
+    """
+    record["router"]["issues"] = [
+        {"id": "issue-1", "summary": "a", "risk": "low", "routing_reason": "r",
+         "expert_category_id": "E1"},
+        {"id": "issue-1", "summary": "撞名", "risk": "low", "routing_reason": "r",
+         "expert_category_id": "E1"},
+        {"summary": "无 id", "risk": "low", "routing_reason": "r", "expert_category_id": "E1"},
+        {"id": "reflection-review", "summary": "与全文锚点同名", "risk": "low",
+         "routing_reason": "r", "expert_category_id": "E1"},
+    ]
+    out = build_review_package(record, "r1")
+    all_keys = [tuple(x["key"]) for x in out["task_candidates"]] + \
+               [tuple(x["key"]) for x in out["manual_triage"]]
+    assert len(all_keys) == len(set(all_keys)), "存在重复 key，平台去重会丢条目: {}".format(all_keys)
+    # 撞名/缺 id 的逐条 triage 走位置占位键，能逐条定位
+    triage_ids = {t["issue_id"] for t in out["manual_triage"]}
+    assert {"invalid-issue-2", "invalid-issue-3"} <= triage_ids, triage_ids
+
+
 def test_blocked_and_safe_views(record):
     record.update(branch="A", injector={"secret": True}, debug="truncated")
     out = build_review_package(record, "r1")
