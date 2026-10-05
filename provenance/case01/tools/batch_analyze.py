@@ -551,6 +551,34 @@ def _md(a: Dict) -> str:
     return "\n".join(L) + "\n"
 
 
+def _write_atomic(path: str, text: str) -> None:
+    """把 `text` 写进 `path`,**要么全写进去,要么原文件一字不动**(2026-10-05 第十一轮 N11-1)。
+
+    为什么不能直接 `open(path, "w")`:那会**先 truncate 再逐块写**。写到一半
+    (磁盘满、进程被杀、机器休眠)就留下一个**被截断的** analysis.json/json.load
+    直接炸,而不存在的文件只会被当成"还没跑"——**截断文件比缺文件更难查**。
+
+    做法:同目录临时文件写完 → `os.replace` 原子换名。同目录是硬要求
+    (`os.replace` 跨文件系统会报错),临时文件用 `.` 前缀并在异常时清掉。
+    """
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    tmp = os.path.join(d, "." + os.path.basename(path) + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())          # 落盘再换名,否则崩溃后可能仍是旧内容
+        os.replace(tmp, path)
+    except BaseException:
+        # 含 KeyboardInterrupt:换名失败时**必须**把临时文件收掉,否则
+        # 下次跑会在目录里留下 .analysis.json.tmp 干扰人工排查。
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="批次数据分析 + 基线对比")
     ap.add_argument("--batch", default="", help="批次号(读其 ledger.jsonl)")
@@ -581,10 +609,12 @@ def main(argv=None) -> int:
     out_dir = args.out or (os.path.join(BATCH_ROOT, args.batch) if args.batch
                            else BATCH_ROOT)
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "analysis.json"), "w", encoding="utf-8") as f:
-        json.dump(a, f, ensure_ascii=False, indent=2)
-    with open(os.path.join(out_dir, "analysis.md"), "w", encoding="utf-8") as f:
-        f.write(_md(a))
+    # 先把两份内容都算好再落盘:写第二份时失败,第一份**也还没被动过**
+    # (各自的 _write_atomic 只会把同名旧文件换掉,不会留下半份新的)。
+    p_json = os.path.join(out_dir, "analysis.json")
+    p_md = os.path.join(out_dir, "analysis.md")
+    _write_atomic(p_json, json.dumps(a, ensure_ascii=False, indent=2))
+    _write_atomic(p_md, _md(a))
 
     print("有效 {} 条(坏 {} 个)→ {}".format(a["n_runs"], a["n_unreadable"],
                                         os.path.join(out_dir, "analysis.md")))
