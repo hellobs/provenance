@@ -213,6 +213,16 @@ def full_context(run_id: str) -> dict:
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=5002)
+    # host 可覆盖(2026-10-05 K3):默认回环。5002 虽然没有写端点,但**同样没有鉴权**,
+    # README 的成品记录人人可读;要绑非回环地址必须显式声明 LIVE_ALLOW_REMOTE=1,
+    # 与 5010 走同一套守卫(此前这里硬编码 127.0.0.1,config_tool 亦然 —— 一旦有人
+    # 改成可配 host 就没有守卫兜底)。
+    from live.netguard import require_explicit_remote
+
+    host = os.environ.get("CASE01_SERVE_HOST", "127.0.0.1")
+    require_explicit_remote(host, where="5002 case01 只读面")
+    uvicorn.run(app, host=host, port=5002)

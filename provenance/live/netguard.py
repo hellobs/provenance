@@ -3,10 +3,13 @@
 
 2026-09-23 安全体检的结论(实测,不是推测):
 
-- 5010 实时面有 4 个**写**端点,且都不需要任何凭证:
+- 5010 实时面有 5 个**写**端点,且都不需要任何凭证:
   `POST /api/goals`(改治理约束权重)、`POST /api/undo-intervention`(撤销干预)、
   `POST /api/reflections/mark`(标记反思并写档)、
+  `POST /api/intervention/{strategy_id}`(统一干预分发口,按注册表分发到全部已注册策略,
+  含 `corrective_feedback` 纠正回流)、
   `POST /control/restart`(重开一局;vizkit 插件在 on_restart 回调存在时注册);
+  (清单以本文件下方 `WRITE_ENDPOINTS` 为准 —— 它就是这条纪律的机器可读版本)
 - 8060 配置工具有 14 个写端点,含 `POST /api/scenario/save`、`POST /api/run/execute`、
   `POST /api/agent/delete`;
 - CORS 原来默认 `*`:跨源读的口子一开,**任意网页**都能把成品记录(研究资料)读走;

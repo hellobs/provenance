@@ -165,3 +165,43 @@ def test_config_tool_write_count_matches_the_list():
     assert m, "清单里没有写端点数量(格式变了,守卫读不出来)"
     claimed = int(m.group(1))
     assert claimed == actual, "8060 代码里 {} 个写端点,清单写 {} 个".format(actual, claimed)
+
+
+def test_docstring_5010_write_count_matches_the_list():
+    """docstring 里"5010 实时面有 N 个写端点"必须与 `WRITE_ENDPOINTS` 里 5010 行数一致。
+
+    2026-10-05 第六轮只读核查 K3:`live/netguard.py:7` 的 docstring 写"4 个",
+    而下方 `WRITE_ENDPOINTS` 已列 5 条(新增 `/api/intervention/{strategy_id}`
+    统一分发口时没同步 docstring)。这个文件本身就是"暴露面要数清楚"那条纪律的
+    说明文件 —— 它自己数错,纪律就没人信。数字由清单**算出来**,不靠人改。
+    """
+    import io as _io
+    import re as _re
+    src = _io.open(NG.__file__, encoding="utf-8", errors="replace").read()
+    # docstring 前 40 行内的"N 个**写**端点"
+    head = "\n".join(src.splitlines()[:40])
+    m = _re.search(r"(\d+)\s*个\*?\*?写\*?\*?端点", head)
+    assert m, "netguard docstring 里读不到 5010 写端点数(格式变了,守卫读不出来)"
+    claimed = int(m.group(1))
+    actual = sum(1 for line in NG.WRITE_ENDPOINTS if line.startswith("5010"))
+    assert claimed == actual, (
+        "netguard docstring 写 5010 有 {} 个写端点,清单里实际 {} 条".format(
+            claimed, actual))
+
+
+def test_more_services_than_5010_also_guard_their_bind():
+    """5002 与 8060 的启动入口必须走 `require_explicit_remote`,不许裸绑 host。
+
+    2026-10-05 第六轮只读核查 K3 的另一半:写面更大的 8060(14 个写端点)与只读的
+    5002 都**没有接入守卫**,靠硬编码 `host="127.0.0.1"` —— 硬编码当下安全,
+    但没人拦得住某天改成 `host=env.get("HOST","0.0.0.0")`。接上守卫后,
+    绑非回环地址必须先显式声明 `LIVE_ALLOW_REMOTE=1`。
+    """
+    for rel, where in (("case01/serve.py", "5002"),
+                       ("config_tool/app.py", "8060")):
+        path = os.path.join(_REPO, "provenance", rel)
+        assert os.path.isfile(path), "缺启动入口:{}".format(rel)
+        src = io.open(path, encoding="utf-8", errors="replace").read()
+        assert "require_explicit_remote" in src, \
+            "{} 的启动入口没接 require_explicit_remote(异常:硬编码 host 无兜底)".format(rel)
+        assert "uvicorn.run(" in src, "{} 里读不到 uvicorn.run".format(rel)

@@ -1696,4 +1696,11 @@ async def export_configs():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8060, log_level="info")
+    # host 可覆盖(2026-10-05 K3):默认回环。8060 是**写面**(改场景/删角色/执行运行,
+    # 14 个写端点)且无鉴权 —— 绑非回环地址必须显式声明 LIVE_ALLOW_REMOTE=1。
+    # 走 5010 同一套守卫(`live.netguard`),不再硬编码 127.0.0.1 裸跑。
+    from live.netguard import require_explicit_remote
+
+    _host = os.environ.get("CONFIG_TOOL_HOST", "127.0.0.1")
+    require_explicit_remote(_host, where="8060 配置工具(写面)")
+    uvicorn.run(app, host=_host, port=8060, log_level="info")
