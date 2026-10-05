@@ -29,15 +29,20 @@ case00 是 provenance 平台**最一开始那套多 agent 设定**：6 个角色
 实时可视化（case00 的"实时"入口现为 **5010** —— 5010 是 case00/case01 共用的**唯一实时入口**，
 由 `live_switch.py` 统一启停、同一时刻只起一个；`live_fastapi.py` 的 `--port` 默认也是 5010）：
 
+> **用你自己的 venv 起**（下文命令里的 `python` 即你的解释器）。
+> `.venv-live` 是作者本机专用的 editable 环境、**不入库**，别照抄那个路径 ——
+> 外部机器上它必然不存在。复现口径以仓库 `requirements.txt` 为准。
+> 建议直接走统一入口：`python live_switch.py --start case00`。
+
 ```
 cd D:\zzr\provenance\provenance
-.\.venv-live\Scripts\python.exe live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5010
+python live_fastapi.py --name demo --start 20250213-09:30 --stride 2 --step 0 --port 5010
 ```
 
 只读存档浏览（**5003**）：
 
 ```
-.\.venv-live\Scripts\python.exe -m case00.serve --port 5003
+python -m case00.serve --port 5003
 ```
 
 ## 声明化场景(2026-09-20,仅声明化不重写语义)
