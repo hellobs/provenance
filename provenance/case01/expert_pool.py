@@ -15,7 +15,16 @@ DEFAULT_POOL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 
 def expert_pool_path() -> str:
-    return os.environ.get("CASE01_EXPERT_POOL_PATH", "").strip() or DEFAULT_POOL_PATH
+    """专家池文件路径:环境变量优先(**须绝对**),否则用仓库内默认。
+
+    2026-10-05 补(GTC 体检 N5):此前裸读 `os.environ.get(...).strip() or DEFAULT`,
+    相对值按 cwd 解释、`..` 不拦 —— 是"守卫按调用点铺开、而非按所有根铺开"的
+    第二个漏点(`review_export.py` 会打开这个路径)。现改走 `resolve_root`,
+    与 `case01/orchestrator.RUNS_ROOT()`、`live/history._data_root` 同语义。
+    """
+    from case_engine.paths import resolve_root
+    return resolve_root("CASE01_EXPERT_POOL_PATH", DEFAULT_POOL_PATH,
+                        what="CASE01_EXPERT_POOL_PATH")
 
 
 def load_expert_pool(path: str = "") -> dict:

@@ -84,8 +84,25 @@ def test_serve_module_constant_tracks_the_env_on_reload(tmp_path, monkeypatch):
     try:
         assert serve.RUNS_ROOT == OR.RUNS_ROOT()
     finally:
-        monkeypatch.delenv("CASE01_RUNS_ROOT")
+        monkeypatch.delenv("CASE01_RUNS_ROOT", raising=False)
         importlib.reload(serve)
+
+
+def test_serve_module_rejects_relative_root_on_reload(monkeypatch):
+    """只读面同样必须拒绝相对值(2026-10-05 补,GTC 体检 N5/N8)。
+
+    此前 `serve.py` 是**裸读** `os.environ.get(...)`,相对值时按 cwd 解释 ——
+    与写侧 `RUNS_ROOT()` 的抛错不对称。虽然这是只读面,但"同一配置在两侧
+    给出不同答案"本身就是错的,而且它 import 时求值、错得静默。
+    """
+    from case_engine.paths import AmbiguousPathError
+    monkeypatch.setenv("CASE01_RUNS_ROOT", "case01/runs")
+    try:
+        with pytest.raises(AmbiguousPathError):
+            importlib.reload(importlib.import_module("case01.serve"))
+    finally:
+        monkeypatch.delenv("CASE01_RUNS_ROOT", raising=False)
+        importlib.reload(importlib.import_module("case01.serve"))
 
 
 def test_run_lands_in_env_root_and_read_side_finds_it(tmp_path, monkeypatch):

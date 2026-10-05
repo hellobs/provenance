@@ -38,14 +38,20 @@ except ImportError:  # 直接脚本运行(在 case01 目录)
     from case01.reflection import evaluate_reflection_quality
 
 from live.netguard import resolve_embed_origins
+from case_engine.paths import resolve_root
 
-RUNS_ROOT = os.environ.get(
+# 2026-10-05:从裸读改为走 resolve_root(相对值当场报错,与写侧同语义)。
+# 此前相对值时这里按 cwd 解释 —— 与 `orchestrator.RUNS_ROOT()` 的读写不对称
+# 属同一类漏点(GTC 体检 N5/N8)。
+RUNS_ROOT = resolve_root(
     "CASE01_RUNS_ROOT",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
+    what="CASE01_RUNS_ROOT",
 )
-RUNS_HTML_ROOT = os.environ.get(
+RUNS_HTML_ROOT = resolve_root(
     "CASE01_RUNS_HTML_ROOT",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs_html"),
+    what="CASE01_RUNS_HTML_ROOT",
 )
 
 app = FastAPI(
