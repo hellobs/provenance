@@ -11,8 +11,10 @@
 
 对照:`tools/verify_demo_sync.py` 是可复跑命令,本文件把它接进测试面。
 """
+import io
 import json
 import os
+import re
 import sys
 
 import pytest
@@ -127,3 +129,55 @@ def test_compare_flags_a_missing_package_file(tmp_path):
     assert missing, "包侧缺文件却没报缺 —— 覆盖不完整"
     assert len(missing) == 1
     assert missing[0][0] == vds.RUNS[0] and missing[0][1] == vds.FILES[0]
+
+
+# ---------------------------------------------------------------------------
+# 方向守卫(2026-10-05 第九轮 N9-1):"谁是原件"曾被文档写反,且没人拦得住
+# ---------------------------------------------------------------------------
+def test_run_demo_script_generates_into_the_package_and_never_copies():
+    """`run_demo.sh` 必须**直接把记录生成在包里**,且不含任何拷贝命令。
+
+    N9-1 的要害不是措辞,是后果:方向含糊时,"演示当天按手册重跑 `run_demo.sh`"
+    只会重新生成**包内**那一份,而5010 读的**仓内**那份原地不动——现场看到旧记录、
+    交给对方的说明是新记录,而 `verify_demo_sync` 要等有人手动跑才会报差异。
+    本条把"脚本不做拷贝"钉成契约:将来谁想改成"写仓内再 cp 到包",必须先改本条
+    并同步手册,而不是让两处默默分叉。
+    """
+    script = os.path.join(vds.DEFAULT_PKG, "run_demo.sh")
+    if not os.path.isfile(script):
+        pytest.skip("交付包不在场(仓外数据):{}".format(script))
+    with io.open(script, encoding="utf-8") as fh:
+        text = fh.read()
+    # 生成目标指向包内 runs/(这正是"包内是原件"的判据)
+    assert "CASE01_RUNS_ROOT" in text, \
+        "run_demo.sh 不再设置 CASE01_RUNS_ROOT —— 生成目标变了,拷贝方向结论要重新核实"
+    m = re.search(r"CASE01_RUNS_ROOT=['\"]?([^'\"\n]+)", text)
+    assert m, "解析不出 CASE01_RUNS_ROOT 的值"
+    assert "demo-case01" in m.group(1), \
+        "CASE01_RUNS_ROOT 不再指向交付包(现在是 {})—— 若改成写仓内,必须同时补上"\
+        "明确的 cp 并更新 verify_demo_sync 的方向说明与手册".format(m.group(1))
+    # 不得含拷贝命令(否则方向就不再是单向的"包内生成")
+    for pat in (r"\bcp\b", r"\bcopy\b", r"shutil\.copy", r"Copy-Item", r"xcopy"):
+        assert not re.search(pat, text), \
+            "run_demo.sh 出现了拷贝命令({})—— 与『包内是原件』的单向结论冲突".format(pat)
+
+
+def test_no_doc_claims_the_copy_runs_repo_to_package():
+    """仓内**入库**文档不得再宣称拷贝方向是"仓内 → 包"。
+
+    N9-1 之前 `tools/verify_demo_sync.py` 的 docstring 正是这么写的(还把包描述成
+    "手工拷贝"的下游)。它在仓内、被跟踪、也被当权威口径读,所以方向写反会被评审
+    当成事实。本条只查**方向措辞**,不查别的 —— 目标是"别再把方向说反",不是
+    "锁死文案"(措辞会随别的改动正常演进)。
+    """
+    doc = os.path.join(_REPO, "provenance", "tools", "verify_demo_sync.py")
+    with io.open(doc, encoding="utf-8") as fh:
+        text = fh.read()
+    # 反向表述 = 同一句里先出现"仓内"、后出现"拷…包"(中间允许隔最多 40 字,
+    # 因为真实误写常常是"那份由 run_demo.sh 手工从仓内拷进本包"这种长句)。
+    for m in re.finditer(r"仓内.{0,40}?拷(?:进|到|入).{0,20}?包", text, re.S):
+        seg = m.group(0)
+        if any(w in seg for w in ("写反", "订正", "此前", "原先", "不是本")):
+            continue          # 订正说明本身,合法
+        pytest.fail("verify_demo_sync.py 里仍宣称『仓内拷进包』:{}"
+                    .format(seg.replace("\n", " ").strip()))
