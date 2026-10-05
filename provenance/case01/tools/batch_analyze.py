@@ -377,6 +377,17 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
             "issues_median": _median(issues),
             "zero_issue_runs": sum(1 for c in issues if c == 0),
             "issues_dist": _dist(issues),
+            # 分母必须写清(2026-10-05 第十轮4.1):`n` 是**参与 Router 统计的行数**,
+            # 即 `len(ok_rows)` —— "没跑成"的样本已被剔除。原先它叫 `n`、旁边只有
+            # 一个 `zero_issue_runs`,读起来像"该批次没有零问题样本",而真实含义是
+            # "零问题的那几条没进分母"。实测 165042 批次:n=34 而样本 43——
+            # 那 9 条 router error(占 21%)在专家表与聚合里**同时消失**。
+            # 改名 `n_scored` + 显式给出被剔除的条数与状态分布,让分母无法被误读。
+            "n_scored": len(issues),
+            "n_excluded_not_scored": len(rows) - len(issues),
+            "router_status_dist": _dist([r.get("router_status") or "ok" for r in rows]),
+            # 兼容旧键:留 `n` 但语义写进注释,免得老脚本 KeyError。
+            # 新读者请用 `n_scored`。
             "n": len(issues),
         },
         "consistency": cons,

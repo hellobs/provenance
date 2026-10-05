@@ -42,17 +42,38 @@ def export() -> int:
                     "summary_ok/field_ok 填 1(认可) 或 0(不认可)",
                     "expected_risk 填 high/medium/low(认可原标注就留空)",
                     "", "", "", "", "", ""])
+        n_norouter = 0
         for p in sorted(glob.glob(os.path.join(RUNS, "*", "run.json")), reverse=True):
             with open(p, encoding="utf-8") as f:
                 d = json.load(f)
             rid = d.get("run_id") or os.path.basename(os.path.dirname(p))
-            for i in (d.get("router") or {}).get("issues") or []:
+            router = d.get("router") or {}
+            issues = router.get("issues") or []
+            # Router 没跑成的样本**也要占一行**(2026-10-05 第十轮 4.1)。
+            # 此前只按issue 出行 ⇒ status=error/skipped 的样本在表里**一行都不占**,
+            # 而它们的 issues 恒为 []。实测全库 311 条里 14 条(9 error + 5 skipped),
+            # 其中 165042 批次 9/43 = 21% —— 专家看这张表时无从知道自己漏看了它们,
+            # 也无从判断"没看到问题"是"干净"还是"坏了"。
+            # 这与 `case01/tests/test_batch_261003_findings.py:160` 里已有的自觉
+            # ("空输出≠没有问题")一致:那条自觉只落到了文案,没落到表结构。
+            if not issues:
+                status = router.get("status") or ""
+                if status in ("error", "skipped"):
+                    w.writerow([rid, "", "【Router 未产出,不适用本表标注】",
+                                "", "", "router.status=" + status,
+                                "", "", "", ""])
+                    n_norouter += 1
+                continue
+            for i in issues:
                 w.writerow([rid, i.get("id", ""),
                             i.get("summary", ""), i.get("field", ""),
                             str(i.get("risk", "")), i.get("risk_note", ""),
                             "", "", "", ""])
                 n += 1
     print("导出 {} 条 issue -> {}".format(n, path))
+    if n_norouter:
+        print("另有 {} 条样本 Router 未产出(error/skipped),已在表中各占一行 ——"
+              "它们不在 {} 条 issue 里,不要读成『没有问题』".format(n_norouter, n))
     return 0
 
 
@@ -60,11 +81,23 @@ def score(path: str) -> int:
     with open(path, encoding="utf-8-sig", newline="") as f:
         rows = [r for r in csv.DictReader(f)
                 if not (r.get("run_id") or "").startswith("#")]
+    # "Router 未产出"的占位行(2026-10-05 第十轮 4.1)必须从**评分分母**里剔掉:
+    # 它们没有 issue 可评,标了 field_ok 也没意义,但算进 `total` 会让
+    # "总条数"比真实 issue 数大,读者又以为漏标了。
+    # 用 `id()` 身份而不是 `not in`(按内容判等):保证**剔除的行数精确等于
+    # 识别出的占位行数** —— 若表里有内容完全相同的两行,`not in` 会把它们当成
+    # 同一条而少删一行,`not_scored_router_missing` 就与表里实际占位行数脱钩。
+    # (本测试数据下两种写法结果相同,这条守的是"计数必须自洽"而非"某条必须被删"。)
+    n_norouter = [r for r in rows if (r.get("summary") or "").startswith("【Router 未产出")]
+    norouter_ids = {id(r) for r in n_norouter}
+    rows = [r for r in rows if id(r) not in norouter_ids]
     labelled = [r for r in rows if (r.get("field_ok") or "").strip()
                 or (r.get("expected_risk") or "").strip()
                 or (r.get("summary_ok") or "").strip()]
     if not labelled:
         print("标注表还没有人工标注(列 field_ok/expected_risk/summary_ok 全空):", path)
+        if n_norouter:
+            print("另有 {} 条样本 Router 未产出,不参与评分".format(len(n_norouter)))
         return 2
     field_ok = [r["field_ok"].strip() == "1" for r in labelled if (r.get("field_ok") or "").strip()]
     summary_ok = [r["summary_ok"].strip() == "1" for r in labelled if (r.get("summary_ok") or "").strip()]
@@ -78,6 +111,7 @@ def score(path: str) -> int:
     result = {
         "labelled": len(labelled),
         "total": len(rows),
+        "not_scored_router_missing": len(n_norouter),
         "routing_agreement": _mean(field_ok),
         "summary_behavior_rate": _mean(summary_ok),
         "risk_calibration": _mean(risk_ok),
