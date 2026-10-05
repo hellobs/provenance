@@ -20,6 +20,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
+from case01.review_export import ReviewPackageResponse
 
 # 统一根:本文件位于 <root>/live/history.py,向上两级即 provenance/provenance。
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -472,6 +473,33 @@ async def explore_page(request: Request) -> HTMLResponse:
     """数据界面:纯数据浏览,不依赖运行状态;由 history.html 渲染。"""
     return templates.TemplateResponse(request, "history.html",
                                       {"embed": "explore", "title": "历史数据"})
+
+
+@router.get("/api/review-package/{run_id}", response_model=ReviewPackageResponse,
+            responses={404: {"description": "Run 不存在或路径非法"},
+                       422: {"description": "记录或类别目录格式错误"},
+                       503: {"description": "记录或类别目录暂不可读"}})
+async def review_package(run_id: str) -> JSONResponse:
+    """平台建单用只读交接包；与实时 case 无关，不分配专家、不接收审核写回。"""
+    from case01.review_export import build_review_package
+
+    if not run_id or run_id in (".", "..") or any(x in run_id for x in ("/", "\\", "\x00")):
+        return JSONResponse({"ok": False, "error": "invalid_run_id"}, status_code=404)
+    root = os.path.realpath(_data_root("CASE01_RUNS_ROOT", "case01", "runs"))
+    path = os.path.realpath(os.path.join(root, run_id, "run.json"))
+    if os.path.commonpath([root, path]) != root or not os.path.isfile(path):
+        return JSONResponse({"ok": False, "error": "run_not_found"}, status_code=404)
+    try:
+        with open(path, encoding="utf-8") as stream:
+            record = json.load(stream)
+        package = build_review_package(record, run_id)
+    except (ValueError, TypeError, KeyError):
+        return JSONResponse({"ok": False, "error": "invalid_review_record_or_catalog"},
+                            status_code=422)
+    except OSError:
+        return JSONResponse({"ok": False, "error": "review_source_unavailable"}, status_code=503)
+    return JSONResponse({"ok": True, "data": package}, headers={
+        "ETag": '"{}"'.format(package["revision"]), "Cache-Control": "no-store"})
 
 
 @router.get("/api/run-detail/{source}/{run_id}")

@@ -45,6 +45,7 @@ def test_failed_router_preserves_reflection(record, router, reason):
 @pytest.mark.parametrize("changes", [
     {"expert_category_id": "BAD"}, {"secondary_expert_category_ids": ["BAD"]},
     {"risk": "wrong"}, {"summary": ""}, {"id": None}, {"match_status": "unmatched"},
+    {"evidence_quote": None}, {"evidence_sentence_ids": [1]},
 ])
 def test_bad_issue_requires_manual_triage(record, changes):
     record["router"]["issues"][0].update(changes)
@@ -76,3 +77,34 @@ def test_identity_and_missing_feedback(record):
         build_review_package(record, "wrong")
     record.pop("final_feedback")
     assert build_review_package(record, "r1")["status"] == "blocked"
+
+
+def test_mixed_candidates_and_triage_are_both_preserved(record):
+    bad = copy.deepcopy(record["router"]["issues"][0])
+    bad.update(id="issue-2", expert_category_id="BAD")
+    record["router"]["issues"].append(bad)
+    out = build_review_package(record, "r1")
+    assert out["status"] == "manual_triage"
+    assert len(out["task_candidates"]) == 2
+    assert out["manual_triage"][0]["issue_id"] == "issue-2"
+
+
+def test_legacy_field_and_failed_reflection(record):
+    issue = record["router"]["issues"][0]
+    issue.pop("expert_category_id")
+    issue["field"] = "信息与证据核验"
+    assert build_review_package(record, "r1")["status"] == "ready"
+    record["reflection"]["quality"] = {"status": "error"}
+    out = build_review_package(record, "r1")
+    assert out["status"] == "blocked" and not out["task_candidates"]
+
+
+def test_category_content_changes_revision_even_with_same_version(record):
+    from case01.expert_pool import load_expert_pool
+    pool = load_expert_pool()
+    out = build_review_package(record, "r1", pool)
+    pool["categories"][0]["description"] += "补充职责"
+    new = build_review_package(record, "r1", pool)
+    assert out["record_revision"] == new["record_revision"]
+    assert out["category_revision"] != new["category_revision"]
+    assert out["revision"] != new["revision"]
