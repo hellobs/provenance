@@ -508,12 +508,24 @@ def _parse_router_json(text: str, expert_pool: dict = None,
         # 字段名容忍:实测本地模型爱用 required_expert/risk_level 而不是 field/risk,
         # 只认 field 会让"专业领域"整列空着(2026-09-19 体检:B-1613 五条全空、
         # B-1710 有四条 risk_note 却 field 全空 —— 不是模型没答,是解析没认)。
+        # 2026-10-05 补 `expert_category`:实测 h120seed-011 三条 issue 只给了这个键,
+        # 于是 field 落空 → test_router_issues_are_reviewable 红。
         raw_field = str(it.get("field", "")
                     or it.get("required_expert", "")
                     or it.get("expert", "")
-                    or it.get("professional_field", "")).strip()
+                    or it.get("professional_field", "")
+                    or it.get("expert_category", "")).strip()
         raw_category_id = str(it.get("expert_category_id", "")
                               or it.get("primary_expert", "")).strip().upper()
+        # 2026-10-05:模型常把「规范名 + 括号里的 ID」写成一体(实测
+        # `市场与交易风险（E4）`、`信息处理机制（UNMATCHED）`),全角括号也出现过。
+        # 拆出来分别再试一次 —— 否则这种"答对了但格式多一层"的输出会被判 unmatched。
+        _m = re.search(r"[（(]\s*([A-Za-z]+\d*|UNMATCHED)\s*[)）]\s*$", raw_field)
+        if _m:
+            _inner = _m.group(1).upper()
+            raw_field = raw_field[: _m.start()].strip()
+            if _inner != "UNMATCHED" and not raw_category_id:
+                raw_category_id = _inner
         category = resolve_category(raw_category_id, raw_field, pool)
         if category:
             category_id = category["id"]

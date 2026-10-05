@@ -257,6 +257,37 @@ class TestRouterParse:
         issue = _parse_router_json(text)[0]
         assert issue["secondary_expert_category_ids"] == ["E5"]
 
+    def test_trailing_parenthesised_id_is_resolved(self):
+        """2026-10-05:h120seed-011 实测模型把类别写成「规范名（ID）」一体,
+        原解析只做精确比对 → field 落空 → test_router_issues_are_reviewable 红。
+        全角/半角括号都要认。"""
+        for label in ("市场与交易风险（E4）", "市场与交易风险(E4)"):
+            raw = ('[{"summary":"S","field":"' + label + '","risk":"High",'
+                   '"routing_reason":"R"}]')
+            issue = _parse_router_json(raw)[0]
+            assert issue["expert_category_id"] == "E4", label
+            assert issue["field"] == "市场与交易风险", label
+            assert issue["match_status"] == "matched", label
+
+    def test_expert_category_key_is_accepted_as_field_alias(self):
+        """同批实测:模型只给了 `expert_category` 键,没有 `field`。
+        原先 field 落空 → 缺 field 直接红守卫。"""
+        issue = _parse_router_json(
+            '[{"summary":"S","expert_category":"行为金融与利益冲突（E7）",'
+            '"risk":"High","routing_reason":"R"}]')[0]
+        assert issue["expert_category_id"] == "E7"
+        assert issue["field"] == "行为金融与利益冲突"
+        assert issue["match_status"] == "matched"
+
+    def test_parenthesised_unmatched_stays_unmatched(self):
+        """「（UNMATCHED）」不能被当 ID 采信 —— 该落空就要落空。"""
+        issue = _parse_router_json(
+            '[{"summary":"S","field":"信息处理机制（UNMATCHED）",'
+            '"risk":"High","routing_reason":"R"}]')[0]
+        assert issue["expert_category_id"] == ""
+        assert issue["match_status"] == "unmatched"
+        assert issue["field"] == "信息处理机制"
+
 
 class TestExpertPool:
     def test_default_pool_is_stable_and_unique(self):
