@@ -26,6 +26,8 @@ class ManualTriage(BaseModel):
     issue_id: str
     reason: str
     key: list[str]
+    # 仅在 issue 撞名时出现：被重复的那个 id，供平台侧定位冲突来源。
+    conflict_id: Optional[str] = None
 
 
 class ReviewPackage(BaseModel):
@@ -89,9 +91,13 @@ def build_review_package(record, run_id, pool=None):
     if isinstance(ref_quality, dict) and ref_quality.get("status") == "error":
         blocked.append("reflection_failed")
 
-    def manual(code, issue_id="reflection-review"):
-        triage.append({"issue_id": issue_id, "reason": code,
-                       "key": ["review", run_id, issue_id, "manual-triage"]})
+    def manual(code, issue_id="reflection-review", conflict_id=None):
+        entry = {"issue_id": issue_id, "reason": code,
+                 "key": ["review", run_id, issue_id, "manual-triage"]}
+        # 撞名时点名冲突 id，平台侧才能定位是哪个 id 被重复；不撞名则不带该键。
+        if conflict_id is not None:
+            entry["conflict_id"] = conflict_id
+        triage.append(entry)
 
     stage = rout.get("status")
     if not blocked:
@@ -104,15 +110,25 @@ def build_review_package(record, run_id, pool=None):
         elif rout.get("expert_pool_version") not in (None, "", pool["version"]):
             manual("category_version_mismatch")
         else:
+            # 只为可用的字符串 id 计重名；缺失/非字符串 id 不参与（各自单独报缺）。
             ids = Counter(x.get("id") for x in issues
-                          if isinstance(x, dict) and isinstance(x.get("id"), str))
+                          if isinstance(x, dict) and isinstance(x.get("id"), str)
+                          and x.get("id").strip())
+            dup_ids = {i for i, n in ids.items() if n > 1}
             for pos, item in enumerate(issues):
                 if not isinstance(item, dict):
                     manual("issue_invalid", "invalid-issue-{}".format(pos + 1))
                     continue
                 iid = item.get("id")
-                if not isinstance(iid, str) or not iid.strip() or ids[iid] != 1:
-                    manual("issue_id_missing_or_duplicated", "invalid-issue-{}".format(pos + 1))
+                # 缺 id 与撞 id 分开报：前者是字段缺失，后者是 Router 产出了两条同名问题，
+                # 平台侧需要的处置不同（补字段 vs 回退重跑 Router）。两种都把该条踢进人工分诊，
+                # 并保留位置占位键以便逐条定位；撞名时再点名撞的是哪个 id。
+                if not isinstance(iid, str) or not iid.strip():
+                    manual("issue_id_missing", "invalid-issue-{}".format(pos + 1))
+                    continue
+                if iid in dup_ids:
+                    manual("issue_ids_duplicated", "invalid-issue-{}".format(pos + 1),
+                           conflict_id=iid)
                     continue
                 if (any(not isinstance(item.get(k), str) or not item[k].strip()
                         for k in ("summary", "routing_reason"))
