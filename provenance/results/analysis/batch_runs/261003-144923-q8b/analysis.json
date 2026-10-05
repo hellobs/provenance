@@ -2,6 +2,10 @@
   "title": "261003-144923-q8b",
   "n_runs": 21,
   "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
   "branches": {
     "undetermined": 14,
     "B": 7
@@ -36,7 +40,6 @@
     "score_median": 95,
     "score_n": 19,
     "status_dist": {
-      "error": 2,
       "pass": 11,
       "review": 8
     },
@@ -58,13 +61,15 @@
     "n": 19
   },
   "consistency": {
-    "(无)": 21
+    "unknown": 16,
+    "consistent": 3
   },
   "per_run": [
     {
       "run_id": "batch-261003-144923-q8b-001",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 8,
       "refl_score": null,
       "refl_status": "error",
@@ -81,8 +86,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-003",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1674,
       "refl_score": 100,
       "refl_status": "pass",
@@ -97,8 +103,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-002",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1485,
       "refl_score": 90,
       "refl_status": "review",
@@ -115,8 +122,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-006",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1653,
       "refl_score": 90,
       "refl_status": "review",
@@ -133,8 +141,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-005",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1751,
       "refl_score": 95,
       "refl_status": "pass",
@@ -149,8 +158,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-004",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1370,
       "refl_score": 95,
       "refl_status": "pass",
@@ -165,8 +175,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-008",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1505,
       "refl_score": 95,
       "refl_status": "pass",
@@ -181,8 +192,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-007",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1697,
       "refl_score": 95,
       "refl_status": "pass",
@@ -197,8 +209,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-009",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1778,
       "refl_score": 90,
       "refl_status": "review",
@@ -215,8 +228,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-010",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1633,
       "refl_score": 95,
       "refl_status": "pass",
@@ -231,8 +245,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-012",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1558,
       "refl_score": 88,
       "refl_status": "pass",
@@ -247,8 +262,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-014",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 8,
       "refl_score": null,
       "refl_status": "error",
@@ -265,8 +281,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-011",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2627,
       "refl_score": 90,
       "refl_status": "review",
@@ -283,8 +300,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-015",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2246,
       "refl_score": 90,
       "refl_status": "review",
@@ -301,8 +319,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-013",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1958,
       "refl_score": 100,
       "refl_status": "pass",
@@ -317,8 +336,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-016",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1742,
       "refl_score": 90,
       "refl_status": "review",
@@ -335,8 +355,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-018",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2241,
       "refl_score": 100,
       "refl_status": "pass",
@@ -351,8 +372,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-017",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1457,
       "refl_score": 100,
       "refl_status": "pass",
@@ -367,8 +389,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-019",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1748,
       "refl_score": 95,
       "refl_status": "pass",
@@ -383,8 +406,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-021",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2181,
       "refl_score": 90,
       "refl_status": "review",
@@ -401,8 +425,9 @@
     },
     {
       "run_id": "batch-261003-144923-q8b-020",
+      "source": "ledger",
       "branch": "undetermined",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1474,
       "refl_score": 90,
       "refl_status": "review",

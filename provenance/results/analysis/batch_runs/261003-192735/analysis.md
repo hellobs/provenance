@@ -35,9 +35,8 @@
 
 | 判定 | 条数 |
 | --- | --- |
-| unknown | 38 |
-| inconsistent | 4 |
-| consistent | 1 |
+| consistent | 29 |
+| unknown | 14 |
 
 ## 5. 与答辩基线对比（25 条 · 本地 4b）
 

@@ -2,6 +2,10 @@
   "title": "261003-165042",
   "n_runs": 43,
   "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
   "branches": {
     "B": 31,
     "C": 12
@@ -64,8 +68,8 @@
     "score_median": 95.0,
     "score_n": 34,
     "status_dist": {
-      "pass": 33,
-      "review": 10
+      "pass": 26,
+      "review": 8
     },
     "fail_reason_top": {
       "未提出可执行的后续改进动作": 10
@@ -84,13 +88,15 @@
     "n": 34
   },
   "consistency": {
-    "(无)": 43
+    "consistent": 28,
+    "unknown": 6
   },
   "per_run": [
     {
       "run_id": "batch-261003-165042-002",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1890,
       "refl_score": 100,
       "refl_status": "pass",
@@ -105,8 +111,9 @@
     },
     {
       "run_id": "batch-261003-165042-001",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1967,
       "refl_score": 100,
       "refl_status": "pass",
@@ -121,8 +128,9 @@
     },
     {
       "run_id": "batch-261003-165042-003",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1373,
       "refl_score": 90,
       "refl_status": "review",
@@ -139,8 +147,9 @@
     },
     {
       "run_id": "batch-261003-165042-004",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1825,
       "refl_score": 95,
       "refl_status": "pass",
@@ -155,8 +164,9 @@
     },
     {
       "run_id": "batch-261003-165042-007",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1908,
       "refl_score": 95,
       "refl_status": "pass",
@@ -171,8 +181,9 @@
     },
     {
       "run_id": "batch-261003-165042-005",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1583,
       "refl_score": 100,
       "refl_status": "pass",
@@ -187,8 +198,9 @@
     },
     {
       "run_id": "batch-261003-165042-006",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1549,
       "refl_score": 90,
       "refl_status": "review",
@@ -205,8 +217,9 @@
     },
     {
       "run_id": "batch-261003-165042-008",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1401,
       "refl_score": 100,
       "refl_status": "pass",
@@ -221,8 +234,9 @@
     },
     {
       "run_id": "batch-261003-165042-009",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1979,
       "refl_score": 90,
       "refl_status": "review",
@@ -239,8 +253,9 @@
     },
     {
       "run_id": "batch-261003-165042-010",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 2040,
       "refl_score": 95,
       "refl_status": "pass",
@@ -255,8 +270,9 @@
     },
     {
       "run_id": "batch-261003-165042-012",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1961,
       "refl_score": 83,
       "refl_status": "review",
@@ -273,8 +289,9 @@
     },
     {
       "run_id": "batch-261003-165042-011",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1104,
       "refl_score": 95,
       "refl_status": "pass",
@@ -289,8 +306,9 @@
     },
     {
       "run_id": "batch-261003-165042-013",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2269,
       "refl_score": 95,
       "refl_status": "pass",
@@ -305,8 +323,9 @@
     },
     {
       "run_id": "batch-261003-165042-015",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 2106,
       "refl_score": 100,
       "refl_status": "pass",
@@ -321,8 +340,9 @@
     },
     {
       "run_id": "batch-261003-165042-016",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1769,
       "refl_score": 100,
       "refl_status": "pass",
@@ -337,8 +357,9 @@
     },
     {
       "run_id": "batch-261003-165042-019",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1489,
       "refl_score": 100,
       "refl_status": "pass",
@@ -353,8 +374,9 @@
     },
     {
       "run_id": "batch-261003-165042-018",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1621,
       "refl_score": 90,
       "refl_status": "review",
@@ -371,8 +393,9 @@
     },
     {
       "run_id": "batch-261003-165042-017",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1779,
       "refl_score": 95,
       "refl_status": "pass",
@@ -387,8 +410,9 @@
     },
     {
       "run_id": "batch-261003-165042-022",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1504,
       "refl_score": 100,
       "refl_status": "pass",
@@ -403,8 +427,9 @@
     },
     {
       "run_id": "batch-261003-165042-020",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1866,
       "refl_score": 100,
       "refl_status": "pass",
@@ -419,8 +444,9 @@
     },
     {
       "run_id": "batch-261003-165042-021",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1416,
       "refl_score": 93,
       "refl_status": "pass",
@@ -435,8 +461,9 @@
     },
     {
       "run_id": "batch-261003-165042-024",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1292,
       "refl_score": 100,
       "refl_status": "pass",
@@ -451,8 +478,9 @@
     },
     {
       "run_id": "batch-261003-165042-023",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1657,
       "refl_score": 95,
       "refl_status": "pass",
@@ -467,8 +495,9 @@
     },
     {
       "run_id": "batch-261003-165042-025",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1356,
       "refl_score": 95,
       "refl_status": "pass",
@@ -483,8 +512,9 @@
     },
     {
       "run_id": "batch-261003-165042-028",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1511,
       "refl_score": 100,
       "refl_status": "pass",
@@ -499,8 +529,9 @@
     },
     {
       "run_id": "batch-261003-165042-027",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1112,
       "refl_score": 93,
       "refl_status": "pass",
@@ -515,8 +546,9 @@
     },
     {
       "run_id": "batch-261003-165042-026",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 2282,
       "refl_score": 95,
       "refl_status": "pass",
@@ -531,8 +563,9 @@
     },
     {
       "run_id": "batch-261003-165042-029",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "unknown",
       "refl_chars": 1772,
       "refl_score": 90,
       "refl_status": "review",
@@ -549,8 +582,9 @@
     },
     {
       "run_id": "batch-261003-165042-030",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1908,
       "refl_score": 100,
       "refl_status": "pass",
@@ -565,8 +599,9 @@
     },
     {
       "run_id": "batch-261003-165042-031",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 2173,
       "refl_score": 100,
       "refl_status": "pass",
@@ -581,8 +616,9 @@
     },
     {
       "run_id": "batch-261003-165042-033",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1991,
       "refl_score": 90,
       "refl_status": "review",
@@ -599,8 +635,9 @@
     },
     {
       "run_id": "batch-261003-165042-032",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 2109,
       "refl_score": 95,
       "refl_status": "pass",
@@ -615,8 +652,9 @@
     },
     {
       "run_id": "batch-261003-165042-034",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1855,
       "refl_score": 90,
       "refl_status": "review",
@@ -633,8 +671,9 @@
     },
     {
       "run_id": "batch-261003-165042-036",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 2535,
       "refl_score": 95,
       "refl_status": "pass",
@@ -649,8 +688,9 @@
     },
     {
       "run_id": "batch-261003-165042-035",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1789,
       "refl_score": 95,
       "refl_status": "pass",
@@ -665,8 +705,9 @@
     },
     {
       "run_id": "batch-261003-165042-037",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1634,
       "refl_score": 90,
       "refl_status": "review",
@@ -683,8 +724,9 @@
     },
     {
       "run_id": "batch-261003-165042-038",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1769,
       "refl_score": 95,
       "refl_status": "pass",
@@ -699,8 +741,9 @@
     },
     {
       "run_id": "batch-261003-165042-040",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1799,
       "refl_score": 100,
       "refl_status": "pass",
@@ -715,8 +758,9 @@
     },
     {
       "run_id": "batch-261003-165042-039",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1762,
       "refl_score": 95,
       "refl_status": "pass",
@@ -731,8 +775,9 @@
     },
     {
       "run_id": "batch-261003-165042-042",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1704,
       "refl_score": 90,
       "refl_status": "review",
@@ -749,8 +794,9 @@
     },
     {
       "run_id": "batch-261003-165042-044",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1668,
       "refl_score": 95,
       "refl_status": "pass",
@@ -765,8 +811,9 @@
     },
     {
       "run_id": "batch-261003-165042-043",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1795,
       "refl_score": 100,
       "refl_status": "pass",
@@ -781,8 +828,9 @@
     },
     {
       "run_id": "batch-261003-165042-041",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "",
+      "consistency": "consistent",
       "refl_chars": 1647,
       "refl_score": 95,
       "refl_status": "pass",

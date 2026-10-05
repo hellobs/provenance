@@ -2,6 +2,10 @@
   "title": "261003-192735",
   "n_runs": 43,
   "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
   "branches": {
     "B": 33,
     "C": 10
@@ -48,15 +52,15 @@
     "n": 43
   },
   "consistency": {
-    "unknown": 38,
-    "inconsistent": 4,
-    "consistent": 1
+    "consistent": 29,
+    "unknown": 14
   },
   "per_run": [
     {
       "run_id": "batch-261003-192735-001",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1538,
       "refl_score": 95,
       "refl_status": "pass",
@@ -71,8 +75,9 @@
     },
     {
       "run_id": "batch-261003-192735-002",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1849,
       "refl_score": 95,
       "refl_status": "pass",
@@ -87,8 +92,9 @@
     },
     {
       "run_id": "batch-261003-192735-003",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1830,
       "refl_score": 93,
       "refl_status": "pass",
@@ -103,8 +109,9 @@
     },
     {
       "run_id": "batch-261003-192735-005",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1947,
       "refl_score": 100,
       "refl_status": "pass",
@@ -119,6 +126,7 @@
     },
     {
       "run_id": "batch-261003-192735-004",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 2042,
@@ -135,6 +143,7 @@
     },
     {
       "run_id": "batch-261003-192735-007",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1526,
@@ -151,8 +160,9 @@
     },
     {
       "run_id": "batch-261003-192735-006",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1495,
       "refl_score": 80,
       "refl_status": "review",
@@ -169,8 +179,9 @@
     },
     {
       "run_id": "batch-261003-192735-009",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1278,
       "refl_score": 95,
       "refl_status": "pass",
@@ -185,6 +196,7 @@
     },
     {
       "run_id": "batch-261003-192735-008",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 2170,
@@ -201,8 +213,9 @@
     },
     {
       "run_id": "batch-261003-192735-010",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1442,
       "refl_score": 83,
       "refl_status": "review",
@@ -219,8 +232,9 @@
     },
     {
       "run_id": "batch-261003-192735-011",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1610,
       "refl_score": 90,
       "refl_status": "pass",
@@ -235,6 +249,7 @@
     },
     {
       "run_id": "batch-261003-192735-012",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1179,
@@ -251,8 +266,9 @@
     },
     {
       "run_id": "batch-261003-192735-015",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1297,
       "refl_score": 100,
       "refl_status": "pass",
@@ -267,6 +283,7 @@
     },
     {
       "run_id": "batch-261003-192735-014",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 2140,
@@ -283,6 +300,7 @@
     },
     {
       "run_id": "batch-261003-192735-013",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1805,
@@ -299,8 +317,9 @@
     },
     {
       "run_id": "batch-261003-192735-017",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1812,
       "refl_score": 100,
       "refl_status": "pass",
@@ -315,8 +334,9 @@
     },
     {
       "run_id": "batch-261003-192735-018",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "inconsistent",
+      "consistency": "unknown",
       "refl_chars": 2144,
       "refl_score": 90,
       "refl_status": "review",
@@ -333,8 +353,9 @@
     },
     {
       "run_id": "batch-261003-192735-016",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1662,
       "refl_score": 95,
       "refl_status": "pass",
@@ -349,8 +370,9 @@
     },
     {
       "run_id": "batch-261003-192735-020",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1417,
       "refl_score": 100,
       "refl_status": "pass",
@@ -365,8 +387,9 @@
     },
     {
       "run_id": "batch-261003-192735-021",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "inconsistent",
+      "consistency": "consistent",
       "refl_chars": 1809,
       "refl_score": 95,
       "refl_status": "pass",
@@ -381,8 +404,9 @@
     },
     {
       "run_id": "batch-261003-192735-019",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1518,
       "refl_score": 100,
       "refl_status": "pass",
@@ -397,6 +421,7 @@
     },
     {
       "run_id": "batch-261003-192735-023",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1440,
@@ -413,6 +438,7 @@
     },
     {
       "run_id": "batch-261003-192735-022",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1345,
@@ -431,8 +457,9 @@
     },
     {
       "run_id": "batch-261003-192735-024",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "inconsistent",
+      "consistency": "unknown",
       "refl_chars": 2105,
       "refl_score": 95,
       "refl_status": "pass",
@@ -447,6 +474,7 @@
     },
     {
       "run_id": "batch-261003-192735-025",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1629,
@@ -463,8 +491,9 @@
     },
     {
       "run_id": "batch-261003-192735-026",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1724,
       "refl_score": 88,
       "refl_status": "pass",
@@ -479,8 +508,9 @@
     },
     {
       "run_id": "batch-261003-192735-029",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1891,
       "refl_score": 95,
       "refl_status": "pass",
@@ -495,8 +525,9 @@
     },
     {
       "run_id": "batch-261003-192735-027",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1807,
       "refl_score": 100,
       "refl_status": "pass",
@@ -511,6 +542,7 @@
     },
     {
       "run_id": "batch-261003-192735-030",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1417,
@@ -527,8 +559,9 @@
     },
     {
       "run_id": "batch-261003-192735-028",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1775,
       "refl_score": 95,
       "refl_status": "pass",
@@ -543,8 +576,9 @@
     },
     {
       "run_id": "batch-261003-192735-032",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1622,
       "refl_score": 90,
       "refl_status": "review",
@@ -561,8 +595,9 @@
     },
     {
       "run_id": "batch-261003-192735-031",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1610,
       "refl_score": 95,
       "refl_status": "pass",
@@ -577,8 +612,9 @@
     },
     {
       "run_id": "batch-261003-192735-034",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "inconsistent",
+      "consistency": "consistent",
       "refl_chars": 2683,
       "refl_score": 90,
       "refl_status": "review",
@@ -595,8 +631,9 @@
     },
     {
       "run_id": "batch-261003-192735-033",
+      "source": "ledger",
       "branch": "C",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 2201,
       "refl_score": 100,
       "refl_status": "pass",
@@ -611,6 +648,7 @@
     },
     {
       "run_id": "batch-261003-192735-037",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1462,
@@ -627,6 +665,7 @@
     },
     {
       "run_id": "batch-261003-192735-035",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1706,
@@ -643,8 +682,9 @@
     },
     {
       "run_id": "batch-261003-192735-036",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1884,
       "refl_score": 90,
       "refl_status": "review",
@@ -661,8 +701,9 @@
     },
     {
       "run_id": "batch-261003-192735-040",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1393,
       "refl_score": 90,
       "refl_status": "review",
@@ -679,8 +720,9 @@
     },
     {
       "run_id": "batch-261003-192735-038",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 2197,
       "refl_score": 100,
       "refl_status": "pass",
@@ -695,6 +737,7 @@
     },
     {
       "run_id": "batch-261003-192735-039",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1584,
@@ -713,8 +756,9 @@
     },
     {
       "run_id": "batch-261003-192735-041",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 2086,
       "refl_score": 95,
       "refl_status": "pass",
@@ -729,8 +773,9 @@
     },
     {
       "run_id": "batch-261003-192735-042",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1691,
       "refl_score": 95,
       "refl_status": "pass",
@@ -745,8 +790,9 @@
     },
     {
       "run_id": "batch-261003-192735-043",
+      "source": "ledger",
       "branch": "B",
-      "consistency": "unknown",
+      "consistency": "consistent",
       "refl_chars": 1713,
       "refl_score": 95,
       "refl_status": "pass",

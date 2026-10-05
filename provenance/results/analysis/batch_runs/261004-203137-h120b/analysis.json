@@ -65,6 +65,7 @@
   "per_run": [
     {
       "run_id": "batch-261004-203137-h120b-001",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2079,
@@ -81,6 +82,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-002",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1358,
@@ -97,6 +99,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-003",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1512,
@@ -113,6 +116,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-004",
+      "source": "primary",
       "branch": "C",
       "consistency": "inconsistent",
       "refl_chars": 1586,
@@ -131,6 +135,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-005",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2059,
@@ -149,6 +154,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-006",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1671,
@@ -165,6 +171,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-007",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1409,
@@ -181,6 +188,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-008",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1464,
@@ -197,6 +205,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-009",
+      "source": "primary",
       "branch": "undetermined",
       "consistency": "inconsistent",
       "refl_chars": 1336,
@@ -215,6 +224,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-010",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1679,
@@ -231,6 +241,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-011",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 2213,
@@ -247,6 +258,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-012",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1727,
@@ -263,6 +275,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-013",
+      "source": "primary",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 2170,
@@ -279,6 +292,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-014",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2661,
@@ -295,6 +309,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-015",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2370,
@@ -313,6 +328,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-016",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1510,
@@ -329,6 +345,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-017",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1568,
@@ -345,6 +362,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-018",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1937,
@@ -361,6 +379,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-019",
+      "source": "primary",
       "branch": "C",
       "consistency": "inconsistent",
       "refl_chars": 2036,
@@ -377,6 +396,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-020",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2070,
@@ -393,6 +413,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-021",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1631,
@@ -409,6 +430,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-022",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2202,
@@ -425,6 +447,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-023",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1979,
@@ -443,6 +466,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-024",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2060,
@@ -459,6 +483,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-025",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1839,
@@ -475,6 +500,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-026",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1811,
@@ -491,6 +517,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-027",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1400,
@@ -507,6 +534,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-028",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2222,
@@ -523,6 +551,7 @@
     },
     {
       "run_id": "batch-261004-203137-h120b-029",
+      "source": "primary",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1497,

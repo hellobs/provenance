@@ -4,6 +4,7 @@
   "n_unreadable": 0,
   "ledger_gap": 6,
   "ledger_gap_resolved": true,
+  "ledger_missing": false,
   "ledger_gap_detail": {
     "n_primary": 35,
     "missing": [
@@ -80,6 +81,7 @@
   "per_run": [
     {
       "run_id": "batch-261004-220441-h120seed-001",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1693,
@@ -96,6 +98,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-002",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2381,
@@ -112,6 +115,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-003",
+      "source": "primary",
       "branch": "C",
       "consistency": "inconsistent",
       "refl_chars": 1318,
@@ -128,6 +132,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-004",
+      "source": "primary",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1404,
@@ -144,6 +149,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-005",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1721,
@@ -160,6 +166,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-006",
+      "source": "primary",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1198,
@@ -178,6 +185,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-007",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1754,
@@ -196,6 +204,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-008",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1938,
@@ -212,6 +221,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-009",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1889,
@@ -230,6 +240,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-010",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2065,
@@ -246,6 +257,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-011",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1480,
@@ -262,6 +274,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-012",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1501,
@@ -278,6 +291,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-013",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1556,
@@ -294,6 +308,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-014",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1558,
@@ -310,6 +325,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-015",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2274,
@@ -326,6 +342,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-016",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1855,
@@ -342,6 +359,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-017",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1849,
@@ -358,6 +376,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-018",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1391,
@@ -376,6 +395,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-019",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1556,
@@ -392,6 +412,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-020",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1558,
@@ -408,6 +429,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-021",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2274,
@@ -424,6 +446,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-022",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1855,
@@ -440,6 +463,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-023",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1849,
@@ -456,6 +480,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-024",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1391,
@@ -474,6 +499,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-025",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1556,
@@ -490,6 +516,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-026",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1558,
@@ -506,6 +533,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-027",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2274,
@@ -522,6 +550,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-028",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1855,
@@ -538,6 +567,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-029",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1556,
@@ -556,6 +586,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-030",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1391,
@@ -574,6 +605,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-031",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 8,
@@ -592,6 +624,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-033",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 8,
@@ -610,6 +643,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-035",
+      "source": "ledger",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1480,
@@ -626,6 +660,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-036",
+      "source": "ledger",
       "branch": "B",
       "consistency": "unknown",
       "refl_chars": 1388,
@@ -642,6 +677,7 @@
     },
     {
       "run_id": "batch-261004-220441-h120seed-037",
+      "source": "ledger",
       "branch": "undetermined",
       "consistency": "unknown",
       "refl_chars": 1760,

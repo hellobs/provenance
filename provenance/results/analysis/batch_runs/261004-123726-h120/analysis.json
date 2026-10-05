@@ -2,6 +2,10 @@
   "title": "261004-123726-h120",
   "n_runs": 39,
   "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
   "branches": {
     "B": 23,
     "C": 16
@@ -55,6 +59,7 @@
   "per_run": [
     {
       "run_id": "batch-261004-123726-h120-003",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1817,
@@ -73,6 +78,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-002",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2151,
@@ -89,6 +95,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-004",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2060,
@@ -105,6 +112,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-001",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1840,
@@ -121,6 +129,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-005",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1763,
@@ -137,6 +146,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-007",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1997,
@@ -155,6 +165,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-006",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 2438,
@@ -173,6 +184,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-008",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2137,
@@ -191,6 +203,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-010",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1808,
@@ -207,6 +220,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-009",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2437,
@@ -223,6 +237,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-012",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1719,
@@ -239,6 +254,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-011",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1974,
@@ -255,6 +271,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-013",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1333,
@@ -273,6 +290,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-016",
+      "source": "ledger",
       "branch": "B",
       "consistency": "inconsistent",
       "refl_chars": 1392,
@@ -291,6 +309,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-014",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1788,
@@ -307,6 +326,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-015",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2358,
@@ -323,6 +343,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-019",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1992,
@@ -339,6 +360,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-017",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2287,
@@ -355,6 +377,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-018",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1735,
@@ -371,6 +394,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-021",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1484,
@@ -387,6 +411,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-020",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1698,
@@ -405,6 +430,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-022",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1876,
@@ -421,6 +447,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-024",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1374,
@@ -440,6 +467,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-023",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1729,
@@ -458,6 +486,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-025",
+      "source": "ledger",
       "branch": "C",
       "consistency": "inconsistent",
       "refl_chars": 1422,
@@ -474,6 +503,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-026",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1642,
@@ -490,6 +520,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-027",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2215,
@@ -506,6 +537,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-028",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1512,
@@ -524,6 +556,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-029",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 2057,
@@ -540,6 +573,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-030",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1427,
@@ -556,6 +590,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-032",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1831,
@@ -572,6 +607,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-033",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1862,
@@ -588,6 +624,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-034",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1830,
@@ -604,6 +641,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-031",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1880,
@@ -620,6 +658,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-036",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1227,
@@ -636,6 +675,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-037",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1498,
@@ -654,6 +694,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-035",
+      "source": "ledger",
       "branch": "C",
       "consistency": "consistent",
       "refl_chars": 1433,
@@ -670,6 +711,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-038",
+      "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
       "refl_chars": 1941,
@@ -688,6 +730,7 @@
     },
     {
       "run_id": "batch-261004-123726-h120-039",
+      "source": "ledger",
       "branch": "C",
       "consistency": "inconsistent",
       "refl_chars": 1630,
