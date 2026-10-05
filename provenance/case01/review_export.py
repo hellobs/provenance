@@ -3,9 +3,53 @@ import copy
 import hashlib
 import json
 from collections import Counter
+from typing import Literal, Optional
+
+from pydantic import BaseModel
 
 from .expert_pool import load_expert_pool, resolve_category
 from .full_context import build_full_context, normalize_record, quality_of
+
+
+class TaskCandidate(BaseModel):
+    key: list[str]
+    issue_id: str
+    expert_category_id: str
+    summary: str
+    risk: Literal["low", "medium", "high"]
+    routing_reason: str
+    evidence_quote: str
+    evidence_sentence_ids: list[str]
+
+
+class ManualTriage(BaseModel):
+    issue_id: str
+    reason: str
+    key: list[str]
+
+
+class ReviewPackage(BaseModel):
+    schema_version: Literal["1.0"]
+    source: Literal["review"]
+    run_id: str
+    status: Literal["ready", "manual_triage", "blocked"]
+    blocked_reasons: list[str]
+    task_candidates: list[TaskCandidate]
+    manual_triage: list[ManualTriage]
+    expert_pool_version: str
+    expert_categories: list[dict]
+    router_pool_version: Optional[str]
+    snapshot: Optional[dict]
+    full_context: str
+    ownership: dict[str, str]
+    record_revision: str
+    category_revision: str
+    revision: str
+
+
+class ReviewPackageResponse(BaseModel):
+    ok: Literal[True]
+    data: ReviewPackage
 
 
 def _digest(value):
@@ -72,7 +116,10 @@ def build_review_package(record, run_id, pool=None):
                     continue
                 if (any(not isinstance(item.get(k), str) or not item[k].strip()
                         for k in ("summary", "routing_reason"))
-                        or item.get("risk") not in ("low", "medium", "high")):
+                        or item.get("risk") not in ("low", "medium", "high")
+                        or not isinstance(item.get("evidence_quote", ""), str)
+                        or not isinstance(item.get("evidence_sentence_ids", []), list)
+                        or any(not isinstance(x, str) for x in item.get("evidence_sentence_ids", []))):
                     manual("issue_fields_invalid", iid)
                     continue
                 cid = item.get("expert_category_id")
@@ -104,6 +151,7 @@ def build_review_package(record, run_id, pool=None):
         "status": status, "blocked_reasons": blocked,
         "task_candidates": candidates, "manual_triage": triage,
         "expert_pool_version": pool["version"],
+        "expert_categories": copy.deepcopy(pool["categories"]),
         "router_pool_version": rout.get("expert_pool_version") or None,
         "snapshot": None if blocked else safe,
         "full_context": "" if blocked else build_full_context(normalized),
@@ -113,4 +161,5 @@ def build_review_package(record, run_id, pool=None):
     payload["record_revision"] = _digest(safe)
     payload["category_revision"] = _digest(pool)
     payload["revision"] = _digest(payload)
+    ReviewPackage(**payload)
     return payload
