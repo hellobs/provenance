@@ -127,6 +127,7 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 # git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
 uv build                              # produces dist/mavisframework-1.3.4-py3-none-any.whl
+#   pip users (no uv): pip install build && python -m build --wheel
 cd ../provenance
 
 # 2.2 Create the environment (uv or conda; Python 3.12)
@@ -151,6 +152,17 @@ uv pip install -r requirements.txt pytest
 > pytest tests                                            # outer: API / pages / guards
 > pytest provenance/case_engine/tests provenance/case01/tests
 > ```
+>
+> **A fresh clone has no run data.** `provenance/case01/runs/` and
+> `provenance/results/checkpoints/` are deliberately gitignored (they are large,
+> and were once submitted by accident), so the live UI at 5010 starts empty and a
+> handful of evidence-dependent tests **skip** rather than run — that is expected,
+> not a broken setup. To produce your own: `python -m case01.run --run-id <id>`
+> (~1-2 min/run), or a batch via `python -m case01.tools.batch_run --duration-min 180
+> --lanes 3 --model qwen3:8b`. Tests that need the missing data say which path they
+> want (e.g. `tests/test_metric_semantics.py` points at `results/checkpoints`) —
+> feed it from your own runs, or drop the project-supplied demo package into
+> `provenance/case01/runs/` (see `docs/专家导览_怎么看provenance.md`).
 
 ## 3. Configure the LLM (choose one)
 

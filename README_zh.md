@@ -117,6 +117,7 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 # 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
 uv build                              # 生成 dist/mavisframework-1.3.4-py3-none-any.whl
+#   pip 用户(没装 uv):pip install build && python -m build --wheel
 cd ../provenance
 
 # 2.2 创建环境(uv 或 conda;Python 3.12)
@@ -139,6 +140,16 @@ uv pip install -r requirements.txt pytest
 > pytest tests                                          # 外层:接口/页面/守卫
 > pytest provenance/case_engine/tests provenance/case01/tests
 > ```
+>
+> **新克隆的仓库里没有运行数据。** `provenance/case01/runs/` 与
+> `provenance/results/checkpoints/` 是有意不入库的(体量大,且曾被误提交过),
+> 所以 5010 实时面启动时是空的,少数依赖证据的测试会 **skip 而不是跑** ——
+> 这是预期行为,不是环境没配好。自己产出数据:`python -m case01.run --run-id <id>`
+> (每条约 1-2 分钟),或批量 `python -m case01.tools.batch_run --duration-min 180
+> --lanes 3 --model qwen3:8b`。缺数据时测试会说明它要哪个路径
+> (例如 `tests/test_metric_semantics.py` 指向 `results/checkpoints`)——
+> 用你自己跑出来的数据喂它,或把项目提供的 demo 包解压进 `provenance/case01/runs/`
+> (见 `docs/专家导览_怎么看provenance.md`)。
 
 ## 3. 配置大模型(二选一)
 
