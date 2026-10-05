@@ -51,6 +51,58 @@ def _sha256(path: str) -> str:
     return h.hexdigest()
 
 
+def check_zip(package: str, zip_path: str = "") -> tuple:
+    """校验**zip 交付件**与包目录一致(2026-10-05 第十二轮4.3)。
+
+    为什么必须单独查:本脚本原先只比"仓内 vs 包目录",**对zip 一无所知**。
+    而实际交付出去的是 zip,不是目录 —— 目录改了而 zip 没重打时,
+    本守卫照样报"OK:逐字节相同",而对方拿到的 zip 里是**旧内容**。
+    2026-10-05 实测踩到:`SHA256SUMS.txt` 在包里 20:09订正了拷贝方向,
+    zip 仍是 18:32 那份,`.zip.sha256` 也匹配这个旧 zip ⇒
+    **任何人校验 zip 都"通过"**,自洽得看不出错。
+
+    查三件事(缺任一都不算通过):
+      ① zip 内每个文件与包目录同名文件逐字节相同;
+      ② zip 内文件集与目录文件集**完全相同**(多/少都算不一致 ——
+         多出来的旧文件同样会误导对方);
+      ③ `.zip.sha256` sidecar 匹配 zip 自身(它只证明 zip 没坏,不证明 zip 新)。
+
+    包目录/zip 任一不存在都返回"不适用"——没交付件≠ 不一致,别误报。
+    """
+    zip_path = zip_path or (package.rstrip("\\/") + ".zip")
+    if not os.path.isfile(zip_path):
+        return None                      # 没打 zip ⇒ 本项不适用
+    import zipfile
+    with zipfile.ZipFile(zip_path) as zf:
+        names = [i.filename for i in zf.infolist() if not i.is_dir()]
+        stale = []
+        for n in names:
+            local = os.path.join(package, n.replace("/", os.sep))
+            if not os.path.isfile(local):
+                stale.append("{}:zip 内有、目录里没有".format(n))
+                continue
+            if hashlib.sha256(zf.read(n)).hexdigest() != _sha256(local):
+                stale.append("{}:内容与目录不同".format(n))
+    on_disk = set()
+    for dp, _dirs, fs in os.walk(package):
+        for f in fs:
+            on_disk.add(os.path.relpath(os.path.join(dp, f), package
+                        ).replace(os.sep, "/"))
+    only_local = sorted(on_disk - set(names))
+    sidecar = zip_path + ".sha256"
+    side = None
+    if os.path.isfile(sidecar):
+        with open(sidecar, encoding="utf-8") as f:
+            parts = f.read().split()
+        side = parts[0] if parts else None
+    problems = list(stale) + ["{}:目录里有、zip 内没有".format(n) for n in only_local]
+    if side is not None and side != _sha256(zip_path):
+        problems.append("{}.sha256 与 zip 不匹配".format(os.path.basename(zip_path)))
+    elif side is None:
+        problems.append("缺 {}.sha256(对方无法校验)".format(os.path.basename(zip_path)))
+    return problems
+
+
 def compare(package: str, repo_runs: str = "") -> tuple:
     """返回 (missing, diff, n_same)。missing/diff 为 (run, file, 说明) 列表。
 
@@ -106,6 +158,20 @@ def main(argv=None) -> int:
         print("   (仓内那份已被跟踪,改动会进 git status —— 提交前记得复核)")
         return 1
     print("OK: 仓内与包内逐字节相同。")
+    # zip 是真正交付出去的那一份,目录一致**不代表** zip 一致(第十二轮 4.3)
+    zip_problems = check_zip(args.package)
+    if zip_problems is None:
+        print("zip: 不存在(尚未打包),本项不适用")
+    elif not zip_problems:
+        print("zip: 与包目录逐字节相同,sidecar 匹配")
+    else:
+        print("\n⚠ zip 与包目录不同步(共{} 处):".format(len(zip_problems)))
+        for p in zip_problems:
+            print("  [zip] {}".format(p))
+        print("   处置:重打 zip 并重算 .zip.sha256。**包内任何文件变动"
+              "(含 SHA256SUMS.txt 自身)都必须重打** ——")
+        print("   sidecar 只证明 zip 没损坏,不证明 zip 是新的。")
+        return 1
     return 0
 
 

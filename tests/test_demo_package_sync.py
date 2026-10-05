@@ -181,3 +181,127 @@ def test_no_doc_claims_the_copy_runs_repo_to_package():
             continue          # 订正说明本身,合法
         pytest.fail("verify_demo_sync.py 里仍宣称『仓内拷进包』:{}"
                     .format(seg.replace("\n", " ").strip()))
+
+
+# ---------------------------------------------------------------------------
+# zip 交付件与包目录同步(2026-10-05 第十二轮 4.3)
+# ---------------------------------------------------------------------------
+def _make_package(tmp_path, extra=None):
+    """造一个最小交付包:两条 run + 一个 SHA256SUMS.txt(+ extra 项覆盖用)。"""
+    import hashlib
+    pkg = tmp_path / "pkg"
+    for run in ("demo1015-A", "demo1015-auto"):
+        for name in vds.FILES:
+            p = pkg / "runs" / run / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("{}:{}".format(run, name), encoding="utf-8")
+    for rel, content in (extra or {}).items():
+        p = pkg / rel.replace("/", os.sep)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+    lines = []
+    for dp, _dirs, fs in os.walk(str(pkg)):
+        for f in fs:
+            lp = os.path.join(dp, f)
+            rel = os.path.relpath(lp, str(pkg)).replace(os.sep, "/")
+            if rel == "SHA256SUMS.txt":
+                continue
+            lines.append("{} *{}\n".format(
+                hashlib.sha256(open(lp, "rb").read()).hexdigest(), rel))
+    (pkg / "SHA256SUMS.txt").write_text("# 自验清单\n" + "".join(sorted(lines)),
+                                        encoding="utf-8")
+    return pkg
+
+
+def _make_zip(pkg, zip_path):
+    import zipfile
+    with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as zf:
+        for dp, _dirs, fs in os.walk(str(pkg)):
+            for f in fs:
+                lp = os.path.join(dp, f)
+                zf.write(lp, os.path.relpath(lp, str(pkg)).replace(os.sep, "/"))
+    import hashlib
+    h = hashlib.sha256(open(str(zip_path), "rb").read()).hexdigest()
+    with io.open(str(zip_path) + ".sha256", "w", encoding="utf-8") as f:
+        f.write("{}  {}\n".format(h, os.path.basename(str(zip_path))))
+
+
+def test_zip_check_is_a_noop_when_nothing_is_packaged(tmp_path):
+    """没打 zip 时本项"不适用",不能报成不一致(没交付件 ≠ 不一致)。"""
+    pkg = _make_package(tmp_path)
+    assert vds.check_zip(str(pkg)) is None
+
+
+def test_zip_in_sync_with_package_passes(tmp_path):
+    pkg = _make_package(tmp_path)
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    assert vds.check_zip(str(pkg)) == []
+
+
+def test_zip_missing_sidecar_is_reported(tmp_path):
+    """sidecar 缺失也要报:对方无从校验,且"没报错"会被读成 zip 已验证。"""
+    pkg = _make_package(tmp_path)
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    os.remove(str(tmp_path / "pkg.zip.sha256"))
+    problems = vds.check_zip(str(pkg))
+    assert problems and any(".sha256" in p for p in problems), problems
+
+
+def test_zip_with_stale_file_is_detected(tmp_path):
+    """**本条是第十二轮 4.3 的原 bug**:目录改了、zip 没重打 ⇒ 必须报出来。
+
+    变异验证:把 `check_zip` 的内容比对那段去掉,本条立刻绿(假绿)。
+    """
+    pkg = _make_package(tmp_path, extra={"README.txt": "v1"})
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    # 事后订正包内文件(模拟"改了 SHA256SUMS.txt 但忘了重打 zip")
+    (pkg / "README.txt").write_text("v2-方向已订正", encoding="utf-8")
+    problems = vds.check_zip(str(pkg))
+    assert problems, "zip 与目录已不同步却没报出来"
+    assert any("README.txt" in p for p in problems), problems
+
+
+def test_zip_missing_a_newly_added_file_is_detected(tmp_path):
+    """目录新增文件但 zip 没重打 ⇒ 也要报(否则对方拿到的是缺件的包)。"""
+    pkg = _make_package(tmp_path)
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    (pkg / "runs" / "demo1015-A" / "extra.json").write_text("{}", encoding="utf-8")
+    problems = vds.check_zip(str(pkg))
+    assert any("extra.json" in p and "zip 内没有" in p for p in problems), problems
+
+
+def test_zip_with_leftover_file_is_detected(tmp_path):
+    """zip 里有目录已删掉的旧文件 ⇒ 也要报(旧文件同样误导对方)。"""
+    pkg = _make_package(tmp_path, extra={"OLD.txt": "上一版残留"})
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    os.remove(str(pkg / "OLD.txt"))
+    problems = vds.check_zip(str(pkg))
+    assert any("OLD.txt" in p for p in problems), problems
+
+
+def test_sidecar_mismatch_is_reported(tmp_path):
+    """sidecar 与 zip 不匹配 ⇒ 报(它只证明 zip 没坏,不证明 zip 新)。"""
+    pkg = _make_package(tmp_path)
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    (tmp_path / "pkg.zip.sha256").write_text("0" * 64 + "  pkg.zip\n", encoding="utf-8")
+    problems = vds.check_zip(str(pkg))
+    assert any(".sha256" in p for p in problems), problems
+
+
+def test_cli_wires_the_zip_check_into_main(tmp_path, monkeypatch, capsys):
+    """`main()` 必须真的调 `check_zip` 并把不同步反映到**退出码**上。
+
+    为什么单列一条(变异验证实测):前七条都只测 `check_zip` 这个函数,
+    变异把 `main()` 里的 `check_zip(...)` 换成 `None` 时**测试全绿** ——
+    函数被测得很好,而 CLI 根本没调用它。本条把接线钉住:zip 与目录不同步时
+    `main()` 必须非 0 退出。
+    """
+    pkg = _make_package(tmp_path, extra={"README.txt": "v1"})
+    _make_zip(pkg, tmp_path / "pkg.zip")
+    (pkg / "README.txt").write_text("v2", encoding="utf-8")   # 忘了重打 zip
+    monkeypatch.setattr(vds, "compare",
+                        lambda package, repo_runs="": ([], [], 16))
+    rc = vds.main(["--package", str(pkg)])
+    out = capsys.readouterr().out
+    assert rc == 1, "zip 与目录不同步但 main() 返回 0(退出码没反映出来)"
+    assert "zip" in out.lower(), out
