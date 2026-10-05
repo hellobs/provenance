@@ -136,3 +136,32 @@ def test_expert_safe_view_does_not_leak_manifest_or_branch_truth():
     assert "manifest" not in out and "consistency" not in out and "branch" not in out
     assert out["reflection"]["text"] == "正文", "专家要看的正文不能被连带删掉"
     assert out["_view"] == "expert-safe"
+
+
+def test_expert_safe_view_drops_router_raw_text():
+    """M6:专家视图的 `router` 只能留归一后的 `issues`，`raw` 原文不得外发。
+
+    `router.raw` 是 Router 的**未加工模型原文**(含 `routing_reason` 推理过程),
+    全库 311 条记录都带(2026-10-05 第六轮只读核查 M6)。它不在平台契约 §2.2
+    要读的键里,此前却因 router 整块在白名单里而跟着外发 ——
+    与 2026-09-25 第十二轮的 `state_history[*].state.branch` 同属
+    "顶层白名单挡不住嵌进去的整块"。
+    """
+    rec = {"run_id": "r-1",
+           "router": {"raw": '[{"summary":"x","routing_reason":"模型推理原文"}]',
+                      "issues": [{"id": "issue-1", "summary": "x"}]}}
+    out = lh.expert_safe_record(rec)
+    assert "raw" not in out["router"], "router.raw 原文外发给了专家"
+    assert out["router"]["issues"], "归一后的 issues 是专家审核的核心,不许连带删掉"
+    # 写时复制:入参的 router 块不能被就地改掉(同进程裸视图会莫名少字段)
+    assert "raw" in rec["router"], "expert_safe_record 就地改了入参记录"
+
+
+def test_expert_safe_view_router_projection_holds_without_raw():
+    """没有 `raw` 的 router 块(只有 issues)投影后结构不变 —— 不许被清空。"""
+    rec = {"run_id": "r-1", "router": {"issues": [1, 2, 3]}}
+    out = lh.expert_safe_record(rec)
+    assert out["router"] == {"issues": [1, 2, 3]}
+    # 空 router:setdefault 的 {"issues": []} 不该被投影逻辑抹掉
+    rec2 = {"run_id": "r-2"}
+    assert lh.expert_safe_record(rec2)["router"] == {"issues": []}

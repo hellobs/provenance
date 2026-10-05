@@ -80,3 +80,33 @@ def test_openapi_exposes_get_contract(source):
     assert set(schema["paths"]["/api/review-package/{run_id}"]) == {"get"}
     assert set(schema["components"]["schemas"]["ReviewPackage"]["properties"]) >= {
         "revision", "status", "task_candidates", "manual_triage", "snapshot", "full_context"}
+
+
+def test_relative_root_yields_reason_code_not_500(monkeypatch):
+    """M2:相对 `CASE01_RUNS_ROOT` 必须返回**原因码**,不许冒成 500。
+
+    2026-10-05 第六轮只读核查:原实现把 `_data_root(...)` 放在 `try` 之外,
+    相对根触发 `AmbiguousPathError(ValueError)` → 未捕获 → HTTP 500。
+    把解析挪进 try 后落入既有的 `ValueError` 分支 → 422
+    `invalid_review_record_or_catalog`(语义:配置格式错)。
+    """
+    monkeypatch.setenv("CASE01_RUNS_ROOT", "relative/runs")
+    r = request("/api/review-package/r1")
+    assert r.status_code == 422, "相对根应给 422,不许是 500"
+    assert r.json() == {"ok": False, "error": "invalid_review_record_or_catalog"}
+
+
+def test_relative_root_on_list_api_skips_source_with_reason(monkeypatch):
+    """M2(推广):`/api/runs` 在相对根下 200,并把被跳过的源写进 `source_errors`。
+
+    "配置错 → 该源整块不可用"是可预期降级,不是服务器错误;但**不许静默**,
+    否则平台看到 count=0 会以为"这个源本来就空"。
+    """
+    monkeypatch.setenv("CASE01_RUNS_ROOT", "relative/runs")
+    r = request("/api/runs")
+    assert r.status_code == 200
+    body = r.json()
+    errs = body.get("source_errors") or []
+    assert any(e["source"] == "review" for e in errs), \
+        "跳过 review 源却未在 source_errors 里说明"
+    assert "review" in body.get("source_errors_note", "")

@@ -44,6 +44,24 @@ def _data_root(env_var: str, *parts: str) -> str:
         from case_engine.paths import require_abs_path
         return require_abs_path(raw, what=env_var)
     return os.path.join(BASE_DIR, *parts)
+
+
+def _data_root_soft(env_var: str, *parts: str):
+    """同 `_data_root`,但**不抛**:解析失败时返回 `(None, 原因)`。
+
+    2026-10-05 第六轮 M2 的推广:相对根配置(`AmbiguousPathError`)在 `_data_root`
+    里是抛异常,而"列表/详情"这类**只读浏览**接口不该因为一个环境变量配错就 500 ——
+    该数据源整块不可用是**可预期**的降级,不是服务器错误。调用方拿到 `None` 后
+    跳过该源,并把原因写进响应(见 `/api/runs` 的 `source_errors`)。
+
+    为什么不在 `_data_root` 里直接吞:契约/交接包那条链要**明确的原因码**
+    (422 `invalid_review_record_or_catalog`),它需要异常本身;这里是浏览链,
+    语义不同。两处各按自己的语义处理,共享同一份判据字符串。
+    """
+    try:
+        return _data_root(env_var, *parts), ""
+    except Exception as exc:  # noqa: BLE001 —— 配置错不该冒成 500
+        return None, "{}: {}".format(env_var, exc)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend/templates"))
 # 顶栏外部工具链接:mavis 仓的 config_tool 是**独立进程**(默认 8060),
 # 地址可用环境变量 MAVIS_CONFIG_TOOL_URL 覆盖(换机/换端口)。
@@ -348,6 +366,30 @@ def _scrub_experiment_values(out: dict) -> None:
             if isinstance(a, dict) and any(k in a for k in _NESTED_EXPERIMENT_KEYS) else a
             for a in audit
         ]
+    _scrub_router_raw(out)
+
+
+# `router.raw` 是 Router 的**未加工模型原文**(含 `routing_reason` 等推理过程),
+# 全库 311 条记录都带(2026-10-05 第六轮只读核查 M6)。
+# 给专家视图的应是**归一后**的 `issues`(结构化 id/summary/risk_note),不是原文 ——
+# 原文里既有冗长的模型推理,也可能随提示词演进而夹带不该外发的内容;把它留在
+# 白名单里等于"顶层白名单做了,嵌进去的整块又漏出去"(与 2026-09-25 第十二轮
+# 的 `state_history[*].state.branch` 是同一类事故)。
+# 处理方式与 `_scrub_experiment_values` 一致:**写时复制**,只投影 router 块,
+# 不动入参 `rec` 的共用对象(否则同进程的裸视图会莫名少字段)。
+_EXPERT_ROUTER_KEYS = ("issues",)
+
+
+def _scrub_router_raw(out: dict) -> None:
+    """把专家视图里的 `router` 投影成只留 `issues`(去 `raw` 原文)。
+
+    契约层是白名单唯一实现处(见 `case01/review_app.py` 的注释),所以这里改一处,
+    `/api/run-detail` 与 run 导出两条链同时生效。
+    """
+    router = out.get("router")
+    if isinstance(router, dict) and "raw" in router:
+        out["router"] = {k: v for k, v in router.items()
+                         if k in _EXPERT_ROUTER_KEYS}
 
 
 def _brief_compressed(name: str) -> dict:
@@ -382,15 +424,20 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     回在 `ignored_params` 里,免得平台以为 `?quality=ok` 生效了。
     """
     runs = []
+    source_errors = []
 
-    ck_root = _data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints")
-    if os.path.isdir(ck_root):
+    ck_root, ck_err = _data_root_soft("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints")
+    if ck_err:
+        source_errors.append({"source": "checkpoint", "error": ck_err})
+    if ck_root and os.path.isdir(ck_root):
         for n in sorted(os.listdir(ck_root)):
             if os.path.isdir(os.path.join(ck_root, n)):
                 runs.append(_brief_checkpoint(n))
 
-    c1_root = _data_root("CASE01_RUNS_ROOT", "case01", "runs")
-    if os.path.isdir(c1_root):
+    c1_root, c1_err = _data_root_soft("CASE01_RUNS_ROOT", "case01", "runs")
+    if c1_err:
+        source_errors.append({"source": "review", "error": c1_err})
+    if c1_root and os.path.isdir(c1_root):
         for n in sorted(os.listdir(c1_root)):
             d = os.path.join(c1_root, n)
             if not os.path.isdir(d):
@@ -402,8 +449,10 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
                 # 平台分不清"没这条"和"这条废了"。详见 _brief_unreadable。
                 runs.append(_brief_unreadable(n))
 
-    comp_root = _data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed")
-    if os.path.isdir(comp_root):
+    comp_root, comp_err = _data_root_soft("RESULTS_COMPRESSED_ROOT", "results", "compressed")
+    if comp_err:
+        source_errors.append({"source": "compressed", "error": comp_err})
+    if comp_root and os.path.isdir(comp_root):
         for n in sorted(os.listdir(comp_root)):
             if os.path.isdir(os.path.join(comp_root, n)):
                 runs.append(_brief_compressed(n))
@@ -458,6 +507,13 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     if ignored:
         body["ignored_params"] = ignored
         body["ignored_note"] = "这些参数本接口不认(没生效):{}".format(",".join(ignored))
+    if source_errors:
+        # 数据源解析失败(如相对根配置)不是"没数据",必须显式报出 ——
+        # 否则平台看到 count=0 会以为"这个源本来就空"(2026-10-05 M2 推广)。
+        body["source_errors"] = source_errors
+        body["source_errors_note"] = (
+            "以下数据源因其根目录配置无法解析而**整块跳过**(不是没有数据):"
+            + ";".join("{}={}".format(e["source"], e["error"]) for e in source_errors))
     if hidden:
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,
@@ -485,11 +541,15 @@ async def review_package(run_id: str) -> JSONResponse:
 
     if not run_id or run_id in (".", "..") or any(x in run_id for x in ("/", "\\", "\x00")):
         return JSONResponse({"ok": False, "error": "invalid_run_id"}, status_code=404)
-    root = os.path.realpath(_data_root("CASE01_RUNS_ROOT", "case01", "runs"))
-    path = os.path.realpath(os.path.join(root, run_id, "run.json"))
-    if os.path.commonpath([root, path]) != root or not os.path.isfile(path):
-        return JSONResponse({"ok": False, "error": "run_not_found"}, status_code=404)
     try:
+        # `_data_root` 必须在 try 内(2026-10-05 第六轮 M2):环境变量给了**相对路径**
+        # 时 `require_abs_path` 抛 `AmbiguousPathError(ValueError)`,原实现在 try 外,
+        # 于是"配置是相对根"这个可预期的输入错直接冒成 500(未捕获异常),
+        # 而不是下面那三个明确的原因码。挪进来后落入 `ValueError` → 422。
+        root = os.path.realpath(_data_root("CASE01_RUNS_ROOT", "case01", "runs"))
+        path = os.path.realpath(os.path.join(root, run_id, "run.json"))
+        if os.path.commonpath([root, path]) != root or not os.path.isfile(path):
+            return JSONResponse({"ok": False, "error": "run_not_found"}, status_code=404)
         with open(path, encoding="utf-8") as stream:
             record = json.load(stream)
         package = build_review_package(record, run_id)
@@ -520,7 +580,10 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
         return JSONResponse({"ok": False, "errors": ["非法 run_id: {}".format(run_id)]},
                             status_code=404)
     if source == "review":
-        p = os.path.join(_data_root("CASE01_RUNS_ROOT", "case01", "runs"), run_id, "run.json")
+        root, rerr = _data_root_soft("CASE01_RUNS_ROOT", "case01", "runs")
+        if rerr:
+            return JSONResponse({"ok": False, "errors": [rerr]}, status_code=422)
+        p = os.path.join(root, run_id, "run.json")
         if not os.path.isfile(p):
             return JSONResponse({"ok": False, "errors": ["没有该 case01 成品: {}".format(run_id)]},
                                 status_code=404)
@@ -537,8 +600,10 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                              "view": "expert-safe",
                              "data": expert_safe_record(rec)})
     if source == "checkpoint":
-        ck_root = os.path.join(_data_root("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints"),
-                               run_id)
+        ck_base, cerr = _data_root_soft("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints")
+        if cerr:
+            return JSONResponse({"ok": False, "errors": [cerr]}, status_code=422)
+        ck_root = os.path.join(ck_base, run_id)
         if not os.path.isdir(ck_root):
             return JSONResponse({"ok": False, "errors": ["没有该 case00 痕迹: {}".format(run_id)]},
                                 status_code=404)
@@ -569,8 +634,10 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
             body["incomplete"] = ";".join(missing)
         return JSONResponse(body)
     if source == "compressed":
-        comp_root = os.path.join(_data_root("RESULTS_COMPRESSED_ROOT", "results", "compressed"),
-                                 run_id)
+        comp_base, xerr = _data_root_soft("RESULTS_COMPRESSED_ROOT", "results", "compressed")
+        if xerr:
+            return JSONResponse({"ok": False, "errors": [xerr]}, status_code=422)
+        comp_root = os.path.join(comp_base, run_id)
         if not os.path.isdir(comp_root):
             return JSONResponse({"ok": False, "errors": ["没有该压缩成品: {}".format(run_id)]},
                                 status_code=404)
