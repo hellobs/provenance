@@ -113,18 +113,47 @@ def path_config_problems() -> list:
     return problems
 
 
-VILLAGE_ROOT = _env_path("MAVIS_ASSETS_ROOT") or (
-    os.path.join(_PLATFORM_DIR, "frontend", "static", "assets", "village")
-    if _PLATFORM_DIR else "")
-SCENARIOS_DIR = _env_path("MAVIS_SCENARIOS_DIR") or (
-    os.path.join(_PLATFORM_DIR, "scenarios") if _PLATFORM_DIR else "")
-# 地图默认指向 case00 实际使用的新地图(地址树与运行时一致,替代旧的 village 小图);
-# 旧 village 图仅作兜底,缺省时优先取 case00/scenario/maze.json。
-_CASE00_MAZE = (os.path.join(_PLATFORM_DIR, "case00", "scenario", "maze.json")
-                if _PLATFORM_DIR else "")
-_FALLBACK_MAZE = os.path.join(VILLAGE_ROOT, "maze.json") if VILLAGE_ROOT else ""
-MAZE_PATH = _env_path("MAVIS_MAZE_PATH") or (
-    _CASE00_MAZE if _CASE00_MAZE and os.path.isfile(_CASE00_MAZE) else _FALLBACK_MAZE)
+# 这三个根**推迟到调用时**求值(2026-10-05 第六轮 M4):
+# 此前它们是模块级常量,`import app` 的那一刻就把环境变量读完了 —— 于是
+# "启动后再设 MAVIS_ASSETS_ROOT / MAVIS_SCENARIOS_DIR / MAVIS_MAZE_PATH"
+# 完全不生效(测试要 reload 整模块才行,且 import 期读到相对值会当场抛,
+# 连横幅都打不出来)。现改为函数,横幅/接口每次实时读,与 live 侧
+# `history._cases_root()` 的"每次实时读"口径一致;仍可用
+# `path_config_problems()` 先看配置问题。
+def village_root() -> str:
+    """village 静态资源根:MAVIS_ASSETS_ROOT 优先(须绝对),否则平台目录下默认位置。"""
+    return _env_path("MAVIS_ASSETS_ROOT") or (
+        os.path.join(_PLATFORM_DIR, "frontend", "static", "assets", "village")
+        if _PLATFORM_DIR else "")
+
+
+def scenarios_dir() -> str:
+    """场景目录:MAVIS_SCENARIOS_DIR 优先(须绝对),否则平台目录下 `scenarios/`。"""
+    return _env_path("MAVIS_SCENARIOS_DIR") or (
+        os.path.join(_PLATFORM_DIR, "scenarios") if _PLATFORM_DIR else "")
+
+
+def maze_path() -> str:
+    """地图文件:MAVIS_MAZE_PATH 优先(须绝对),否则 case00 新图 → village 旧图兜底。
+
+    默认指向 case00 实际使用的新地图(地址树与运行时一致,替代旧的 village 小图);
+    旧 village 图仅作兜底,缺省时优先取 case00/scenario/maze.json。
+    """
+    case00_maze = (os.path.join(_PLATFORM_DIR, "case00", "scenario", "maze.json")
+                   if _PLATFORM_DIR else "")
+    fallback = os.path.join(village_root(), "maze.json") if village_root() else ""
+    return _env_path("MAVIS_MAZE_PATH") or (
+        case00_maze if case00_maze and os.path.isfile(case00_maze) else fallback)
+
+
+# 供 `tests` 与模板沿用的模块级别名:启动时求值一次(此时环境变量已定)。
+# **注意**:运行中改环境变量请调用上面的函数;别名只是"启动快照"。
+VILLAGE_ROOT = village_root()
+SCENARIOS_DIR = scenarios_dir()
+MAZE_PATH = maze_path()
+# agents 派生目录跟随 VILLAGE_ROOT(启动快照,同上面的说明)。
+AGENTS_ROOT = os.path.join(VILLAGE_ROOT, "agents") if VILLAGE_ROOT else ""
+POOL_ROOT = os.path.join(VILLAGE_ROOT, "agents_pool") if VILLAGE_ROOT else ""
 
 
 def runtime_status() -> dict:
@@ -154,8 +183,8 @@ def _print_startup_banner() -> None:
     print("[dirs] 本地设置文件 = {} (可在「运行方式」页填写;不入库)".format(
         engine_bridge.SETTING_FILE), flush=True)
     print("[platform] 资源根 = {} ; 场景目录 = {} ; 地图 = {}".format(
-        VILLAGE_ROOT or "(未声明)", SCENARIOS_DIR or "(未声明)",
-        MAZE_PATH or "(未声明)"), flush=True)
+        village_root() or "(未声明)", scenarios_dir() or "(未声明)",
+        maze_path() or "(未声明)"), flush=True)
     # 路径配置问题（相对路径等）**启动就说**，别等用户发现场景没了。
     for _p in path_config_problems():
         print("[path.ERROR] {} -> {}".format(_p["var"], _p["problem"]), flush=True)
@@ -217,14 +246,18 @@ def _launch_live(case_id: str) -> dict:
 
 
 def _load_maze():
-    """加载默认地图;平台目录/地图未声明时**明确报错**(不静默退回空地图)。"""
-    if not MAZE_PATH:
+    """加载默认地图;平台目录/地图未声明时**明确报错**(不静默退回空地图)。
+
+    走 `maze_path()` 实时解析(而非模块常量),这样运行中改 MAVIS_MAZE_PATH 也生效。
+    """
+    target = maze_path()
+    if not target:
         raise RuntimeError(
             "地图不可用:未声明平台目录(设置 {} 或 MAVIS_PLATFORM_DIR,"
             "或用 MAVIS_MAZE_PATH 直接指向地图文件)".format(engine_bridge.ENV_DIR))
-    if not os.path.isfile(MAZE_PATH):
-        raise RuntimeError("地图文件缺失: {}".format(MAZE_PATH))
-    with open(MAZE_PATH, "r", encoding="utf-8") as f:
+    if not os.path.isfile(target):
+        raise RuntimeError("地图文件缺失: {}".format(target))
+    with open(target, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -416,8 +449,7 @@ def _parse_goals(text: str) -> dict:
 # - 哈希式:hash(角色名) → 池中索引,确定性(同名角色永远同一贴图)
 # - agent.json 记录 texture_ref(映射来源),供 Unity 端同样处理
 # ---------------------------------------------------------------------------
-AGENTS_ROOT = os.path.join(VILLAGE_ROOT, "agents")
-POOL_ROOT = os.path.join(VILLAGE_ROOT, "agents_pool")
+# AGENTS_ROOT / POOL_ROOT 已随 VILLAGE_ROOT 上移到模块常量区(见那里的说明)。
 DEFAULT_TEXTURE_SOURCE = "沈砚之"  # 兜底贴图(池空时用)
 
 

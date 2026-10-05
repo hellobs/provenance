@@ -9,6 +9,8 @@
 import os
 import sys
 
+import pytest
+
 _this = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_this)                       # <provenance repo>
 _TOOL = os.path.join(_REPO, "provenance", "config_tool")
@@ -91,3 +93,67 @@ def test_settings_roundtrip_and_clear(tmp_path, monkeypatch):
     assert eb._read_settings() == {"engine_dir": "C:/e", "platform_dir": "C:/p"}
     eb.write_settings(engine_dir="")            # 空串 = 清除该项
     assert eb._read_settings() == {"platform_dir": "C:/p"}
+
+
+# --------------------------------------------------------------- 逐项路径 M4
+# 2026-10-05 第六轮 M4:`config_tool/app.py` 的三个根(MAVIS_ASSETS_ROOT /
+# MAVIS_SCENARIOS_DIR / MAVIS_MAZE_PATH)此前是**模块级常量**,import 时求值一次。
+# 后果有两个:① 启动后再设环境变量完全不生效(要 reload 整模块);
+# ② 若 import 期读到相对值,当场抛 —— 连启动横幅都打不出来。
+# 现改为函数(每次实时读)。下面钉住"改环境变量立刻生效"这条语义。
+
+def _tool_module():
+    """import config_tool/app.py(它 import 期会打横幅,属正常行为)。"""
+    _TOOL = os.path.join(_REPO, "provenance", "config_tool")
+    if _TOOL not in sys.path:
+        sys.path.insert(0, _TOOL)
+    if os.path.join(_REPO, "provenance") not in sys.path:
+        sys.path.insert(0, os.path.join(_REPO, "provenance"))
+    import app as app_mod
+    return app_mod
+
+
+def test_scenarios_dir_reads_env_at_call_time(tmp_path, monkeypatch):
+    """`MAVIS_SCENARIOS_DIR` 在**调用时**读 —— import 之后设也生效(M4)。"""
+    app_mod = _tool_module()
+    target = str(tmp_path / "my_scenarios")
+    monkeypatch.setenv("MAVIS_SCENARIOS_DIR", target)
+    assert app_mod.scenarios_dir() == os.path.normpath(target)
+
+
+def test_assets_root_reads_env_at_call_time(tmp_path, monkeypatch):
+    app_mod = _tool_module()
+    target = str(tmp_path / "my_assets")
+    monkeypatch.setenv("MAVIS_ASSETS_ROOT", target)
+    assert app_mod.village_root() == os.path.normpath(target)
+
+
+def test_maze_path_reads_env_at_call_time(tmp_path, monkeypatch):
+    app_mod = _tool_module()
+    maze = tmp_path / "maze.json"
+    maze.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("MAVIS_MAZE_PATH", str(maze))
+    assert app_mod.maze_path() == os.path.normpath(str(maze))
+
+
+def test_module_aliases_are_startup_snapshots(tmp_path, monkeypatch):
+    """模块级别名(`VILLAGE_ROOT` 等)是**启动快照**,不随 env 变 —— 这是缺陷不是特性。
+
+    保留别名是为了兼容既有模板引用(以及若干测试 monkeypatch);真正要用"实时值"
+    的地方一律调函数。这条把两种语义的差别钉下来,免得后人以为别名会跟着变。
+    """
+    app_mod = _tool_module()
+    before = app_mod.SCENARIOS_DIR
+    monkeypatch.setenv("MAVIS_SCENARIOS_DIR", str(tmp_path / "late"))
+    assert app_mod.SCENARIOS_DIR == before, "别名不该随环境变量变"
+    assert app_mod.scenarios_dir() == os.path.normpath(str(tmp_path / "late")), \
+        "函数必须实时读"
+
+
+def test_relative_env_is_rejected_by_the_functions(monkeypatch):
+    """相对值必须当场报错(与 case01 侧同语义),而不是按 cwd 静默解释。"""
+    app_mod = _tool_module()
+    monkeypatch.setenv("MAVIS_SCENARIOS_DIR", "some/relative/dir")
+    with pytest.raises(Exception) as ei:
+        app_mod.scenarios_dir()
+    assert "MAVIS_SCENARIOS_DIR" in str(ei.value) or "绝对路径" in str(ei.value)

@@ -82,6 +82,15 @@ def test_saved_governance_json_equals_engine_mapping(tmp_path, monkeypatch):
     monkeypatch.setattr(app_mod, "_PLATFORM_DIR", str(tmp_path))
     monkeypatch.setattr(app_mod, "scenario_assets_dir",
                         lambda cid: os.path.join(str(tmp_path), "cases", cid, "assets"))
+    # 地图**显式**指向仓内真实地图(#2026-10-05 M4)。
+    # 背景:`maze_path()` 从"import 期快照"改成了"调用时按 _PLATFORM_DIR 解析"。
+    # 上面把 _PLATFORM_DIR 换成 tmp,tmp 里自然没有 case00/scenario/maze.json ——
+    # 而本用例考的是"保存路径产出的 governance.json 与引擎映射一致",不是地图解析。
+    # 以前它靠的是旧实现的陈旧快照(恰好指向真实仓),那是**偶然**而非本意;
+    # 现在显式钉住:用真地图,让这条用例只回归它该管的事。
+    real_maze = os.path.join(_PKG, "case00", "scenario", "maze.json")
+    if os.path.isfile(real_maze):
+        monkeypatch.setenv("MAVIS_MAZE_PATH", real_maze)
 
     form = _form()
     rel = app_mod._write_scenario_content(form["case_id"], form)
@@ -110,6 +119,10 @@ def test_saved_agents_carry_initial_tendency(tmp_path, monkeypatch):
     monkeypatch.setattr(app_mod, "_PLATFORM_DIR", str(tmp_path))
     monkeypatch.setattr(app_mod, "scenario_assets_dir",
                         lambda cid: os.path.join(str(tmp_path), "cases", cid, "assets"))
+    # 同 test_saved_governance_json_equals_engine_mapping:地图显式钉到仓内真图(M4)。
+    real_maze = os.path.join(_PKG, "case00", "scenario", "maze.json")
+    if os.path.isfile(real_maze):
+        monkeypatch.setenv("MAVIS_MAZE_PATH", real_maze)
     form = _form()
     rel = app_mod._write_scenario_content(form["case_id"], form)
 
