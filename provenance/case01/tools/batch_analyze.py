@@ -93,7 +93,16 @@ def _consistency_verdict(d: Dict) -> str:
     return ""
 
 
-def _row(run_id: str, d: Dict) -> Dict:
+def _row(run_id: str, d: Dict, source: str = "ledger") -> Dict:
+    """把一条 run.json 记录(或台账扁平摘要)归一成统计行。
+
+    `source`(**2026-10-05 第七轮 N4/第九轮**):标明这条的来源是台账还是一手
+    `run.json`。它必须**逐行**带而不是只在表头上,原因在体检 N4:台账缺段时补入的
+    一手行与台账原有行在产物里**同形**,下游拿到 `per_run` 分不出哪几条的
+    `seconds/attempt/model_actual` 是真的、哪几条是拿 run.json 造的(那些字段为空)。
+    判"这条结论建立在什么数据上"必须能追到行级来源,否则补入行会被当成台账权威。
+    取值:`"ledger"`(台账行) / `"primary"`(由一手 run.json 造的行)。
+    """
     refl = d.get("reflection") or {}
     router = d.get("router") or {}
     quality = refl.get("quality") or {}
@@ -102,6 +111,7 @@ def _row(run_id: str, d: Dict) -> Dict:
     reasons = quality.get("failure_reasons") or []
     row = {
         "run_id": run_id,
+        "source": source,
         "branch": d.get("branch") or "",
         "consistency": _consistency_verdict(d),
         "refl_chars": _count(refl.get("text")) or len(refl.get("text") or ""),
@@ -164,7 +174,7 @@ def _collect_from_runs(prefix: str = "") -> tuple:
         if d is None:
             bad += 1
             continue
-        rows.append(_row(run_id, d))
+        rows.append(_row(run_id, d, source="primary"))
     return rows, bad
 
 
@@ -206,7 +216,8 @@ def _collect_from_ledger(batch: str, fill_from_primary: bool = False) -> tuple:
         primary = sorted(_primary_ids(batch))
         if not primary:
             return [], 0, None
-        rows = [r for r in (_row(rid, _load_run(os.path.join(RUNS_DIR, rid, "run.json")))
+        rows = [r for r in (_row(rid, _load_run(os.path.join(RUNS_DIR, rid, "run.json")),
+                                source="primary")
                             for rid in primary) if r]
         gap = {"n_primary": len(primary), "missing": [], "extra": [], "filled": 0,
                "ledger_missing": True}
@@ -233,11 +244,18 @@ def _collect_from_ledger(batch: str, fill_from_primary: bool = False) -> tuple:
     # 时的代理判断;一旦 _row 开始吃扁平字段,这个代理就永远为真、回读整段变成死代码,
     # 而 router.status(error/skipped)只有 run.json 里有 —— 不读就摘不出"Router 没跑成"。
     # 现在恒回读:文件在场就以明细为准,不在场就以台账摘要为准。
+    #
+    # source **保持 "ledger"**:这条的来源是台账,回读只是把台账行缺的字段填满,
+    # 它仍然是一条台账行(seconds/attempt/model_actual 那些台账独有字段是真的)。
+    # 只有下面 `missing` 那段由 run.json 从零造的行才算 "primary"。
     for r in rows:
         d2 = _load_run(os.path.join(RUNS_DIR, r["run_id"], "run.json"))
         if d2:
-            full = _row(r["run_id"], d2)
+            full = _row(r["run_id"], d2, source="ledger")
             r.update({k: v for k, v in full.items() if v not in ("", None, [])})
+            # `source` 不由上面那轮 update 决定(它靠"值非空"恰好覆盖,属于巧合而非契约):
+            # 这一行的来源恒为台账,回读只填字段。
+            r["source"] = "ledger"
     # 一手对账(2026-10-05,体检 G1)
     gap = None
     primary = set(_primary_ids(batch))
@@ -252,7 +270,7 @@ def _collect_from_ledger(batch: str, fill_from_primary: bool = False) -> tuple:
             for rid in missing:
                 d2 = _load_run(os.path.join(RUNS_DIR, rid, "run.json"))
                 if d2:
-                    rows.append(_row(rid, d2))
+                    rows.append(_row(rid, d2, source="primary"))
                     gap["filled"] += 1
             rows.sort(key=lambda r: r["run_id"])
     return rows, bad, gap

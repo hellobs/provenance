@@ -116,6 +116,12 @@ def test_ledger_and_scan_paths_agree_end_to_end(sandbox):
 
     报告里"台账 39 条"和"目录扫出 39 条"要能互相对上;两条链口径分叉 =
     同一批数据两个结论。
+
+    **唯一的例外是 `source`**(2026-10-05 第七轮 N4):台账行标 `"ledger"`、
+    目录扫出来的行标 `"primary"` —— 这正是这条字段存在的意义:两者取数来源
+    不同,台账独有字段(seconds/attempt/model_actual)只在台账侧为真。
+    所以断言改成"除source 外全等",并顺带钉住这两个值别被写反
+    (写反了下游会把补入的一手行当成台账权威)。
     """
     _write_ledger(sandbox, FLAT)
     _write_run_json(sandbox, RUN_ID, NESTED)
@@ -123,8 +129,16 @@ def test_ledger_and_scan_paths_agree_end_to_end(sandbox):
     from_runs, bad2 = ba._collect_from_runs(prefix="batch-")
     assert bad1 == bad2 == 0
     assert len(from_ledger) == len(from_runs) == 1
-    assert from_ledger[0] == from_runs[0], \
-        "台账链与目录链口径分叉:\n{} vs\n{}".format(from_ledger[0], from_runs[0])
+    # N4:来源标记必须逐行带且取值正确
+    assert from_ledger[0]["source"] == "ledger", \
+        "台账行的 source 应为 ledger,实际 {}".format(from_ledger[0].get("source"))
+    assert from_runs[0]["source"] == "primary", \
+        "目录扫出的行应为 primary,实际 {}".format(from_runs[0].get("source"))
+    # 除 source 外两条链必须完全同形
+    lhs = {k: v for k, v in from_ledger[0].items() if k != "source"}
+    rhs = {k: v for k, v in from_runs[0].items() if k != "source"}
+    assert lhs == rhs, \
+        "台账链与目录链口径分叉:\n{} vs\n{}".format(lhs, rhs)
 
 
 # ---------------------------------------------------------------------------
