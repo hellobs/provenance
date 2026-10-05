@@ -328,6 +328,61 @@ def test_extra_ledger_rows_are_also_flagged(sandbox):
 
 
 # ---------------------------------------------------------------------------
+# 4b. 整份台账缺失(体检 N5)—— G1 修的是"有台账缺段",没修"没台账"
+# ---------------------------------------------------------------------------
+def test_missing_ledger_falls_back_to_primary_instead_of_reporting_zero(sandbox):
+    """台账文件整份不存在时,不能报"0 条"——盘上明明有一手产物。
+
+    真实形态:批次 261004-203137-h120b 的台账在 10-04 事故里永久丢失,29 条一手
+    产物健在。旧写法 `return [], 0, None` 会让 `--batch` 报"没有可用记录",
+    而 `_primary_ids` 能扫到 29 条 —— 这条路径就是那次事故的复现路径。
+    """
+    ids = _primary(sandbox, 4)
+    assert not os.path.exists(sandbox["ledger"]), "本用例的前提就是台账不存在"
+    rows, bad, gap = ba._collect_from_ledger(BATCH, fill_from_primary=True)
+    assert len(rows) == 4, "台账没了不等于记录没了,应照一手重建"
+    assert bad == 0
+    assert gap is not None and gap.get("ledger_missing") is True
+    assert gap["n_primary"] == 4
+
+
+def test_missing_ledger_is_not_confused_with_a_resolved_gap(sandbox):
+    """台账全缺时 ledger_gap/resolved 会算成 0/False,那读起来像"与一手一致"。
+
+    所以另开 `ledger_missing` 字段单独标这一形态 —— 别让它混进"无缺口"里。
+    """
+    ids = _primary(sandbox, 3)
+    rows, bad, gap = ba._collect_from_ledger(BATCH)
+    a = ba.analyze(rows, bad, BATCH, gap)
+    assert a["ledger_missing"] is True
+    assert a["n_runs"] == 3
+    # 关键:这两个字段的值"看起来正常",正是要靠 ledger_missing 才能区分的原因
+    assert a["ledger_gap"] == 0 and a["ledger_gap_resolved"] is False
+    md = ba._md(a)
+    assert "台账整份缺失" in md, "报告正文必须说清台账没了,不能只进 JSON"
+    assert "由一手" in md
+
+
+def test_no_ledger_and_no_primary_still_returns_empty(sandbox):
+    """两头都没有才算真无数据 —— 这时返回空是对的(由 main 决定退出码)。"""
+    rows, bad, gap = ba._collect_from_ledger(BATCH, fill_from_primary=True)
+    assert rows == [] and gap is None
+    a = ba.analyze([], bad, BATCH, gap)
+    assert a["ledger_missing"] is False, "没有台账也没有一手,不是'台账缺失'"
+
+
+def test_present_ledger_without_gap_is_not_marked_missing(sandbox):
+    """有台账且与一手一致时,ledger_missing 必须是 False(别把守卫变成噪音)。"""
+    ids = _primary(sandbox, 2)
+    _write_ledger(sandbox, *[dict(FLAT, run_id=r) for r in ids])
+    rows, _bad, gap = ba._collect_from_ledger(BATCH)
+    a = ba.analyze(rows, 0, BATCH, gap)
+    assert a["ledger_missing"] is False
+    md = ba._md(a)
+    assert "台账整份缺失" not in md, "没丢台账就不该报丢失"
+
+
+# ---------------------------------------------------------------------------
 # 4. 统计原语:均值/中位数/计数算错就是整份报告错
 # ---------------------------------------------------------------------------
 def test_median_handles_even_odd_and_empty():

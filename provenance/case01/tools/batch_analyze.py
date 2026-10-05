@@ -193,11 +193,24 @@ def _collect_from_ledger(batch: str, fill_from_primary: bool = False) -> tuple:
     `fill_from_primary`(2026-10-05 加):台账缺段时,把**一手有而台账无**的记录也用
     run.json 补进来(台账独有字段如 seconds/attempt 在这些行上留空)。默认**关**——
     默认行为必须是"如实报缺口",补齐要显式要求,免得把一次数据事故顺手抹平。
+
+    `ledger_missing`(2026-10-05 加,体检 N5):**整份台账不存在**时不再静默返回空——
+    那正是 261004-203137-h120b 的形态(台账永久丢失,29 条一手产物健在),旧写法会让
+    `--batch --fill-from-primary` 报"0 条"而盘上明明有记录。这里改为:能拿到一手就照一手造行,
+    并把 gap 标成 `"ledger_missing": True`,让报告知道这些行的台账来源字段天然为空。
+    一手也扫不到才真的返回空(那种情况 `main` 会 `return 1`)。
     """
     d = os.path.join(BATCH_ROOT, batch)
     lp = os.path.join(d, "ledger.jsonl")
     if not os.path.exists(lp):
-        return [], 0, None
+        primary = sorted(_primary_ids(batch))
+        if not primary:
+            return [], 0, None
+        rows = [r for r in (_row(rid, _load_run(os.path.join(RUNS_DIR, rid, "run.json")))
+                            for rid in primary) if r]
+        gap = {"n_primary": len(primary), "missing": [], "extra": [], "filled": 0,
+               "ledger_missing": True}
+        return rows, 0, gap
     rows, bad = [], 0
     seen = set()
     with open(lp, encoding="utf-8") as f:
@@ -316,6 +329,9 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
         "ledger_gap": (gap or {}).get("missing") and len(gap["missing"]) or 0,
         "ledger_gap_resolved": bool(gap and gap.get("missing")
                                     and gap.get("filled") == len(gap["missing"])),
+        # 整份台账不存在(体检 N5):上面两个字段会算成 0/False,那读起来像"台账与一手一致"。
+        # 这个布尔量负责把那种形态单独标出来,别让它混进"无缺口"里。
+        "ledger_missing": bool(gap and gap.get("ledger_missing")),
         "ledger_gap_detail": gap,
         "branches": br,
         "branch_top": {"branch": top_branch, "count": top_n,
@@ -368,7 +384,14 @@ def _md(a: Dict) -> str:
         # 用 `filled == len(miss)` 判断比切片清楚。
         resolved = bool(miss) and filled == len(miss)
         L.append("")
-        if resolved:
+        if gap.get("ledger_missing"):
+            # 整份台账不存在(体检 N5):措辞必须与"缺段"分开——这里不是少记,是全都没有,
+            # 因此本表的台账独有字段(seconds/attempt/model_actual)全部为空。
+            L.append("> ⚠ **本批次台账整份缺失**:目录 `ledger.jsonl` 不存在;"
+                     "本表 **{}** 条全部由一手 `run.json` 重建,"
+                     "台账独有字段(seconds/attempt/model_actual)在本表**全为空**。".format(
+                         a["n_runs"]))
+        elif resolved:
             L.append("> ⚠ **台账缺段(已用一手补齐)**:台账 `ledger.jsonl` 少记 **{}** 条,"
                      "已从一手 `run.json` 补入;本表 **{}** 条 == 一手条数。".format(
                          filled, a["n_runs"]))
@@ -381,7 +404,7 @@ def _md(a: Dict) -> str:
         if extra:
             L.append("> 多(台账有、一手无){} 条:{}{}".format(
                 len(extra), ", ".join(extra[:12]), " …" if len(extra) > 12 else ""))
-        if not resolved:
+        if not resolved and not gap.get("ledger_missing"):
             L.append("> **以上分支分布仅基于 {} 条,不代表本批次全体。**".format(a["n_runs"]))
     L.extend([
         "",
