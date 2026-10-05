@@ -11,6 +11,7 @@
 
 对照:`tools/verify_demo_sync.py` 是可复跑命令,本文件把它接进测试面。
 """
+import json
 import os
 import sys
 
@@ -29,9 +30,30 @@ def _has_repo_runs():
 
 
 def test_repo_side_present_or_skipped_with_reason():
-    """仓内 demo 记录在场就断言结构完整;不在场则 skip 并说明(不静默)。"""
+    """仓内 demo 记录在场就断言结构完整;不在场则 skip 并说明(不静默)。
+
+    2026-10-05 第八审计 N8-3 订正:初版只写了 `if not ...: skip` 就结束,**在场分支
+    一条 assert 都没有**,函数名与 docstring 承诺的"断言结构完整"没有实现 ——
+    于是它在本机永远 PASS(CI 上永远 skip),恰好把这个文件存在的自述目的
+    ("守卫不能是摆设")自己变成了摆设。
+    """
     if not _has_repo_runs():
         pytest.skip("case01/runs/demo1015-* 不在场(gitignore):双份同步无本机样本可查")
+    # 在场分支:逐条断言结构完整。任一条不成立就红,不许靠 docstring 蒙过去。
+    base = os.path.join(vds.PKG_ROOT, "case01", "runs")
+    for run in vds.RUNS:
+        for fname in vds.FILES:
+            path = os.path.join(base, run, fname)
+            assert os.path.isfile(path), "自称在场却缺文件:{}/{}".format(run, fname)
+            assert os.path.getsize(path) > 0, "文件在但是空的:{}/{}".format(run, fname)
+    for run in vds.RUNS:
+        with open(os.path.join(base, run, "run.json"), encoding="utf-8") as f:
+            rec = json.load(f)
+        assert isinstance(rec, dict), "run.json 顶层不是对象:{}".format(run)
+        assert rec.get("run_id") == run, "run.json 的 run_id 与目录名不符:{}".format(run)
+        assert rec.get("branch") in ("A", "B", "C"), \
+            "分支取值非法:{} -> {!r}".format(run, rec.get("branch"))
+        assert rec.get("reflection"), "demo 记录必须有反思正文:{}".format(run)
 
 
 def test_package_side_matches_repo_side():

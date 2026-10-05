@@ -120,11 +120,37 @@ def test_index_content_dates_come_from_git_not_mtime():
     匹配失败返回 `未提交` 而不用 mtime 冒充。
 
     断言:索引里出现的日期,要么是 `未提交`,要么能在 `git log -1` 里找到同值。
+
+    ⚠ `--index` 是**生成物**命令,会写 `docs/文档索引.md`。本测试必须跑在真实
+    仓库(`cwd=_PKG`)上——`cdate()` 依赖 git 历史,搬进 tmp 就测不到"提交日 vs mtime"
+    这个区别了。代价是**跑一次测试就弄脏工作树**(行序会被重排)。所以前后各存档一次,
+    无论测试成败都还原,不给"跑测试顺手改脏仓库"留口子(2026-10-05 实测踩到:
+    `pytest tests` 跑完索引 mtime 变 19:26,一度以为 `--check` 破坏了只读契约)。
     """
+    idx = os.path.join(_PKG, "docs", "文档索引.md")
+    before = _read_bytes(idx) if os.path.isfile(idx) else None
+    try:
+        _assert_index_dates_match_git(idx)
+    finally:
+        after = _read_bytes(idx) if os.path.isfile(idx) else None
+        if before is not None and after != before:
+            _write_bytes(idx, before)
+
+
+def _read_bytes(path):
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
+def _write_bytes(path, data):
+    with open(path, "wb") as fh:
+        fh.write(data)
+
+
+def _assert_index_dates_match_git(idx):
     p = subprocess.run([_PY, "-X", "utf8", _TOOL, "--index"], cwd=_PKG,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert p.returncode == 0, p.stdout[-1500:] + p.stderr[-1500:]
-    idx = os.path.join(_PKG, "docs", "文档索引.md")
     assert os.path.isfile(idx)
     with io.open(idx, encoding="utf-8") as fh:
         lines = fh.read().splitlines()
