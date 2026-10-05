@@ -18,5 +18,6 @@
       "sim_time": "20250213-09:30",
       "reason": "窗口内无行动文本"
     }
-  ]
+  ],
+  "noise_floor_by_agent": {}
 }

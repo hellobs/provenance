@@ -11,14 +11,21 @@
 - 升维维度:干预前后都在约束里,直接用决策事件里已记录的 goal_alignment;
 - 降维维度:干预后从约束里消失,记录里没有 —— 用同一 GoalScorer 对前后窗口的
   行动文本**离线补算**(本地 Ollama embedding,抽样封顶控成本);
+- **底噪对照**(2026-10-05 归入代码,此前只活在文档里、无法复算):
+  在没有干预发生的时段上,取同宽度的相邻两窗,用**同一对齐口径**算一个"位移",
+  得到行为对齐度的自然波动分布 —— 它是"观察位移是否可区分于噪声"的参照系;
 - 主统计量:跨全部干预/维度的 **Δweight 与 Δalignment 的相关**(Spearman),
-  以及升维组/降维组的平均位移 —— 双向选择性(升的↑降的↓)才支持"行为追随治理"。
+  以及升维组/降维组的平均位移 —— 双向选择性(升的↑降的↓)才支持"行为追随治理";
+  判读时必须与同一批数据的 `noise_floor` 对照。
 
 诚实边界:
 - goal_alignment 是 mavis 自带的语义打分器,与倾向更新共用同一 embedding 模型 ——
   这是"同一把尺子量两处",不是独立裁判;结论定位为"行为与内化状态同向",
   不宣称"独立验证";
-- 行动文本是"计划做什么",不是实际对话;对话层证据留给 M4 专家链路。
+- 行动文本是"计划做什么",不是实际对话;对话层证据留给 M4 专家链路;
+- 底噪对照只**归一化参照系**,不是零假设检验:对照窗的维度集与干预窗不同,
+  样本量也小(见 `noise_floor.n_windows`),只用于"是不是同一量级"的判断,
+  不产出 p 值。
 """
 import json
 import os
@@ -209,8 +216,6 @@ def analyse_intervention(events: List[dict], intervention: dict,
     if warnings:
         result["warnings"] = warnings    # 部分结果必须亮牌,不静默
     return result
-    return {"agent": intervention.get("agent", ""), "sim_time": t,
-            "note": intervention.get("note", ""), "dims": rows}
 
 
 def _spearman(xs: List[float], ys: List[float]) -> Optional[float]:
@@ -240,10 +245,129 @@ def _spearman(xs: List[float], ys: List[float]) -> Optional[float]:
     return round(num / den, 4) if den else None
 
 
+# ---------------------------------------------------------------------------
+# 底噪对照(2026-10-05 入库:此前 0.0187 等数字是手工算的,无法复算)
+# ---------------------------------------------------------------------------
+
+DEFAULT_NOISE_WINDOWS = 20   # 目标对照窗数(与 2026-09-25 手工口径一致)
+
+
+def _interval_of(events: List[dict]) -> Optional[Tuple[float, float]]:
+    """事件时间跨度 [min, max](绝对分钟);不足两点返回 None。"""
+    ts = [v for v in (_abs_min(e.get("time", "")) for e in events) if v is not None]
+    return (min(ts), max(ts)) if len(ts) >= 2 else None
+
+
+def _reference_windows(events: List[dict], interventions: List[dict],
+                       window_min: float, margin_min: float) -> List[float]:
+    """挑出**远离全部干预**的窗心时刻(等间隔),返回绝对分钟列表。
+
+    规则:窗心 c 的两侧窗 [c-w, c) / (c, c+w] 必须落在事件跨度内,且与任一干预
+    时刻的距离 > w + margin —— 保证对照窗既不含干预,也不贴着干预的余波。
+    """
+    span = _interval_of(events)
+    if span is None:
+        return []
+    lo, hi = span
+    t0, t1 = lo + window_min, hi - window_min          # 窗心可取范围
+    if t1 <= t0:
+        return []
+    blocked = [v for v in (_abs_min(iv.get("sim_time", "")) for iv in interventions)
+               if v is not None]
+    guard = window_min + margin_min
+
+    def _clear(c: float) -> bool:
+        return all(abs(c - b) > guard for b in blocked)
+
+    # 先按固定步长扫,再在可行区间里等间隔取,尽量凑到目标窗数
+    step = max(1, int(window_min))
+    cands = [c for c in range(int(t0), int(t1) + 1, step) if _clear(float(c))]
+    if not cands and t1 - t0 <= 4 * step:
+        # 步长太粗导致全被挡:仅在跨度不大时逐分钟回退(避免长轨迹上的百万级循环)
+        cands = [c for c in range(int(t0), int(t1) + 1) if _clear(float(c))]
+    if not cands:
+        return []
+    if len(cands) <= DEFAULT_NOISE_WINDOWS:
+        return [float(c) for c in cands]
+    step = len(cands) / DEFAULT_NOISE_WINDOWS
+    return [float(cands[int(i * step)]) for i in range(DEFAULT_NOISE_WINDOWS)]
+
+
+def _noise_shift(events: List[dict], dims: List[str], c: float,
+                 window_min: float, sample: int, scorer) -> Optional[float]:
+    """在窗心 c 处按同一口径算一次"伪位移":对齐度 after − before。"""
+    before, after = split_window(events, _min_to_time(c), window_min)
+    if not before or not after:
+        return None
+    b_txt = [e.get("action", "") for e in _sample(before, sample)]
+    a_txt = [e.get("action", "") for e in _sample(after, sample)]
+    # 对照窗不预设升/降维,统一用离线打分器(与降维分支同口径),
+    # 避免"对照用记录值、干预用离线值"的口径混用
+    a_b = _offline_alignment(b_txt, dims, scorer)
+    a_a = _offline_alignment(a_txt, dims, scorer)
+    if a_b is None or a_a is None:
+        return None
+    return round(a_a - a_b, 4)
+
+
+def _min_to_time(v: float) -> str:
+    """绝对分钟 → 'YYYYMMDD-HH:MM'(注意内部编码是 日期*1440+分钟)。"""
+    date, rem = divmod(int(v), 1440)
+    h, m = divmod(rem, 60)
+    return "{:08d}-{:02d}:{:02d}".format(date, h, m)
+
+
+def noise_floor(events: List[dict], interventions: List[dict], dims: List[str],
+                window_min: float = DEFAULT_WINDOW_MIN,
+                sample: int = DEFAULT_SAMPLE, scorer=None,
+                margin_min: float = 0.0) -> dict:
+    """无干预时段的行为对齐度自然波动(底噪带)。
+
+    与 `analyse_intervention` 用**同一对齐口径**、同一窗宽,唯一区别是窗心
+    远离所有干预时刻。返回分布统计量,供"观察位移是否可区分于噪声"对照。
+    """
+    if not dims:
+        return {"n_windows": 0, "note": "无可对照维度"}
+    if scorer is None and not _probe_ollama():
+        return {"n_windows": 0,
+                "note": "Ollama 不可达,底噪对照跳过(检查本地 embedding 服务)"}
+    centers = _reference_windows(events, interventions, window_min, margin_min)
+    if not centers:
+        return {"n_windows": 0,
+                "note": "无满足条件的对照窗(事件跨度不足或全被干预遮挡)"}
+    shifts = []
+    for c in centers:
+        v = _noise_shift(events, dims, c, window_min, sample, scorer)
+        if v is not None:
+            shifts.append(v)
+    if not shifts:
+        return {"n_windows": 0, "note": "对照窗内无可评判的行动文本"}
+    absv = sorted(abs(x) for x in shifts)
+    signed = sorted(shifts)
+    n = len(absv)
+    return {
+        "n_windows": n,
+        "window_min": window_min,
+        "median_signed": round(signed[n // 2], 4),
+        "median_abs": round(absv[n // 2], 4),
+        "p75_abs": round(absv[min(n - 1, int(n * 0.75))], 4),
+        "max_abs": round(absv[-1], 4),
+        "dims": sorted(dims),
+    }
+
+
+def compare_to_noise(observed_shift: float, nf: dict) -> Optional[str]:
+    """把一个观察位移放到底噪带里判读:'in_band' / 'above_band'。"""
+    if not nf or not nf.get("n_windows"):
+        return None
+    return "above_band" if abs(observed_shift) > nf["max_abs"] else "in_band"
+
+
 def analyse_simulation(decisions_path: str, interventions: List[dict],
                        window_min: float = DEFAULT_WINDOW_MIN,
-                       sample: int = DEFAULT_SAMPLE, scorer=None) -> dict:
-    """一个模拟的行为追随汇总。"""
+                       sample: int = DEFAULT_SAMPLE, scorer=None,
+                       with_noise_floor: bool = True) -> dict:
+    """一个模拟的行为追随汇总(含底噪对照)。"""
     by_agent: Dict[str, List[dict]] = {}
     for iv in interventions:
         by_agent.setdefault(iv.get("agent", ""), []).append(iv)
@@ -256,16 +380,25 @@ def analyse_simulation(decisions_path: str, interventions: List[dict],
         for iv in ivs:
             r = analyse_intervention(events, iv, window_min=window_min,
                                      sample=sample, scorer=scorer)
-            if r:
+            # analyse_intervention 用带 skip_reason 的字典表示"没分析成",
+            # 它与真正的结果行**不同构**(无 dims)。此前不分流会让下游
+            # 拿 r["dims"] 直接 KeyError(2026-10-05 demo 上暴露)。
+            if r and "dims" in r:
                 rows.append(r)
+            elif r:
+                skipped.append({"agent": agent, "sim_time": iv.get("sim_time", ""),
+                                "reason": r.get("skip_reason", "未分析"),
+                                **({"warnings": r["warnings"]} if r.get("warnings") else {})})
             else:
                 skipped.append({"agent": agent, "sim_time": iv.get("sim_time", ""),
-                                "reason": "窗口内无行动文本"})
+                                "reason": "约束无变化(无升维也无降维)"})
     pairs = [(d["dw"], d["shift"]) for row in rows for d in row["dims"]]
     xs = [x for x, _ in pairs]
     ys = [y for _, y in pairs]
-    raised = [d["shift"] for row in rows for d in row["dims"] if d["kind"] == "raised"]
-    dropped = [d["shift"] for row in rows for d in row["dims"] if d["kind"] == "dropped"]
+    raised = [(d["shift"], row["agent"]) for row in rows for d in row["dims"]
+              if d["kind"] == "raised"]
+    dropped = [(d["shift"], row["agent"]) for row in rows for d in row["dims"]
+               if d["kind"] == "dropped"]
 
     def _mean(v):
         return round(sum(v) / len(v), 4) if v else None
@@ -274,15 +407,58 @@ def analyse_simulation(decisions_path: str, interventions: List[dict],
         "n_interventions": len(rows),
         "n_dim_pairs": len(pairs),
         "spearman_dw_vs_shift": _spearman(xs, ys),
-        "mean_shift_raised": _mean(raised),
-        "mean_shift_dropped": _mean(dropped),
-        "n_raised_positive": sum(1 for v in raised if v > 0),
+        "mean_shift_raised": _mean([v for v, _ in raised]),
+        "mean_shift_dropped": _mean([v for v, _ in dropped]),
+        "n_raised_positive": sum(1 for v, _ in raised if v > 0),
         "n_raised": len(raised),
-        "n_dropped_negative": sum(1 for v in dropped if v < 0),
+        "n_dropped_negative": sum(1 for v, _ in dropped if v < 0),
         "n_dropped": len(dropped),
         "n_skipped": len(skipped),
     }
-    return {"summary": summary, "interventions": rows, "skipped": skipped}
+
+    # 底噪对照:按 agent 各算一份(每个 agent 的干预时刻不同),再并出全局带
+    noise = {}
+    if with_noise_floor:
+        for agent in sorted(by_agent):
+            events = load_events(decisions_path, agent)
+            if not events:
+                continue
+            dims = sorted({d for row in rows if row["agent"] == agent
+                           for dd in row["dims"] for d in dd["dims"]})
+            if not dims:
+                continue
+            nf = noise_floor(events, by_agent[agent], dims,
+                             window_min=window_min, sample=sample, scorer=scorer)
+            if nf.get("n_windows"):
+                noise[agent] = nf
+        merged = _merge_noise(noise)
+        if merged:
+            summary["noise_floor"] = merged
+            above = [d for row in rows for d in row["dims"]
+                     if compare_to_noise(d["shift"], merged) == "above_band"]
+            summary["n_shifts_above_noise_band"] = len(above)
+    return {"summary": summary, "interventions": rows, "skipped": skipped,
+            "noise_floor_by_agent": noise}
+
+
+def _merge_noise(by_agent: Dict[str, dict]) -> Optional[dict]:
+    """各 agent 的底噪带并成一条(取最宽的 max_abs 与各分位中位),供全局判读。"""
+    nfs = [v for v in by_agent.values() if v.get("n_windows")]
+    if not nfs:
+        return None
+
+    def _med(key):
+        vs = sorted(nf[key] for nf in nfs if nf.get(key) is not None)
+        return round(vs[len(vs) // 2], 4) if vs else None
+
+    return {
+        "n_windows": sum(nf["n_windows"] for nf in nfs),
+        "n_agents": len(nfs),
+        "median_abs": _med("median_abs"),
+        "p75_abs": _med("p75_abs"),
+        "max_abs": round(max(nf["max_abs"] for nf in nfs), 4),
+        "window_min": nfs[0].get("window_min"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -296,25 +472,40 @@ def _md(result: dict, sim: str) -> str:
              "| 分析的干预数 | {} |".format(s["n_interventions"]),
              "| 维度观测对(Δw, Δ行为) | {} |".format(s["n_dim_pairs"]),
              "| Spearman(Δw vs Δ行为) | **{}** |".format(s["spearman_dw_vs_shift"]),
-             "| 升维组平均行为位移 | {} ({} {}/{} 为正) |".format(
+             "| 升维组平均行为位移 | {} ({} {} 为正 / {}) |".format(
                  s["mean_shift_raised"], s["n_raised_positive"], "↑", s["n_raised"]),
-             "| 降维组平均行为位移 | {} ({} {}/{} 为负) |".format(
-                 s["mean_shift_dropped"], s["n_dropped_negative"], "↓", s["n_dropped"]),
-             "", "| agent | sim_time | 类别 | 维度 | Δw | 对齐前→后 | 位移 |",
-             "|---|---|---|---|---|---|---|"]
+             "| 降维组平均行为位移 | {} ({} {} 为负 / {}) |".format(
+                 s["mean_shift_dropped"], s["n_dropped_negative"], "↓", s["n_dropped"])]
+    nf = s.get("noise_floor")
+    if nf:
+        lines.append(
+            "| **底噪带**(无干预对照窗 \\|Δ\\|) | 中位 {} / P75 {} / 最大 {} "
+            "({} 窗 × {} agent) |".format(
+                nf["median_abs"], nf["p75_abs"], nf["max_abs"],
+                nf["n_windows"], nf["n_agents"]))
+        lines.append("| 超出底噪带的观察位移 | {} 个 |".format(
+            s.get("n_shifts_above_noise_band", 0)))
+    lines += ["", "| agent | sim_time | 类别 | 维度 | Δw | 对齐前→后 | 位移 | 对照底噪 |",
+              "|---|---|---|---|---|---|---|---|"]
     for r in result["interventions"]:
         if "dims" not in r:      # skip_reason 行(打分器失败/窗口无行动):如实列出
-            lines.append("| {} | {} | 跳过 | {} | — | — | — |".format(
+            lines.append("| {} | {} | 跳过 | {} | — | — | — | — |".format(
                 r.get("agent", ""), r.get("sim_time", ""), r.get("skip_reason", "")))
             continue
         for d in r["dims"]:
-            lines.append("| {} | {} | {} | {} | {:+.3f} | {:.3f}→{:.3f} | {:+.3f} |".format(
+            verdict = compare_to_noise(d["shift"], nf) if nf else None
+            tag = {"above_band": "超带", "in_band": "带内"}.get(verdict, "—")
+            lines.append("| {} | {} | {} | {} | {:+.3f} | {:.3f}→{:.3f} | {:+.3f} | {} |".format(
                 r["agent"], r["sim_time"], d["kind"], "+".join(d["dims"]),
-                d["dw"], d["align_before"], d["align_after"], d["shift"]))
+                d["dw"], d["align_before"], d["align_after"], d["shift"], tag))
     if result["skipped"]:
         lines += ["", "跳过:"] + [
             "- {} @ {} : {}".format(x.get("agent", ""), x.get("sim_time", ""), x.get("reason", ""))
             for x in result["skipped"]]
+    if nf:
+        lines += ["", "> 底噪带 = 远离全部干预时刻的同宽对照窗上、按**同一对齐口径**算出的",
+                  "> |对齐度位移| 分布;它是「是否同一量级」的参照,不是零假设检验,",
+                  "> 不产出 p 值。「带内」= |位移| ≤ 底噪最大 |Δ|。"]
     return "\n".join(lines) + "\n"
 
 
@@ -326,6 +517,8 @@ def main() -> int:
     ap.add_argument("--window", type=float, default=DEFAULT_WINDOW_MIN)
     ap.add_argument("--sample", type=int, default=DEFAULT_SAMPLE)
     ap.add_argument("--out-root", default=os.path.join(CHECKPOINTS, "..", "analysis"))
+    ap.add_argument("--no-noise-floor", action="store_true",
+                    help="跳过底噪对照(默认开启;对照窗需本地 embedding)")
     args = ap.parse_args()
 
     with open(args.interventions, encoding="utf-8") as f:
@@ -342,7 +535,8 @@ def main() -> int:
             print("[!] 无 decisions.json: {}".format(sim))
             continue
         result = analyse_simulation(dp, by_sim.get(sim, []),
-                                    window_min=args.window, sample=args.sample)
+                                    window_min=args.window, sample=args.sample,
+                                    with_noise_floor=not args.no_noise_floor)
         out_dir = os.path.join(args.out_root, sim)
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "behavior_follow.json"), "w", encoding="utf-8") as f:
@@ -350,10 +544,14 @@ def main() -> int:
         with open(os.path.join(out_dir, "behavior_follow.md"), "w", encoding="utf-8") as f:
             f.write(_md(result, sim))
         s = result["summary"]
-        print("[{}] 干预{} 条, Δw–Δ行为 Spearman={}, 升维 {} {}/{}, 降维 {} {}/{}".format(
+        nf = s.get("noise_floor")
+        print("[{}] 干预{} 条, Δw–Δ行为 Spearman={}, 升维 {} {}/{}, 降维 {} {}/{}{}".format(
             sim, s["n_interventions"], s["spearman_dw_vs_shift"],
             s["mean_shift_raised"], s["n_raised_positive"], s["n_raised"],
-            s["mean_shift_dropped"], s["n_dropped_negative"], s["n_dropped"]))
+            s["mean_shift_dropped"], s["n_dropped_negative"], s["n_dropped"],
+            ", 底噪中位 {}/P75 {}/最大 {} ({} 窗)".format(
+                nf["median_abs"], nf["p75_abs"], nf["max_abs"], nf["n_windows"])
+            if nf else ", 底噪未算"))
         ok += 1
     return 0 if ok else 1
 

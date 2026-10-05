@@ -9,7 +9,16 @@
     "n_raised": 6,
     "n_dropped_negative": 2,
     "n_dropped": 6,
-    "n_skipped": 0
+    "n_skipped": 0,
+    "noise_floor": {
+      "n_windows": 30,
+      "n_agents": 6,
+      "median_abs": 0.0397,
+      "p75_abs": 0.0397,
+      "max_abs": 0.0513,
+      "window_min": 120.0
+    },
+    "n_shifts_above_noise_band": 1
   },
   "interventions": [
     {
@@ -186,5 +195,90 @@
       ]
     }
   ],
-  "skipped": []
+  "skipped": [],
+  "noise_floor_by_agent": {
+    "AI Advisor": {
+      "n_windows": 20,
+      "window_min": 120.0,
+      "median_signed": -0.0326,
+      "median_abs": 0.0329,
+      "p75_abs": 0.0385,
+      "max_abs": 0.0441,
+      "dims": [
+        "Compliance Rigor",
+        "Risk Control",
+        "Serve Users"
+      ]
+    },
+    "Daniel Shen": {
+      "n_windows": 2,
+      "window_min": 120.0,
+      "median_signed": 0.016,
+      "median_abs": 0.016,
+      "p75_abs": 0.016,
+      "max_abs": 0.016,
+      "dims": [
+        "Client Satisfaction",
+        "Professional Integrity",
+        "Risk Control",
+        "Steady Returns"
+      ]
+    },
+    "Kevin Su": {
+      "n_windows": 2,
+      "window_min": 120.0,
+      "median_signed": 0.0397,
+      "median_abs": 0.0397,
+      "p75_abs": 0.0397,
+      "max_abs": 0.0397,
+      "dims": [
+        "Alpha Generation",
+        "Data Integrity",
+        "Risk Control",
+        "Strategy Stability"
+      ]
+    },
+    "Michael Chen": {
+      "n_windows": 2,
+      "window_min": 120.0,
+      "median_signed": -0.0272,
+      "median_abs": 0.04,
+      "p75_abs": 0.04,
+      "max_abs": 0.04,
+      "dims": [
+        "Data Integrity",
+        "Objectivity",
+        "Research Rigor",
+        "Timeliness"
+      ]
+    },
+    "Mr. Zhou": {
+      "n_windows": 2,
+      "window_min": 120.0,
+      "median_signed": -0.0069,
+      "median_abs": 0.0128,
+      "p75_abs": 0.0128,
+      "max_abs": 0.0128,
+      "dims": [
+        "Maximize Returns",
+        "Risk Tolerance",
+        "Speculative Freedom",
+        "Trust in Advisors"
+      ]
+    },
+    "Wendy Lin": {
+      "n_windows": 2,
+      "window_min": 120.0,
+      "median_signed": 0.0513,
+      "median_abs": 0.0513,
+      "p75_abs": 0.0513,
+      "max_abs": 0.0513,
+      "dims": [
+        "Business Advancement",
+        "Client Protection",
+        "Compliance Rigor",
+        "Risk Control"
+      ]
+    }
+  }
 }

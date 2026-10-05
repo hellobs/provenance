@@ -9,7 +9,16 @@
     "n_raised": 5,
     "n_dropped_negative": 2,
     "n_dropped": 5,
-    "n_skipped": 0
+    "n_skipped": 0,
+    "noise_floor": {
+      "n_windows": 20,
+      "n_agents": 1,
+      "median_abs": 0.0215,
+      "p75_abs": 0.0353,
+      "max_abs": 0.0516,
+      "window_min": 120.0
+    },
+    "n_shifts_above_noise_band": 2
   },
   "interventions": [
     {
@@ -34,9 +43,9 @@
             "Serve Users"
           ],
           "dw": -0.4116,
-          "align_before": 0.4405,
+          "align_before": 0.4404,
           "align_after": 0.4767,
-          "shift": 0.0362
+          "shift": 0.0363
         }
       ]
     },
@@ -153,5 +162,20 @@
       ]
     }
   ],
-  "skipped": []
+  "skipped": [],
+  "noise_floor_by_agent": {
+    "AI Advisor": {
+      "n_windows": 20,
+      "window_min": 120.0,
+      "median_signed": 0.0034,
+      "median_abs": 0.0215,
+      "p75_abs": 0.0353,
+      "max_abs": 0.0516,
+      "dims": [
+        "Compliance Rigor",
+        "Risk Control",
+        "Serve Users"
+      ]
+    }
+  }
 }
