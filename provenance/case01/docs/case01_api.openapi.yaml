@@ -2,6 +2,15 @@
 #
 # 本文件只覆盖【平台对接端点】;/api/runs、/api/runs/{run_id}、
 # /api/runs/{run_id}/full-context、/api/expert-categories 是平台侧的正式对接面。
+#
+# 2026-10-05 补入**共享历史面**的三条(与 case01/case00 哪个在跑无关,由
+# `live/history.py` 的 router 提供,真实 5010 服务在 `live/routes.py` 挂载):
+#   /api/review-package/{run_id}      —— 平台建单用只读交接包
+#   /api/run-detail/{source}/{run_id} —— 共享只读详情(专家安全视图)
+#   /embed/explore                    —— 数据界面(HTML,供平台嵌入)
+# 此前契约只列 case01 serve.app 的路由,这三条被**静默遗漏**;守卫的比对域
+# 已从 `serve.app.routes` 扩到与 `live.history.router` 的并集(见 test_serve.py),
+# 以后少写一条就是红。
 # 不含 /viewer:它是实现侧调试挂载(serve.app.mount("/viewer", StaticFiles),
 # 依赖 gitignored 的 runs_html/ 目录,且 FastAPI 自身的 /openapi.json 也不含它,
 # 不是 API 操作端点、不是平台对接面)。详见 prose 契约 Governance平台对接说明.md §1.1。
@@ -292,6 +301,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/review-package/{run_id}:
+    get:
+      tags:
+      - review-package
+      summary: Review Package
+      description: |-
+        平台建单用**只读交接包**(2026-10-05 补入契约)。与实时 case 无关:
+        不分配专家、不接收审核写回。
+
+        与完整的 run.json 相比,交接包按实验边界裁剪:不含 `injector`
+        (Branch 实验元信息 + 逐节点 dialogue 原文)、`branch` 等实验底牌;
+        只保留平台建单需要的快照、任务候选与专家全文。
+
+        **状态码语义(平台据此分支处理,不许只看 200)**:
+        - 200 `ok=true`:正常返回,`data` 为交接包;
+        - 404 `invalid_run_id` / `run_not_found`:run_id 非法或该记录不存在;
+        - 422 `invalid_review_record_or_catalog`:记录格式错,或**类别目录/根目录配置不可用**
+          (含 `CASE01_RUNS_ROOT` 给相对路径的情形);
+        - 503 `review_source_unavailable`:记录或类别目录暂不可读(IO)。
+
+        响应带 `ETag`(取 `data.revision`)与 `Cache-Control: no-store`。
+      operationId: review_package_api_review_package__run_id__get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: ReviewPackageEnvelope
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    additionalProperties: true
+                    description: 交接包(Pydantic `ReviewPackageResponse` 的序列化;
+                      字段含义见 case01/docs/平台对接说明.md)。
+                required:
+                - ok
+                - data
+        '404':
+          description: Run 不存在或路径非法(invalid_run_id / run_not_found)
+        '422':
+          description: 记录或类别目录格式错误(invalid_review_record_or_catalog)
+        '503':
+          description: 记录或类别目录暂不可读(review_source_unavailable)
+  /api/run-detail/{source}/{run_id}:
+    get:
+      tags:
+      - runs
+      summary: Run Detail
+      description: |-
+        共享只读详情:按 `source` 返回该 run 的数据,供历史界面自渲染
+        (与"当前跑哪个 case"无关)。`source ∈ {review, checkpoint, compressed}`;
+        路径白名单,杜绝穿越。
+
+        **默认给"专家安全视图"**(与 full-context 同一信息边界):case01 成品只回
+        `expert_safe_record()` 白名单里的键。要原始全文(内部排查/引擎侧)加 `?raw=1`。
+        相对 `CASE01_RUNS_ROOT` 等根目录配置时返回 422 并带原因(2026-10-05 修)。
+      operationId: run_detail_api_run_detail__source___run_id__get
+      parameters:
+      - name: source
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      - name: raw
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Raw
+        description: 为 true 时返回原始 run.json(非专家安全视图)。
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: RunDetail
+        '404':
+          description: run_id 非法或该记录不存在
+        '422':
+          description: 数据根配置不可解析(如相对路径)
+  /embed/explore:
+    get:
+      tags:
+      - embed
+      summary: Explore Page
+      description: 数据界面(纯数据浏览,不依赖运行状态);由 history.html 渲染。
+        返回 HTML,不是 JSON —— 供平台 iframe 嵌入。
+      operationId: explore_page_embed_explore_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
 components:
   schemas:
     RunSummary:

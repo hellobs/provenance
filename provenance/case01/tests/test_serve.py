@@ -246,11 +246,23 @@ def _static_yaml_paths():
 
 class TestOpenApiStaticDriftGuard:
     def test_static_yaml_paths_match_serve_routes(self):
+        """契约 YAML 必须覆盖 **serve.app + live.history.router** 的并集。
+
+        2026-10-05 第六轮只读核查 M3:原守卫只比 `serve.app.routes`,而
+        **真实 5010 服务(`live/routes.py`)另挂了 `live.history.router`** ——
+        交接包路由 `/api/review-package/{run_id}` 就在那个 router 上,
+        于是"契约缺这条"这件事被守卫**静默放过**(两边都看不到它)。
+        现在把两个 router 的路径并集一起比。
+        """
+        from live.history import router as history_router
         yaml_paths = set(_static_yaml_paths())
         actual_paths = {getattr(r, "path", None) for r in serve.app.routes}
+        actual_paths |= {getattr(r, "path", None) for r in history_router.routes}
         actual_paths.discard(None)
         biz = actual_paths - _EXCLUDED_PATHS
-        assert yaml_paths == biz
+        assert yaml_paths == biz, (
+            "契约 YAML 与真实路由集不一致:YAML 多 {} ;代码多 {}".format(
+                sorted(yaml_paths - biz), sorted(biz - yaml_paths)))
 
     def test_static_yaml_documents_every_field_quality_of_emits(self):
         """索引里有的键,契约必须逐个写说明 —— 平台照 YAML 实现,漏一个就是少一个字段。
