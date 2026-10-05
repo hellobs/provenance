@@ -1,67 +1,181 @@
 {
   "title": "261004-220441-h120seed",
-  "n_runs": 29,
+  "n_runs": 35,
   "n_unreadable": 0,
+  "ledger_gap": 6,
+  "ledger_gap_resolved": true,
+  "ledger_gap_detail": {
+    "n_primary": 35,
+    "missing": [
+      "batch-261004-220441-h120seed-001",
+      "batch-261004-220441-h120seed-002",
+      "batch-261004-220441-h120seed-003",
+      "batch-261004-220441-h120seed-004",
+      "batch-261004-220441-h120seed-005",
+      "batch-261004-220441-h120seed-006"
+    ],
+    "extra": [],
+    "filled": 6
+  },
   "branches": {
-    "B": 14,
-    "C": 14,
+    "C": 19,
+    "B": 15,
     "undetermined": 1
   },
   "branch_top": {
-    "branch": "B",
-    "count": 14,
-    "share": 0.483,
+    "branch": "C",
+    "count": 19,
+    "share": 0.543,
     "collapse_warning": false
   },
   "excluded_failed": {
     "n": 2,
-    "n_scored": 27,
+    "n_scored": 33,
     "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
     "records": [
       {
-        "run_id": "batch-261004-220441-h120seed-033",
+        "run_id": "batch-261004-220441-h120seed-031",
         "reason": "ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。"
       },
       {
-        "run_id": "batch-261004-220441-h120seed-031",
+        "run_id": "batch-261004-220441-h120seed-033",
         "reason": "ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。"
       }
     ]
   },
   "reflection": {
-    "chars_mean": 1718.9,
+    "chars_mean": 1700.8,
     "chars_median": 1558,
-    "chars_min": 1388,
-    "chars_max": 2274,
-    "score_mean": 95.6,
+    "chars_min": 1198,
+    "chars_max": 2381,
+    "score_mean": 95.9,
     "score_median": 95,
-    "score_n": 27,
+    "score_n": 33,
     "status_dist": {
-      "review": 6,
-      "pass": 21
+      "pass": 26,
+      "review": 7
     },
     "fail_reason_top": {
-      "未提出可执行的后续改进动作": 6,
+      "未提出可执行的后续改进动作": 7,
       "反思生成失败": 2
     }
   },
   "router": {
-    "issues_total": 130,
-    "issues_mean": 4.8,
+    "issues_total": 154,
+    "issues_mean": 4.7,
     "issues_median": 5,
     "zero_issue_runs": 0,
     "issues_dist": {
-      "4": 5,
-      "5": 22
+      "4": 7,
+      "5": 24,
+      "3": 2
     },
-    "n": 27
+    "n": 33
   },
   "consistency": {
-    "consistent": 24,
-    "inconsistent": 1,
+    "consistent": 29,
+    "inconsistent": 2,
     "unknown": 2
   },
   "per_run": [
+    {
+      "run_id": "batch-261004-220441-h120seed-001",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1693,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-002",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 2381,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-003",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 1318,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-004",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1404,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-005",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1721,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-006",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1198,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
     {
       "run_id": "batch-261004-220441-h120seed-007",
       "branch": "B",
@@ -81,15 +195,13 @@
       "router_error": ""
     },
     {
-      "run_id": "batch-261004-220441-h120seed-009",
-      "branch": "C",
+      "run_id": "batch-261004-220441-h120seed-008",
+      "branch": "B",
       "consistency": "consistent",
-      "refl_chars": 1889,
-      "refl_score": 90,
-      "refl_status": "review",
-      "refl_fail_reasons": [
-        "未提出可执行的后续改进动作"
-      ],
+      "refl_chars": 1938,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
       "issues": 5,
       "issues_final": 5,
       "turns": 4,
@@ -99,13 +211,15 @@
       "router_error": ""
     },
     {
-      "run_id": "batch-261004-220441-h120seed-008",
-      "branch": "B",
+      "run_id": "batch-261004-220441-h120seed-009",
+      "branch": "C",
       "consistency": "consistent",
-      "refl_chars": 1938,
-      "refl_score": 100,
-      "refl_status": "pass",
-      "refl_fail_reasons": [],
+      "refl_chars": 1889,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
       "issues": 5,
       "issues_final": 5,
       "turns": 4,
@@ -211,24 +325,6 @@
       "router_error": ""
     },
     {
-      "run_id": "batch-261004-220441-h120seed-018",
-      "branch": "C",
-      "consistency": "consistent",
-      "refl_chars": 1391,
-      "refl_score": 90,
-      "refl_status": "review",
-      "refl_fail_reasons": [
-        "未提出可执行的后续改进动作"
-      ],
-      "issues": 5,
-      "issues_final": 5,
-      "turns": 4,
-      "events": 13,
-      "router_status": "",
-      "refl_error": "",
-      "router_error": ""
-    },
-    {
       "run_id": "batch-261004-220441-h120seed-016",
       "branch": "B",
       "consistency": "consistent",
@@ -252,6 +348,24 @@
       "refl_score": 95,
       "refl_status": "pass",
       "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261004-220441-h120seed-018",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1391,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
       "issues": 5,
       "issues_final": 5,
       "turns": 4,
@@ -309,6 +423,22 @@
       "router_error": ""
     },
     {
+      "run_id": "batch-261004-220441-h120seed-022",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1855,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
       "run_id": "batch-261004-220441-h120seed-023",
       "branch": "C",
       "consistency": "consistent",
@@ -336,22 +466,6 @@
       ],
       "issues": 4,
       "issues_final": 4,
-      "turns": 4,
-      "events": 13,
-      "router_status": "",
-      "refl_error": "",
-      "router_error": ""
-    },
-    {
-      "run_id": "batch-261004-220441-h120seed-022",
-      "branch": "B",
-      "consistency": "consistent",
-      "refl_chars": 1855,
-      "refl_score": 100,
-      "refl_status": "pass",
-      "refl_fail_reasons": [],
-      "issues": 5,
-      "issues_final": 5,
       "turns": 4,
       "events": 13,
       "router_status": "",
@@ -407,6 +521,22 @@
       "router_error": ""
     },
     {
+      "run_id": "batch-261004-220441-h120seed-028",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1855,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
       "run_id": "batch-261004-220441-h120seed-029",
       "branch": "C",
       "consistency": "consistent",
@@ -443,24 +573,8 @@
       "router_error": ""
     },
     {
-      "run_id": "batch-261004-220441-h120seed-028",
+      "run_id": "batch-261004-220441-h120seed-031",
       "branch": "B",
-      "consistency": "consistent",
-      "refl_chars": 1855,
-      "refl_score": 100,
-      "refl_status": "pass",
-      "refl_fail_reasons": [],
-      "issues": 5,
-      "issues_final": 5,
-      "turns": 4,
-      "events": 13,
-      "router_status": "",
-      "refl_error": "",
-      "router_error": ""
-    },
-    {
-      "run_id": "batch-261004-220441-h120seed-033",
-      "branch": "C",
       "consistency": "consistent",
       "refl_chars": 8,
       "refl_score": null,
@@ -477,8 +591,8 @@
       "router_error": "RuntimeError: 上游反思未生成,Router 未执行"
     },
     {
-      "run_id": "batch-261004-220441-h120seed-031",
-      "branch": "B",
+      "run_id": "batch-261004-220441-h120seed-033",
+      "branch": "C",
       "consistency": "consistent",
       "refl_chars": 8,
       "refl_score": null,
