@@ -269,29 +269,52 @@ def first_heading(path):
 
 
 def git_last_dates(here):
-    """path(相对 here, posix) -> 该文件**最后一次提交**的日期。
+    """path(相对**仓库根**, posix) -> 该文件**最后一次提交**的日期。
 
     为什么不用 mtime:给文档补状态块会刷新 mtime,那样 index 里"最后改动"会全变成今天,
     反而把"内容多久没动过"这个信号抹掉了。
+
+    `-c core.quotepath=false` 必须加(2026-10-05 修 N6 深层根因):默认 quotepath=true 时
+    git 会把非 ASCII 路径转义成八进制并加**外层双引号**(`"provenance/docs/GTC\\347\\240..."`),
+    于是**所有中文文档都匹配不上**、只能回退 mtime —— 索引上"今天核对过"其实是 mtime 假象。
     """
     import subprocess
     out = {}
     try:
-        p = subprocess.run(["git", "log", "--date=short", "--pretty=format:%ad",
+        p = subprocess.run(["git", "-c", "core.quotepath=false",
+                            "log", "--date=short", "--pretty=format:%ad",
                             "--name-only", "--", "."],
                            cwd=here, capture_output=True, text=True, encoding="utf-8",
                            errors="replace")
         cur = ""
         for line in (p.stdout or "").splitlines():
-            if not line.strip():
+            line = line.strip()
+            if not line:
                 continue
-            if re.match(r"^\d{4}-\d{2}-\d{2}$", line.strip()):
-                cur = line.strip()
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", line):
+                cur = line
             elif cur:
-                out[line.strip().replace("\\", "/")] = cur
+                # 极旧版 git 即便关了 quotepath 也可能留外层引号:去一层
+                name = line[1:-1] if line.startswith('"') and line.endswith('"') else line
+                key = name.replace("\\", "/")
+                # git log 按**新→旧**遍历:第一次遇到即最新那次提交,别被更早的覆盖
+                out.setdefault(key, cur)
     except Exception:  # noqa: BLE001 - 拿不到就退回 mtime
         return {}
     return out
+
+
+def git_repo_root(here):
+    """`here` 所属仓库的**根目录**(绝对)。取不到返回 here 本身。"""
+    import subprocess
+    try:
+        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=here,
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace")
+        top = (p.stdout or "").strip()
+        return top or here
+    except Exception:  # noqa: BLE001
+        return here
 
 
 def main():
@@ -348,14 +371,26 @@ def main():
     if args.index:
         idx = os.path.join(here, "docs", "文档索引.md")
         gdates = git_last_dates(here)
+        repo_root = git_repo_root(here)
 
         def cdate(path):
-            """内容日期:优先取最后一次提交日期,取不到退回文件 mtime。"""
-            for cand in (path, "provenance/" + path, path.replace("../", "", 1)):
+            """内容日期 = **最后一次提交该文件的日期**;查不到就如实标注,不冒充。
+
+            2026-10-05 修(GTC 体检 N6):此前匹配失败会**静默回退 `os.stat().st_mtime`**,
+            正是表头点名要避免的那种回退 —— 后果是索引给《GTC研究边界声明》标 2026-10-05
+            (mtime),而 `git log -1` 实际是 2026-10-03,把"这页纸多久没核对过"的信号抹掉了。
+            根因有二:① `git log --name-only` 输出的是**仓库根相对**路径(`provenance/docs/x.md`),
+            而 `path` 是**相对 here** 的(`docs/x.md`),候选里的 `"provenance/" + path`
+            才对得上,`path` 本身几乎永不命中,于是回退成了常态;② 回退本身不报错。
+            现在:先按"仓库根相对"正解匹配,命中不了再依次试旧候选;
+            全都命中不了就返回 `未提交`(新文件 / 未入库),**绝不用 mtime 冒充提交日**。
+            """
+            rel_to_root = os.path.relpath(os.path.join(here, path), repo_root).replace("\\", "/")
+            for cand in (rel_to_root, path, "provenance/" + path,
+                         path.replace("../", "", 1)):
                 if cand in gdates:
                     return gdates[cand]
-            st = os.stat(os.path.join(here, path))
-            return time.strftime("%Y-%m-%d", time.localtime(st.st_mtime))
+            return "未提交"
 
         cur = [r for r in rows if _status_for(r[0])[0] == "现行"]
         other = [r for r in rows if r not in cur]
@@ -363,7 +398,8 @@ def main():
                banner_text("docs/文档索引.md", time.strftime("%Y-%m-%d")).rstrip("\n"),
                "> **用途**:一眼看出哪些文档是现行口径、哪些已被取代。每份 md 顶部也有同样的状态块。",
                "> **「内容日期」= 最后一次提交该文件的日期**(不是文件 mtime:补状态块会刷新 mtime,"
-               "那样会把「内容多久没动过」这个信号抹掉)。**本仓全仓都在这里管**(含仓库根 `docs/`、"
+               "那样会把「内容多久没动过」这个信号抹掉;查不到提交日期时标 `未提交`,不冒充)。"
+               "**本仓全仓都在这里管**(含仓库根 `docs/`、"
                "`packages/`、`tools/` 与两个 README;2026-09-27 起);mavis 仓的文档不在这里管。",
                "",
                "## 一、现行(以这些为准)", "",
