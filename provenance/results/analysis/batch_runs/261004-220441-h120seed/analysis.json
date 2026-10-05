@@ -71,6 +71,12 @@
       "5": 24,
       "3": 2
     },
+    "n_scored": 33,
+    "n_excluded_not_scored": 2,
+    "router_status_dist": {
+      "ok": 33,
+      "skipped": 2
+    },
     "n": 33
   },
   "consistency": {

@@ -43,6 +43,11 @@
       "5": 2,
       "4": 2
     },
+    "n_scored": 4,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 4
+    },
     "n": 4
   },
   "consistency": {

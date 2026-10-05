@@ -55,6 +55,11 @@
       "4": 10,
       "3": 2
     },
+    "n_scored": 29,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 29
+    },
     "n": 29
   },
   "consistency": {

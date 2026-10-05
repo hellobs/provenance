@@ -49,6 +49,11 @@
       "3": 6,
       "4": 11
     },
+    "n_scored": 43,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 43
+    },
     "n": 43
   },
   "consistency": {
