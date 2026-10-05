@@ -277,12 +277,12 @@ class TestDynamicsDefinitions(unittest.TestCase):
 # E. 行为层"底噪对照"的可复算性(2026-10-05 审计发现)
 # ---------------------------------------------------------------------------
 
-class TestNoiseFloorIsNotReproducible(unittest.TestCase):
-    """底噪对照的数字**无法从仓库复算** —— 生成它的代码不在库里。
+class TestNoiseFloorReproducibility(unittest.TestCase):
+    """底噪对照:曾经**无法从仓库复算**,2026-10-05 已收进代码。
 
-    `docs/GTC研究边界声明.md` §三 line 44 把
+    历史(数理审计 G5 #34):`docs/GTC研究边界声明.md` §三 line 44 把
     "行为层位移:与底噪不可区分(中位 0.026 vs 0.019)"的来源标为
-    `behavior_follow.json`;但实测该工具的 `summary` 只有 10 个键,
+    `behavior_follow.json`;但当时该工具的 `summary` 只有 10 个键,
     **没有任何底噪/对照窗字段**:
 
         ['mean_shift_dropped','mean_shift_raised','n_dim_pairs','n_dropped',
@@ -293,16 +293,20 @@ class TestNoiseFloorIsNotReproducible(unittest.TestCase):
     22 个 shift 值的中位是 **~0.013**(en7 0.0126 / en8 0.0131),
     与文档写的 **0.0256** 不在同一量级。
 
-    这不是说文档在编数字 —— 更可能是:
+    这不是说文档在编数字 —— 它确有来源:
       - 底噪对照是 2026-09-25 用**一次性脚本**手工算的(后来没入库);
       - 观察位移当时用的窗口/样本与现在重算的不同(`--window` / `--sample` 可调)。
 
     但对**证据链**而言这构成一个真实缺口:一个被写进"评委速查表"的数字
-    **没有可复算的路径**。本测试把这条事实钉住,并给出口径建议:
-    要么把底噪计算收进仓库,要么在文档里标注"一次性结果、当前不可复算"。
+    **没有可复算的路径**。本测试当年把这条事实钉住(守卫);
 
-    注意:这条**只**质疑可复算性,**不**质疑"不主张行为级改变"这个结论 ——
-    该结论有独立的、方向一致的证据(升维/降维双向选择性不成立、Spearman≈0)。
+    **2026-10-05 用户决策 ③:收进代码** —— `behavior_follow.py` 新增
+    `noise_floor()` / `compare_to_noise()`,产物出 `summary.noise_floor`。
+    守卫随之**翻转**:现在断言"字段与实现都在",防止回落。
+
+    注意:这条**只**关乎可复算性,**不**质疑"不主张行为级改变"这个结论 ——
+    该结论有独立的、方向一致的证据(升维/降维双向选择性不成立、Spearman≈0,
+    且唯一超带的观察位移方向还与预期相反)。
     """
 
     NOISE_KEYS = ("noise", "baseline", "floor", "control_window")
@@ -334,7 +338,8 @@ class TestNoiseFloorIsNotReproducible(unittest.TestCase):
         只是文档没写明分组口径 —— 这条测试把这个口径**写死**,
         免得后人像本次审计一样重走一遍弯路(或误以为数字有问题)。
 
-        底噪那半("vs 0.019")仍无法复算,见 `test_no_noise_floor_field_in_products`。
+        底噪那半("vs 0.019")当时不可复算,现已收进代码,
+        见 `test_noise_floor_is_now_in_the_products_and_in_code`。
         """
         raised = []
         for f in self.files:
@@ -354,45 +359,41 @@ class TestNoiseFloorIsNotReproducible(unittest.TestCase):
         self.assertLess(median, 0.035,
                         "raised 组中位 {:.4f} 超出文档量级 —— 请重核文档口径".format(median))
 
-    def test_no_noise_floor_field_in_products(self):
-        """底噪(0.019)在产物里**没有**字段,也没有生成它的脚本。
+    def test_noise_floor_is_now_in_the_products_and_in_code(self):
+        """底噪对照**已入库**(2026-10-05):产物有字段,代码有实现。
 
-        `docs/GTC研究边界声明.md` §三 line 44 写
-        "行为层位移:与底噪不可区分(中位 0.026 vs 0.019)",
-        来源标为 `behavior_follow.json` —— 但:
-          - 产物的 `summary` 里没有任何底噪/对照窗字段(本测试断言这一点);
-          - `git show ef1e556 --stat` 显示那次提交只有 8 个文件,
-            **不含底噪计算脚本**;
-          - 全仓 grep "noise|底噪" 在 case01/tools 下**零命中**。
+        历史:`docs/GTC研究边界声明.md` 曾写
+        "行为层位移:与底噪不可区分(中位 0.026 vs 0.019)",来源标
+        `behavior_follow.json` —— 但当时产物**无该字段**、代码**无该逻辑**、
+        `git show ef1e556` 也不含计算脚本 ⇒ 那个 0.019 是一次性手工数字,
+        写进评委速查表却**没有可复算路径**(数理审计 G5 #34 记为缺口)。
 
-        即:底噪对照是**一次性手工计算、未入库**的。这不否定结论
-        ("不主张行为级改变"另有独立证据:Spearman≈0、双向选择性不成立),
-        但一个写进评委速查表的数字**没有可复算路径**,是证据链上的真实缺口。
-
-        建议(未实施,留给口径决策):把底噪计算收进 `behavior_follow.py`
-        (它已有 `split_window`,加个"远离干预的相邻窗"对照很自然),
-        或在文档里标注"一次性结果"。
+        本测试此前断言"产物里没有底噪字段"(守卫),现已**按用户决策 ③
+        收进代码**:`case01/tools/behavior_follow.py` 新增 `noise_floor()`,
+        `analyse_simulation` 产出 `summary.noise_floor`。测试随之翻转成
+        **断言其存在**,防止再次退化为不可复算。
         """
         for f in self.files:
             with open(f, encoding="utf-8") as fh:
                 d = json.load(fh)
             keys = set(d.get("summary") or {})
             hit = [k for k in keys if any(t in k.lower() for t in self.NOISE_KEYS)]
-            self.assertEqual(
-                hit, [],
-                "{} 出现了底噪类字段 {} —— 说明底噪已入库;请把 "
-                "docs/GTC研究边界声明 §三 line 44 的来源改成该字段,"
-                "并把本测试改为断言其存在".format(
-                    os.path.basename(os.path.dirname(f)), hit))
+            # stock-en7 / stock-en8 应有;demo(跨度不足)允许无
+            sim = os.path.basename(os.path.dirname(f))
+            if sim.startswith("demo"):
+                continue
+            self.assertTrue(
+                hit,
+                "{} 的 summary 里没有底噪字段 —— 底噪对照回落成了不可复算".format(sim))
 
-        # 同时确认代码里也没有底噪逻辑(两处都没有,才是真的"不可复算")
+        # 代码里必须有可复算实现(否则字段是凭空塞的)
         tool_src = os.path.join(REPO_ROOT, "provenance", "case01", "tools",
                                 "behavior_follow.py")
-        if os.path.isfile(tool_src):
-            with open(tool_src, encoding="utf-8") as fh:
-                src = fh.read().lower()
-            self.assertNotIn("noise", src, "behavior_follow 已含底噪逻辑,请更新本测试")
-            self.assertNotIn("底噪", src, "behavior_follow 已含底噪逻辑,请更新本测试")
+        with open(tool_src, encoding="utf-8") as fh:
+            src = fh.read()
+        self.assertIn("def noise_floor", src, "behavior_follow 缺 noise_floor 实现")
+        self.assertIn("底噪", src, "behavior_follow 缺底噪口径说明")
+        self.assertIn("compare_to_noise", src, "缺带内/超带判读函数")
 
 
 # ---------------------------------------------------------------------------
