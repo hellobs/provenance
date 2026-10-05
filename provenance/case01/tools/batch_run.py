@@ -166,13 +166,31 @@ def _run_with_probe(cmd, cwd: str, env: Dict, log_path: str, timeout: int,
             proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=lf,
                                     stderr=subprocess.STDOUT)
             deadline = time.time() + timeout
+            timed_out = False
             while proc.poll() is None and time.time() < deadline:
                 if not seen:
                     seen = _ollama_loaded_model()
                 time.sleep(5)
+            if proc.poll() is None:
+                # 到点仍在跑:必须**真的终止**,否则一条卡死就让整批陪跑
+                # (2026-10-03 h120seed 那次 3 条 lane 卡 8h25m;此前这里是直接
+                #  proc.wait() —— 轮询退出后仍无限等待,deadline 形同虚设)。
+                timed_out = True
+                proc.terminate()
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()          # Windows 上走 TerminateProcess
+                    proc.wait(timeout=10)
+                lf.write("\n\n===== TIMEOUT after {}s, process terminated =====\n"
+                         .format(timeout))
+                lf.flush()
             code = proc.wait()
             if not seen:
                 seen = _ollama_loaded_model()
+            if timed_out:
+                # 用非零 rc 让上层按失败记账,并把"超时"写进日志(见 _failure_tail)
+                return (code if code not in (0, None) else -9), seen
             return code, seen
     except Exception as exc:  # noqa: BLE001 —— 单条崩不带走整批
         return -1, seen

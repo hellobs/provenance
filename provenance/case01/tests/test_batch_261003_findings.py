@@ -321,3 +321,48 @@ def test_failure_tail_falls_back_when_no_traceback():
 def test_failure_tail_missing_file_is_empty_not_crash():
     """日志文件不存在时返回空串 —— 记账不该因为取日志失败而崩掉。"""
     assert _failure_tail(r"D:\zzr\__definitely_not_here__.log") == ""
+
+
+# ---------------------------------------------------------------------------
+# 6. 到点必须真的终止子进程(2026-10-05 体检 §七)
+# ---------------------------------------------------------------------------
+def test_timeout_actually_terminates_the_subprocess():
+    """超时后 `_run_with_probe` 必须终止子进程,而不是无限 `proc.wait()`。
+
+    此前实现:轮询到 deadline 后直接 `proc.wait()` —— 子进程还在跑就永远等下去,
+    deadline 形同虚设(2026-10-03 h120seed 那次 3 条 lane 卡 8h25m)。
+    这里用一个**睡 60s** 的子进程配 2s 超时:若没真终止,本测试会挂住;
+    真终止则秒回且 rc 非零。
+    """
+    import time as _time
+    from case01.tools import batch_run as br
+
+    log_path = tempfile.mktemp(suffix=".log")
+    cmd = [sys.executable, "-c", "import time; time.sleep(60)"]
+    t0 = _time.time()
+    rc, seen = br._run_with_probe(cmd, os.getcwd(), dict(os.environ),
+                                  log_path, timeout=2)
+    elapsed = _time.time() - t0
+    try:
+        assert elapsed < 30, "子进程没被终止,耗了 {:.0f}s".format(elapsed)
+        assert rc != 0, "超时应记成失败(rc!=0),实际 rc={}".format(rc)
+        with open(log_path, encoding="utf-8") as f:
+            assert "TIMEOUT" in f.read(), "日志里应留下超时痕迹"
+    finally:
+        if os.path.exists(log_path):
+            os.unlink(log_path)
+
+
+def test_normal_completion_returns_its_own_rc():
+    """没超时的正常子进程:rc 原样返回(终止逻辑不该误伤正常路径)。"""
+    from case01.tools import batch_run as br
+
+    log_path = tempfile.mktemp(suffix=".log")
+    cmd = [sys.executable, "-c", "raise SystemExit(0)"]
+    rc, _ = br._run_with_probe(cmd, os.getcwd(), dict(os.environ),
+                               log_path, timeout=30)
+    try:
+        assert rc == 0
+    finally:
+        if os.path.exists(log_path):
+            os.unlink(log_path)
