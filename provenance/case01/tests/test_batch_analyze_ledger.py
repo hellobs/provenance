@@ -119,7 +119,7 @@ def test_ledger_and_scan_paths_agree_end_to_end(sandbox):
     """
     _write_ledger(sandbox, FLAT)
     _write_run_json(sandbox, RUN_ID, NESTED)
-    from_ledger, bad1 = ba._collect_from_ledger(BATCH)
+    from_ledger, bad1, _gap = ba._collect_from_ledger(BATCH)
     from_runs, bad2 = ba._collect_from_runs(prefix="batch-")
     assert bad1 == bad2 == 0
     assert len(from_ledger) == len(from_runs) == 1
@@ -133,7 +133,7 @@ def test_ledger_and_scan_paths_agree_end_to_end(sandbox):
 def test_missing_run_json_still_carries_the_ledger_summary(sandbox):
     """run.json 不在时,台账自带的字数/质量分/status 必须照样进统计(而不是 0)。"""
     _write_ledger(sandbox, FLAT)                       # 故意不写 run.json
-    rows, bad = ba._collect_from_ledger(BATCH)
+    rows, bad, _gap = ba._collect_from_ledger(BATCH)
     assert len(rows) == 1 and bad == 0
     r = rows[0]
     assert r["refl_chars"] == 1817, "台账写了 1817 字,取数层不该交回 0"
@@ -151,7 +151,7 @@ def test_run_json_present_overrides_the_summary(sandbox):
     """明细在场时以明细为准(台账只是摘要,run.json 才是原始记录)。"""
     _write_ledger(sandbox, dict(FLAT, reflection_chars=9999))
     _write_run_json(sandbox, RUN_ID, NESTED)
-    rows, _ = ba._collect_from_ledger(BATCH)
+    rows, _bad, _gap = ba._collect_from_ledger(BATCH)
     assert rows[0]["refl_chars"] == 1817
 
 
@@ -161,7 +161,7 @@ def test_error_status_from_ledger_is_quarantined(sandbox):
                reflection_score=None, reflection_status="error",
                reflection_failure_reasons=["Ollama 连接被拒"])
     _write_ledger(sandbox, FLAT, err)                  # 一条正常、一条 error,无 run.json
-    rows, bad = ba._collect_from_ledger(BATCH)
+    rows, bad, _gap = ba._collect_from_ledger(BATCH)
     a = ba.analyze(rows, bad, BATCH)
     assert a["excluded_failed"]["n"] == 1
     assert a["excluded_failed"]["records"][0]["run_id"] == RUN_ID + "-err"
@@ -189,7 +189,7 @@ def test_router_error_is_still_caught_when_ledger_already_has_quality(sandbox):
                         "issues": [], "postprocess": {}}
     _write_ledger(sandbox, FLAT)
     _write_run_json(sandbox, RUN_ID, broken)
-    rows, _ = ba._collect_from_ledger(BATCH)
+    rows, _bad, _gap = ba._collect_from_ledger(BATCH)
     assert rows[0]["router_status"] == "error", "台账有质量摘要≠明细读过了"
     assert ba._is_failed(rows[0])
     a = ba.analyze(rows, 0, BATCH)
@@ -209,7 +209,7 @@ def test_unparseable_and_unsuccessful_ledger_lines_are_dropped_not_counted(sandb
                                 returncode=1), ensure_ascii=False) + "\n")
         f.write("\n")                                          # 空行
         f.write(json.dumps(FLAT, ensure_ascii=False) + "\n")   # 重复(重试成功两次)
-    rows, bad = ba._collect_from_ledger(BATCH)
+    rows, bad, _gap = ba._collect_from_ledger(BATCH)
     assert bad == 1, "坏行要单独计数,不能和有效记录混在一起"
     assert len(rows) == 1, "失败行不掺进来,重复行只留一条"
 
@@ -226,7 +226,7 @@ def test_failed_row_count_and_scored_row_count_share_one_population(sandbox):
                  reflection_chars=(7 if i == 0 else 2000))
             for i in range(10)]
     _write_ledger(sandbox, *rows)
-    collected, bad = ba._collect_from_ledger(BATCH)
+    collected, bad, _gap = ba._collect_from_ledger(BATCH)
     a = ba.analyze(collected, bad, BATCH)
     assert a["n_runs"] == 10
     assert a["excluded_failed"]["n"] + a["excluded_failed"]["n_scored"] == a["n_runs"]
@@ -244,6 +244,87 @@ def test_branch_collapse_is_called_out_in_numbers_not_left_to_the_reader(sandbox
     few = [ba._row("s-%02d" % i, dict(FLAT, branch="B")) for i in range(4)]
     assert not ba.analyze(few, 0, BATCH)["branch_top"]["collapse_warning"], \
         "4 条样本不足以谈『分布偏斜』,不许报警"
+
+
+# ---------------------------------------------------------------------------
+# 3.5 台账缺段必须暴露(G1,2026-10-05)
+# ---------------------------------------------------------------------------
+def _primary(sandbox, n, batch=BATCH, start=1):
+    """在 runs 目录造 n 条一手 run.json(id 尾号 start..start+n-1)。"""
+    for i in range(start, start + n):
+        rid = "batch-%s-%03d" % (batch, i)
+        _write_run_json(sandbox, rid, dict(NESTED, branch="C"))
+    return ["batch-%s-%03d" % (batch, i) for i in range(start, start + n)]
+
+
+def test_ledger_gap_is_reported_when_ledger_misses_shards(sandbox):
+    """台账少记几条时,`gap` 必须给出缺口清单,而不是静默出"完整"表。
+
+    2026-10-05 体检 G1 的真实事故:批次 261004-220441-h120seed 一手 35 条、
+    台账 31 条、聚合 29 条,`--batch` 只读台账、全文件 grep "缺/missing" = 0,
+    于是报告里 C 分支被少报 5 条而**毫无提示**。
+    """
+    ids = _primary(sandbox, 5)
+    _write_ledger(sandbox, *[dict(FLAT, run_id=r) for r in ids[:3]])   # 只记了前 3 条
+    rows, bad, gap = ba._collect_from_ledger(BATCH)
+    assert bad == 0
+    assert len(rows) == 3, "默认只报缺口,不擅自补齐"
+    assert gap is not None, "缺 2 条却给 gap=None,等于把事故抹平"
+    assert gap["n_primary"] == 5
+    assert gap["missing"] == ids[3:], "缺口清单要对得上(谁被漏了)"
+    assert gap["extra"] == [] and gap["filled"] == 0
+    a = ba.analyze(rows, bad, BATCH, gap)
+    assert a["ledger_gap"] == 2
+    assert a["ledger_gap_resolved"] is False
+    md = ba._md(a)
+    assert "与一手产物不一致" in md, "缺口必须出现在报告正文,不能只进 JSON"
+    assert ids[3].split("-")[-1] in md or ids[3] in md
+
+
+def test_fill_from_primary_backfills_and_marks_resolved(sandbox):
+    """`fill_from_primary=True` 时缺口用一手补齐,且 `resolved` 明确为真。"""
+    ids = _primary(sandbox, 5)
+    _write_ledger(sandbox, *[dict(FLAT, run_id=r) for r in ids[:3]])
+    rows, _bad, gap = ba._collect_from_ledger(BATCH, fill_from_primary=True)
+    assert len(rows) == 5, "补齐后条数应等于一手条数"
+    assert sorted(r["run_id"] for r in rows) == ids
+    assert gap["filled"] == 2 and gap["missing"] == ids[3:]
+    a = ba.analyze(rows, 0, BATCH, gap)
+    assert a["n_runs"] == 5
+    assert a["ledger_gap"] == 2 and a["ledger_gap_resolved"] is True
+    md = ba._md(a)
+    assert "与一手产物不一致" not in md, "已补齐还说『不一致』= 自己诬告自己"
+    assert "已用一手补齐" in md
+
+
+def test_gap_is_none_when_ledger_matches_primary(sandbox):
+    """台账与一手一致时不许凭空报警(否则守卫本身变成噪音)。"""
+    ids = _primary(sandbox, 3)
+    _write_ledger(sandbox, *[dict(FLAT, run_id=r) for r in ids])
+    rows, _bad, gap = ba._collect_from_ledger(BATCH)
+    assert gap is None and len(rows) == 3
+    a = ba.analyze(rows, 0, BATCH, gap)
+    assert a["ledger_gap"] == 0 and a["ledger_gap_resolved"] is False
+    md = ba._md(a)
+    assert "一手" not in md and "不一致" not in md, \
+        "没有缺口就不该在报告里提一手对账"
+
+
+def test_gap_is_none_when_no_primary_shards(sandbox):
+    """扫不到一手产物时(换机分析/目录被清)不报警 —— 无从对账 ≠ 有缺口。"""
+    _write_ledger(sandbox, FLAT)
+    rows, _bad, gap = ba._collect_from_ledger(BATCH)
+    assert gap is None and len(rows) == 1
+
+
+def test_extra_ledger_rows_are_also_flagged(sandbox):
+    """台账多出的一手没有的 id(改过名/删档遗留)同样要报,不能只看缺。"""
+    ids = _primary(sandbox, 2)
+    _write_ledger(sandbox, *[dict(FLAT, run_id=r) for r in ids]
+                  + [dict(FLAT, run_id="batch-%s-999" % BATCH)])
+    rows, _bad, gap = ba._collect_from_ledger(BATCH)
+    assert gap is not None and gap["extra"] == ["batch-%s-999" % BATCH]
+    assert gap["missing"] == []
 
 
 # ---------------------------------------------------------------------------

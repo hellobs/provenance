@@ -168,12 +168,36 @@ def _collect_from_runs(prefix: str = "") -> tuple:
     return rows, bad
 
 
-def _collect_from_ledger(batch: str) -> tuple:
-    """读批次台账。有 run.json 的才算数(台账里失败行不掺进来)。"""
+def _primary_ids(batch: str) -> List[str]:
+    """枚举本批次**一手产物**的 run_id(扫 case01/runs/batch-<batch>-*/run.json)。
+
+    2026-10-05 加(体检 G1):台账天生可能缺段(实测 h120seed 台账号 31 < 一手 35),
+    只读台账会在缺段时**静默**产出"看起来完整"的表。这里给出独立的一手清单,
+    供 `_collect_from_ledger` 对账用。批次为空/扫不到时返回空列表(调用方据此跳过对账)。
+    """
+    if not batch:
+        return []
+    pat = os.path.join(RUNS_DIR, "batch-{}-*".format(batch), "run.json")
+    return sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(pat))
+
+
+def _collect_from_ledger(batch: str, fill_from_primary: bool = False) -> tuple:
+    """读批次台账。返回 (rows, 坏行数, gap)。
+
+    有 run.json 的才算数(台账里失败行不掺进来)。
+
+    `gap`(2026-10-05 加,体检 G1):把台账 id 集与**一手产物** id 集对账,不相等时
+    给出 `{"n_primary": N, "missing": [一手有而台账无的 id], "extra": [台账有而一手无的 id]}`;
+    两者一致或拿不到一手清单时为 `None`。此前这里是纯静默——缺 6 条也照出"完整"报告。
+
+    `fill_from_primary`(2026-10-05 加):台账缺段时,把**一手有而台账无**的记录也用
+    run.json 补进来(台账独有字段如 seconds/attempt 在这些行上留空)。默认**关**——
+    默认行为必须是"如实报缺口",补齐要显式要求,免得把一次数据事故顺手抹平。
+    """
     d = os.path.join(BATCH_ROOT, batch)
     lp = os.path.join(d, "ledger.jsonl")
     if not os.path.exists(lp):
-        return [], 0
+        return [], 0, None
     rows, bad = [], 0
     seen = set()
     with open(lp, encoding="utf-8") as f:
@@ -201,7 +225,24 @@ def _collect_from_ledger(batch: str) -> tuple:
         if d2:
             full = _row(r["run_id"], d2)
             r.update({k: v for k, v in full.items() if v not in ("", None, [])})
-    return rows, bad
+    # 一手对账(2026-10-05,体检 G1)
+    gap = None
+    primary = set(_primary_ids(batch))
+    if primary:
+        missing = sorted(primary - seen)
+        extra = sorted(seen - primary)
+        if missing or extra:
+            gap = {"n_primary": len(primary), "missing": missing, "extra": extra,
+                   "filled": 0}
+        if missing and fill_from_primary:
+            # 补齐:缺的一手记录用 run.json 造行(台账独有字段在 _row 里天生为空)。
+            for rid in missing:
+                d2 = _load_run(os.path.join(RUNS_DIR, rid, "run.json"))
+                if d2:
+                    rows.append(_row(rid, d2))
+                    gap["filled"] += 1
+            rows.sort(key=lambda r: r["run_id"])
+    return rows, bad, gap
 
 
 def _dist(values: List, key=lambda x: x) -> Dict:
@@ -226,7 +267,7 @@ def _median(vals) -> Optional[float]:
     return vals[mid] if n % 2 else round((vals[mid - 1] + vals[mid]) / 2, 1)
 
 
-def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
+def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) -> Dict:
     n = len(rows)
     # 失败/未执行的记录不进质量与产出统计(2026-10-03):它们的 0 分、0 issue
     # 不代表"质量差",而是"这一步没跑成"。混进均值会把结论带偏
@@ -268,6 +309,14 @@ def analyze(rows: List[Dict], bad: int, title: str) -> Dict:
         "title": title,
         "n_runs": n,
         "n_unreadable": bad,
+        # 一手对账(2026-10-05,体检 G1):台账与一手产物不等时非空,机器可读。
+        # n_runs 是"本表实际统计了多少条"(以台账为准,补齐后含补入的一手行),
+        # ledger_gap 说明台账原缺了几条;ledger_gap_resolved=True 表示缺口已用一手补齐
+        # (此时 n_runs 已等于一手条数,不能只看 ledger_gap 判断表是否完整)。
+        "ledger_gap": (gap or {}).get("missing") and len(gap["missing"]) or 0,
+        "ledger_gap_resolved": bool(gap and gap.get("missing")
+                                    and gap.get("filled") == len(gap["missing"])),
+        "ledger_gap_detail": gap,
         "branches": br,
         "branch_top": {"branch": top_branch, "count": top_n,
                        "share": round(top_n / n, 3) if n else None,
@@ -307,12 +356,40 @@ def _md(a: Dict) -> str:
         "",
         "- 有效记录:**{}** 条(另有 {} 个文件解析失败,未计入)".format(
             a["n_runs"], a["n_unreadable"]),
+    ]
+    # 一手对账告警(2026-10-05,体检 G1):台账缺段必须写在**报告顶部**,不能只在 JSON 里。
+    # 两种情形措辞要分开 —— 补齐后本表已与一手一致,若还写"本表与一手不一致"就是诬告自己。
+    gap = a.get("ledger_gap_detail")
+    if gap:
+        miss = gap.get("missing") or []
+        extra = gap.get("extra") or []
+        filled = gap.get("filled") or 0
+        # 补全 = 一手有而台账无的每一条都补进来了。注意 `filled` 只是计数,
+        # 用 `filled == len(miss)` 判断比切片清楚。
+        resolved = bool(miss) and filled == len(miss)
+        L.append("")
+        if resolved:
+            L.append("> ⚠ **台账缺段(已用一手补齐)**:台账 `ledger.jsonl` 少记 **{}** 条,"
+                     "已从一手 `run.json` 补入;本表 **{}** 条 == 一手条数。".format(
+                         filled, a["n_runs"]))
+        else:
+            L.append("> ⚠ **本表与一手产物不一致**:一手 `run.json` **{}** 条,"
+                     "本表基于 **{}** 条。".format(gap.get("n_primary"), a["n_runs"]))
+        if miss:
+            L.append("> 缺(一手有、台账无){} 条:{}{}".format(
+                len(miss), ", ".join(miss[:12]), " …" if len(miss) > 12 else ""))
+        if extra:
+            L.append("> 多(台账有、一手无){} 条:{}{}".format(
+                len(extra), ", ".join(extra[:12]), " …" if len(extra) > 12 else ""))
+        if not resolved:
+            L.append("> **以上分支分布仅基于 {} 条,不代表本批次全体。**".format(a["n_runs"]))
+    L.extend([
         "",
         "## 1. 分支分布",
         "",
         "| 分支 | 条数 | 占比 |",
         "| --- | --- | --- |",
-    ]
+    ])
     tot = max(a["n_runs"], 1)
     for b, c in sorted(a["branches"].items(), key=lambda kv: -kv[1]):
         L.append("| {} | {} | {:.1%} |".format(b, c, c / tot))
@@ -429,13 +506,16 @@ def main(argv=None) -> int:
                     help="直接扫 case01/runs 下所有 run.json")
     ap.add_argument("--prefix", default="", help="配合 --scan-runs 按 run_id 前缀过滤")
     ap.add_argument("--out", default="", help="输出目录(默认写批次目录)")
+    ap.add_argument("--fill-from-primary", action="store_true",
+                    help="台账缺段时用一手 run.json 补齐(默认只报缺口不补)")
     args = ap.parse_args(argv)
 
     if not args.batch and not args.scan_runs:
         ap.error("给 --batch <批次号> 或 --scan-runs")
 
+    gap = None
     if args.batch:
-        rows, bad = _collect_from_ledger(args.batch)
+        rows, bad, gap = _collect_from_ledger(args.batch, args.fill_from_primary)
         title = args.batch
     else:
         rows, bad = _collect_from_runs(args.prefix)
@@ -445,7 +525,7 @@ def main(argv=None) -> int:
         print("没有可用记录(bad={}）——确认 run.json 是否已落盘".format(bad))
         return 1
 
-    a = analyze(rows, bad, title)
+    a = analyze(rows, bad, title, gap)
     out_dir = args.out or (os.path.join(BATCH_ROOT, args.batch) if args.batch
                            else BATCH_ROOT)
     os.makedirs(out_dir, exist_ok=True)
@@ -456,6 +536,14 @@ def main(argv=None) -> int:
 
     print("有效 {} 条(坏 {} 个)→ {}".format(a["n_runs"], a["n_unreadable"],
                                         os.path.join(out_dir, "analysis.md")))
+    if gap:
+        miss = gap.get("missing") or []
+        filled = gap.get("filled") or 0
+        tag = ("台账缺段(已用一手补齐)" if miss and filled == len(miss)
+               else "与一手不一致")
+        print("⚠ {}:一手 {} 条,本表 {} 条;缺 {} 条:{}{}".format(
+            tag, gap["n_primary"], a["n_runs"], len(miss),
+            ", ".join(miss[:8]), " …" if len(miss) > 8 else ""))
     print("分支分布:{}".format(a["branches"]))
     print("反思均字 {} · 质量分均值 {} · issues 合计 {}".format(
         a["reflection"]["chars_mean"], a["reflection"]["score_mean"],
