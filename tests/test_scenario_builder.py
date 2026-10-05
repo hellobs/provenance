@@ -143,7 +143,9 @@ def test_validate_fails_on_bad_case_id():
 @needs_case_engine
 def test_save_writes_to_cases_and_loads_back(monkeypatch, tmp_path):
     """保存后落盘 cases/<case_id>/scenario.yaml,且能被 case_engine 加载。"""
-    os.environ["CASE_ENGINE_CASES_ROOT"] = str(tmp_path / "_cases")
+    # 必须用 monkeypatch:裸写 os.environ 会跨测试文件泄漏到 case_engine 的用例
+    # (tmp_path 用完即删,泄漏后 case00/scenario/* 一律"缺失",红 12 条)。
+    monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", str(tmp_path / "_cases"))
     from case_engine.config import load_yaml
     cfg = scenario_builder.build_scenario(_sample_form())
     path = scenario_builder.save_scenario(PLATFORM_DIR, cfg)

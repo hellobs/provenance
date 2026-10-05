@@ -27,7 +27,8 @@ import engine_runner  # noqa: E402
 
 
 def _cases_env(root, monkeypatch):
-    os.environ["CASE_ENGINE_CASES_ROOT"] = root or CASES_ROOT
+    # 走 monkeypatch 以便测试结束自动回滚;裸写 os.environ 会跨文件泄漏。
+    monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", root or CASES_ROOT)
 
 
 def test_case_engine_is_located():
