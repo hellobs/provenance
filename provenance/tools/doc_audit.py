@@ -100,6 +100,7 @@ STATUS = {
     "docs/0924_下一步方向_给实现侧.md": ("现行", "方向与派单:先打通研究闭环,再补内化,最后收工程底座(每条含验收)"),
     "docs/给平台侧_嵌入与数据接入.md": ("现行", "平台侧接入说明书:iframe 片段、数据调用、宿主协议、冒烟清单、安全边界"),
     "docs/专家导览_怎么看provenance.md": ("现行", "**给 GTC 专家的查看导览**:结论边界/面归属/只读口/字段读法/标注表用法/十五分钟走查(2026-09-27 起)"),
+    "docs/核验主张与证据说明书.md": ("草稿", "GTC 10/15 提交件:五部分(项目概况/评估标准/演示计划/主张登记表/主张与证据对应)。数字全部实测可复跑;含【待填】团队信息与专家署名,提交前删〇节内部须知"),
     "docs/文档索引.md": ("生成物", "由 `tools/doc_audit.py --banner --index` 生成;状态块与内容日期自动维护,勿手工大改"),
     "case01/docs/通知平台侧_换样本_20260917.md": ("未发出·已过时", "从未发出;样本改名、quality/debug 默认过滤、A 线样本不自洽都发生在此文之后 —— 与 `架构总览与对接指南 §11` 合并后重发"),
     "case01/docs/对接启动_给平台侧_20260905.md": ("历史依据", "2026-09-05 的启动包;契约口径以 2026-09-21 指南为准"),
@@ -226,7 +227,10 @@ def rewrite_if_needed(path, rel, date, write):
 
 SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs", "runs_injector",
-             "runs_archive_20260919", "runs_html",
+             "runs_html",
+             # 2026-10-05:`runs_archive_*` 不再逐个列举 —— 统一由下面 walk 里的
+             # `d.startswith("runs_archive")` 前缀过滤覆盖,与 tests/test_docs_status.py
+             # 同一机制(此前这里写死 `runs_archive_20260919`,再加新归档目录就漏筛)。
              # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
              # 不是本仓文档 —— 记忆文件没有状态块,把它们按项目文档治理会红测试
              # (test_docs_status)。工具目录与项目文档分开管。
