@@ -21,6 +21,7 @@
 真实裸读点既不在清单里、后缀正则也抓不到(`_FILE` 不在 `_ROOT/_PATH/_DIR` 里),
 清册"全绿"而洞一直开着。现改为 `os.walk` 全仓 + 后缀集合含 `_FILE/_JSON/...`。
 """
+import io
 import os
 import re
 import sys
@@ -236,3 +237,90 @@ def test_guard_message_names_the_variable():
     with pytest.raises(AmbiguousPathError) as ei:
         require_abs_path("rel/x", what="CASE01_SOMETHING_ROOT")
     assert "CASE01_SOMETHING_ROOT" in str(ei.value)
+
+
+# ---------------------------------------------------------------------------
+# mavis 存档根(第十一轮定因):测试构造 Game 时不设根 ⇒ 往生产路径建空目录
+# ---------------------------------------------------------------------------
+def test_tests_never_construct_real_game_without_checkpoints_root():
+    """清册式:测试里构造 `Game(...)` 必须先设 `MAVIS_CHECKPOINTS_ROOT`。
+
+    为什么要专门钉这一条(第十轮 N9-7 / 第十一轮定因):
+    `mavisframework/runtime/game.py:39-41` 在构造 Game 时会
+    `os.makedirs(os.path.join(checkpoints_root, name, "storage"))`,而
+    `checkpoints_root` 默认取**相对当前工作目录**的 `results/checkpoints`。
+
+    ⇒ CI 上`cd provenance` 跑 case01 套件时,任何一个不设根就构造 Game 的测试,
+    都会在**生产路径** `provenance/results/checkpoints/` 留一个空目录
+    (实测是 `visual-path-test/storage`,0 个文件)。
+
+    危害有两层,第二层才是真的:① 多一个生产目录;
+    ② `test_metric_semantics.py` 的 F 组判据是 `os.path.isdir(CK_DIR)`,目录一旦
+    存在,CI 上本该打印的"results/checkpoints/未入库(gitignore)"就变成
+    "checkpoints 目录在但无 value_tendency 样本" —— **测试把自己的依据说明改成了
+    错的**,而那3 条正是研究边界红线 1 引用的性质断言。
+    (实证:修之前干净检出 case01 跑完 skip 是 6 条且文案自相矛盾;修之后回到 8 条、
+    文案全部一致。)
+
+    判据用 AST 找 `Game(` 的**真实调用**(排除 `_FakeGame(`、类定义、注释),
+    再看它所在的测试函数有没有 `setenv("MAVIS_CHECKPOINTS_ROOT")`。这样新增测试
+    忘了设根会立刻报红,而不是等下一轮体检从skip 文案里反推。
+    """
+    import ast
+
+    tests_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    scan_roots = [
+        tests_root,
+        os.path.join(os.path.dirname(tests_root), "case_engine", "tests"),
+        os.path.join(os.path.dirname(os.path.dirname(tests_root)), "tests"),
+    ]
+    offenders, checked = [], 0
+    for root in scan_roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, _dirs, files in os.walk(root):
+            for fn in files:
+                if not fn.endswith(".py"):
+                    continue
+                path = os.path.join(dirpath, fn)
+                with io.open(path, encoding="utf-8") as fh:
+                    src = fh.read()
+                # 跳过守卫自己:它的报错文案里就写着 `Game(` 与
+                # `MAVIS_CHECKPOINTS_ROOT`,扫到自己是自指误报(第一版就被这条绊住:
+                # 还原修复后守卫仍红,报的 offender 是它自己)。
+                if os.path.abspath(path) == os.path.abspath(__file__):
+                    continue
+                if "Game(" not in src:
+                    continue
+                try:
+                    tree = ast.parse(src)
+                except SyntaxError:
+                    continue
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.FunctionDef):
+                        continue
+                    body = ast.get_source_segment(src, node) or ""
+                    if not re.search(r"(?<![\w.])Game\s*\(", body.replace(
+                            "_FakeGame(", "").replace("class Game", "")):
+                        continue
+                    checked += 1
+                    # 判据必须是**真实的 setenv 调用**,不能是"函数体里出现过这个字符串"。
+                    # 第一版用后者,结果自家 docstring 里那句"必须设 MAVIS_CHECKPOINTS_ROOT"
+                    # 就把违规函数判成了合规 —— 变异验证时才发现(守卫放过了刚被回退的修复)。
+                    has = False
+                    for sub in ast.walk(node):
+                        if (isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute)
+                                and sub.func.attr in ("setenv", "setdefault")):
+                            if sub.args and isinstance(sub.args[0], ast.Constant) \
+                                    and sub.args[0].value == "MAVIS_CHECKPOINTS_ROOT":
+                                has = True
+                    if not has:
+                        offenders.append("{}:{} {}".format(
+                            os.path.relpath(path, tests_root).replace("\\", "/"),
+                            node.lineno, node.name))
+    assert not offenders, (
+        "这些测试构造了真实 Game 却没设 MAVIS_CHECKPOINTS_ROOT —— 会在生产路径 "
+        "provenance/results/checkpoints/ 留下空目录,并让 Σ=1 那3 条 skip 打印"
+        "错误的理由:\n  " + "\n  ".join(offenders))
+    assert checked, ("扫描面没抓到任何 Game( 调用点 —— 本守卫已失效:"
+                     "要么 Game( 改了写法,要么测试目录挪了位置)")

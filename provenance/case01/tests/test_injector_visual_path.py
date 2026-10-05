@@ -132,8 +132,24 @@ def test_same_coord_needs_no_path():
     assert not maze.calls
 
 
-def test_real_maze_path_is_orthogonal():
-    """用真实场景的迷宫再验一次(不依赖假迷宫):两个角色初始格必须互相可达。"""
+def test_real_maze_path_is_orthogonal(monkeypatch, tmp_path):
+    """用真实场景的迷宫再验一次(不依赖假迷宫):两个角色初始格必须互相可达。
+
+    ⚠ `MAVIS_CHECKPOINTS_ROOT` **必须指向 tmp**(第十轮 N9-7/第十一轮定因):
+    `mavisframework/runtime/game.py:39-41` 在构造Game 时会
+    `os.makedirs(os.path.join(checkpoints_root, name, "storage"))`,而
+    `checkpoints_root` 默认是**相对当前工作目录**的 `results/checkpoints`。
+    本测试不设它⇒ 在**生产路径** `provenance/results/checkpoints/` 留下一个空目录
+    (实测目录名 `visual-path-test/storage`,0 个文件)。
+
+    后果不只是"多了个空目录":`test_metric_semantics.py` 的 F 组判据是
+    `os.path.isdir(CK_DIR)`,那个目录一旦存在,CI 上原本该打印的
+    "results/checkpoints/ 未入库(gitignore)" 就变成
+    "checkpoints 目录在但无 value_tendency 样本" —— **测试自己把自己的依据说明
+    改成了错的**,而且那3 条正是红线 1 引用的性质断言。同文件另两处
+    (`test_viz_plugin_wiring.py:69`、`test_injector_mavis_build.py:44`)早就设了,
+    这处是漏的。
+    """
     import pytest
     try:
         from mavisframework.config.loader import load_config
@@ -141,6 +157,7 @@ def test_real_maze_path_is_orthogonal():
         from mavisframework.runtime.game import Game
     except Exception:      # pragma: no cover - 引擎缺席时跳过
         pytest.skip("mavisframework 不可用")
+    monkeypatch.setenv("MAVIS_CHECKPOINTS_ROOT", str(tmp_path / "checkpoints"))
     cfg = load_config(start_time="20260827-09:30", stride=0, agents=list(ROLES),
                       config_path=os.path.join(SCENARIO, "config.json"), assets_root="")
     game = Game("visual-path-test", SCENARIO, cfg, {}, timer=Timer("20260827-09:30"),
