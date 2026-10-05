@@ -4,9 +4,9 @@
 
 **AI value formation is observable, governable and auditable.**
 
-**Built on [mavisframework](https://github.com/hellobs/mavis) v1.3.3** (a self-developed generative multi-agent simulation engine, versioned independently). The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time.
+**Built on [mavisframework](https://github.com/hellobs/mavis) v1.3.4** (a self-developed generative multi-agent simulation engine, versioned independently). The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time.
 
-[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.3%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
+[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.4%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
 
 **English** | [简体中文](./README_zh.md)
 
@@ -16,7 +16,7 @@
 >
 > This is a multi-agent simulation platform. The application scenario is investment advisory (secondary market): agents make context-based judgments, move and converse within a spatial environment, with every step configurable, explainable and visualizable in real time. It serves the Global Trust Challenge *process-alignment* story — **AI value formation can be observed, governed and audited**.
 >
-> Platform and engine are separated: [mavisframework](https://github.com/hellobs/mavis) is maintained and released independently (v1.3.3); this repo depends on it via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. **Constraints never enter the prompt** — an expert edit only weights the *consequence feedback*, so the tendency converges only through later experience (lagged convergence = observable evidence of internalization).
+> Platform and engine are separated: [mavisframework](https://github.com/hellobs/mavis) is maintained and released independently (v1.3.4); this repo depends on it via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. **Constraints never enter the prompt** — an expert edit only weights the *consequence feedback*, so the tendency converges only through later experience (lagged convergence = observable evidence of internalization).
 >
 > → [0\. Current state](#0-current-state) ｜ [7\. IVD Governance Platform](#7-ivd-governance-platform) ｜ [Expert tour](provenance/docs/专家导览_怎么看provenance.md)
 
@@ -53,7 +53,7 @@
 (checked 2026-10-01)
 
 **Layers**: scenario declaration (data) -> engine (`case_engine/`, registrable & replaceable)
--> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.3)
+-> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.4)
 -> presentation (`packages/mavis-vizkit`, a mavis plugin).
 
 **Interventions are pluggable**: the three expert write endpoints run through an
@@ -126,7 +126,7 @@ git clone https://github.com/hellobs/mavis.git ../mavis
 #   or SSH (requires a configured SSH key added to your GitHub account):
 # git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # produces dist/mavisframework-1.3.3-py3-none-any.whl
+uv build                              # produces dist/mavisframework-1.3.4-py3-none-any.whl
 cd ../provenance
 
 # 2.2 Create the environment (uv or conda; Python 3.12)
@@ -135,7 +135,7 @@ uv venv .venv --python 3.12
 
 # 2.3 Install dependencies **in this exact order** (all three steps matter)
 #     a) the framework (wheel built in 2.1; `pip install -e ../mavis` also works)
-uv pip install ../mavis/dist/mavisframework-1.3.3-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.4-py3-none-any.whl
 #     b) the two **local packages** in this repo (not on PyPI; skipping this makes
 #        the next step fail with "No matching distribution found")
 uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector

@@ -5,9 +5,9 @@
 
 **AI 价值形成过程，可观察、可治理、可审计。**
 
-**本平台基于 [mavisframework](https://github.com/hellobs/mavis) v1.3.3 构建**（自研生成式智能体仿真框架，独立发版）。应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。
+**本平台基于 [mavisframework](https://github.com/hellobs/mavis) v1.3.4 构建**（自研生成式智能体仿真框架，独立发版）。应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。
 
-[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.3%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
+[![based on mavisframework](https://img.shields.io/badge/based%20on-mavisframework%201.3.4%20%C2%B7%20engine-7c3aed?style=flat-square&labelColor=1f2328)](https://github.com/hellobs/mavis) [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square&labelColor=1f2328)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-2ea043?style=flat-square&labelColor=1f2328)](tests) [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.12-3776ab?style=flat-square&labelColor=1f2328)](requirements.txt) [![Live](https://img.shields.io/badge/live-127.0.0.1%3A5010-009688?style=flat-square&labelColor=1f2328)](provenance/docs/平台对接契约_5010唯一入口.md) [![Scenarios](https://img.shields.io/badge/cases-3%20declared-f59e0b?style=flat-square&labelColor=1f2328)](provenance/cases)
 
 [English](./README.md) | **简体中文**
 
@@ -17,7 +17,7 @@
 >
 > 本平台是一个多智能体仿真平台，应用场景为投资咨询（二级市场）：智能体在空间环境中基于情境作判断、移动、对话，每一步可配置、可解释、可实时可视化。平台面向 Global Trust Challenge 的*过程对齐*叙事——**AI 的价值形成过程可被观察、可被治理、可被审计**。
 >
-> 平台与框架分离：[mavisframework](https://github.com/hellobs/mavis) 独立维护、独立发版（v1.3.3），本仓通过 `requirements.txt` 中的 `mavisframework>=1.2.0,<2.0.0` 依赖它。**制度约束不进提示词**——专家调整约束只加权*后果反馈*，倾向需经后续体验才逐步收敛（滞后收敛 = 内化发生的可观测证据）。
+> 平台与框架分离：[mavisframework](https://github.com/hellobs/mavis) 独立维护、独立发版（v1.3.4），本仓通过 `requirements.txt` 中的 `mavisframework>=1.2.0,<2.0.0` 依赖它。**制度约束不进提示词**——专家调整约束只加权*后果反馈*，倾向需经后续体验才逐步收敛（滞后收敛 = 内化发生的可观测证据）。
 >
 > → [0\. 现状速览](#0-现状速览) ｜ [7\. IVD 治理平台](#7-ivd-治理平台) ｜ [专家导览](provenance/docs/专家导览_怎么看provenance.md)
 
@@ -54,7 +54,7 @@
 （2026-10-01 核对）
 
 **分层**：场景声明（数据）→ 引擎（`case_engine/`，可注册可替换）→ 案例
-（`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.3）→ 呈现
+（`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.4）→ 呈现
 （`packages/mavis-vizkit`，mavis 插件）。
 
 **干预可插拔**：三个专家写端点走 `InterventionStrategy` 注册表
@@ -116,7 +116,7 @@ CI 会先用 `tools/check_engine_baseline.py` 断言插件面存在,再跑测试
 git clone https://github.com/hellobs/mavis.git ../mavis
 # 或: git clone git@github.com:hellobs/mavis.git ../mavis
 cd ../mavis
-uv build                              # 生成 dist/mavisframework-1.3.3-py3-none-any.whl
+uv build                              # 生成 dist/mavisframework-1.3.4-py3-none-any.whl
 cd ../provenance
 
 # 2.2 创建环境(uv 或 conda;Python 3.12)
@@ -125,7 +125,7 @@ uv venv .venv --python 3.12
 
 # 2.3 按顺序装依赖(**顺序不能反**;三条都做完才算装好)
 #     a) 框架(2.1 构建的 wheel;开发期也可 `pip install -e ../mavis` 可编辑安装)
-uv pip install ../mavis/dist/mavisframework-1.3.3-py3-none-any.whl
+uv pip install ../mavis/dist/mavisframework-1.3.4-py3-none-any.whl
 #     b) 本仓的两个**本地包**(不在 PyPI;漏这步,下一步会报 "No matching distribution found")
 uv pip install -e packages/mavis-vizkit -e packages/mavis-case01-injector
 #     c) 其余运行依赖 + 测试框架(requirements.txt **不含** pytest)
