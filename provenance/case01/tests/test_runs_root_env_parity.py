@@ -53,6 +53,29 @@ def test_write_side_and_read_side_resolve_the_same_root(tmp_path, monkeypatch):
     assert OR.RUNS_ROOT() == LH._data_root("CASE01_RUNS_ROOT", "case01", "runs")
 
 
+def test_write_side_rejects_relative_path(monkeypatch):
+    """写侧对相对路径必须**当场报错**(2026-10-05 补)。
+
+    此前 `RUNS_ROOT()` 是裸 `os.environ.get(...) or 默认根`,相对值时写侧按 cwd
+    落盘、读侧却抛 AmbiguousPathError —— 读写不对称:同一条配置写侧"能跑",
+    界面上却读不到。这条把对称性钉死。
+    """
+    from case_engine.paths import AmbiguousPathError
+    monkeypatch.setenv("CASE01_RUNS_ROOT", "case01/runs")
+    with pytest.raises(AmbiguousPathError):
+        OR.RUNS_ROOT()
+
+
+def test_write_side_and_read_side_agree_on_relative_rejection(monkeypatch):
+    """读写两侧对"相对路径"的判定必须一致:都拒绝,而不是一侧拒绝一侧接受。"""
+    from case_engine.paths import AmbiguousPathError
+    monkeypatch.setenv("CASE01_RUNS_ROOT", "some/relative/root")
+    with pytest.raises(AmbiguousPathError):
+        OR.RUNS_ROOT()
+    with pytest.raises(AmbiguousPathError):
+        LH._data_root("CASE01_RUNS_ROOT", "case01", "runs")
+
+
 def test_serve_module_constant_tracks_the_env_on_reload(tmp_path, monkeypatch):
     """只读面 `case01/serve.py` 在 import 时读环境变量;重加载后应与写侧一致。"""
     env = str(tmp_path / "records")

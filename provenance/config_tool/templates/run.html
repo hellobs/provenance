@@ -2,6 +2,12 @@
 {% block title %}组合 · MAVIS 配置工具{% endblock %}
 {% block content %}
 <h1>组合</h1>
+{% if root_problem %}
+<div class="banner-warn"><b>场景根不可用:</b>{{ root_problem }}</div>
+{% endif %}
+{% if roots_problem %}
+<div class="banner-warn"><b>CASE_ENGINE_CASES_ROOT 有误:</b>{{ roots_problem }}</div>
+{% endif %}
 <p class="hint">场景(case)是数据,运行方式决定这一局怎么跑,<b>组合</b>是二者配对后的一份可复用记录。下表即组合注册表——<b>点选一个组合即可运行</b>;用下方表单登记新的组合(case × engine)。</p>
 
 <div class="section">

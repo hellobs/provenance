@@ -556,9 +556,17 @@ def RUNS_ROOT():  # noqa: N802 —— 函数形态不能改:run.py 与多处测�
     踩过一次的口径分叉(2026-10-04 实测):`CASE01_RUNS_ROOT` 只有读侧认,写侧写死
     `case01/runs`。用覆盖根做演示时,新跑的记录落在默认根,界面正好看不到它 ——
     表现为"跑成功了但演示里没这条"。
+
+    2026-10-05 补:写侧此前**未过绝对路径守卫**(裸 `os.environ.get`),于是
+    `CASE01_RUNS_ROOT=case01/runs` 时写侧按 cwd 落盘、读侧当场抛 AmbiguousPathError
+    —— 读写不对称。改为走 `resolve_root`,与 `live/history._data_root`、
+    `case_engine/scenarios` 同语义:环境变量须绝对,空值按未设置回默认根。
     """
-    return (os.environ.get("CASE01_RUNS_ROOT")
-            or os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"))
+    from case_engine.paths import resolve_root
+    return resolve_root(
+        "CASE01_RUNS_ROOT",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
+        what="CASE01_RUNS_ROOT")
 FIN_DIR = lambda: os.path.join(os.path.dirname(os.path.abspath(__file__)),  # noqa: E731
                                "data", "financial")
 

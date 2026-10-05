@@ -82,7 +82,7 @@ def _abs_or_empty(raw: str) -> str:
     return engine_bridge.env_abs_path(raw, what="环境变量路径")
 
 
-# 这几个根的**来源**要能报出来(相对路径配置会抛 AmbientePathError),
+# 这几个根的**来源**要能报出来(相对路径配置会抛 AmbiguousPathError),
 # 界面横幅与启动日志用 `path_config_problems()` 显示原因,不静默。
 _ENV_PATHS = {
     "MAVIS_ASSETS_ROOT": "village 静态资源根",
@@ -156,9 +156,15 @@ def _print_startup_banner() -> None:
     print("[platform] 资源根 = {} ; 场景目录 = {} ; 地图 = {}".format(
         VILLAGE_ROOT or "(未声明)", SCENARIOS_DIR or "(未声明)",
         MAZE_PATH or "(未声明)"), flush=True)
+    # 路径配置问题（相对路径等）**启动就说**，别等用户发现场景没了。
+    for _p in path_config_problems():
+        print("[path.ERROR] {} -> {}".format(_p["var"], _p["problem"]), flush=True)
 
 
 templates.env.globals["runtime_status"] = runtime_status
+# 路径配置问题(相对路径等)也做成全局:界面横幅与启动日志共用同一处判断,
+# 否则只有"场景没了/置灰"一种表现,用户看不到原因(2026-10-05 体检 §六 未闭环B)。
+templates.env.globals["path_config_problems"] = path_config_problems
 # 启动即打印(任何启动方式都可见:python app.py / uvicorn app:app)
 _print_startup_banner()
 
@@ -1391,6 +1397,10 @@ async def run_page(request: Request):
          "engine_options": scenario_builder.SUPPORTED_ENGINES,
          "platform_dir": _PLATFORM_DIR,
          "engine_available": _engine_available(),
+         # 场景根解析失败的可读原因(相对路径等)。此前 list_cases 静默回空列表,
+         # 界面只表现成"场景没了";这里把原因送到横幅(2026-10-05 体检 §六 未闭环B)。
+         "root_problem": engine_runner.root_problem(_PLATFORM_DIR),
+         "roots_problem": compositions._roots_problem(),
          "active": "composition"},
     )
 

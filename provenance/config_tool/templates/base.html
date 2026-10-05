@@ -87,6 +87,11 @@ nav a:hover { color: #333; }
 {% if rs.platform_reason %}
 <div class="banner-warn"><b>平台目录不可用:</b>{{ rs.platform_reason }}</div>
 {% endif %}
+{% if path_config_problems is defined %}
+{% for p in path_config_problems() %}
+<div class="banner-warn"><b>路径配置有误 ({{ p.var }}):</b>{{ p.problem }}</div>
+{% endfor %}
+{% endif %}
 {% if rs.available and rs.platform %}
 <div class="banner-ok">运行方式已就绪:{{ rs.dir }} · 平台根:{{ rs.platform }}</div>
 {% endif %}
