@@ -366,3 +366,32 @@ def test_normal_completion_returns_its_own_rc():
     finally:
         if os.path.exists(log_path):
             os.unlink(log_path)
+
+
+# ---------------------------------------------------------------------------
+# 7. 收尾 join 必须有界(2026-10-05 第六轮 M7)
+# ---------------------------------------------------------------------------
+def test_main_uses_bounded_thread_join():
+    """`main()` 的收尾等待必须是**有界** `t.join(timeout=...)`,不能是裸 `t.join()`。
+
+    为什么:每条子进程自身有 `--timeout`(`_run_with_probe` 会真终止),但
+    **线程退出**此前是无限等待。若某条卡在 kill 不掉的子进程或收尾 I/O 上,
+    整批会一直挂着 —— "到点自停"的语义等于失效(h120seed 那次 8h25m 的同类)。
+    这条用**源码级**断言钉住:裸 `t.join()` 一旦回来就红。
+
+    源码级而非行为级,是因为要真制造"线程卡住"得挂一个不可杀的子进程,
+    代价过高;而这里要守的恰是"这行代码的形态",源码断言足够。
+    """
+    import io as _io
+    from case01.tools import batch_run as br
+
+    src = _io.open(br.__file__, encoding="utf-8").read()
+    assert "t.join(timeout=" in src, \
+        "收尾等待不是有界的 —— 请改回 `t.join(timeout=...)`(见 M7)"
+    # 反向:不能存在没有 timeout 的裸 `t.join()`
+    bare = [ln.strip() for ln in src.splitlines()
+            if ln.strip() == "t.join()"]
+    assert not bare, "又出现了无超时的裸 join:{}".format(bare)
+    # 卡住时要**如实报出来**(不静默)
+    assert "没退出" in src or "is_alive()" in src, \
+        "线程卡住时应报出,而不是静默接着走"

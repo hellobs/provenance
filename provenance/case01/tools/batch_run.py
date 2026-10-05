@@ -510,8 +510,21 @@ def main(argv=None) -> int:
                for i in range(max(1, args.lanes))]
     for t in threads:
         t.start()
+    # 收尾有界等待(2026-10-05 第六轮 M7,回应体检 §七.4「join 无超时」)。
+    # 每条子进程自身有 --timeout(见 _run_with_probe),但**线程退出**此前是无限
+    # `t.join()`:若某条卡在 kill 不掉的子进程或收尾 I/O 上,整批会一直挂着,
+    # 到点自停的语义等于失效(2026-10-03 h120seed 的 8h25m 就是这一类)。
+    # 现在:先等 `--timeout * (retries+1) + 60` 秒(单条最坏耗时 + 余量),
+    # 仍不退出的**如实报出来**(不静默),线程是 daemon,主进程照常收尾出汇总。
+    budget = int(args.timeout) * (int(args.retries) + 1) + 60
+    deadline = time.time() + budget
     for t in threads:
-        t.join()
+        t.join(timeout=max(1, deadline - time.time()))
+    stuck = [t for t in threads if t.is_alive()]
+    if stuck:
+        _log("⚠️ {} 条 lane 在 {}s 内没退出(可能卡在不可杀的子进程上);"
+             "已放弃等待,按其已落盘的台账出汇总。未完成的 run 见 failures.jsonl"
+             .format(len(stuck), budget))
 
     summary = _summarize(out_dir, batch, stats, args)
     _log("批次 {} 结束:成功 {} / 失败 {}".format(
