@@ -110,45 +110,31 @@ def test_check_mode_is_readonly_and_clean():
     assert "待更新 0 个" in p.stdout
 
 
-def test_index_content_dates_come_from_git_not_mtime():
+def test_index_content_dates_come_from_git_not_mtime(tmp_path):
     """索引的「内容日期」必须是**最后一次提交日**,不是 mtime(GTC 体检 N6)。
 
     历史缺陷:git log 默认 `core.quotepath=true`,非 ASCII 路径被转义成八进制
-    并加外层引号 ⇒ **所有中文文档都匹配不上**,`cdate()` 静默回退 `os.stat().st_mtime`,
+    并加外层引号⇒ **所有中文文档都匹配不上**,`cdate()` 静默回退 `os.stat().st_mtime`,
     把"这页纸多久没核对过"的信号抹掉(`GTC研究边界声明` 因此显示 10-05 而实际 10-03)。
     修法:git 加 `-c core.quotepath=false`、字典 `setdefault` 只留最新一次、
     匹配失败返回 `未提交` 而不用 mtime 冒充。
 
     断言:索引里出现的日期,要么是 `未提交`,要么能在 `git log -1` 里找到同值。
 
-    ⚠ `--index` 是**生成物**命令,会写 `docs/文档索引.md`。本测试必须跑在真实
-    仓库(`cwd=_PKG`)上——`cdate()` 依赖 git 历史,搬进 tmp 就测不到"提交日 vs mtime"
-    这个区别了。代价是**跑一次测试就弄脏工作树**(行序会被重排)。所以前后各存档一次,
-    无论测试成败都还原,不给"跑测试顺手改脏仓库"留口子(2026-10-05 实测踩到:
-    `pytest tests` 跑完索引 mtime 变 19:26,一度以为 `--check` 破坏了只读契约)。
+    ⚠ `cdate()` 依赖**真实 git 历史**,这一条搬不进 tmp —— 但**索引文件本身可以**
+    (2026-10-05 第九审计 N9-6):此前本测试跑 `doc_audit --index`(默认写
+    `docs/文档索引.md`,也就是入库的那份),靠前后存档还原,等于"跑一次测试就写一次
+    真实索引"。存档还原挡不住进程被杀/断电,更挡不住两个会话并行跑 pytest 时互相
+    覆盖(A 存档 → B 改写 → A 还原 → B 的写入被抹掉)。现在用 `--index-out` 把结果
+    写到 `tmp_path`,真实索引一个字节都不碰;git 历史仍从真实仓库读(它的语义就在那儿)。
     """
-    idx = os.path.join(_PKG, "docs", "文档索引.md")
-    before = _read_bytes(idx) if os.path.isfile(idx) else None
-    try:
-        _assert_index_dates_match_git(idx)
-    finally:
-        after = _read_bytes(idx) if os.path.isfile(idx) else None
-        if before is not None and after != before:
-            _write_bytes(idx, before)
-
-
-def _read_bytes(path):
-    with open(path, "rb") as fh:
-        return fh.read()
-
-
-def _write_bytes(path, data):
-    with open(path, "wb") as fh:
-        fh.write(data)
+    idx = str(tmp_path / "文档索引.md")
+    _assert_index_dates_match_git(idx)
 
 
 def _assert_index_dates_match_git(idx):
-    p = subprocess.run([_PY, "-X", "utf8", _TOOL, "--index"], cwd=_PKG,
+    p = subprocess.run([_PY, "-X", "utf8", _TOOL, "--index", "--index-out", idx],
+                       cwd=_PKG,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert p.returncode == 0, p.stdout[-1500:] + p.stderr[-1500:]
     assert os.path.isfile(idx)

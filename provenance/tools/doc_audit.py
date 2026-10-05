@@ -324,6 +324,9 @@ def main():
                     help="与 --banner 同口径但**只读**:报告待规范化的 md 数,不写盘;"
                          "有待修时退出码 1(供体检/CI;永不改工作树)")
     ap.add_argument("--index", action="store_true", help="生成 docs/文档索引.md(状态一览)")
+    ap.add_argument("--index-out", default="",
+                    help="配合 --index:把索引写到这个绝对路径而不是 docs/文档索引.md"
+                         "(给测试用,免得跑一次测试就改写真实入库索引)")
     ap.add_argument("--banner-all", action="store_true",
                     help="连同 `--banner`:把没在 STATUS 表里的也补上「待核对」状态块")
     args = ap.parse_args()
@@ -369,7 +372,14 @@ def main():
         print("\n已更新 {} 个 md 的状态块(状态取自 STATUS 表 / 模式兜底)".format(n))
 
     if args.index:
-        idx = os.path.join(here, "docs", "文档索引.md")
+        # --index-out 写别处(2026-10-05 第九审计 N9-6):--index 是**生成物**命令,
+        # 默认落 `docs/文档索引.md` —— 也就是真实入库的那份。测试若图省事直接跑它,
+        # 等于"跑一次测试就写一次真实索引":`finally` 存档还原只挡得住异常,
+        # 挡不住进程被杀/断电,也挡不住两个会话并行跑 pytest 时互相覆盖
+        # (A 存档 → B 改写 → A 还原 → B 的写入被抹掉)。给测试一条写临时路径的出口,
+        # 从此不必碰真实索引。`cdate()` 仍读真实 git 历史(那是它的语义来源,搬不走)。
+        idx = os.path.abspath(args.index_out) if args.index_out else \
+            os.path.join(here, "docs", "文档索引.md")
         gdates = git_last_dates(here)
         repo_root = git_repo_root(here)
 
@@ -417,6 +427,10 @@ def main():
                 "2. 口径变了就**改状态并写明被谁取代**,不要删文件(评审要能追);",
                 "3. 新增文档后跑一次 `python tools/doc_audit.py --banner --index`;",
                 "4. `task_*` / `任务_*` 这类派发单完成后一律标「历史存档」。"]
+        # 目标目录可能不存在(测试给的临时路径),建出来而不是让调用方自己造
+        _d = os.path.dirname(idx)
+        if _d and not os.path.isdir(_d):
+            os.makedirs(_d, exist_ok=True)
         with io.open(idx, "w", encoding="utf-8", newline="") as f:
             f.write("\n".join(out) + "\n")
         print("已写 {}".format(idx))
