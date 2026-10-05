@@ -35,6 +35,12 @@ jinja2>=3.1
 # 报 RuntimeError("requires httpx2")。本行必须保留。
 httpx2>=0.28
 
+# 少数守卫测试(tests/test_config_tool_save_e2e.py 的 HTTP 层用例)不走 TestClient,
+# 而是直接 `import httpx` 用 ASGITransport 打端点(为绕开 TestClient 线程死锁)。
+# httpx2 装的是 `httpx2` 命名空间,不提供 `httpx`,所以这两个模块要单独有本行;
+# 缺它 CI 必红(ModuleNotFoundError: No module named 'httpx')。
+httpx>=0.28
+
 # 导出倾向曲线 PNG(export-chart 接口,matplotlib 渲染)
 matplotlib>=3.8
 
