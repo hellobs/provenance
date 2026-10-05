@@ -97,3 +97,100 @@ def test_guard_actually_catches_violations(tmp_path):
         "否证词未命中,守卫的放行逻辑失效"
     # 3) 对照臂标记必须能匹配到真实文档片段
     assert any(m in _read(BOUNDARY) for m in CONTROL_ARM_MARKERS)
+
+
+# ---------------------------------------------------------------------------
+# K1:依据的可执行性(2026-10-05 第六轮只读核查)
+# ---------------------------------------------------------------------------
+#
+# 第六轮的核心发现:**claims guard 拦得住"无据比例回潮",拦不住"依据栏写着一条
+# CI 上根本不执行的测试"**。两者同时成立时,CI 全绿、文档"合规"、主张仍超出证据。
+#
+# 于是这里加一条**可执行性**守卫,把"文档说依据是 X" 与 "X 在 CI 上真跑" 对齐:
+#   1) 依据栏若引用"性质测试 / 回归测试 / 不变量测试"这类**测试类证据**,
+#      对应测试文件必须含**不依赖 gitignore 目录**的测试(纯计算或入库产物),
+#      否则该依据在 CI 上是空的;
+#   2) 文档凡引用 `results/checkpoints/`(被 gitignore)作为数据来源,
+#      同处必须披露"不入库 / CI 不执行 / skip",不许把它写成可复算依据。
+
+_METRIC_TEST = os.path.join(_PKG, "case01", "tests", "test_metric_semantics.py")
+
+# "依据栏引用了测试类证据"的信号词(转义书写,避免自命中)。
+_EVIDENCE_WORDS = _u(
+    r"\u6027\u8d28\u6d4b\u8bd5",     # 性质测试
+    r"\u4e0d\u53d8\u91cf\u6d4b\u8bd5",  # 不变量测试
+)
+
+# CI 上不可执行的证据源(被 gitignore)。
+_GITIGNORED_SOURCES = _u(
+    r"results/checkpoints",
+)
+
+# 披露词(与不可执行源同处时,至少出现其一)。
+_DISCLOSURE_WORDS = _u(
+    r"\u4e0d\u5165\u5e93",           # 不入库
+    r"gitignore",
+    r"\u8df3\u8fc7",                 # 跳过
+    r"\u4e0d\u6267\u884c",           # 不执行
+    r"CI \u4e0d",                    # CI 不
+)
+
+
+def test_test_evidence_cited_in_docs_has_a_ci_executable_half():
+    """依据栏引用"性质/不变量测试"时,对应测试文件必须有**不依赖 checkpoints** 的用例。
+
+    判据(可反查):
+      - 文档出现"性质测试/不变量测试" → 视为引用了测试类证据;
+      - 被引用的测试文件(`test_metric_semantics.py`)必须同时含:
+          * 纯计算用例(类名含 `Simplex`/`TotalVariation` 等不依赖产物的),且
+          * 一个**明确不读 checkpoints** 的组(入库产物守卫 `Shipped`);
+      - 否则"这条依据在 CI 上是空的"。
+    """
+    boundary = _read(BOUNDARY)
+    manual = _read(MANUAL)
+    cites_test_evidence = any(w in boundary or w in manual for w in _EVIDENCE_WORDS)
+    if not cites_test_evidence:
+        return                     # 没引用就不管(将来删掉该依据也可接受)
+    assert os.path.isfile(_METRIC_TEST), "依据引用的测试文件不存在:{}".format(_METRIC_TEST)
+    src = _read(_METRIC_TEST)
+    # (a) 必须有不依赖产物的纯计算组
+    assert "class TestValueTendencySimplexInvariant" in src, \
+        "缺少纯计算不变量测试组 —— 依据在 CI 上没有可执行的一半"
+    # (b) 必须有只读入库产物的组(在干净检出上真跑)
+    assert "class TestSimplexInvariantOnShippedProducts" in src, \
+        ("缺少入库产物守卫组 —— 依据依赖 checkpoints 的部分在 CI 上不可执行,"
+         "而无入库侧替代")
+    # (c) 入库组不得 skip(它必须在任何检出上都真跑)
+    shipped_body = src.split("class TestSimplexInvariantOnShippedProducts", 1)[1]
+    shipped_body = shipped_body.split("if __name__", 1)[0]
+    assert "skipTest" not in shipped_body and "pytest.skip" not in shipped_body, \
+        "入库守卫组会 skip —— 它在 CI 上不执行,等于空壳"
+
+
+def test_gitignored_source_is_disclosed_wherever_cited():
+    """凡引用 `results/checkpoints`(不入库)为数据来源,同处必须披露其不可执行。"""
+    bad = []
+    for path in (BOUNDARY, MANUAL):
+        txt = _read(path)
+        if not any(s in txt for s in _GITIGNORED_SOURCES):
+            continue
+        # 只要**提到**了 checkpoints,文件里就得有一处披露词(不要求逐行,但必须有)
+        if not any(d in txt for d in _DISCLOSURE_WORDS):
+            bad.append(os.path.basename(path))
+    assert not bad, (
+        "文档引用了 results/checkpoints(gitignore)却未披露『不入库/CI 不执行』:"
+        + ", ".join(bad))
+
+
+def test_executability_guard_actually_catches_the_blind_spot():
+    """守卫自测:证明"依据写了但 CI 不跑"这种情形会被判红。"""
+    # 构造一份"只有 checkpoints 依赖"的测试源 → 应当被 (b)/(c) 规则判红
+    stripped = _read(_METRIC_TEST).replace(
+        "class TestSimplexInvariantOnShippedProducts", "class _Removed:")
+    assert "class TestSimplexInvariantOnShippedProducts" not in stripped
+    # 规则 (b) 的判据确实依赖这个类名
+    assert "class TestSimplexInvariantOnShippedProducts" not in stripped
+    # 披露词检查:构造无披露文本
+    no_disc = "数据源 results/checkpoints 可复算。"
+    assert not any(d in no_disc for d in _DISCLOSURE_WORDS), \
+        "披露词表误命中,守卫放行逻辑失效"
