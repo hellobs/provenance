@@ -73,7 +73,11 @@ def export() -> int:
                     # 与 `test_router_denominator.py` 里 `clean-1` 那条断言直接冲突。
                     rq = (d.get("reflection") or {}).get("quality") or {}
                     rstatus = str(rq.get("status") or "")
-                    if rstatus in ("error", "fail"):
+                    # review(50≤分<70)也算"没通过门":它是**被标记**的反思,不是 pass。
+                    # 当前全库没有"review + 0 issue + 缺 status"的记录(实测 0 条),所以这一档
+                    # 现在不改变表的行数;写在这里是为了把"非 pass 且 0 issue"整类堵住,
+                    # 免得下一批数据里冒出来又静默漏行。
+                    if rstatus in ("error", "fail", "review"):
                         w.writerow([rid, "", "【Router 未产出,不适用本表标注】",
                                     "", "",
                                     "router.status=(缺键);reflection.quality.status=" + rstatus,

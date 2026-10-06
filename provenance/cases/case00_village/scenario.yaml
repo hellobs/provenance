@@ -20,7 +20,7 @@ meta:
   protocol: sandbox                 # 值演化/干预型(区别于 case01 的受控实验 experiment)
   simulation: "investment"          # 取自 story/relationships 的 simulation 字段
   start_date: "2025-02-13"          # live_fastapi 的 --start(沙盒墙钟起始)
-  runtime: "live_fastapi.py(5001) + live/"   # 过渡:沙盒语义仍由旧运行方式持有
+  runtime: "live_switch.py --start case00(5010) + live/"   # 过渡:沙盒语义仍由旧运行方式持有
   audit_target: ai_advisor          # 专家审核链只监控 AI 助手(2026-09-22 已定):
                                     # 六角色仅 ai_advisor 为 ai_tool,其余 user 不产生
                                     # "AI 自主判断"可审。调用方经 kw 传 evolution+llm 触发。

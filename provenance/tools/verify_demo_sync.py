@@ -51,7 +51,7 @@ def _sha256(path: str) -> str:
     return h.hexdigest()
 
 
-def check_zip(package: str, zip_path: str = "") -> tuple:
+def check_zip(package: str, zip_path: str = "", require: bool = False) -> tuple:
     """校验**zip 交付件**与包目录一致(2026-10-05 第十二轮4.3)。
 
     为什么必须单独查:本脚本原先只比"仓内 vs 包目录",**对zip 一无所知**。
@@ -67,11 +67,18 @@ def check_zip(package: str, zip_path: str = "") -> tuple:
          多出来的旧文件同样会误导对方);
       ③ `.zip.sha256` sidecar 匹配 zip 自身(它只证明 zip 没坏,不证明 zip 新)。
 
-    包目录/zip 任一不存在都返回"不适用"——没交付件≠ 不一致,别误报。
+    默认:**zip 不在就返回"不适用"**(None)—— 开发期"包已生成、还没打包"是正常中间态,
+    "没交付件 ≠ 不一致",别误报(这条语义有测试守着:
+    `tests/test_demo_package_sync.py::test_zip_check_is_a_noop_when_nothing_is_packaged`)。
+    `require=True`(CLI 的 `--require-zip`):**冻结/交付时必须打** —— 删了 zip 就是交付件缺失,
+    不能因为"清单与目录自洽"而算通过。
     """
     zip_path = zip_path or (package.rstrip("\\/") + ".zip")
     if not os.path.isfile(zip_path):
-        return None                      # 没打 zip ⇒ 本项不适用
+        if require:
+            return ["{}:冻结/交付要求 zip 存在,但它不在 —— 交付件缺失".format(
+                os.path.basename(zip_path))]
+        return None                      # 没打 zip ⇒ 本项不适用(见 docstring)
     import zipfile
     with zipfile.ZipFile(zip_path) as zf:
         names = [i.filename for i in zf.infolist() if not i.is_dir()]
@@ -135,6 +142,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="demo 双份记录同步守卫")
     ap.add_argument("--package", default=DEFAULT_PKG,
                     help="交付包根目录(默认 {}）".format(DEFAULT_PKG))
+    ap.add_argument("--require-zip", action="store_true",
+                    help="冻结/交付时用:zip 不存在即判失败(默认:不适用,给开发期用)")
     args = ap.parse_args(argv)
 
     if not os.path.isdir(args.package):
@@ -159,9 +168,10 @@ def main(argv=None) -> int:
         return 1
     print("OK: 仓内与包内逐字节相同。")
     # zip 是真正交付出去的那一份,目录一致**不代表** zip 一致(第十二轮 4.3)
-    zip_problems = check_zip(args.package)
+    zip_problems = check_zip(args.package, require=args.require_zip)
     if zip_problems is None:
-        print("zip: 不存在(尚未打包),本项不适用")
+        print("zip: 不存在(尚未打包),本项不适用"
+              "(冻结/交付时请加 --require-zip,那时它缺失就是失败)")
     elif not zip_problems:
         print("zip: 与包目录逐字节相同,sidecar 匹配")
     else:
