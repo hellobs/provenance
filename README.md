@@ -117,6 +117,31 @@ source). Do not go below 1.2.0: 1.0.0 predates the three case01 injection hooks
 surface (`mavisframework.plugin`, `Simulator(plugins=)`,
 `agent_core.subscribe_chat_line`). CI asserts that surface is present, via
 `tools/check_engine_baseline.py`, before running any test.
+
+**One command (recommended).** From the repository root:
+
+```bash
+# Windows: double-click setup.cmd        (or in a terminal:  setup.cmd --check)
+./setup.sh                               # macOS / Linux
+python tools/setup_all.py                # any platform — the same thing
+```
+
+It performs the six steps below for you and then self-checks: clone/build the engine,
+create the venv, install everything **in the required order**, pull the Ollama models,
+and print what to run next. Re-running is safe — finished steps are skipped and say so.
+Read-only pre-flight (installs nothing, tells you what is missing):
+
+```bash
+python tools/setup_all.py --check
+```
+
+Flags worth knowing: `--yes` (no questions), `--skip-models` (skip the ~8 GB model
+download), `--editable-engine` (install `-e ../mavis` instead of building a wheel),
+`--venv-name`, `--models a,b`, `--install-ollama`, `--api-key sk-...`.
+
+The manual steps below are exactly what it automates — keep them for reference and
+troubleshooting.
+
 Execute in order:
 
 ```bash
@@ -131,7 +156,10 @@ uv build                              # produces dist/mavisframework-1.3.4-py3-n
 cd ../provenance
 
 # 2.2 Create the environment (uv or conda; Python 3.12)
-uv venv .venv --python 3.12
+#     Create it at provenance/.venv-live — in-repo tooling looks for the interpreter
+#     there (tools/run_live_watchdog.ps1, docs/10月15日演示_运行手册.md,
+#     case01/tools/batch_run.py). tools/setup_all.py does the same by default.
+uv venv provenance/.venv-live --python 3.12
 #   conda users: conda create -n provenance python=3.12 && conda activate provenance
 
 # 2.3 Install dependencies **in this exact order** (all three steps matter)
@@ -170,11 +198,13 @@ uv pip install -r requirements.txt pytest
   [Ollama](https://ollama.com/) and pull models
 
   ```bash
-  ollama pull qwen3:4b-instruct-2507-q4_K_M
-  ollama pull qwen3-embedding:0.6b-q8_0
+  ollama pull qwen3:4b-instruct-2507-q4_K_M   # 代码里的默认 chat 模型
+  ollama pull qwen3-embedding:0.6b-q8_0       # 检索用 embedding
+  ollama pull qwen3:8b                        # 演示/验证轨用(经 CASE01_LLM_MODEL)
   ```
 
   No configuration change needed (Ollama is the default).
+  `python tools/setup_all.py` pulls all three (skip with `--skip-models`).
 
 - **OpenRouter (or any OpenAI-compatible API), needs a key**: one command writes
   the key and **verifies it online** (the key is never printed):

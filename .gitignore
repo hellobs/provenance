@@ -202,6 +202,9 @@ dist/
 build/
 *.egg-info/
 .venv/
+# 仓内工具按这个名字找解释器(见 tools/setup_all.py 与 run_live_watchdog.ps1);
+# 用 `.venv*` 兜住 `setup_all.py --venv-name` 选的自定义名,免得建完弄脏工作区。
+.venv*/
 .uv/
 
 # 目视验收截图(用 case01/tools/webshot.js 随时重新生成,不入库)
