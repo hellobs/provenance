@@ -39,8 +39,11 @@ def main():
     ap.add_argument("--hf-device", default=os.environ.get("CASE01_HF_DEVICE", ""),
                     help="本地 HF 推理设备,如 cuda/cuda:0/cpu")
     ap.add_argument("--seed", default=os.environ.get("CASE01_SEED") or os.environ.get("CASE01_LLM_SEED", ""),
-                    help="采样种子(整数);缺省不设=保持非确定行为。"
-                         "设了会由 manifest.seed 记下,只保证同机同版本大概率可逐字复现")
+                    help="采样种子(整数);缺省不设=保持非确定行为。设了会由 manifest.seed 记下。"
+                         "本路径(批/单条)不跑引擎,世界动力学那条流在这里没有取数点"
+                         "(只有 5010 小镇面有),所以它管的是模型采样:同 seed 且服务端状态"
+                         "(模型驻留/预热)对齐时实测可逐字相同,状态没对齐就只保证同一条线;"
+                         "要多样本就得换 seed")
     ap.add_argument("--reflect-only", action="store_true",
                     help="只对已存在的 run 触发 Reflection+Router(不重跑对话)")
     args = ap.parse_args()

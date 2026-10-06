@@ -62,7 +62,9 @@
 - **把各个面起起来**:`serve.cmd` / `./serve.sh` / `python tools/serve_all.py`
   —— 起 5010(默认 case01 只翻记录)+ 5002 + 5003 + 5020,逐个健康自检并打印地址。
   `--status` 只看不动;`--stop` **只停本工具起过的**那些(同时核对自己的 pid 记录与目标命令行);
-  `--all` 连 8060 写面一起起;`--full` 让 5010 真跑一局。
+  `--all` 连 8060 写面一起起;`--full` 让 5010 真跑一局,再带 `--seed <种子> --run-id <名字>`
+  就是"一条命令 + 一个种子"的可复现起法(这三个参数只在 `--full` 那条分支有消费者,少了
+  `--full` 会在起跑前直接拒,不静默丢掉)。
 - **打包 / 校验交付件**:`tools/make_demo_zip.py`(重打)+
   `provenance/tools/verify_demo_sync.py --require-zip`(四者逐字节比对)—— 见 §13。
 

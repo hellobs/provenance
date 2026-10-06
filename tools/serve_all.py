@@ -9,6 +9,7 @@ r"""一条命令起/查/停 provenance 的各个面。
     python tools/serve_all.py --only 5010,5020
     python tools/serve_all.py --case case00  # 5010 换成 case00
     python tools/serve_all.py --full         # 5010 真跑推演(需 Ollama/GPU);默认 --review-only
+    python tools/serve_all.py --full --seed 20261015 --run-id demo1015-live   # 一条命令 + 一个种子
 
 Windows 可双击 `serve.cmd`,macOS/Linux 用 `./serve.sh`。
 
@@ -73,12 +74,24 @@ PID_FILE = os.path.join(LOG_DIR, "pids.json")
 ROLES_5010 = "AI Advisor,Daniel Shen,Kevin Su,Michael Chen,Mr. Zhou,Wendy Lin"
 
 
-def faces(case: str, full: bool, host: str, hold: float):
+def faces(case: str, full: bool, host: str, hold: float,
+          seed: str = "", run_id: str = "", nodes: int = 0):
     live = ["live_switch.py", "--start", case, "--host", host]
     if case == "case01":
         live += ["--hold", str(int(hold))]
         if not full:
             live += ["--review-only"]      # 默认只翻记录:不占 GPU、演示更稳
+        else:
+            # 真跑时把"外部只给一个种子"这条链打通(2026-10-06):这几个参数此前在
+            # 一条命令入口上**传不进去**,于是 README 推的入口反而比手敲 live_switch 少能力。
+            # `--run-id` 不是装饰:世界子种子按 sha256(scheme|world|run_id|master) 派生,
+            # 不钉住 run_id 就等于每次重开换一份世界流,③档"逐字复现"从产物侧就无从谈起。
+            if str(seed or "").strip():
+                live += ["--seed", str(seed).strip()]
+            if str(run_id or "").strip():
+                live += ["--run-id", str(run_id).strip()]
+            if nodes:
+                live += ["--nodes", str(int(nodes))]
     else:
         if not full:
             live += ["--no-sim"]           # case00:不起推演,只服务界面
@@ -452,17 +465,36 @@ def main() -> int:
                     help="5010 真起推演(需要 Ollama/GPU);默认 --review-only 只翻记录")
     ap.add_argument("--host", default="127.0.0.1", help="5010 绑定地址(非本机地址需显式声明)")
     ap.add_argument("--hold", type=float, default=3600, help="case01 跑完保持服务的秒数")
+    ap.add_argument("--seed", default="",
+                    help="case01 真跑(--full)的种子;必须和 --full 一起用,否则会被拒(不静默丢掉)")
+    ap.add_argument("--run-id", dest="run_id", default="",
+                    help="case01 真跑(--full)的 run_id;不钉则按时刻派生,世界流子种子跟着变")
+    ap.add_argument("--nodes", type=int, default=0,
+                    help="case01 真跑(--full):只跑前 N 个节点(0=全部)")
     ap.add_argument("--wait", type=float, default=15, help="起完后等待并自检的秒数(0=不等)")
     ap.add_argument("--python", default="", help="跑服务的解释器(默认自动探测仓内 venv)")
     ap.add_argument("--keep-proxy", action="store_true", help="保留代理环境变量给子进程(默认清掉)")
     ap.add_argument("--log-dir", default=DEFAULT_LOG_DIR,
                     help="日志目录(默认 {} 已 gitignore)".format(DEFAULT_LOG_DIR))
     args = ap.parse_args()
+    pinned = [name for name, val in (("--seed", args.seed), ("--run-id", args.run_id),
+                                     ("--nodes", args.nodes)) if val]
+    if pinned and not (args.full and args.case == "case01"):
+        # **拒,不静默丢掉**:live_switch 只在 case01 真跑那一条分支才往下转这三个参数,
+        # --review-only 只翻已有记录、case00 走 live_fastapi。以前入口直接把它们扔了,
+        # 于是"我钉过种子"和"实际跑的是非确定路径"可以同时在 —— 正是本仓修过好几轮的那类假契约。
+        why = ("现在是 --review-only(5010 只翻记录,不产生新记录)" if args.case == "case01"
+               else "现在是 case00,那条面不吃这三个参数")
+        say("[失败] {} 只有 case01 真跑推演时才有消费者;{}。".format(" ".join(pinned), why))
+        say("        要么换成 `python tools/serve_all.py --full --seed <种子> --run-id <一个名字>`,"
+            "要么去掉它们。")
+        return 2
     global LOG_DIR, PID_FILE
     LOG_DIR = os.path.abspath(args.log_dir)
     PID_FILE = os.path.join(LOG_DIR, "pids.json")
 
-    spec = faces(args.case, args.full, args.host, args.hold)
+    spec = faces(args.case, args.full, args.host, args.hold,
+                 args.seed, args.run_id, args.nodes)
     default_ports = [5010, 5002, 5003, 5020] + ([8060] if args.all else [])
     if args.only:
         want = {int(x) for x in re.split(r"[,\s]+", args.only.strip()) if x}
@@ -491,6 +523,10 @@ def main() -> int:
         return 2
     if 5010 in ports and args.case == "case01" and not args.full:
         say("5010:case01 **只翻记录**(--review-only,不占 GPU);要真跑加 --full")
+    if 5010 in ports and pinned:
+        # 把转出去的实际命令打出来 —— "种子传进去了"要当场可验,而不是等跑完翻 rng.json
+        # 才发现那一下根本没生效(本仓的假契约大多是这一类:选项在、能力不在)。
+        say("5010 的实际命令:{} -X utf8 {}".format(py, " ".join(spec[5010][0])))
     if 8060 in ports:
         say("注意:8060 是**写面且无鉴权**,只在需要改配置时开。")
     return do_start(args, ports, spec, py)

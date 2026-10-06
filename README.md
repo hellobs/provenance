@@ -63,7 +63,8 @@
   — starts 5010 (case01, review-only by default) + 5002 + 5003 + 5020, health-checks each and
   prints the addresses. `--status` only looks; `--stop` stops **only what this tool started**
   (it checks both its own pid record and the target's command line); `--all` adds the 8060 write
-  face; `--full` runs a real simulation on 5010.
+  face; `--full` runs a real simulation on 5010, and `--full --seed <N> --run-id <name>` is the
+  one-command way to pin a run (the seed reaches the record's `manifest` and its `rng.json`).
 - **Ship / verify a bundle**: `tools/make_demo_zip.py` (repack) and
   `provenance/tools/verify_demo_sync.py --require-zip` (four-way byte comparison) — see §13.
 
@@ -249,6 +250,7 @@ uv pip install -r requirements.txt pytest
 python tools/serve_all.py            # Windows: double-click serve.cmd   |  macOS/Linux: ./serve.sh
 python tools/serve_all.py --all      # also start 8060 (config tool — an unauthenticated WRITE face)
 python tools/serve_all.py --full     # 5010 runs a real simulation (needs Ollama/GPU); default is --review-only
+python tools/serve_all.py --full --seed 20261015 --run-id demo1015-live   # one command + one seed
 python tools/serve_all.py --status   # only check: is each port listening, does HTTP answer
 python tools/serve_all.py --stop     # stop the faces THIS tool started (by recorded port owner; never kills others)
 ```

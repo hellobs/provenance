@@ -7,6 +7,8 @@
 #          ./serve.sh --status       only check, change nothing
 #          ./serve.sh --stop         stop the faces this script started
 #          ./serve.sh --full         5010 runs a real simulation (needs Ollama/GPU)
+#          ./serve.sh --full --seed N --run-id X   one command + one seed (reproducible run)
+#          (a seed without --full is refused, never silently dropped)
 #
 #  All real logic lives in tools/serve_all.py (shared with Windows).
 # ============================================================================

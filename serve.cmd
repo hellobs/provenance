@@ -7,6 +7,8 @@ rem          serve.cmd --all               -> also start 8060 (config tool, WRIT
 rem          serve.cmd --status            -> only check, change nothing
 rem          serve.cmd --stop              -> stop the faces THIS script started
 rem          serve.cmd --full              -> 5010 runs a real simulation (needs Ollama/GPU)
+rem          serve.cmd --full --seed N --run-id X  -> one command + one seed (reproducible run)
+rem          (a seed without --full is refused, never silently dropped)
 rem
 rem  All real logic lives in tools\serve_all.py (shared with macOS/Linux).
 rem
