@@ -1,0 +1,42 @@
+{
+  "batch": "261006-142519-r2h06",
+  "finished_at": "2026-10-06 15:06:21",
+  "settings": {
+    "model": "qwen3:8b",
+    "timeline": "auto",
+    "lanes": 3,
+    "duration_min": 120.0,
+    "disable_thinking": true,
+    "python": "D:\\zzr\\provenance\\provenance\\.venv-live\\Scripts\\python.exe"
+  },
+  "counts": {
+    "done": 12,
+    "ok": 12,
+    "failed": 0,
+    "ledger_rows": 12
+  },
+  "branches": {
+    "C": 3,
+    "B": 9
+  },
+  "reflection": {
+    "n": 12,
+    "chars_mean": 1792.3,
+    "chars_min": 1433,
+    "chars_max": 2364,
+    "score_mean": 87.5,
+    "score_n": 12,
+    "status_dist": {
+      "pass": 6,
+      "review": 6
+    }
+  },
+  "router": {
+    "issues_mean": 4.2,
+    "issues_total": 51,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 556.5,
+  "seconds_total": 6677.4,
+  "seconds_n": 12
+}

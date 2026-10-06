@@ -1,0 +1,41 @@
+{
+  "batch": "261006-214428-seedbase12",
+  "finished_at": "2026-10-06 22:09:14",
+  "settings": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 180.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 12,
+    "ok": 12,
+    "failed": 0,
+    "ledger_rows": 12
+  },
+  "branches": {
+    "B": 12
+  },
+  "reflection": {
+    "n": 12,
+    "chars_mean": 2136.2,
+    "chars_min": 686,
+    "chars_max": 2538,
+    "score_mean": 97.1,
+    "score_n": 12,
+    "status_dist": {
+      "pass": 9,
+      "review": 3
+    }
+  },
+  "router": {
+    "issues_mean": 4.2,
+    "issues_total": 50,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 123.8,
+  "seconds_total": 1485.3,
+  "seconds_n": 12
+}
