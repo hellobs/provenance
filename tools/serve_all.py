@@ -276,9 +276,30 @@ def do_start(args, ports, spec, py) -> int:
 
     if not started:
         say("没有新起任何面。")
+    # 探活改成**窗口内轮询**,不再"睡固定 N 秒 + 一次性判定"(2026-10-06 修,第三方复核指出):
+    # 慢启动的面(尤其 case01 那条要走 trampoline→conda python 的链)会被误报红字,
+    # 而误报的代价是"人去排查不存在的问题",再跑一次还会撞端口。
+    # `--wait` 现在是**最长等待**,面一通就立刻往下走;超时才报失败。
     if args.wait > 0:
-        say("等待 {} 秒让它起来(不用 timeout /t:坑 3)…".format(args.wait))
-        time.sleep(args.wait)
+        say("等待各面就绪(最长 {} 秒,通了就立刻继续;不用 timeout /t:坑 3)…".format(args.wait))
+    t0 = time.time()
+    deadline = t0 + max(args.wait, 0)
+    ready_at = {}
+    pending = [p for p in sorted(ports) if p not in [q for q, _ in skipped]]
+    while True:
+        for p in list(pending):
+            _cmd, url, _label, _w = spec[p]
+            if http_ok(url):
+                ready_at[p] = time.time()
+                pending.remove(p)
+        if not pending or time.time() >= deadline:
+            break
+        time.sleep(2.0)
+    if ready_at:
+        slow = {p: round(t - t0, 1) for p, t in ready_at.items() if t - t0 > 2.0}
+        if slow:
+            say("  (慢启动:{} —— 秒数已记下,免得下次又怀疑它没起来)".format(
+                ", ".join("{} 用 {} 秒".format(p, s) for p, s in sorted(slow.items()))))
 
     # 坑 6:把 pid 换成**端口持有者**。实测有些面会 re-exec 成子进程,
     # 我们 spawn 的是父进程,照它停会"报告已停、端口还在听"。
@@ -297,7 +318,7 @@ def do_start(args, ports, spec, py) -> int:
     bad = 0
     for p in sorted(ports):
         _cmd, url, label, _w = spec[p]
-        ok = http_ok(url)
+        ok = p in ready_at
         say("  {:<5}  {:<8}  {}".format(p, "OK" if ok else "失败", url))
         if not ok:
             bad += 1

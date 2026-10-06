@@ -307,8 +307,11 @@ def start(case, args):
 
     log = os.path.join(LOG_DIR, "live_%s.out" % case)
     err = os.path.join(LOG_DIR, "live_%s.err" % case)
-    # 输出重定向到文件,不用管道(管道会随父进程退出把子进程带走)
-    with open(log, "ab") as fo, open(err, "ab") as fe:
+    # 输出重定向到文件,不用管道(管道会随父进程退出把子进程带走)。
+    # **启动前截断**(2026-10-06 修):此前是 `"ab"` 追加,而下面报错时读文件尾部 ——
+    # 于是**任何一次历史 bind 冲突都会永久显示成"当次失败原因"**(本机 err 当时全文就一行旧 10048),
+    # 让人以为这次也失败了。旧日志不是当次证据。与 `tools/serve_all.py` 的口径一致。
+    with open(log, "wb") as fo, open(err, "wb") as fe:
         subprocess.Popen(cmd, cwd=HERE, stdout=fo, stderr=fe,
                          creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
@@ -344,9 +347,23 @@ def start(case, args):
             bound = True
             break
     if not bound:
+        # 探活不可靠时**不照着它杀服务**(2026-10-06 修,第三方只读复核的两条合并):
+        #   ① 判据(命令行 PID ∩ netstat PID)在 uv trampoline → conda python 这条链上偏脆,
+        #      真判不出来时,自动 `stop` 会把一个**真在跑**的服务收掉 —— 探针 bug 升级成事故;
+        #   ② 失败信息要可诊断:把"两侧各看到什么"打出来,而不是只给一句"没绑上"。
+        ours = live_pids(case)
+        port_pids = _pids_by_port(LIVE[case])
         print("\n  [失败] 起来后端口没绑上(常见原因:端口被别的进程占着)。")
-        print("    正在收掉这个游离实例,避免留下'看不见的第二个推演'……")
-        stop(case, quiet=True)
+        print("     判据:本 case 进程 {} 个 / :{} 监听 PID {} 个 / 交集 {} 个".format(
+            len(ours), LIVE[case], len(port_pids), len(set(ours) & port_pids)))
+        if port_pids:
+            print("     ⚠ :{} **确实在听**(PID {}),只是归属判不出来 ⇒ **不自动收掉**".format(
+                LIVE[case], ", ".join(str(x) for x in sorted(port_pids))))
+            print("        先 HTTP 确认一下:curl.exe -s http://127.0.0.1:{}/health".format(LIVE[case]))
+            print("        确认要停:`python live_switch.py --stop {}`,或 Stop-Process -Id <pid>".format(case))
+        else:
+            print("     正在收掉这个游离实例,避免留下'看不见的第二个推演'……")
+            stop(case, quiet=True)
         tail = ""
         try:
             with open(err, "r", encoding="utf-8", errors="replace") as f:
