@@ -175,3 +175,36 @@ def test_batch_child_env_passes_seed(monkeypatch):
 
     _Ns.seed = None
     assert "CASE01_LLM_SEED" not in batch_run._child_env(_Ns()), "缺省时不要写这一栏"
+
+
+def test_seed_base_逐条一个值_且重试沿用同一条():
+    """`--seed-base`:多样本的唯一来源(同 master 多跑几条 = 同一份内容,2026-10-06 实测)。
+
+    序号取自 run_id 末尾(`batch_run.py` 起批时按 `-{i:03d}` 铸名字),所以
+    ① lane 乱序消费不影响"第 i 条 = base+i";② **重试沿用同一个 run_id ⇒ 同一个种子**
+    (否则一次重试同时改了设定,失败原因就分不清是偶发还是换数)。
+    """
+    from types import SimpleNamespace
+
+    from case01.tools import batch_run
+
+    def ns(base=None, seed=None):
+        return SimpleNamespace(model="", embed_model="", disable_thinking=False,
+                               seed=seed, seed_base=base)
+
+    assert batch_run.run_seed(ns(base=20261101), "batch-x-001") == 20261102
+    assert batch_run.run_seed(ns(base=20261101), "batch-x-012") == 20261113
+    # base=0 是合法值,不能当成"没设"
+    assert batch_run.run_seed(ns(base=0), "batch-x-005") == 5
+    # 逐条值确实进了子进程 env(种子只走 env、不进 cmd,env 是唯一通道)
+    env = batch_run._child_env(ns(base=20261101),
+                               batch_run.run_seed(ns(base=20261101), "batch-x-003"))
+    assert env["CASE01_LLM_SEED"] == "20261104", env
+    # 两者都没给 = 不固定,env 里一个 seed 字节都不许多写
+    assert batch_run.run_seed(ns()) is None
+    assert "CASE01_LLM_SEED" not in batch_run._child_env(ns()), "缺省时不要写这一栏"
+    # --seed 那条既有语义不动:整批一个值
+    assert batch_run.run_seed(ns(seed=777), "batch-x-009") == 777
+    # 名字里没有序号就**不猜**(宁可起跑前炸,不要跑完不知道用的哪个数)
+    with pytest.raises(ValueError, match="序号"):
+        batch_run.run_seed(ns(base=7), "manual-name")

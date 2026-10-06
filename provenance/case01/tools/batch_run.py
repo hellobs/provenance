@@ -27,11 +27,18 @@
     # 快速自检(2 分钟内结束,看调度器本身有没有毛病)
     python -m case01.tools.batch_run --duration-min 2 --max-runs 4
 
+    # 要**多样本**:逐条一个种子(第 i 条 = base+i,记在每条台账行的 seed 栏)
+    python -m case01.tools.batch_run --max-runs 12 --lanes 1 --seed-base 20261101
+    # 为什么不是"同一种子多跑几条":批/单条路径上没有世界流的消费者(全仓唯一的
+    # random.* 就是 rngchain.py:174 那句播种,15 个取数点都在 mavisframework 里,
+    # 只有小镇面跑得到)⇒ 同 master + 同一服务端状态 = 同一份内容。
+    # 2026-10-06 实测:12 条同 master、单 lane,内容只有 2 种(空载 1 条 + 暖 11 条全等)。
+
 产物
 ----
 - 每条案例:`case01/runs/<run_id>/run.json`(由 `case01.run` 自己落盘);
 - 调度台账:`results/analysis/batch_runs/<批次号>/ledger.jsonl`
-  (每条一行:run_id/分支/反思质量/issues/耗时/重试次数,供事后统计;
+  (每条一行:run_id/分支/反思质量/issues/耗时/重试次数/**这一条用的种子**,供事后统计;
    **例外**:收尾真的越过界限弃等某条 lane 时,那条不会有台账行 —— 去 failures 里看);
 - 失败明细:同目录 `failures.jsonl`(含 stderr 尾部,便于判断是模型崩还是代码崩;
    越过界限弃等的在飞条目也在这一份里,带 `abandoned:true` 与 `lane`,没有 `log_tail`);
@@ -46,6 +53,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -60,6 +68,7 @@ CASE01_DIR = os.path.dirname(HERE)                        # .../case01
 PROV_DIR = os.path.dirname(CASE01_DIR)                    # .../provenance
 RUNS_DIR = os.path.join(CASE01_DIR, "runs")
 ANALYSIS_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
+_SEQ_RE = re.compile(r"-(\d{3,})$")            # run_id 末尾的 -001…-NNN(--seed-base 用)
 
 def _detect_python() -> str:
     """挑跑 `case01.run` 的解释器:环境变量 → 仓内 venv → 并列的 mavis venv → 当前解释器。
@@ -241,7 +250,7 @@ def _failure_tail(log_path: str, limit: int = 3000) -> str:
     return tail[-limit:]
 
 
-def _child_env(args_ns) -> Dict:
+def _child_env(args_ns, run_seed=None) -> Dict:
     """组装子进程(`python -m case01.run`)的环境。
 
     `PYTHONIOENCODING=utf-8` 是必须的,不是美化:日志文件由本进程按 utf-8 打开并
@@ -259,17 +268,45 @@ def _child_env(args_ns) -> Dict:
         env["CASE01_LLM_DISABLE_THINKING"] = "1"
     else:
         env.pop("CASE01_LLM_DISABLE_THINKING", None)
-    # 采样种子:整批同一个值(缺省不写这一栏 = 每条都不固定)。逐条不同种子
-    # 会让"这批跑的是什么设定"变成 39 个答案,而清单只有一栏可对照。
-    seed = getattr(args_ns, "seed", None)
+    # 采样种子:`--seed` 是整批同一个值;`--seed-base` 是逐条一个值(见 `run_seed`)。
+    # 缺省两者都不写这一栏 = 每条不固定(请求体一个 seed 字节都不许多发,既有语料的语义前提)。
+    # 以前这里写过一句"逐条不同种子会让'这批跑的是什么设定'变成 39 个答案"——
+    # 那句话的前提是"清单只有一栏可对照",而台账行现在自己记 `seed`(:288),
+    # 所以逐条不同种子是可以被回答的:**这批 = base+序号,每条记在自己的台账行里**。
+    seed = getattr(args_ns, "seed", None) if run_seed is None else run_seed
     if seed is not None and str(seed).strip() != "":
         env["CASE01_LLM_SEED"] = str(seed).strip()
     return env
 
 
+def run_seed(args_ns, run_id: str = ""):
+    """这一条用哪个采样种子(None = 不固定)。
+
+    - `--seed N`:整批同一个值(既有语义,一字不动)。
+    - `--seed-base N`:第 i 条 = `N + i`,i 取自 run_id 末尾的 `-001`…`-NNN`
+      (`:536` 起批时按序号铸名字,lane 乱序消费不影响序号;重试沿用同一个 run_id
+      ⇒ **同一条的重试必然同一个种子**,不然重试会把"偶发失败"换成"换了设定",
+      两件事混在一次运行里)。
+    - 两个都没给:返回 None,子进程不写 seed。
+    `--seed` 与 `--seed-base` 互斥在 `main()` 里就拦掉,到这里不会两个都有值。
+    """
+    # 只有 None/空串算"没给";0 是合法种子值(`str(0 or "")` 会变空串,所以不能这么写)
+    base = "" if getattr(args_ns, "seed_base", None) is None \
+        else str(args_ns.seed_base).strip()
+    if base:
+        tail = _SEQ_RE.search(str(run_id or ""))
+        if tail is None:
+            raise ValueError("--seed-base 需要 run_id 末尾带序号(-001 这种),"
+                             "取不到序号就不猜:{}".format(run_id))
+        return int(base) + int(tail.group(1))
+    seed = "" if getattr(args_ns, "seed", None) is None else str(args_ns.seed).strip()
+    return int(seed) if seed else None
+
+
 def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
     """跑一条案例。返回台账行;失败不抛异常(一条崩不带走整批)。"""
-    env = _child_env(args_ns)
+    seed = run_seed(args_ns, run_id)
+    env = _child_env(args_ns, seed)
 
     cmd = [args_ns.python, "-m", "case01.run", "--run-id", run_id]
     if args_ns.timeline:
@@ -278,9 +315,13 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
         cmd += ["--external-ethan"]
 
     t0 = time.time()
+    # `seed` 记在**行里**而不是只靠 env:`cmd` 字段里永远不会有种子(它是 env 传的),
+    # 以前只能回答"整批一个值",`--seed-base` 之后每条不同 —— 不记就等于
+    # "这批 12 条各用了什么种子"在台账里查不回来(2026-10-06 加)。空串 = 这条没固定。
     rec = {"run_id": run_id, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
            "cmd": " ".join(cmd), "attempt": 1, "timeline": args_ns.timeline or "auto",
-           "model_requested": args_ns.model or "(默认)"}
+           "model_requested": args_ns.model or "(默认)",
+           "seed": "" if seed is None else seed}
     log_path = os.path.join(out_dir, "{}.log".format(run_id))
     rc, seen_model = _run_with_probe(cmd, PROV_DIR, env, log_path, args_ns.timeout)
     rec["returncode"] = rc
@@ -330,7 +371,11 @@ def _worker(idx: int, args_ns, job_q: "queue.Queue", out_dir: str,
             _log("lane{}: 到点,不再开新任务(丢弃 {})".format(idx, run_id))
             job_q.task_done()
             return
-        _log("lane{}: 开始 {}".format(idx, run_id))
+        # 开跑就把这一条的种子打出来:`--seed-base` 时人要能当场看见"第 3 条用的是哪个数",
+        # 而不是跑完再去翻台账(种子本身走 env、不在 cmd 里,stdout 是唯一的过程侧可见面)。
+        _seed = run_seed(args_ns, run_id)
+        _log("lane{}: 开始 {}{}".format(
+            idx, run_id, "" if _seed is None else " (种子 {})".format(_seed)))
         # 在飞记录:收尾放弃等待时,"哪几条正在跑"必须是查得出的,不能只说"有 lane 没退出"
         if inflight is not None:
             with _write_lock:
@@ -499,14 +544,23 @@ def main(argv=None) -> int:
     ap.add_argument("--tag", default="", help="批次标签(默认用批次号)")
     ap.add_argument("--seed", default="",
                     help="采样种子(整数,整批同一个值);缺省不固定 = 现有非确定行为")
+    ap.add_argument("--seed-base", dest="seed_base", default="",
+                    help="逐条种子的基数(整数):第 i 条用 base+i,记在该条台账行的 seed 栏;"
+                         "与 --seed 互斥。要多样本用这个 —— 同一种子多跑几条只会得到同一份内容"
+                         "(2026-10-06 实测:12 条同 master 单 lane,内容 2 种,冷/暖各一)")
     args = ap.parse_args(argv)
 
     from case01.agents.llm import parse_seed
     try:
         args.seed = parse_seed(args.seed)
+        args.seed_base = parse_seed(args.seed_base)
     except ValueError as e:
         # 在起跑前就拒,不烧掉一整批才发现种子没生效
         print(str(e), file=sys.stderr)
+        return 2
+    if args.seed is not None and args.seed_base is not None:
+        print("--seed 与 --seed-base 互斥:前者是整批一个值,后者是逐条 base+序号。",
+              file=sys.stderr)
         return 2
 
     python = shutil.which(args.python) or args.python
@@ -538,9 +592,17 @@ def main(argv=None) -> int:
     stop_at = time.time() + args.duration_min * 60
     stats = {"done": 0, "ok": 0, "failed": 0}
     inflight: Dict = {}
-    _log("批次 {} 开始 · 目标 {} 分钟 · 并发 {} · 模型 {} · 分支 {} · 备任务 {} 条".format(
+    # 起跑行就把种子形态说全:批的"设定"要能被一句话回答(整批一个值 / base+序号 / 不固定),
+    # 逐条的具体值另记在每条台账行的 seed 栏里。
+    if args.seed_base is not None:
+        _seed_desc = "逐条 {}+序号".format(args.seed_base)
+    elif args.seed is not None:
+        _seed_desc = str(args.seed)
+    else:
+        _seed_desc = "不固定"
+    _log("批次 {} 开始 · 目标 {} 分钟 · 并发 {} · 模型 {} · 分支 {} · 备任务 {} 条 · 种子 {}".format(
         batch, args.duration_min, args.lanes, args.model,
-        args.timeline or "auto", planned))
+        args.timeline or "auto", planned, _seed_desc))
     _log("台账目录: {}".format(out_dir))
 
     threads = [threading.Thread(target=_worker,
