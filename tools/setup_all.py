@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import platform
@@ -133,18 +134,72 @@ def http_json(url: str, timeout: float = 4.0):
 
 
 def ask(question: str, auto_yes: bool) -> bool:
-    """需要联网/下载/管理员动作时的确认。非交互(无 tty)时按自动继续处理并留痕。"""
+    """需要联网/下载/管理员动作时的确认。
+
+    非交互(无 tty)**默认拒绝**(2026-10-06 修)。此前这里是 `return True`,
+    于是在 CI / 计划任务里跑 setup 会**自动** `git clone` 上游仓、**自动** `ollama pull`
+    约 8GB 模型,甚至自动装 Ollama —— 既可能挂死在凭据提示上,也违背本仓"不静默"的规矩。
+    无人值守要跑,请显式加 `--yes`(那时每一问都会打印"自动继续")。
+    """
     if auto_yes:
         info("--yes:自动继续:" + question)
         return True
     if not sys.stdin.isatty():
-        info("非交互模式:自动继续:" + question)
-        return True
+        warn("非交互且未给 --yes:默认**不做** —— " + question)
+        info("要无人值守跑,请显式加 --yes")
+        return False
     try:
         ans = input("   ? " + question + " [Y/n] ").strip().lower()
     except EOFError:
-        return True
+        return False
     return ans in ("", "y", "yes")
+
+
+def engine_version(engine_dir: str) -> str:
+    """引擎仓自己声明的版本(先 pyproject,再 mavisframework/__init__.py)。
+
+    为什么要它:只看 `dist/` 里有哪些 wheel、再用 `sorted()[-1]` 挑,会踩
+    "字典序当版本序"的坑 —— 2026-10-06 实测:dist 里只有 1.1.0/1.2.0/**1.2.1**,
+    而引擎仓声明的是 **1.3.4**;`sorted()[-1]` 挑中 1.2.1,而 requirements 的
+    `>=1.2.0` 又满足 ⇒ 新机**静默装到旧引擎**,后续 run 直接跑在没有 1.3.x 钩子的框架上。
+    """
+    for cand, pat in ((os.path.join(engine_dir, "pyproject.toml"),
+                       r'^\s*version\s*=\s*["\']([^"\']+)'),
+                      (os.path.join(engine_dir, "mavisframework", "__init__.py"),
+                       r'__version__\s*=\s*["\']([^"\']+)')):
+        if os.path.isfile(cand):
+            try:
+                for ln in io.open(cand, encoding="utf-8", errors="replace"):
+                    m = re.match(pat, ln)
+                    if m:
+                        return m.group(1)
+            except OSError:
+                continue
+    return ""
+
+
+def wheel_version(fname: str) -> str:
+    """从 `mavisframework-1.3.4-py3-none-any.whl` 取出 `1.3.4`。"""
+    m = re.match(r"^.+?-(\d+(?:\.\d+)*)-", os.path.basename(fname))
+    return m.group(1) if m else ""
+
+
+def pick_wheel(dist: str, want: str) -> str:
+    """挑**与引擎版本一致**的 wheel;没有就返回空串(让调用方去构建/报错)。
+
+    读不到引擎版本时退回旧行为(取字典序最后一个),但调用方会把它打印出来。
+    """
+    if not os.path.isdir(dist):
+        return ""
+    cands = [f for f in sorted(os.listdir(dist)) if f.endswith(".whl")]
+    if not cands:
+        return ""
+    if want:
+        for f in cands:
+            if wheel_version(f) == want:
+                return os.path.join(dist, f)
+        return ""
+    return os.path.join(dist, cands[-1])
 
 
 # ---------------------------------------------------------------------------
@@ -227,14 +282,16 @@ def ensure_engine(engine_dir: str, auto_yes: bool, editable: bool, force: bool) 
         info("--editable-engine:就地安装(-e),跳过 wheel 构建")
         return
     dist = os.path.join(engine_dir, "dist")
-    whl = ""
-    if os.path.isdir(dist):
-        cands = sorted(f for f in os.listdir(dist) if f.endswith(".whl"))
-        if cands:
-            whl = os.path.join(dist, cands[-1])
+    want = engine_version(engine_dir)
+    whl = pick_wheel(dist, want)
     if whl and not force:
-        ok("已有 wheel:{}".format(os.path.basename(whl)))
+        ok("已有 wheel:{} (版本 {}{})".format(
+            os.path.basename(whl), wheel_version(whl),
+            ";引擎仓声明 {}".format(want) if want else ";版本未读到"))
         return
+    if want and not whl and os.path.isdir(dist) and \
+            [f for f in os.listdir(dist) if f.endswith(".whl")]:
+        warn("dist/ 里的 wheel 没有一个对得上引擎版本 {} —— 需要重建(否则会静默装旧引擎)".format(want))
     if not ask("要构建引擎 wheel 吗(uv build / python -m build)?约 10 秒", auto_yes):
         raise Failed("未构建 wheel;可加 --editable-engine 改为就地安装")
     uv = which("uv")
@@ -245,10 +302,10 @@ def ensure_engine(engine_dir: str, auto_yes: bool, editable: bool, force: bool) 
             run([sys.executable, "-m", "build", "--wheel"], cwd=engine_dir)
     except Failed:
         die("构建失败。pip 用户请先 pip install build;或改用 --editable-engine")
-    cands = sorted(f for f in os.listdir(dist) if f.endswith(".whl")) if os.path.isdir(dist) else []
-    if not cands:
-        die("构建后 dist/ 里没有 wheel")
-    ok("wheel:{}".format(cands[-1]))
+    whl = pick_wheel(dist, want)
+    if not whl:
+        die("构建后 dist/ 里没有与引擎版本({})一致的 wheel".format(want or "未读到"))
+    ok("wheel:{} (版本 {})".format(os.path.basename(whl), wheel_version(whl)))
 
 
 def ensure_venv(venv_dir: str, force: bool) -> str:
@@ -310,12 +367,14 @@ def install_deps(py: str, engine_dir: str, editable: bool, force: bool) -> None:
         pip_install(py, ["-e", engine_dir])
     else:
         dist = os.path.join(engine_dir, "dist")
-        whls = sorted((f for f in os.listdir(dist) if f.endswith(".whl")), reverse=True) \
-            if os.path.isdir(dist) else []
-        if not whls:
-            die("找不到引擎 wheel(先跑 ensure_engine 那步,或加 --editable-engine)")
-        info("a) 引擎 wheel:{}".format(whls[0]))
-        pip_install(py, [os.path.join(dist, whls[0])])
+        want = engine_version(engine_dir)
+        whl = pick_wheel(dist, want)
+        if not whl:
+            # 宁可不装,也不静默装旧引擎:requirements 的 >=1.2.0 会让 pip 认为已满足
+            die("dist/ 里没有与引擎版本({})一致的 wheel —— 先重跑 `python tools/setup_all.py`"
+                "(它会重建),或加 --editable-engine 就地安装".format(want or "未读到"))
+        info("a) 引擎 wheel:{} (版本 {})".format(os.path.basename(whl), wheel_version(whl)))
+        pip_install(py, [whl])
     # b) 本仓两个本地包(不在 PyPI 上)
     info("b) 本仓本地包:-e packages/mavis-vizkit -e packages/mavis-case01-injector")
     pip_install(py, ["-e", os.path.join("packages", "mavis-vizkit"),
