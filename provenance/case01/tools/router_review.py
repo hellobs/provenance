@@ -63,6 +63,22 @@ def export() -> int:
                                 "", "", "router.status=" + status,
                                 "", "", "", ""])
                     n_norouter += 1
+                else:
+                    # 第四态(2026-10-06 补):`status` 键缺失 + 0 issue,但**反思没过质量门**。
+                    # 实测全库只此 1 条(`p8b-1234`):`router.raw='[]'`、反思仅 67 字、
+                    # `reflection.quality.status='fail'` ⇒ 它的 0 issue 是"反思坏了"的后果,
+                    # **不读作干净**;此前落到 continue,该条在专家表里一行不占,
+                    # 于是"覆盖 310/311"对外说不圆。
+                    # 为什么不按"缺 status 键"一律补行:那会把"干净"与"未产出"重新混起来,
+                    # 与 `test_router_denominator.py` 里 `clean-1` 那条断言直接冲突。
+                    rq = (d.get("reflection") or {}).get("quality") or {}
+                    rstatus = str(rq.get("status") or "")
+                    if rstatus in ("error", "fail"):
+                        w.writerow([rid, "", "【Router 未产出,不适用本表标注】",
+                                    "", "",
+                                    "router.status=(缺键);reflection.quality.status=" + rstatus,
+                                    "", "", "", ""])
+                        n_norouter += 1
                 continue
             for i in issues:
                 w.writerow([rid, i.get("id", ""),
@@ -72,7 +88,7 @@ def export() -> int:
                 n += 1
     print("导出 {} 条 issue -> {}".format(n, path))
     if n_norouter:
-        print("另有 {} 条样本 Router 未产出(error/skipped),已在表中各占一行 ——"
+        print("另有 {} 条样本 Router 未产出(error/skipped/反思未过质量门),已在表中各占一行 ——"
               "它们不在 {} 条 issue 里,不要读成『没有问题』".format(n_norouter, n))
     return 0
 
