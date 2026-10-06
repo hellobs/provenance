@@ -21,7 +21,7 @@
 
 现有 12 条可比干预记录的**对照维度集为空**——真实干预是"同维度集重归一化"
 (约束维度一个不缺、只是权重变),所以 `internalization_metrics` 里的
-`displacement_control` / `mean_displacement_control` 恒为空、恒为 0。
+`displacement_control` 恒为空,`mean_displacement_control` **没有值可算**。
 其后果是 `internalization_gap`(= treated − control)**退化为干预维度自身的位移**:
 
 > **"11/12 为正"只读作「被干预的维度朝新约束方向移动」,
@@ -31,7 +31,12 @@
 但**"相对未干预维度的强度"从未被测量过**——这需要一个真正含"未被触及维度"的
 对照臂,当前样本里没有。**不主张"干预维度比对照维度动得多"。**
 对照臂测量列为后续工作(见 §五)。复算:`results/analysis/*/internalization.json`
-的 `interventions[].control_dims` 全为 `[]`、`summary.mean_displacement_control == 0.0`。
+的 `interventions[].control_dims` 全为 `[]`。
+⚠ **产物形状在 2026-10-06 改过**(口径不变,只是不再印假数字):此前空集会被算成 `0.0`,
+读起来像"对照测过、没动";现在对照为空时 `mean_displacement_control` 与 `internalization_gap`
+一律为 **`null`** 并附 `internalization_gap_note`(md 里印"无对照维度"/"未定义(无对照)")。
+**入库的历史产物不回填**,仍是 `0.0` 旧形状 —— 两者都表示"没有对照",
+判据见 `case01/tests/test_metric_semantics.py` 的 B 组三条断言。
 
 ### 依据的可执行性(第 1 条红线的依据,**哪些在 CI 上真跑**)
 

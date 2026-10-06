@@ -191,31 +191,74 @@ class TestControlDegeneratesToEmpty(unittest.TestCase):
             "真实数据出现了非空 control_dims:内化的对照口径可能已改变,"
             "请复核 docs/内化与敏感性 的 §一-2 与答辩口径")
 
-    def test_gap_equals_mean_treated_exactly(self):
-        """gap 与 mean_treated 逐条完全相等 —— 减号从未生效。"""
-        bad = [(sim, r["agent"], r["internalization_gap"],
-                r["mean_displacement_treated"])
-               for sim, r in self.rows
-               if abs(r["internalization_gap"] - r["mean_displacement_treated"]) > 1e-9]
-        self.assertEqual(bad, [], "gap 不再等于 mean_treated,说明 control 开始起作用了")
+    def test_empty_control_yields_null_not_zero(self):
+        """**2026-10-06 改口径**:对照为空时,`mean_displacement_control` 与
+        `internalization_gap` 必须是 `None`(JSON null),**不再是 0.0**。
 
-    def test_mean_control_is_always_zero(self):
-        nz = [(sim, r["agent"], r["mean_displacement_control"])
-              for sim, r in self.rows
-              if r["mean_displacement_control"] != 0.0]
-        self.assertEqual(nz, [], "mean_displacement_control 非零:口径变了")
+        为什么改:0.0 在产物里读起来像"对照测过、位移为 0",而真相是**没有对照维度**
+        (空集)。《GTC研究边界声明》:24-34 与《说明书》:167 早就写明这条退化,
+        这里让**产物与那两句话一致**。
+
+        变异验证:把 `internalization_metrics.py` 里那两处 `if control else None`
+        改回 `round(mean_ct, 4)` / `round(mean_tr - mean_ct, 4)`,本机重算那一路立刻红
+        (入库产物是旧形状,不受影响 —— 见下一条)。
+        """
+        if self.source != "本机重算":
+            self.skipTest("只在能本机重算时判'当前代码产出的形状';入库产物的形状由下一条守")
+        bad = []
+        for sim, r in self.rows:
+            if r["control_dims"]:
+                continue
+            if r["mean_displacement_control"] is not None or r["internalization_gap"] is not None:
+                bad.append((sim, r["agent"], r["mean_displacement_control"], r["internalization_gap"]))
+            if not r.get("internalization_gap_note"):
+                bad.append((sim, r["agent"], "缺 internalization_gap_note", None))
+        self.assertEqual(bad, [],
+                         "对照为空时必须产出 null + 说明,不能给 0.0(会被读成'对照测过没动')")
+
+    def test_committed_artifacts_keep_legacy_shape(self):
+        """**入库产物不做回填**:2026-10-06 之前生成的 `internalization.json` 仍是旧形状
+        (`mean_displacement_control == 0.0`、`gap == mean_displacement_treated`),
+        这是**当时的证据**,不该被改写。
+
+        这条把"旧形状"也钉住:哪天有人批改了入库产物、或新跑的产物覆盖了它们,
+        它会红 —— 提醒"要么补一条说明,要么明确这是一次有意的重生成"。
+        """
+        rows = _load_committed_rows()
+        if not rows:
+            self.skipTest("没有入库产物(干净到连 results/analysis 都没有)")
+        legacy, new = [], []
+        for sim, r in rows:
+            if r["control_dims"]:
+                continue
+            if r["mean_displacement_control"] is None:
+                new.append((sim, r["agent"]))
+            elif (r["mean_displacement_control"] == 0.0
+                  and abs(r["internalization_gap"] - r["mean_displacement_treated"]) <= 1e-9):
+                legacy.append((sim, r["agent"]))
+            else:
+                self.fail("入库产物的对照形状既不是旧形状也不是新形状:{} / {}".format(sim, r["agent"]))
+        self.assertTrue(legacy or new,
+                        "入库产物里一条空对照记录都没有?口径可能变了")
 
     def test_the_headline_count_is_about_treated_only(self):
         """"11/12 正"这个结论只能读作"干预维度自身朝目标移动",不含对照成分。
 
         这条不是在质疑数字,是在**限定它的解释范围**:它不能支撑
         "干预维度比未干预维度动得多"这个更强的说法。
+        对照为空时,`gap` 与 `treated` 本就同源,故两者正数计数必须一致;
+        对照非空(将来)时 `gap > 0` 是更严的判据,那时本条应改为分开断言。
         """
-        pos = sum(1 for _, r in self.rows if r["internalization_gap"] > 0)
-        pos_treated = sum(1 for _, r in self.rows
-                          if r["mean_displacement_treated"] > 0)
-        self.assertEqual(pos, pos_treated,
-                         "gap 与 treated 的正数计数应一致(因二者恒等)")
+        empty_ctrl = [r for _, r in self.rows if not r["control_dims"]]
+        if not empty_ctrl:
+            self.skipTest("没有空对照行,无法判'朝目标为正'的计数口径")
+        gap_like = sum(1 for r in empty_ctrl
+                       if (r["internalization_gap"] if r["internalization_gap"] is not None
+                           else r["mean_displacement_treated"]) > 0)
+        treated_like = sum(1 for r in empty_ctrl
+                           if (r["mean_displacement_treated"] or 0) > 0)
+        self.assertEqual(gap_like, treated_like,
+                         "对照为空时,'朝目标为正'的计数应与 treated 一致")
 
 
 # ---------------------------------------------------------------------------
@@ -715,17 +758,28 @@ class TestSimplexInvariantOnShippedProducts(unittest.TestCase):
         """入库产物上复验「对照臂为空」—— 红线 1 强度边界的可执行证据。
 
         这是 2026-10-05 边界声明里那条披露的可执行版本:**入库**产物即可复算,
-        不依赖 checkpoints。`internalization_gap == mean_displacement_treated`
-        当且仅当 control 恒空。
+        不依赖 checkpoints。
+
+        形状(2026-10-06 起两种都合法,见 B 组两条新增断言):
+          * **旧形状**(2026-10-06 之前生成的产物):`gap == mean_displacement_treated`
+            —— 空集算出的 0.0 让那个减号失效;
+          * **新形状**:`gap is None` 且带 `internalization_gap_note`。
+        两种都表示"没有对照维度";这里只要求**别出现第三种**(比如 gap 变成别的数),
+        以及别把 `control_dims` 变成非空。
         """
         for f, r in self.rows:
-            self.assertEqual(r.get("control_dims"), [], 
-                             "{} {} 出现了非空对照臂 —— 披露句要重写".format(
-                                 os.path.basename(os.path.dirname(f)), r.get("agent")))
+            where = "{} {}".format(os.path.basename(os.path.dirname(f)), r.get("agent"))
+            self.assertEqual(r.get("control_dims"), [],
+                             "{} 出现了非空对照臂 —— 披露句要重写".format(where))
             self.assertEqual(r.get("displacement_control"), {})
-            self.assertAlmostEqual(
-                r["internalization_gap"], r["mean_displacement_treated"], places=4,
-                msg="gap 与 treated 均值不等,说明 control 不再恒空")
+            gap = r.get("internalization_gap")
+            if gap is None:
+                self.assertTrue(r.get("internalization_gap_note"),
+                                "{} 的新形状缺 internalization_gap_note".format(where))
+            else:
+                self.assertAlmostEqual(
+                    gap, r["mean_displacement_treated"], places=4,
+                    msg="{} 的 gap 既不等于 treated(旧形状)也不是 None(新形状)".format(where))
 
     def test_shipped_displacement_mean_matches_its_own_dims(self):
         """`mean_displacement_treated` 必须等于 `displacement_treated` 各维均值。

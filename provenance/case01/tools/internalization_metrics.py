@@ -93,6 +93,12 @@ def snapshots_in_window(traj: List[dict], t: str, window_min: float) -> List[dic
 # 位移统计(纯函数,可单测)
 # ---------------------------------------------------------------------------
 
+# 对照维度为空时,`internalization_gap` 不产出数字,产物里带这句说明。
+# 口径来源:《GTC研究边界声明》:24-34、《核验主张与证据说明书》:167(都已披露"无对照臂")。
+GAP_NO_CONTROL = ("未定义(无对照维度):本次干预触及的维度集与旧集重归一化,"
+                  "没有未触及维度可作对照 —— 不要把它读成'对照测过、位移为 0'")
+
+
 def displacement(tendency_before: Dict[str, float], tendency_after: Dict[str, float],
                  target: Dict[str, float]) -> Dict[str, float]:
     """每维 gap_before − gap_after;>0 = 朝 target 移动。只统计三方都有的维度。"""
@@ -145,8 +151,16 @@ def analyse_intervention(traj: List[dict], intervention: dict,
         "displacement_treated": {k: round(v, 4) for k, v in d_tr.items()},
         "displacement_control": {k: round(v, 4) for k, v in d_ct.items()},
         "mean_displacement_treated": round(mean_tr, 4),
-        "mean_displacement_control": round(mean_ct, 4),
-        "internalization_gap": round(mean_tr - mean_ct, 4),
+        # 对照为空 ⇒ **不产出数字**(2026-10-06 修)。原先这里写 `round(mean_ct, 4)`,
+        # 空集算出 0.0,在产物里读起来像"对照测过、没动";而《GTC研究边界声明》:24-34 与
+        # 《核验主张与证据说明书》:167 早已写明:真实数据 `control_dims` 恒空 ⇒
+        # `internalization_gap` 退化为干预维度自身位移。此处让**产物与那两句话一致**:
+        # 值为 `null`,并附一条说明。**键保留**(不删):下游有按 `"internalization_gap" in row`
+        # 认行的代码,删键会让它们静默少行 —— 那是另一种"静默"。
+        "mean_displacement_control": round(mean_ct, 4) if control else None,
+        "internalization_gap": round(mean_tr - mean_ct, 4) if control else None,
+        "n_control_dims": len(control),
+        "internalization_gap_note": "" if control else GAP_NO_CONTROL,
         "tv_to_new_before": round(_tv(tb, new_c), 4) if new_c and _tv(tb, new_c) is not None else None,
         "tv_to_new_after": round(_tv(ta, new_c), 4) if new_c and _tv(ta, new_c) is not None else None,
         **(dynamics_metrics(traj, intervention, next_t=next_t) or {}),
@@ -255,16 +269,27 @@ def analyse_simulation(ck_dir: str, interventions: List[dict],
     treated = [r for r in rows if "internalization_gap" in r]
     lat = [r["latency_min"] for r in treated if r.get("latency_min") is not None]
     sus = [r for r in treated if r.get("persistence")]
+    # 真做过对照的条数(对照维度非空)。全库实测为 0 ⇒ 下面两个均值不产出数字。
+    with_ctrl = [r for r in treated if r.get("control_dims")]
     summary = {
         "n_interventions_analysed": len(treated),
         "n_skipped": len(skipped),
         "mean_displacement_treated": round(
             sum(r["mean_displacement_treated"] for r in treated) / len(treated), 4) if treated else None,
         "mean_displacement_control": round(
-            sum(r["mean_displacement_control"] for r in treated) / len(treated), 4) if treated else None,
+            sum(r["mean_displacement_control"] for r in with_ctrl) / len(with_ctrl), 4) if with_ctrl else None,
         "internalization_gap": round(
-            sum(r["internalization_gap"] for r in treated) / len(treated), 4) if treated else None,
-        "n_positive_gap": sum(1 for r in treated if r["internalization_gap"] > 0),
+            sum(r["internalization_gap"] for r in with_ctrl) / len(with_ctrl), 4) if with_ctrl else None,
+        "n_with_control": len(with_ctrl),
+        "control_arm": "present" if with_ctrl else "empty",
+        "internalization_gap_note": "" if with_ctrl else GAP_NO_CONTROL,
+        # 兼容旧键名(材料里"11/12 正"读的就是它):对照为空时它等价于"干预维度自身朝目标为正"。
+        "n_positive_gap": sum(1 for r in treated
+                              if (r["internalization_gap"] if r["internalization_gap"] is not None
+                                  else r["mean_displacement_treated"]) > 0),
+        # 不含歧义的写法,新读者请用这个。
+        "n_positive_displacement": sum(1 for r in treated
+                                       if (r["mean_displacement_treated"] or 0) > 0),
         "median_latency_min": sorted(lat)[len(lat) // 2] if lat else None,
         "n_sustained": sum(1 for r in sus if r["persistence"] == "sustained"),
         "n_rebound": sum(1 for r in sus if r["persistence"] == "rebound"),
@@ -279,24 +304,33 @@ def analyse_simulation(ck_dir: str, interventions: List[dict],
 
 def _md(result: dict, sim: str) -> str:
     s = result["summary"]
+    # 对照为空时**不印数字**(2026-10-06):`0.0` 会被读成"对照测过、没动"。
+    # 历史的 `internalization.json` 仍是旧形状(0.0),这里只影响此后新生成的 md。
+    has_ctrl = bool(s.get("n_with_control"))
+    ctrl_txt = "{}".format(s["mean_displacement_control"]) if has_ctrl else "无对照维度(control_dims 全空)"
+    gap_txt = "**{}**".format(s["internalization_gap"]) if has_ctrl else "未定义(无对照)"
     lines = ["# 内化定量分析 — {}".format(sim), "",
              "| 指标 | 值 |", "|---|---|",
              "| 分析的干预数 | {} |".format(s["n_interventions_analysed"]),
              "| 干预维度平均朝目标位移 | {} |".format(s["mean_displacement_treated"]),
-             "| 对照维度平均位移 | {} |".format(s["mean_displacement_control"]),
-             "| 内化差值(干预 − 对照) | **{}** |".format(s["internalization_gap"]),
+             "| 对照维度平均位移 | {} |".format(ctrl_txt),
+             "| 内化差值(干预 − 对照) | {} |".format(gap_txt),
              "| 差值为正的干预数 | {} / {} |".format(s["n_positive_gap"], s["n_interventions_analysed"]),
              "| 响应延迟中位数(分钟) | {} |".format(s["median_latency_min"]),
              "| 持续 / 回弹 | {} / {} |".format(s["n_sustained"], s["n_rebound"]),
              "| 过冲(越过目标)次数 | {} |".format(s["n_overshoot"]),
              "", "| agent | sim_time | 干预位移均值 | 对照位移均值 | 差值 | 延迟(分) | 持续性 | 过冲 |",
              "|---|---|---|---|---|---|---|---|"]
+    if not has_ctrl:
+        lines.append("")
+        lines.append("> ⚠ {}".format(s.get("internalization_gap_note") or GAP_NO_CONTROL))
     for r in result["interventions"]:
         if "internalization_gap" not in r:
             continue
         lines.append("| {} | {} | {} | {} | {} | {} | {} | {} |".format(
             r["agent"], r["sim_time"], r["mean_displacement_treated"],
-            r["mean_displacement_control"], r["internalization_gap"],
+            r["mean_displacement_control"] if r.get("control_dims") else "无对照",
+            r["internalization_gap"] if r["internalization_gap"] is not None else "未定义",
             r.get("latency_min") if r.get("latency_min") is not None else "—",
             r.get("persistence") or "—",
             "{:.2f}".format(r["max_overshoot_frac"]) if r.get("overshoot") else "—"))
@@ -342,9 +376,11 @@ def main() -> int:
             json.dump(result, f, ensure_ascii=False, indent=2)
         with open(os.path.join(out_dir, "internalization.md"), "w", encoding="utf-8") as f:
             f.write(_md(result, sim))
+        _gap = result["summary"]["internalization_gap"]
         print("[{}] 分析 {} 条干预,内化差值 {}".format(
             sim, result["summary"]["n_interventions_analysed"],
-            result["summary"]["internalization_gap"]))
+            _gap if _gap is not None else "未定义(无对照维度:{}/{} 条有对照)".format(
+                result["summary"].get("n_with_control"), result["summary"]["n_interventions_analysed"])))
         print("    -> {}\\internalization.{{json,md}}".format(out_dir))
         ok += 1
     return 0 if ok else 1
