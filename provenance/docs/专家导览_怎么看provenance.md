@@ -140,9 +140,15 @@ python live_switch.py --start case01 --review-only
   `python -m case01.tools.router_review --score <填好的.csv>` 得到
   **路由一致率 / 行为句率 / 风险校准率**三个指标。
   ⚠ **行数会随跑随增,以上不给具体数字**,要当前条数就重新导出后数:
-  `python -m case01.tools.router_review --export`。表里除真issue 行外还有
-  **Router 未产出(error/skipped)的占位行**(summary 写明"Router 未产出"),
-  它们不在评分分母内,也**不要读成"没有问题"**;
+  `python -m case01.tools.router_review --export`。表里除真 issue 行外还有
+  **"Router 未产出"的占位行**(summary 写明"Router 未产出"),它们不在评分分母内,
+  也**不要读成"没有问题"**。占位行有两类来源,看 `risk_note` 列区分:
+  ① `router.status=error` / `=skipped`(Router 明确跑失败或被跳过);
+  ② **第四态**(2026-10-06 补):`router.status=(缺键);reflection.quality.status=…`
+  —— 旧记录连 `status` 键都没有,而**反思质量门没过**(`error`/`fail`/`review`)。
+  实测全库只此一条 `p8b-1234`:`router.raw='[]'`、反思仅 67 字、`quality.status=fail`;
+  ⚠ 所以"0 issue"单独看**分不清"干净"还是"没跑成"**:`status` 正常且 0 issue 的记录
+  是**真干净、不占行**;反过来,**表里没出现某条 ≠ 那条没问题** —— 两件事都要看 `risk_note`;
 - `results/analysis/reflection_review/reflection_review_sheet.csv`:反思的质量标注表,
   标 `dim1..dim8`(八维是否实质覆盖)、`relevance`(切题度)、`fidelity`(1 = 未编造事实)、
   `style_ok`(1 = 无客套/追问/emoji);同样用 `--export` / `--score` 两个子命令,
