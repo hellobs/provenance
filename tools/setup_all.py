@@ -267,6 +267,14 @@ def ensure_engine(engine_dir: str, auto_yes: bool, editable: bool, force: bool) 
         if not ask("要现在 git clone 引擎仓到 {} 吗?".format(engine_dir), auto_yes):
             raise Failed("引擎仓缺失;请手动 clone 后重跑(或加 --yes)")
         os.makedirs(parent, exist_ok=True)
+        # Git 预检(2026-10-06,第三方复核指出):此前直接 `git clone`,而本机 PATH 里
+        # **可能没有 git**(实测裸 shell 里 `git` 不是命令,连带外层 3 条 doc 测试红)。
+        # 新机宣传"一条命令",就该在这一步给出可执行的安装提示,而不是抛一个 traceback。
+        if not which("git"):
+            die("这台机器 PATH 里没有 git —— 引擎仓要用它 clone。\n"
+                "       Windows:winget install --id Git.Git   (装完重开终端)\n"
+                "       macOS:brew install git     Linux:apt install git\n"
+                "       已有的引擎仓也可以:把 mavis 目录拷到 {} 再重跑本脚本。".format(engine_dir))
         try:
             run(["git", "clone", "https://github.com/hellobs/mavis.git", engine_dir])
         except Failed:

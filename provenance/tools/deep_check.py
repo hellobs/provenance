@@ -210,6 +210,11 @@ say("ivd", not rev.strip(), "mavis 反向依赖案例层:{} 处".format(len(rev.
 # 与测试口径对不上 —— 体检数字和守卫数字必须同源,否则两个都不可信。
 ct = sh('git grep -c -E "case_engine|provenance" -- "config_tool/*.py" "config_tool/**/*.py"', MAVIS)
 ct_files = [l for l in ct.splitlines() if l.strip()]
+# 2026-10-06 修:`sh()` 会把 stderr 拼进来,于是这里可能收到不含冒号的行
+# (例如 "领先 origin is" 这类残句),`rsplit(":",1)[1]` 先于 isdigit 守卫**越界崩掉**
+# (IndexError),F 段之后的 G 文档面检查全都跑不到 —— 而冻版晨检正靠这个工具。
+# 一行防御:先只留"文件:数"形状的行。
+ct_files = [l for l in ct_files if ":" in l]
 ct_hits = sum(int(l.rsplit(":", 1)[1]) for l in ct_files if l.rsplit(":", 1)[1].isdigit())
 ct_doc = sh('git grep -l -E "case_engine|provenance" -- config_tool/ ":!*.py"', MAVIS)
 n_doc = len([l for l in ct_doc.splitlines() if l.strip()])
