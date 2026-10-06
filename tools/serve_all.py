@@ -5,7 +5,7 @@ r"""一条命令起/查/停 provenance 的各个面。
     python tools/serve_all.py                # 起:5010(case01 只读)+5002+5003+5020
     python tools/serve_all.py --all          # 再加 8060 配置工具(写面,无鉴权)
     python tools/serve_all.py --status       # 只查:端口在听吗 / HTTP 通吗
-    python tools/serve_all.py --stop         # 停掉**本脚本起的**那些(按 pid 文件,不误杀)
+    python tools/serve_all.py --stop         # 只停本工具起过的(pid 记录 + 命令行核对;别人的一律不碰)
     python tools/serve_all.py --only 5010,5020
     python tools/serve_all.py --case case00  # 5010 换成 case00
     python tools/serve_all.py --full         # 5010 真跑推演(需 Ollama/GPU);默认 --review-only
@@ -359,7 +359,7 @@ def looks_like_our_face(pid: int, port: int) -> bool:
     return any(m in line for m in markers.get(port, ()))
 
 
-def do_stop(ports, spec, py) -> int:
+def do_stop(ports, spec, py, case: str = "") -> int:
     pids = load_pids()
     if not pids:
         say("pid 文件里没有记录({})。看门狗/live_switch 自己起的请用它们自己的停法:".format(PID_FILE))
@@ -396,14 +396,18 @@ def do_stop(ports, spec, py) -> int:
             left[p] = rec
             continue
         say("[停] {} pid={}".format(p, rec))
-    # 5010 额外让 live_switch 收尾(它自己管互斥与子进程)
-    if 5010 in ports:
+    # 5010 额外让 live_switch 收尾 —— **只在端口还占着时**(说明我们那一下没停干净),
+    # 且**只停我们这轮起的那个 case**(2026-10-06 修下半场:这里原先无条件跑 `--stop all`,
+    # 而 `all` = 两个 case 都停 + 输出进 DEVNULL —— 与 do_start 侧同一个"静默清场",
+    # 演示当天表现为:讲完按 --stop 收尾,顺手把对面 case 还在跑的一局杀掉,且什么都不打印)。
+    if 5010 in ports and port_listening(5010):
+        say("5010 仍在听 —— 让 live_switch 收尾(只停{});它的输出如下:".format(
+            " " + case if case else "当前实时面"))
         try:
-            subprocess.run([py, "-X", "utf8", "live_switch.py", "--stop", "all"],
-                           cwd=PKG_DIR, stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL, timeout=60)
-        except (OSError, subprocess.SubprocessError):
-            pass
+            cmd = [py, "-X", "utf8", "live_switch.py", "--stop", case or "all"]
+            subprocess.run(cmd, cwd=PKG_DIR, timeout=90)
+        except (OSError, subprocess.SubprocessError) as e:
+            say("[提示] live_switch --stop 没跑成:{}".format(e))
     time.sleep(1.5)
     for p in sorted(ports):
         if port_listening(p):
@@ -418,7 +422,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="起/查/停 provenance 各面",
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--status", action="store_true", help="只查,不动进程")
-    ap.add_argument("--stop", action="store_true", help="停掉本脚本起的那些(按 pid 文件)")
+    ap.add_argument("--stop", action="store_true",
+                    help="只停本工具起过的那些(pid 记录 + 命令行核对;别人的进程一律不碰)")
     ap.add_argument("--all", action="store_true", help="连 8060 配置工具(写面)一起起")
     ap.add_argument("--only", default="", help="只操作这些端口,逗号分隔(如 5010,5020)")
     ap.add_argument("--case", choices=["case01", "case00"], default="case01", help="5010 跑哪个 case")
@@ -449,7 +454,7 @@ def main() -> int:
         ports = default_ports
 
     if args.stop:
-        return do_stop(ports, spec, pick_python(args.python))
+        return do_stop(ports, spec, pick_python(args.python), args.case)
     py = pick_python(args.python)
     if args.status:
         return do_status(ports, spec)
