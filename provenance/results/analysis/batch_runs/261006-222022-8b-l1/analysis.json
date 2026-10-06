@@ -1,0 +1,117 @@
+{
+  "title": "261006-222022-8b-l1",
+  "n_runs": 3,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "branches": {
+    "B": 2,
+    "C": 1
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 2,
+    "share": 0.667,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 3,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 1509.7,
+    "chars_median": 1442,
+    "chars_min": 1406,
+    "chars_max": 1681,
+    "score_mean": 93.3,
+    "score_median": 95,
+    "score_n": 3,
+    "status_dist": {
+      "pass": 2,
+      "review": 1
+    },
+    "fail_reason_top": {
+      "未提出可执行的后续改进动作": 1
+    }
+  },
+  "router": {
+    "issues_total": 15,
+    "issues_mean": 5.0,
+    "issues_median": 5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 3
+    },
+    "n_scored": 3,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 3
+    },
+    "n": 3,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 2,
+    "inconsistent": 1
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261006-222022-8b-l1-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1681,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261006-222022-8b-l1-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 1442,
+      "refl_score": 85,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261006-222022-8b-l1-003",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1406,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}
