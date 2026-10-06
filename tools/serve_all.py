@@ -36,6 +36,12 @@ Windows 可双击 `serve.cmd`,macOS/Linux 用 `./serve.sh`。
      照 spawn pid 停会"报告已停、端口还在听"。
      同理:**Windows 上不要用 `os.kill(pid, 0)` 探测存活** —— Python 在 Windows 把任意信号
      实现成 TerminateProcess,`os.kill(pid, 0)` 会**真的把进程杀掉**;这里用 `tasklist` 探活。
+  7. **子进程 stdout 重定向到文件时是块缓冲**:被 `taskkill /F` 强杀会丢掉缓冲区,日志 0 字节,
+     看着像"根本没起来"。子进程环境里必须带 `PYTHONUNBUFFERED=1`(2026-10-06 实测踩到)。
+
+**`--stop` 到底停谁(只此一种说法)**:只停 **pid 文件里记过、且命令行核过像本工具那个面**的进程,
+`/T` 连整棵树(有的面会 re-exec 成子进程)。**当前端口持有者若不是上面那个,一律不动手**,
+只打印补救命令(`live_switch.py --stop` 或手工停)—— 因为端口可能被别人的进程占着。
 
 另外两条纪律:①5010 是**唯一实时入口且两个 case 互斥**,由 `live_switch.py` 管,本文件不自己绑;
 ②`--stop` 只杀 pid 文件里记着的进程 —— 别人的进程一律不碰(旧脚本那句 `Stop-Process -Name python`
@@ -103,6 +109,10 @@ def child_env(keep_proxy: bool):
     env = dict(os.environ)
     env["PYTHONIOENCODING"] = "utf-8"       # 中文日志别在 GBK 上炸(与 safestream 同口径)
     env["PYTHONUTF8"] = "1"
+    # 坑 7(2026-10-06 修):子进程 stdout 重定向到**文件** ⇒ Python 默认块缓冲,
+    # 而被 taskkill /F 强杀时缓冲区直接丢 ⇒ 日志 0 字节,看着像"根本没起来"。
+    # 实测 `5020.out.log` 与 `.err.log` 都是 0 B;stage_run 里也只有两处 print 带 flush。
+    env["PYTHONUNBUFFERED"] = "1"
     if not keep_proxy:
         for k in list(env):
             if k.lower() in ("http_proxy", "https_proxy", "all_proxy", "no_proxy"):
@@ -218,14 +228,21 @@ def do_start(args, ports, spec, py) -> int:
     pids = load_pids()
     started, skipped = [], []
 
-    # 5010 交给 live_switch 自己管互斥:先让它停掉当前在跑的那个 case
-    if 5010 in ports:
+    # 5010 交给 live_switch 自己管互斥。但**只在它真被占着时才清场**:
+    # `live_switch.py --stop all` 会停掉**两个 case**,无条件跑就等于"静默清场"——
+    # 别人正用 live_switch 跑 case00 讲演示时,你一起面就把那局杀了(2026-10-06 修,
+    # qwen 第十六轮 §二:实测当时没有在途的一局,所以是风险不是事故)。
+    # 输出**不再丢进 DEVNULL**:它本来会打印现状表,扔掉可惜(用户据此知道杀掉了什么)。
+    if 5010 in ports and port_listening(5010):
+        say("5010 上已有实时面实例 —— 先停掉它。注意:`--stop all` 会停掉**两个 case**,"
+            "若那是别人正在推演的一局,先跟人确认。live_switch 的输出如下:")
         try:
             subprocess.run([py, "-X", "utf8", "live_switch.py", "--stop", "all"],
-                           cwd=PKG_DIR, env=child_env(args.keep_proxy),
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
-        except (OSError, subprocess.SubprocessError):
-            say("[提示] live_switch --stop all 没跑成(可能本来就没在跑),继续")
+                           cwd=PKG_DIR, env=child_env(args.keep_proxy), timeout=90)
+        except (OSError, subprocess.SubprocessError) as e:
+            say("[提示] live_switch --stop all 没跑成:{};继续起新的".format(e))
+    elif 5010 in ports:
+        say("5010 空闲,不需要清场。")
 
     for p in sorted(ports):
         cmd, url, label, _is_write = spec[p]
@@ -295,6 +312,53 @@ def do_start(args, ports, spec, py) -> int:
     return 1
 
 
+def cmdline_of(pid: int) -> str:
+    """目标进程的命令行(拿不到返回空串)。
+
+    用途只有一个:**kill 之前确认那确实是我们的面**,而不是 PID 回收后撞上的别人进程。
+    Windows 走 CIM(约 0.5s);mac/Linux 读 /proc 或 ps。
+    """
+    try:
+        if IS_WIN:
+            out = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-CimInstance Win32_Process -Filter \"ProcessId={}\").CommandLine".format(pid)],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=25).stdout or ""
+            return out.strip()
+        p = "/proc/%d/cmdline" % pid
+        if os.path.isfile(p):
+            with open(p, "rb") as f:
+                return f.read().decode("utf-8", "replace").replace("\x00", " ").strip()
+        out = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True,
+                             text=True, timeout=15).stdout or ""
+        return out.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def looks_like_our_face(pid: int, port: int) -> bool:
+    """这一条是"绝不误杀"的闸:目标命令行必须含该面的特征串。
+
+    为什么要它(2026-10-06 修,qwen 第十六轮 §一):`--stop` 原先"以当前端口持有者为准",
+    于是**端口被别人的进程占着时它也会 taskkill /T /F** —— 而 PID 会回收,
+    `pids.json` 里昨天的记录今天可能正指向别人的进程。docstring 承诺"别人的进程一律不碰",
+    实现却相反。现在改成:只杀**同时**满足"在 pids.json 记录里"且"命令行像我们的面"的进程;
+    对不上就打补救命令、不动手。
+    """
+    if not alive(pid):
+        return False
+    line = cmdline_of(pid)
+    if not line:
+        return False                    # 拿不到命令行就不动手(宁可让用户手工停)
+    markers = {5010: ("live_switch.py", "vizkit.live_run", "vizkit\\live_run", "vizkit/live_run"),
+               5002: ("case01.serve",),
+               5003: ("case00.serve",),
+               8060: ("config_tool", "app.py"),
+               5020: ("stage_run",)}
+    return any(m in line for m in markers.get(port, ()))
+
+
 def do_stop(ports, spec, py) -> int:
     pids = load_pids()
     if not pids:
@@ -307,24 +371,31 @@ def do_stop(ports, spec, py) -> int:
         if p not in ports:
             left[p] = rec
             continue
-        owner = port_owner(p)          # 坑 6:以端口持有者为准
-        target = owner or rec
-        if owner and rec and owner != rec:
-            say("[注意] {} 的持有者是 pid={}(记录里是 {}),按持有者停".format(p, owner, rec))
-        if not target or not alive(target):
-            say("[已不在] {} pid={}".format(p, target or rec))
+        # 只认记录里的那个 pid(它就是启动后实测到的"端口持有者",/T 会带整棵树);
+        # **不再**"以当前持有者为准" —— 那是误杀别人的入口(见 looks_like_our_face)。
+        if not alive(rec):
+            say("[已不在] {} pid={}(记录值;可能已被回收,不做任何动作)".format(p, rec))
+            if port_listening(p):
+                say("         但 {} 仍在听 —— 那是**别人的**进程,不碰;要停请用 "
+                    "`live_switch.py --stop` 或手工停".format(p))
+            continue
+        if not looks_like_our_face(rec, p):
+            line = cmdline_of(rec)[:90]
+            say("[不动手] {} 记录的 pid={} 命令行不像本工具起的那个面:{}".format(p, rec, line or "(读不到)"))
+            say("         要停它请用:`cd provenance && python live_switch.py --stop` 或手工停")
+            left[p] = rec
             continue
         try:
             if IS_WIN:
-                subprocess.run(["taskkill", "/PID", str(target), "/T", "/F"],
+                subprocess.run(["taskkill", "/PID", str(rec), "/T", "/F"],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
             else:
-                os.killpg(os.getpgid(target), signal.SIGTERM)
+                os.killpg(os.getpgid(rec), signal.SIGTERM)
         except (OSError, subprocess.SubprocessError) as e:
-            say("[失败] 停 {} pid={}: {}".format(p, target, e))
-            left[p] = target
+            say("[失败] 停 {} pid={}: {}".format(p, rec, e))
+            left[p] = rec
             continue
-        say("[停] {} pid={}".format(p, target))
+        say("[停] {} pid={}".format(p, rec))
     # 5010 额外让 live_switch 收尾(它自己管互斥与子进程)
     if 5010 in ports:
         try:
