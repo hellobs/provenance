@@ -46,12 +46,25 @@
 * [10\. 修改地图](#10-修改地图)
 * [11\. 参考资料](#11-参考资料)
 * [12\. 安全与暴露面](#12-安全与暴露面)
+* [13\. 校验与交付](#13-校验与交付)
 
 ---
 
 ## 0. 现状速览
 
-（2026-10-01 核对）
+（2026-10-06 核对）
+
+**入口:各一条命令**（下面 §2、§4 的手工步骤就是它们替你做的事）:
+
+- **装一台新机**:`setup.cmd`（Windows 双击）/ `./setup.sh` / `python tools/setup_all.py`
+  —— 克隆或构建引擎、建 `provenance/.venv-live`、按固定顺序装依赖、拉 Ollama 模型,
+  最后自检。`--check` 是只读预检(不装任何东西)。重复跑是安全的:已完成的步骤会跳过并说明。
+- **把各个面起起来**:`serve.cmd` / `./serve.sh` / `python tools/serve_all.py`
+  —— 起 5010(默认 case01 只翻记录)+ 5002 + 5003 + 5020,逐个健康自检并打印地址。
+  `--status` 只看不动;`--stop` **只停本工具起过的**那些(同时核对自己的 pid 记录与目标命令行);
+  `--all` 连 8060 写面一起起;`--full` 让 5010 真跑一局。
+- **打包 / 校验交付件**:`tools/make_demo_zip.py`(重打)+
+  `provenance/tools/verify_demo_sync.py --require-zip`(四者逐字节比对)—— 见 §13。
 
 **分层**：场景声明（数据）→ 引擎（`case_engine/`，可注册可替换）→ 案例
 （`case01/`、`case00/`）→ 内核（`mavisframework`，独立发版，v1.3.4）→ 呈现
@@ -103,6 +116,32 @@ Provenance(平台,本仓库)
 (config_tool)亦属框架仓库。
 
 ## 2. 环境准备与框架安装
+
+**前置条件**:Python ≥ 3.12;[Git](https://git-scm.com/) 在 `PATH` 上(安装器用它克隆引擎,
+缺了会直接说清楚);以及 [uv](https://docs.astral.sh/uv/) 或 [conda](https://docs.conda.io/),
+纯 `pip` 同样可用。安装器构建/挑选的引擎 wheel **与引擎仓声明的版本一致** ——
+若 `../mavis/dist` 里只有旧版本,它会重建,而不是悄悄装上旧引擎。
+
+**一条命令(推荐)。** 在仓根执行:
+
+```bash
+# Windows:双击 setup.cmd        (命令行里也可以:setup.cmd --check)
+./setup.sh                               # macOS / Linux
+python tools/setup_all.py                # 任意平台 —— 同一个东西
+```
+
+它会替你做完下面六步然后自检:克隆/构建引擎、建环境、**按顺序**装齐依赖、拉 Ollama 模型、
+打印下一步。重复跑安全 —— 已完成的步骤会跳过并说明。只读预检(不装东西、只告诉你缺什么):
+
+```bash
+python tools/setup_all.py --check
+```
+
+值得知道的旗标:`--yes`(不再问)、`--skip-models`(跳过约 8 GB 模型下载)、
+`--editable-engine`(改用 `-e ../mavis` 就地安装)、`--venv-name`、`--models a,b`、
+`--install-ollama`、`--api-key sk-...`。
+
+下面是它自动化的手工步骤 —— 留作参考与排障。按顺序执行:
 
 平台依赖框架 `mavisframework>=1.2.0,<2.0.0`(不在 PyPI,需从源码构建)。不要低于 1.2.0:
 1.0.0 早于 case01 需要的三处注入钩子(external_state / interaction_request /
@@ -344,6 +383,8 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 
 - **默认只绑本机**(`127.0.0.1`)。要绑非本机地址必须显式声明 `LIVE_ALLOW_REMOTE=1`,
   否则进程**拒绝启动**并把暴露面逐条列出来(不是打一句 warning 就放行)。
+  **所有已交付的入口都执行这条**(5020 布景播放器是最后一个接上的,2026-10-06),
+  所以误写 `--host 0.0.0.0` 会**响亮地失败**,而不是悄悄把端口开出去。
 - **跨源白名单默认只给本机来源**(未设 `EMBED_ALLOW_ORIGINS` 时)。平台侧跨源取数请显式设
   `EMBED_ALLOW_ORIGINS=https://<平台域名>`;**iframe 嵌入本身不走 CORS,不受影响**。
 - **跨机对接优先"不要暴露端口"**:同机部署、只读反向代理(只代理 `/embed/*` 与 `GET /api/*`)、
@@ -354,6 +395,27 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 
 代码位置:`live/netguard.py`(绑定与白名单策略)、`tests/test_netguard.py`(行为断言)。
 对接细节见 `provenance/docs/给平台侧_嵌入与数据接入.md`,体检结论见 `provenance/docs/0923_体检报告.md`。
+
+## 13. 校验与交付
+
+三件事都由机器可查 —— 别靠记忆:
+
+```bash
+python tools/setup_all.py --check                          # ① 环境(只读)
+python tools/serve_all.py --status                         # ② 各面在不在(端口 + HTTP)
+python tools/serve_all.py --stop                           #    只停本工具起过的那些
+python provenance/tools/verify_demo_sync.py --require-zip   # ③ 交付件一致性(四者逐字节)
+```
+
+`--require-zip` 是关键:不加它,**压缩包缺失**会被报成"不适用",于是"删掉包"看起来像通过。
+重打是一条命令(`python tools/make_demo_zip.py`,先加 `--dry-run` 可以只看条目);
+按顺序的交付清单在 `provenance/docs/冻结流程_打包装箱一页纸.md`。
+
+**克隆下来没有的东西**:`provenance/case01/runs/` 与 `provenance/results/checkpoints/`
+是**故意 gitignore 的**(体积大,且曾经误提交过),所以本仓带的是**派生分析**
+(`provenance/results/analysis/`,已入库),**不含其背后的原始记录**。
+因此依赖原始记录的主张**无法只靠一次克隆复算** —— 这条边界连同"复现三档口径"写在
+`provenance/docs/GTC研究边界声明.md` 与 `provenance/docs/复现说明_三档口径.md` 里。
 
 ## 许可证
 

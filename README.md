@@ -45,12 +45,27 @@
 * [10\. Custom Maps](#10-custom-maps)
 * [11\. References](#11-references)
 * [12\. Security & exposure](#12-security--exposure)
+* [13\. Verification & delivery](#13-verification--delivery)
 
 ---
 
 ## 0. Current state
 
-(checked 2026-10-01)
+(checked 2026-10-06)
+
+**Entry points (one command each)** — these are the supported ways in; the manual steps in §2 and §4 are what they automate:
+
+- **Set up a machine**: `setup.cmd` (Windows: double-click) / `./setup.sh` / `python tools/setup_all.py`
+  — clones or builds the engine, creates `provenance/.venv-live`, installs in the required order,
+  pulls the Ollama models, then self-checks. `--check` is a read-only pre-flight (installs nothing).
+  Re-running is safe: finished steps are skipped and say so.
+- **Bring every face up**: `serve.cmd` / `./serve.sh` / `python tools/serve_all.py`
+  — starts 5010 (case01, review-only by default) + 5002 + 5003 + 5020, health-checks each and
+  prints the addresses. `--status` only looks; `--stop` stops **only what this tool started**
+  (it checks both its own pid record and the target's command line); `--all` adds the 8060 write
+  face; `--full` runs a real simulation on 5010.
+- **Ship / verify a bundle**: `tools/make_demo_zip.py` (repack) and
+  `provenance/tools/verify_demo_sync.py --require-zip` (four-way byte comparison) — see §13.
 
 **Layers**: scenario declaration (data) -> engine (`case_engine/`, registrable & replaceable)
 -> case (`case01/`, `case00/`) -> kernel (`mavisframework`, independently versioned, v1.3.4)
@@ -109,6 +124,12 @@ via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. The role configuration
 (config_tool) also belongs to the engine repo.
 
 ## 2. Environment & Engine Setup
+
+**Prerequisites**: Python ≥ 3.12; [Git](https://git-scm.com/) on `PATH` (the installer clones
+the engine with it, and says so plainly if it is missing); and [uv](https://docs.astral.sh/uv/)
+or [conda](https://docs.conda.io/) — plain `pip` works as well. The installer builds or picks
+the engine wheel **matching the engine repo's declared version**; if `../mavis/dist` only holds
+older wheels it rebuilds rather than silently installing an older engine.
 
 The platform depends on `mavisframework>=1.2.0,<2.0.0` (not on PyPI; built from
 source). Do not go below 1.2.0: 1.0.0 predates the three case01 injection hooks
@@ -477,6 +498,8 @@ edit scenarios, delete roles and launch a run.
 - **Loopback-only by default.** Binding a non-loopback address requires an explicit
   `LIVE_ALLOW_REMOTE=1`; otherwise the process **refuses to start** and prints exactly what
   would be exposed (a one-line warning is not enough — the port would already be open).
+  Every shipped entry point enforces this (the 5020 scene player was the last one wired up,
+  2026-10-06), so an accidental `--host 0.0.0.0` fails loudly instead of opening a port.
 - **CORS defaults to loopback origins only** (when `EMBED_ALLOW_ORIGINS` is unset). For
   cross-origin data access from the platform, set `EMBED_ALLOW_ORIGINS=https://<platform-host>`.
   Plain `<iframe>` embedding does not use CORS and is unaffected.
@@ -490,6 +513,30 @@ edit scenarios, delete roles and launch a run.
 Code locations: `live/netguard.py` (binding & allowlist policy), `tests/test_netguard.py`
 (behaviour assertions). Integration details: `provenance/docs/给平台侧_嵌入与数据接入.md`;
 health-check conclusions: `provenance/docs/0923_体检报告.md`.
+
+## 13. Verification & delivery
+
+Three things are checkable by machine — use them instead of memory:
+
+```bash
+python tools/setup_all.py --check                          # 1) environment (read-only)
+python tools/serve_all.py --status                         # 2) are the faces up (ports + HTTP)?
+python tools/serve_all.py --stop                           #    stop only what that tool started
+python provenance/tools/verify_demo_sync.py --require-zip   # 3) bundle consistency, four-way
+```
+
+`--require-zip` matters: without it a **missing** archive is reported as "not applicable", so
+deleting the zip would look like a pass. Repacking is one command
+(`python tools/make_demo_zip.py`, add `--dry-run` to just list the entries first); the ordered
+delivery checklist is `provenance/docs/冻结流程_打包装箱一页纸.md`.
+
+**What a clone does not contain.** `provenance/case01/runs/` and
+`provenance/results/checkpoints/` are deliberately gitignored (large, and once committed by
+accident), so this repository ships the **derived analysis**
+(`provenance/results/analysis/`, tracked) but **not the raw run records behind it**. Claims
+that need those records therefore cannot be recomputed from a fresh clone alone — that
+boundary, with the three reproducibility tiers, is written down in
+`provenance/docs/GTC研究边界声明.md` and `provenance/docs/复现说明_三档口径.md`.
 
 ## License
 
