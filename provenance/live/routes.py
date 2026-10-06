@@ -903,6 +903,11 @@ def _render_reflections_page() -> HTMLResponse:
 </main>
 <script>
 const VERDICTS = [["correct","✓ 正确"],["incorrect","✗ 错误"],["partial","◐ 部分正确"]];
+// 转义helper(2026-10-06 修):本节的反思正文/角色名/专家纠正文本此前直接拼进 innerHTML ——
+// 模型产物里出现 `<`、`&` 会被当标签解析,专家在纠正框里输入 `<` 同样会破坏渲染。
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 let picks = {};
 
 async function refresh() {
@@ -915,8 +920,8 @@ async function refresh() {
     for (const p of d.pending) {
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `<div class="meta"><b>${p.agent}</b> · ${p.sim_time} · P.${p.poignancy}</div>
-        <div class="thought">${p.text}</div>
+      card.innerHTML = `<div class="meta"><b>${esc(p.agent)}</b> · ${esc(p.sim_time)} · P.${esc(p.poignancy)}</div>
+        <div class="thought">${esc(p.text)}</div>
         <div class="actions">${VERDICTS.map(([v, t]) =>
           `<button class="${v === "correct" ? "ok" : v === "incorrect" ? "bad" : "part"}" data-v="${v}">${t}</button>`).join("")}</div>
         <textarea placeholder="纠正文本(错误/部分正确时必填)..." style="display:none"></textarea>
@@ -945,9 +950,9 @@ async function refresh() {
     for (const m of d.marked.slice().reverse()) {
       const card = document.createElement("div");
       card.className = "card marked";
-      card.innerHTML = `<div class="meta"><b>${m.agent}</b> · ${m.sim_time} · <span class="badge ${m.verdict}">${m.verdict}</span></div>
-        <div class="thought">${m.thought}</div>` +
-        (m.correction ? `<div class="corr">纠正: ${m.correction}</div>` : "");
+      card.innerHTML = `<div class="meta"><b>${esc(m.agent)}</b> · ${esc(m.sim_time)} · <span class="badge ${esc(m.verdict)}">${esc(m.verdict)}</span></div>
+        <div class="thought">${esc(m.thought)}</div>` +
+        (m.correction ? `<div class="corr">纠正: ${esc(m.correction)}</div>` : "");
       mbox.appendChild(card);
     }
   }

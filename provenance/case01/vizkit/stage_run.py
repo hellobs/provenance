@@ -29,7 +29,7 @@ chat_line/story/snapshot)推进已有的小镇界面,于是"布景"就是一个 
 
     python -m case01.vizkit.stage_run --scenario-dir case00/scenario \
         --roles "AI Advisor,Daniel Shen,Kevin Su,Michael Chen,Mr. Zhou,Wendy Lin" \
-        --script case00/scenario/stage_village.json --port 5020
+        --script case00/stage/village.json --port 5020
 """
 import argparse
 import json
@@ -143,6 +143,11 @@ def main(argv=None):
     ap.add_argument("--loop", action="store_true", help="放完从头再来")
     ap.add_argument("--stop-after", type=float, default=None, help="放 N 秒后停住(自测用)")
     args = ap.parse_args(argv)
+
+    # 绑非本机地址必须显式声明(2026-10-06 补):这一档和其它 5 个入口一样**没有任何鉴权**,
+    # 此前是唯一没接 netguard 的入口 —— 演示当天顺手写 `--host 0.0.0.0` 就会无声开出去。
+    from live.netguard import require_explicit_remote
+    require_explicit_remote(args.host, where="5020 布景播放器")
 
     roles = [r.strip() for r in args.roles.split(",") if r.strip()]
     alias = {}
