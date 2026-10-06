@@ -38,7 +38,7 @@ def main():
                     help="本地 embedding 模型目录;也可用 CASE01_HF_EMBED_MODEL")
     ap.add_argument("--hf-device", default=os.environ.get("CASE01_HF_DEVICE", ""),
                     help="本地 HF 推理设备,如 cuda/cuda:0/cpu")
-    ap.add_argument("--seed", default=os.environ.get("CASE01_LLM_SEED", ""),
+    ap.add_argument("--seed", default=os.environ.get("CASE01_SEED") or os.environ.get("CASE01_LLM_SEED", ""),
                     help="采样种子(整数);缺省不设=保持非确定行为。"
                          "设了会由 manifest.seed 记下,只保证同机同版本大概率可逐字复现")
     ap.add_argument("--reflect-only", action="store_true",
@@ -112,9 +112,24 @@ def main():
         ethan_llm = OpenRouterClient()
         router_llm = OpenRouterClient()
 
+    # 种子链:把"人敲的那一个数"摊到两条流 —— 模型侧仍走 CASE01_LLM_SEED(原值,
+    # 所以 manifest.seed 记的还是它),世界动力学侧按 master+run_id 派生后播种。
+    # 不设 master 时 apply_chain 什么都不做,默认路径的非确定行为与今天逐字节相同。
+    from .rngchain import apply_chain, ensure_run_id, write_side_record
+    if seed is not None:
+        # 名字要**在派生之前**定下来:它既是世界流的盐,也是旁证的落盘目录。
+        # 不先定名的话 `--seed` 不带 `--run-id` 会静默得到"共用一条世界流 + 没有旁证"
+        # (第二十轮体检记的 D-2)。
+        args.run_id = ensure_run_id(args.run_id)
+    rng_info = apply_chain(seed, run_id=args.run_id, log=print)
+
     run_case01(llm=local_llm, timeline=args.timeline, run_id=args.run_id,
                no_llm=args.no_llm, ethan_llm=ethan_llm,
                router_llm=router_llm)
+
+    if rng_info:
+        from .orchestrator import RUNS_ROOT
+        write_side_record(os.path.join(RUNS_ROOT(), args.run_id), rng_info, log=print)
 
 
 if __name__ == "__main__":

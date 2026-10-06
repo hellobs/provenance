@@ -297,6 +297,8 @@ def start(case, args):
                    "--host", args.host,
                    "--port", str(LIVE["case01"]), "--hold", str(args.hold),
                    "--run-id", run_id, "--out", out]
+            if str(getattr(args, "seed", "") or "").strip():
+                cmd += ["--seed", str(args.seed).strip()]
             if args.nodes:
                 cmd += ["--nodes", str(args.nodes)]
     else:
@@ -464,6 +466,10 @@ def main():
                          "(0904doc 01 §六 的设计原意,默认);preset=分支由 --branch 指定")
     ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到 case01/runs_injector/<run_id>/raw.json)")
     ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
+    ap.add_argument("--seed", default="",
+                    help="case01:**唯一的种子入口**(整数)。设了会把模型采样与小镇世界动力学"
+                         "一起固定(世界流按 master+run_id 派生);不设=保持今天的非确定行为。"
+                         "也可用环境变量 CASE01_SEED")
     ap.add_argument("--name", default="demo", help="case00:模拟名")
     ap.add_argument("--sim-start", dest="sim_start", default="20250213-09:30",
                     help="case00:模拟起始时间(与 --start 的 case 选择不是一回事)")

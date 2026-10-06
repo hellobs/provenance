@@ -30,6 +30,19 @@ _LONG_OUTPUT_TYPES = frozenset([
 ])
 
 
+def _env_seed():
+    """现读种子链的 env(`CASE01_LLM_SEED`);没设或非法都返回 None(=不下发 seed)。"""
+    import os
+    text = str(os.environ.get("CASE01_LLM_SEED", "") or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        print("[case01.llm] CASE01_LLM_SEED 不是整数,按未设处理:{!r}".format(text), flush=True)
+        return None
+
+
 def _res_annotation(return_type):
     """取 `res` 字段的类型标注:整数/布尔类回答(打分、起床点、是非)给最小档就够。"""
     field = getattr(return_type, "model_fields", {}).get("res")
@@ -53,6 +66,13 @@ class Case01SafeProvider:
         # 记进 summary 才会出现在 mavis 的角色日志/state 里,而不是只有天知道。
         self.truncations = 0
         self.last_truncation = None
+        # 采样种子:配置里显式给了就用它;没给则在每次调用时现读 env —— 因为 env
+        # 可能在 provider 构造之后才被种子链设上(live_run 是"先建桥后播种"的顺序)。
+        raw_seed = str(self.config.get("seed", "") or "").strip()
+        try:
+            self.seed = int(raw_seed) if raw_seed else None
+        except ValueError:
+            self.seed = None
 
     def completion(self, prompt, retry=10, callback=None, failsafe=None,
                    return_type=None, caller="llm_normal", **kwargs):
@@ -117,6 +137,12 @@ class Case01SafeProvider:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        # 种子链:显式设过 CASE01_SEED/CASE01_LLM_SEED 才下发 —— 不传就是今天的
+        # 非确定路径。此前 agent 台词根本不带 seed(`--seed` 只钉住了判定/反思/路由),
+        # 所以"一个种子"覆盖不到小镇;这一行把它接上。
+        seed = self.seed if self.seed is not None else _env_seed()
+        if seed is not None:
+            body["seed"] = seed
         if response_format:
             body["response_format"] = response_format
         headers = {"Content-Type": "application/json"}

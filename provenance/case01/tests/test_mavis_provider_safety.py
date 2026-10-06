@@ -1,4 +1,4 @@
-"""Case01SafeProvider:输出校验、生成上限、截断计数(不联网)。
+"""Case01SafeProvider:输出校验、生成上限、截断计数、种子上线(都不联网)。
 
 2026-09-23 补的两条是**回归**:原来的分档只看 `caller`,而 mavis 的
 `Agent.completion` 从不传 caller(`Result` 只有 prompt/callback/failsafe/return_type
@@ -192,3 +192,42 @@ def test_structured_output_uses_json_schema(monkeypatch):
     assert sent["response_format"]["json_schema"]["strict"] is True
     assert sent["max_tokens"] == 256
     assert json.loads(json.dumps(sent))  # 可序列化(没有被塞进奇怪对象)
+
+
+# --------------------------------------------------------------- 种子必须真的上线
+# 为什么单独钉这三条:2026-10-06 之前 `--seed` 只钉住了判定/反思/路由,镇里 agent
+# 的每次发言**根本没带 seed**,而这件事在日志与产物里都看不出来(请求体不落盘)。
+# 起面要 5010(本会话不起),所以这里用假 post 把"发出去的字节"钉住 —— 这是
+# 不烧 GPU 能拿到的最强证据。
+
+def test_env_seed_reaches_the_request_body(monkeypatch):
+    monkeypatch.setenv("CASE01_LLM_SEED", "20261015")
+    provider = _provider()
+    calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    assert calls[0].get("seed") == 20261015, \
+        "种子没上线 ⇒ 镇里台词仍是非确定的:{}".format(calls[0])
+    assert isinstance(calls[0]["seed"], int), "必须是整数,Ollama 才认"
+
+
+def test_没有种子时请求体里不许出现_seed_键(monkeypatch):
+    """默认路径的红线:不传 seed 就一个字节都不许多发(既有语料的语义前提)。"""
+    monkeypatch.delenv("CASE01_LLM_SEED", raising=False)
+    provider = _provider()
+    calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    assert "seed" not in calls[0], calls[0]
+
+
+def test_显式配置的种子压过环境变量(monkeypatch):
+    monkeypatch.setenv("CASE01_LLM_SEED", "999")
+    provider = _provider(seed=7)
+    calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    assert provider.seed == 7 and calls[0]["seed"] == 7, calls[0]
+    # 非法值不静默回落到 env 之外的第三种状态:配置坏 ⇒ 退回读 env(仍要有种子)
+    bad = _provider(seed="abc")
+    monkeypatch.setenv("CASE01_LLM_SEED", "999")
+    calls2 = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    bad.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    assert bad.seed is None and calls2[0]["seed"] == 999, calls2[0]

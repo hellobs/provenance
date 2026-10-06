@@ -69,9 +69,16 @@ class MavisBridge:
         debug_note: str = "",
         judge_llm: Optional[object] = None,
         backend_kind: str = "",
+        think_workers: int = 0,
     ):
         self.nodes = list(nodes or [])
         self.roles = tuple(roles)
+        # 并行思考线程数。0 = 按角色数(今天的行为)。
+        # 为什么这跟"可复现"有关:引擎那 15 个 `random.*` 走的是**进程全局** RNG,
+        # 多个 agent 同时 think 时,数流是固定的(种子链已钉),但**谁拿到哪个数**
+        # 取决于线程调度 ⇒ 位置/目的地/retry_prob 会在角色之间串味。
+        # 设成 1 才让"同一个种子"落到同一个角色的同一次抽样上。
+        self.think_workers = max(0, int(think_workers or 0))
         self.scenario_dir = scenario_dir
         self.run_id = run_id
         self.max_retries = int(max_retries)
@@ -461,7 +468,7 @@ class MavisBridge:
             adapter = VizForwarder(self)
             self._adapter = adapter
         sim_kwargs = dict(
-            max_workers=max(1, len(self.roles)),
+            max_workers=self.think_workers or max(1, len(self.roles)),
             export_decisions=False,
             external_state=self.external_state,
             interaction_request=self.interaction_request,

@@ -40,16 +40,33 @@ def _install_stub_provider(monkeypatch):
     return instance
 
 
-def _bridge(dry_run=False, monkeypatch=None, tmp_path=None):
+def _bridge(dry_run=False, monkeypatch=None, tmp_path=None, **kw):
     monkeypatch.setenv("MAVIS_CHECKPOINTS_ROOT", str(tmp_path / "checkpoints"))
     monkeypatch.delenv("CASE01_ETHAN_BASE_URL", raising=False)
     monkeypatch.delenv("CASE01_ETHAN_MODEL", raising=False)
     nodes = default_nodes("A", roles=list(DEFAULT_ROLES))
     bridge = MavisBridge(
         nodes=nodes, roles=DEFAULT_ROLES, scenario_dir=SCENARIO,
-        run_id="test-build", dry_run=dry_run,
+        run_id="test-build", dry_run=dry_run, **kw
     )
     return bridge, nodes
+
+
+def test_think_workers_默认按角色数而显式值落到_simulator(monkeypatch, tmp_path):
+    """`--think-workers` 是种子链的一部分,但不许悄悄改今天的默认并行度。
+
+    引擎的 `random.*` 是进程全局的:多 agent 并行 think 时数流固定而"谁拿到哪个数"
+    随线程调度 ⇒ 设 1 才让同种子落到同一次抽样上。默认必须仍是角色数(速度)。
+    """
+    _install_stub_provider(monkeypatch)
+    default_bridge, _ = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    default_bridge._build_mavis()
+    assert default_bridge.think_workers == 0
+    assert default_bridge.simulator.max_workers == max(1, len(default_bridge.roles))
+
+    serial, _ = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path, think_workers=1)
+    serial._build_mavis()
+    assert serial.simulator.max_workers == 1, "串行没落到 Simulator 上 ⇒ 种子链形同虚设"
 
 
 def test_build_mavis_wires_hooks_and_agents(monkeypatch, tmp_path):

@@ -144,7 +144,11 @@ SCAN_DIRS = [
 
 # 允许出现的地方:随机数生成器以外的一切。这里只禁"采样随机"。
 BANNED = (
-    (re.compile(r"(?<![\w.])random\."), "random.*"),
+    # 放行 `random.seed(`:播种**不是**新增随机源,而是把引擎已有的那条流固定住
+    # (见 case01/rngchain.py 的种子链 —— 引擎那 15 个 `random.*` 调用点在我们仓外,
+    # 唯一能管住它们的方式就是在进程入口 seed 一次)。本守卫的前提是"随机源可枚举",
+    # seed 让这个前提更可管而非更破坏;其余 `random.` 照旧禁止。
+    (re.compile(r"(?<![\w.])random\.(?!seed\()"), "random.*"),
     (re.compile(r"(?<![\w.])uuid\.uuid[14]\("), "uuid1/4"),
     (re.compile(r"np\.random|numpy\.random"), "numpy.random"),
 )
