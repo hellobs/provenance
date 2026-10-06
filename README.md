@@ -221,6 +221,19 @@ uv pip install -r requirements.txt pytest
 
 ## 4. Run the Live Simulation
 
+**One command for all faces** (recommended — starts 5010 in case01 review-only mode, plus
+5002 / 5003 / 5020, then health-checks them and prints the URLs):
+
+```bash
+python tools/serve_all.py            # Windows: double-click serve.cmd   |  macOS/Linux: ./serve.sh
+python tools/serve_all.py --all      # also start 8060 (config tool — an unauthenticated WRITE face)
+python tools/serve_all.py --full     # 5010 runs a real simulation (needs Ollama/GPU); default is --review-only
+python tools/serve_all.py --status   # only check: is each port listening, does HTTP answer
+python tools/serve_all.py --stop     # stop the faces THIS tool started (by recorded port owner; never kills others)
+```
+
+By hand, the same thing:
+
 ```bash
 cd provenance/provenance
 python live_switch.py --start case01        # 5010 is the single live entry (case00/case01 are mutually exclusive)

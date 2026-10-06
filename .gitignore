@@ -197,6 +197,10 @@ decisions_*.json
 # 前端冒烟测试渲染产物(pytest 生成,CI 用,不入库)
 tests/_pages/
 
+# 本地服务日志与 pid 文件(tools/serve_all.py 的产物:运行态,不入库)
+# *.log 早已忽略,这条是为了 `logs/serve/pids.json` 之类非 .log 文件也不弄脏工作区。
+logs/
+
 # Python 打包产物(uv build / setuptools)
 dist/
 build/
