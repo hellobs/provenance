@@ -227,12 +227,15 @@ def rewrite_if_needed(path, rel, date, write):
     return True
 
 
-SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
+SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs", "runs_injector",
              "runs_html",
              # 2026-10-05:`runs_archive_*` 不再逐个列举 —— 统一由下面 walk 里的
              # `d.startswith("runs_archive")` 前缀过滤覆盖,与 tests/test_docs_status.py
              # 同一机制(此前这里写死 `runs_archive_20260919`,再加新归档目录就漏筛)。
+             # 2026-10-06:venv 同样改成前缀 —— 下面 `d.startswith(".venv")`。
+             # 此前只写死 `.venv`/`.venv-live`,于是 `tools/setup_all.py --venv-name` 建的
+             # 自定义 venv 里 site-packages/**/LICENSE.md 会被列进"文档待核对"清单。
              # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
              # 不是本仓文档 —— 记忆文件没有状态块,把它们按项目文档治理会红测试
              # (test_docs_status)。工具目录与项目文档分开管。
@@ -245,7 +248,8 @@ def md_files(root):
         return out
     for dirpath, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS
-                   and not d.startswith("runs_archive")]
+                   and not d.startswith("runs_archive")
+                   and not d.startswith(".venv")]
         dirs.sort()   # 目录顺序也钉住:否则日期并列的行随 scandir 顺序漂移,产生假 diff
         for fn in sorted(files):
             if fn.lower().endswith(".md"):

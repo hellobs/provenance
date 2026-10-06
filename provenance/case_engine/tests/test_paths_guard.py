@@ -135,7 +135,15 @@ def test_relative_root_fails_from_any_cwd():
         code = _CWD_PROBE.format(plat=plat_dir, root="cases")
         env = dict(os.environ)
         env.pop("CASE_ENGINE_CASES_ROOT", None)
-        out = subprocess.run([sys.executable, "-c", code], cwd=cwd, env=env,
-                             capture_output=True, text=True, timeout=60)
+        # 子进程的报错信息是中文。中文 Windows 下子进程默认按 GBK 写管道,
+        # 而本套件常以 `-X utf8` 运行 —— 父进程按 UTF-8 读会在读取线程里抛
+        # UnicodeDecodeError,`stderr` 变成 None,下一行断言就 TypeError
+        # (2026-10-06 实测,与 case01/safestream.py 记的那次事故同一类)。
+        # 只加 errors="replace" 不够:那会把中文换成 U+FFFD,断言的"绝对路径"永远匹配不上。
+        # 正解是让子进程也按 UTF-8 写。
+        env["PYTHONIOENCODING"] = "utf-8"
+        out = subprocess.run([sys.executable, "-X", "utf8", "-c", code], cwd=cwd, env=env,
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=60)
         assert out.returncode != 0, "相对配置在 {} 下竟然通过了".format(cwd)
         assert "AmbiguousPathError" in out.stderr or "绝对路径" in out.stderr

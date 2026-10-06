@@ -16,13 +16,17 @@ _this_dir = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_this_dir)                    # D:\zzr\provenance
 _PKG = os.path.join(_REPO, "provenance")
 
-SKIP_DIRS = (".git", "node_modules", "__pycache__", ".venv", ".venv-live", "_shared",
+SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              ".pytest_cache", ".uv-cache", ".audit-tmp", "results", "runs",
              "runs_injector", "runs_html",
              # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
              # 不是项目文档,不该按文档治理要求带状态块。工具侧同见 tools/doc_audit.py。
              # 2026-10-05:`runs_archive_*` 由下方 `d.startswith("runs_archive")` 前缀
              # 过滤统一覆盖,别再往这个元组里逐个加归档目录名(两处必须同一机制)。
+             # 2026-10-06:venv 由 `.venv` 前缀统一覆盖(见 _md_files)—— 此前只写死
+             # `.venv`/`.venv-live` 两个名字,于是 `tools/setup_all.py --venv-name` 建出来的
+             # 自定义 venv 里的 site-packages/**/LICENSE.md 会被当成"没状态块的文档",
+             # 让新机使用者看到 4 条假红(实测)。同机制:tools/doc_audit.py。
              ".workbuddy")
 BANNER = re.compile(r"^>\s*\*\*(状态|Status)\*\*", re.M)
 # 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起);
@@ -37,7 +41,10 @@ def _md_files():
     # "本仓每份 .md" 不符(见第 2 轮体检)。
     out = []
     for dirpath, dirs, files in os.walk(_REPO):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith("runs_archive")]
+        dirs[:] = [d for d in dirs
+                   if d not in SKIP_DIRS
+                   and not d.startswith("runs_archive")
+                   and not d.startswith(".venv")]   # 任何 venv 名(--venv-name 可自定义)
         for fn in files:
             if fn.lower().endswith(".md"):
                 out.append(os.path.join(dirpath, fn))

@@ -59,8 +59,32 @@ PROV_DIR = os.path.dirname(CASE01_DIR)                    # .../provenance
 RUNS_DIR = os.path.join(CASE01_DIR, "runs")
 ANALYSIS_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 
-# 默认解释器:mavis 仓的 venv(mavisframework 装在那儿)。可用 --python 覆盖。
-DEFAULT_PYTHON = r"D:\zzr\mavis\.venv\Scripts\python.exe"
+def _detect_python() -> str:
+    """挑跑 `case01.run` 的解释器:环境变量 → 仓内 venv → 并列的 mavis venv → 当前解释器。
+
+    为什么不写死(2026-10-06 修):此处原本硬编码 `D:\\zzr\\mavis\\.venv\\Scripts\\python.exe`,
+    换机器/换 venv 名就跑不起来 —— 这正是新人第一次用批量工具会撞的墙。
+    顺序:`CASE01_BATCH_PYTHON` → `provenance/.venv-live` → `provenance/.venv`
+    → 仓根同名两个 → 与仓并列的 `../mavis/.venv` → `sys.executable`。
+    选中的路径会打印出来(不静默),也可用 `--python` 覆盖。
+    """
+    env = os.environ.get("CASE01_BATCH_PYTHON", "").strip()
+    if env:
+        return env
+    repo = os.path.dirname(PROV_DIR)                     # 仓根
+    tail = os.path.join("Scripts", "python.exe") if os.name == "nt" else os.path.join("bin", "python")
+    for c in (os.path.join(PROV_DIR, ".venv-live", tail),
+              os.path.join(PROV_DIR, ".venv", tail),
+              os.path.join(repo, ".venv-live", tail),
+              os.path.join(repo, ".venv", tail),
+              os.path.join(os.path.dirname(repo), "mavis", ".venv", tail)):
+        if os.path.isfile(c):
+            return c
+    return sys.executable
+
+
+# 默认解释器见 _detect_python()(可用 --python 或 CASE01_BATCH_PYTHON 覆盖)
+DEFAULT_PYTHON = _detect_python()
 
 _write_lock = threading.Lock()
 
@@ -479,6 +503,9 @@ def main(argv=None) -> int:
         print("找不到解释器:{} —— 装好 mavisframework 或用 --python 指定".format(python),
               file=sys.stderr)
         return 2
+    # 选中的解释器要看得见:自动探测错了(例如挑到系统 python 而它没装 mavisframework)
+    # 时,只会在每条 run 里失败,不打印就很难定位。
+    print("解释器:{}".format(python), flush=True)
     if not os.path.isdir(RUNS_DIR):
         print("找不到 runs 目录:{} —— 确认在 provenance/provenance 下运行".format(RUNS_DIR),
               file=sys.stderr)
