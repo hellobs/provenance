@@ -389,6 +389,11 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
             # 兼容旧键:留 `n` 但语义写进注释,免得老脚本 KeyError。
             # 新读者请用 `n_scored`。
             "n": len(issues),
+            # 自述字段(2026-10-06 补,第三方追问"4.7 的分母是谁"):把均值的分母**写进产物**,
+            # 免得读者去读代码或默认成 `n_runs`。实测 261004-220441-h120seed:
+            # issues_total=154 / n_scored=33 ⇒ 4.7;而 n_runs=35(2 条 router skipped 被剔除)。
+            "issues_mean_over": "n_scored",
+            "issues_mean_formula": "issues_total / n_scored",
         },
         "consistency": cons,
         "per_run": rows,
@@ -494,6 +499,9 @@ def _md(a: Dict) -> str:
         "",
         "- issues:合计 {} · 均值 {} · 中位 {}".format(
             r["issues_total"], r["issues_mean"], r["issues_median"]),
+        "- 均值的分母:**{} 条**（`issues_total / n_scored`；本批次总 {} 条，"
+        "另有 {} 条 Router 未产出被剔除 — 见 `router_status_dist`）".format(
+            r.get("n_scored"), a["n_runs"], r.get("n_excluded_not_scored")),
         "- 零 issue 记录:{} 条（占 {:.1%}，分母为参与统计的 {} 条）".format(
             r["zero_issue_runs"],
             r["zero_issue_runs"] / r["n"] if r["n"] else 0, r["n"]),
