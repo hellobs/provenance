@@ -142,6 +142,12 @@ class Case01SafeProvider:
         # 所以"一个种子"覆盖不到小镇;这一行把它接上。
         seed = self.seed if self.seed is not None else _env_seed()
         if seed is not None:
+            # 把**这一次实际发出去的值**记回实例。清单里的 `seed` 只认客户端自己的
+            # 声明(`manifest.detect_seed` 刻意不读 env,免得造出"清单说固定了、
+            # 客户端其实没固定"的假证据),而这里此前只在请求体里带 seed、实例仍是
+            # None ⇒ 产物写着 `seed: null`,而"一个种子"这件事在记录里查不到
+            # (2026-10-06 实测:小镇面三条真跑的 manifest.seed 全为 null)。
+            self.seed = seed
             body["seed"] = seed
         if response_format:
             body["response_format"] = response_format

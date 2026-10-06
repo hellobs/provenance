@@ -603,19 +603,28 @@ def _http_ctx(app) -> InterventionContext:
     `supports_governance` 取自 **app.state** 而不是 live.state 的全局:两面在测试里
     会建在同一进程内,做成模块全局就会互相污染(case01 面一建,后面的 case00 用例
     全部被判成"不挂治理")。生产里两 case 互斥共用 5010,但按进程声明本来就是错的粒度。
+
+    `server`/`sim_name` 同样按面取:全局 `state.server` 与 `state.sim_state["name"]`
+    只有 case00 的 live_fastapi 会注入,而 case01 的小镇面把这一局的引擎握在
+    MavisBridge 里(全局从来不留)。此前不声明的后果实测过:那面的反思标记照样
+    `ok:true` 落盘,但 `simulation` 与 `sim_time` 恒为空串 —— 标记归不到任何一条
+    记录,M4 的"哪一局、哪个时刻"就查不回来了(而 `corrective_feedback` 只会说
+    "当前没有运行中的模拟",对着动个不停的小镇像坏了)。
     """
     from live import state as _state
 
+    engine = getattr(app.state, "intervention_engine", None) or _state.server
     try:
         ckpt_dir = _state.current_ckpt_dir()
     except Exception:  # noqa: BLE001 —— 未运行/压缩器缺失:ckpt 留空
         ckpt_dir = ""
     return InterventionContext(
-        server=_state.server,
+        server=engine,
         base_dir=_state.BASE_DIR,
         ckpt_dir=ckpt_dir or "",
-        sim_name=_state.current_sim_name(),
-        sim_time=_state.current_sim_time("%Y%m%d-%H:%M"),
+        sim_name=(_state.current_sim_name()
+                  or getattr(app.state, "intervention_sim_name", "") or ""),
+        sim_time=_state.current_sim_time("%Y%m%d-%H:%M", engine=engine),
         supports_governance=getattr(app.state, "engine_has_governance", True),
     )
 

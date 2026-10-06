@@ -370,6 +370,22 @@ def detect_seed(client: Any) -> Optional[int]:
         return None
 
 
+def seed_among(clients: Dict[str, Any]) -> Optional[int]:
+    """这次运行**真用到的客户端**里第一个自报的种子(判定优先)。
+
+    口径与 `detect_seed` 完全一致:只认客户端自己声明的值,不读环境变量。
+    为什么要扫一圈:起面路径的判定走桥自己兜底的客户端、对话与反思走挂在 agent 上的
+    `Case01SafeProvider`,种子只在后者的请求体里 —— 只看判定那一个就会落 `seed: null`
+    (2026-10-06 小镇三条真跑实测:`rng.json` 记着 master=20261015,而
+    `manifest.seed` 全为 null;批路径不受影响,它本来就同时收 llms)。
+    """
+    for client in (clients or {}).values():
+        seed = detect_seed(client)
+        if seed is not None:
+            return seed
+    return None
+
+
 def truncation_counts(clients: Dict[str, Any]) -> Dict[str, int]:
     """各客户端各自的 max_tokens 截断次数(只留非零项,同一对象不重复计数)。
 
@@ -444,7 +460,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                                  or raw.get("branch_source", "") or "")
         meta["judge_model"] = meta.get("judge_model") or ""
         if meta.get("seed") is None:
-            meta["seed"] = detect_seed(judge_llm)
+            meta["seed"] = seed_among(clients)
         meta.setdefault("truncations", sum(counts.values()))
         meta.setdefault("truncation_detail", counts)
         return meta
@@ -479,7 +495,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     # 真的调过模型。规则路径记 null,由 build_manifest 落一条 warnings 说明。
     meta["temperature"] = {"judge": None if kind == "rules"
                                      else detect_temperature(judge_llm)}
-    meta["seed"] = None if kind == "rules" else detect_seed(judge_llm)
+    meta["seed"] = None if kind == "rules" else seed_among(clients)
     # 截断计数:客户端(_ChatMixin/Case01SafeProvider)把"输出被 max_tokens 截断"
     # 记在实例的 .truncations 上。此前这个数只 print 一次就没了 —— 32 次截断只活在
     # lane 日志里,台账/清单读不到(2026-10-05 体检 §七)。这里把它抽进 meta,

@@ -301,6 +301,10 @@ def start(case, args):
                 cmd += ["--seed", str(args.seed).strip()]
             if args.nodes:
                 cmd += ["--nodes", str(args.nodes)]
+            # --no-map 必须**传给子进程**(2026-10-06 修):此前它只影响下面那句提示,
+            # 子进程仍照默认自动映射 —— 选项写着"不自动映射",实际照映射。
+            if args.no_map:
+                cmd += ["--no-map"]
     else:
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
                "--stride", str(args.stride), "--port", str(LIVE["case00"]),

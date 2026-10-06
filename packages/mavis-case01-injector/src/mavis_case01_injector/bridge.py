@@ -18,7 +18,7 @@ import datetime
 import json
 import os
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .nodes import NodeSpec
 
@@ -72,6 +72,9 @@ class MavisBridge:
         think_workers: int = 0,
     ):
         self.nodes = list(nodes or [])
+        # 调用方给的序列长度就是它要的步数(冒烟/收时间窗用的截断也在这里)。
+        # judge 模式下换时间线时要按它重新截,否则"只跑前 N 个节点"会被换回完整序列。
+        self._node_cap = len(self.nodes)
         self.roles = tuple(roles)
         # 并行思考线程数。0 = 按角色数(今天的行为)。
         # 为什么这跟"可复现"有关:引擎那 15 个 `random.*` 走的是**进程全局** RNG,
@@ -257,7 +260,14 @@ class MavisBridge:
 
         # LLMBranchJudge owns all three attempts; avoid multiplying retries
         # inside the transport client.
-        return local_client_from_env(retries=1)
+        client = local_client_from_env(retries=1)
+        # 把**真正拿去判定的那个客户端**记回 self.judge_llm:清单的 seed /
+        # judge_model / temperature 全是从它身上读的。此前起面路径不注入 judge_llm,
+        # 于是这三项落的是常量默认值(记录里 `seed: null`,而请求体其实带着种子)
+        # —— 2026-10-06 小镇三条实测皆如此。声明式探测的口径不变:只认客户端自报。
+        if self.judge_llm is None:
+            self.judge_llm = client
+        return client
 
     def _decide_branch_from_t0(self, rec: dict, t0_node: NodeSpec) -> str:
         """用 Investment AI 在 T0 的实际回答判定分支(01 §六),并据此重排后续节点与事实层。
@@ -304,7 +314,12 @@ class MavisBridge:
                            "attempts": info.get("attempts", 1),
                            "raw_outputs": list(info.get("raw_outputs") or [])}
         # 后续节点换成该分支的时间线(T0 已经跑过,从第 2 个节点接着跑)
-        self.nodes = [t0_node] + self._nodes_for(detected)[1:]
+        rebuilt = [t0_node] + self._nodes_for(detected)[1:]
+        # 换完必须按调用方给的长度重新截,否则 `--nodes N`(冒烟/收时间窗那条)
+        # 在默认 judge 模式下被这句话整个换回完整序列 —— 2026-10-06 实测:按 4 个
+        # 节点提交,记录里是 7 个节点、~397 秒,而 live_run 还打印了"已截断 7→4"。
+        cap = self._node_cap
+        self.nodes = rebuilt[:cap] if 0 < cap < len(rebuilt) else rebuilt
         # 事实层也得换成该分支的市场世界,并把它推进到 T0(与刚跑完的那一步对齐)
         if self.use_case01_facts:
             from .worldfacts import Case01Facts
@@ -350,9 +365,20 @@ class MavisBridge:
         raw = {"branch": self.branch, "branch_mode": self.branch_mode,
                "branch_source": self.branch_source, "judge_info": dict(self.judge_info),
                "mode": "dry-run" if self.dry_run else "mavis"}
+        # 小镇这一局的对话/反思走的是挂在各 agent 上的 `Case01SafeProvider`,把它们
+        # 一起交给清单:否则清单只看得见判定那一个客户端 —— 起面实测过两次后果:
+        # `manifest.seed=null`(而每个请求体都带着 seed)、`truncations=0`(而 stdout
+        # 明明打过头截断)。与批路径同一口径(`orchestrator` 就是这样收 llms 的)。
+        town: Dict[str, Any] = {}
+        game = getattr(self, "game", None)
+        for _name, _agent in (getattr(game, "agents", None) or {}).items():
+            _llm = getattr(_agent, "_llm", None)
+            if _llm is not None:
+                town["小镇 {}".format(_name)] = _llm
         meta = collect_run_meta(raw, branch_mode=self.branch_mode,
                                 judge_llm=self.judge_llm,
-                                backend_kind=self.backend_kind)
+                                backend_kind=self.backend_kind,
+                                llms=town or None)
         self._manifest_meta_cache = (key, dict(meta))
         return meta
 

@@ -209,11 +209,17 @@ def current_sim_name() -> str:
     return sim_state.get("name", "") or ""
 
 
-def current_sim_time(fmt: str = "%Y%m%d-%H:%M") -> str:
-    """当前模拟时间(模拟未运行返回空串)"""
-    if server is not None and getattr(server, "game", None) is not None:
+def current_sim_time(fmt: str = "%Y%m%d-%H:%M", engine=None) -> str:
+    """当前模拟时间(模拟未运行返回空串)。
+
+    `engine` 是给"不填全局 `server` 的面"留的入口:case01 的小镇面由 injector 自己
+    持有这一局的引擎(见 live/interventions._http_ctx 从 app.state 取),全局 `server`
+    只有 case00 的 live_fastapi 会注入。不传就沿用全局,case00 行为一字不变。
+    """
+    srv = engine if engine is not None else server
+    if srv is not None and getattr(srv, "game", None) is not None:
         try:
-            return server.game._timer.get_date(fmt)
+            return srv.game._timer.get_date(fmt)
         except Exception:
             return ""
     return ""

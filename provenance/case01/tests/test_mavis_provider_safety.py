@@ -210,8 +210,36 @@ def test_env_seed_reaches_the_request_body(monkeypatch):
     assert isinstance(calls[0]["seed"], int), "必须是整数,Ollama 才认"
 
 
+def test_现读env的种子要声明回实例并进清单(monkeypatch):
+    """请求体带 seed 还不够 —— `manifest.seed` 也得记上(2026-10-06 小镇实测 null)。
+
+    清单只认客户端自报(`manifest.detect_seed` 刻意不读 env,免得造出"清单说固定了、
+    客户端其实没固定"的假证据),而小镇的 provider 是"每次调用现读 env"的 ⇒ 发出去
+    那一刻必须把值声明回实例,再由桥把 agent 上的 provider 一并交给 `collect_run_meta`
+    (只看判定那个客户端时,起面路径的三项 seed/judge_model/temperature 全落默认值)。
+    """
+    from mavis_case01_injector.manifest import collect_run_meta
+
+    monkeypatch.setenv("CASE01_LLM_SEED", "20261015")
+    provider = _provider()
+    assert provider.seed is None, "构造时配置里没给种子"
+    calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    assert provider.seed == 20261015, "发出去的种子必须声明回实例"
+    meta = collect_run_meta({}, branch="B", branch_mode="judge",
+                            judge_llm=None, llms={"小镇 Ethan Lin": provider})
+    assert meta["seed"] == 20261015, meta
+    # 没播种时仍然是 null(不许把"取不到"写成"固定过")
+    monkeypatch.delenv("CASE01_LLM_SEED", raising=False)
+    bare = _provider()
+    _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
+    bare.completion("说点什么", return_type=TextResponse, failsafe="嗯")
+    meta2 = collect_run_meta({}, branch="B", branch_mode="judge",
+                             judge_llm=None, llms={"小镇 Ethan Lin": bare})
+    assert meta2["seed"] is None, meta2
+
+
 def test_没有种子时请求体里不许出现_seed_键(monkeypatch):
-    """默认路径的红线:不传 seed 就一个字节都不许多发(既有语料的语义前提)。"""
     monkeypatch.delenv("CASE01_LLM_SEED", raising=False)
     provider = _provider()
     calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
@@ -226,8 +254,12 @@ def test_显式配置的种子压过环境变量(monkeypatch):
     provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
     assert provider.seed == 7 and calls[0]["seed"] == 7, calls[0]
     # 非法值不静默回落到 env 之外的第三种状态:配置坏 ⇒ 退回读 env(仍要有种子)
+    # 注:实例的 `.seed` 语义是"这一次真发出去的值"(清单的 seed 就取它,见
+    # manifest.detect_seed 只认客户端自报),所以 env 兜底之后它不再是 None
+    # —— 2026-10-06 起;此前"请求体带 seed 而实例记 None",小镇记录落的是
+    # `manifest.seed: null`。
     bad = _provider(seed="abc")
     monkeypatch.setenv("CASE01_LLM_SEED", "999")
     calls2 = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
     bad.completion("说点什么", return_type=TextResponse, failsafe="嗯")
-    assert bad.seed is None and calls2[0]["seed"] == 999, calls2[0]
+    assert calls2[0]["seed"] == 999 and bad.seed == 999, calls2[0]

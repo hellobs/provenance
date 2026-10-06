@@ -17,6 +17,7 @@ from live import state
 from live.state import manager, log
 from live import interventions as _interventions
 from live.interventions import InterventionContext
+from live.simulation import load_initial_payload
 from live.chart import render_tendency_png
 from live.reflections import (
     load_marks,
@@ -80,44 +81,9 @@ templates.env.globals["extra_nav_links"] = [
 # ---------------------------------------------------------------------------
 # 页面(主页面 + 嵌入模式)
 # ---------------------------------------------------------------------------
-def _discover_agent_names():
-    """动态发现 agents 目录下的所有角色名(不写死,支持任意角色数)"""
-    from mavisframework.config.loader import personas
-    agents_root = os.path.join(state.BASE_DIR, "frontend/static/assets/village/agents")
-    if os.path.isdir(agents_root):
-        names = [
-            n for n in sorted(os.listdir(agents_root))
-            if os.path.exists(os.path.join(agents_root, n, "agent.json"))
-        ]
-        if names:
-            return names
-    return personas
-
-
-def load_initial_payload(start_datetime, stride):
-    from datetime import datetime
-    persona_init_pos = {}
-    description = {}
-    for name in _discover_agent_names():
-        json_path = os.path.join(
-            state.BASE_DIR, "frontend/static", f"assets/village/agents/{name}/agent.json"
-        )
-        if not os.path.exists(json_path):
-            continue
-        with open(json_path, "r", encoding="utf-8") as f:
-            json_data = json.load(f)
-        persona_init_pos[name] = json_data["coord"]
-        description[name] = {
-            "currently": json_data["currently"],
-            "scratch": json_data["scratch"],
-        }
-    return {
-        "start_datetime": datetime.strptime(start_datetime, "%Y%m%d-%H:%M").isoformat(),
-        "stride": stride,
-        "sec_per_step": stride,
-        "persona_init_pos": persona_init_pos,
-        "all_movement": {"description": description, "conversation": {}},
-    }
+# `_discover_agent_names` / `load_initial_payload` 的实现在 live/simulation.py
+# (引擎侧装配,与 run_simulation 同一模块),本层只调用。此前两条各有一份副本,
+# 且 simulation 那份全仓无人调用(2026-10-06 逐字节比对:两份只差一行注释)。
 
 
 async def _active_components() -> list:

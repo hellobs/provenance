@@ -454,6 +454,74 @@ class TestBothFaces:
             r = c.post(path, json={})
             assert r.status_code == 403, (path, r.status_code, r.text)
 
+    def test_case01_face_marks_carry_run_identity(self, monkeypatch):
+        """小镇面把自己这一局的引擎与 run_id 交给干预层(2026-10-06 接线)。
+
+        此前 `_http_ctx` 只读 live.state 的全局(只有 case00 的 live_fastapi 注入),
+        于是 5010 面上的专家标记虽然 `ok:true` 落盘,`simulation`/`sim_time` 恒是空串
+        —— 标到哪一条记录查不回来(实测佐证:仓根 interventions.json 里 2026-09-27
+        那几条 case01 面的记录 simulation 就是空串)。同一条链上"纠正回流"也只会回
+        一句"当前没有运行中的模拟",对着正在动的小镇像坏了。
+        """
+        from fastapi.testclient import TestClient
+        from case01.vizkit.live_run import build_service
+        import live.reflections as rf
+
+        class _Timer:
+            def get_date(self, fmt):
+                return "20250213-10:20"
+
+        class _Agent:
+            def __init__(self):
+                self.injected = []
+
+            def inject_story_event(self, ev):
+                self.injected.append(ev)
+
+        class _Game:
+            governance = None
+
+            def __init__(self, agents):
+                self.agents = agents
+                self._timer = _Timer()
+
+        class _Engine:
+            """冒充 MavisBridge:干预层只用到 `.game`。"""
+
+            def __init__(self, agents):
+                self.game = _Game(agents)
+
+        agent = _Agent()
+        svc = build_service()
+        svc.app.state.intervention_engine = _Engine({"Ethan": agent})
+        svc.app.state.intervention_sim_name = "261006-live-case01-B-2030"
+        # 存储侧全部截住:本测试验的是上下文接线,不碰真实的 marks/审计文件
+        captured = {}
+        monkeypatch.setattr(rf, "append_mark", lambda rec: captured.update(rec))
+        monkeypatch.setattr(rf, "rebuild_jsonl", lambda: "<patched>")
+        monkeypatch.setattr(ivm, "_append_audit", lambda ctx, rec: None)
+        c = TestClient(svc.app)
+
+        r = c.post("/api/reflections/mark", json={
+            "agent": "Ethan", "node_id": "n3", "text": "一条反思", "verdict": "correct"})
+        assert r.status_code == 200 and r.json()["ok"] is True, r.text
+        assert captured["simulation"] == "261006-live-case01-B-2030", captured
+        assert captured["sim_time"] == "20250213-10:20", captured
+
+        r = c.post("/api/intervention/corrective_feedback",
+                   json={"agent": "Ethan", "correction": "纠正文本"})
+        assert r.json()["ok"] is True and len(agent.injected) == 1, r.text
+
+        # 一局跑完(live_run 在 finally 里撤句柄):注入要挡下,事后标记仍归得到记录
+        svc.app.state.intervention_engine = None
+        r = c.post("/api/intervention/corrective_feedback",
+                   json={"agent": "Ethan", "correction": "纠正文本"})
+        assert r.json()["ok"] is False and len(agent.injected) == 1, r.text
+        captured.clear()
+        r = c.post("/api/reflections/mark", json={
+            "agent": "Ethan", "node_id": "n3", "text": "事后补标", "verdict": "correct"})
+        assert r.json()["ok"] is True and captured["simulation"] == "261006-live-case01-B-2030"
+
 
 class TestAdversarialPayloads:
     """畸形输入轰炸(2026-09-27 深检):策略作为库被直调时的健壮性。"""

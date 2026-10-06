@@ -119,7 +119,7 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     return live
 
 
-def _map_run(run_id, branch, raw_out):
+def _map_run(run_id, branch, raw_out, rng_info=None):
     """把这一局的原始记录映射成成品记录(**在本进程里顺序做**,不另起看护进程)。
 
     为什么改成顺序做:重开一局时如果每局都起一个独立的映射看护进程,连点几次就会
@@ -149,6 +149,11 @@ def _map_run(run_id, branch, raw_out):
             print("      stderr 尾部:", proc.stderr.strip()[-400:])
         return False
     print("  成品记录已生成({:.0f}s) -> {}".format(time.time() - t0, out))
+    # 种子链留痕也要落在**成品记录**旁边:起面时那份 `rng.json` 只跟着 `--out`
+    # 指向的原始记录(`case01/runs_injector/<run_id>/`),而结果面板与复盘读的是
+    # 这里这份 `case01/runs/<run_id>/run.json` —— 成品记录旁边没有 rng.json 的话,
+    # "这一条是用哪个种子/哪套派生参数跑出来的"在成品目录里就查不到(2026-10-06 修)。
+    write_side_record(os.path.dirname(os.path.join(PKG_ROOT, out)), rng_info, log=print)
     return True
 
 
@@ -176,7 +181,9 @@ def main(argv=None):
     ap.add_argument("--max-retries", type=int, default=3)
     ap.add_argument("--hold", type=float, default=60.0, help="运行结束后保持服务的秒数")
     ap.add_argument("--nodes", type=int, default=0, help="只跑前 N 个节点(0=全部;冒烟用)")
-    ap.add_argument("--out", default="", help="可选:同时保存运行记录 JSON")
+    ap.add_argument("--out", default="",
+                    help="第一局原始记录的落盘路径(缺省按 run_id 派生到 "
+                         "case01/runs_injector/<run_id>/raw.json;重开一局总是按新 run_id 派生)")
     ap.add_argument("--review-only", dest="review_only", action="store_true",
                     help="只服务界面(小镇 + 结果记录),不跑推演;用于随时翻成品记录")
     ap.add_argument("--no-restart", dest="no_restart", action="store_true",
@@ -291,6 +298,7 @@ def main(argv=None):
             # 记录写完(raw 落盘)后由 pipeline 的 branch 覆盖 —— 提示会打出来。
             # --run-id 是调用方点名的名字(第一局),之后每一局现铸;同名会被 unique_run_id
             # 让开(否则同一分钟内重开一局会覆盖上一局的记录)。
+            first_round = not ran_once
             if args.run_id and not ran_once:
                 run_id = args.run_id
             else:
@@ -299,7 +307,12 @@ def main(argv=None):
                 if run_id != base:
                     print("名字 {} 已被占用(上一局),改用 {}".format(base, run_id))
             ran_once = True
-            out = os.path.join("case01", "runs_injector", run_id, "raw.json")
+            # --out 只对**第一局**生效(2026-10-06 修:此前它被完全忽略,而 live_switch
+            # 既把它传给本进程、又照它打印手工映射命令 —— 于是那条命令指向一个从不存在
+            # 的文件)。重开一局会现铸新 run_id,若继续往同一个 --out 写,两局的原始记录
+            # 会覆盖成同一份,所以重开一律按新 run_id 派生。
+            out = (args.out if (first_round and args.out)
+                   else os.path.join("case01", "runs_injector", run_id, "raw.json"))
             print("本次 run_id: {} (分支方式={} 兜底分支={})".format(run_id, branch_mode, branch))
             # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
             # 否则刷新后的页面会收到上一局的 done / 旧位置。
@@ -334,6 +347,13 @@ def main(argv=None):
                 visualizers=[live],
                 think_workers=workers,
             )
+            # 把**这一局的引擎与身份**交给共享干预层(2026-10-06 修):两面共用
+            # live.interventions,而它原先只从 live.state 的全局取上下文 —— 那份全局
+            # 只有 case00 的 live_fastapi 会注入。于是 5010 面上的反思标记虽然
+            # `ok:true` 落盘,`simulation`/`sim_time` 却恒是空串(标到哪条记录查不回来),
+            # 而"纠正回流"只会回一句"当前没有运行中的模拟"。跑完在 finally 里撤句柄。
+            live.app.state.intervention_engine = bridge
+            live.app.state.intervention_sim_name = run_id
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
             # 于是小镇一边动、右栏的对话/检索/事件/状态/审计一边长出来(用户要的"同步看全程")。
             # 跑完不立刻撤:成品记录还要等自动映射(~1-2 分钟),这期间面板继续显示完整过程。
@@ -349,7 +369,9 @@ def main(argv=None):
                 bridge.save(out)
                 print("记录已保存 ->", out)
                 # 派生参数随记录同目录留痕(不动 run.json 的键集)
-                write_side_record(os.path.dirname(out), rng_info, log=print)
+                # 取绝对目录:`--out` 现在可以是调用方给的路径,若只给个文件名
+                # dirname 会是空串,write_side_record 会当"没目录"直接不写。
+                write_side_record(os.path.dirname(os.path.abspath(out)), rng_info, log=print)
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
                 live.finish(record.get("finish_reason") or "run_finished")
@@ -362,7 +384,7 @@ def main(argv=None):
                               "Select a branch in the UI and restart.")
                     elif not args.no_map:
                         # 用**判定后的**真实分支做映射(judge 模式下 branch 参数只是兜底)
-                        _map_run(run_id, record.get("branch") or branch, out)
+                        _map_run(run_id, record.get("branch") or branch, out, rng_info)
                     else:
                         print("  (--no-map:跳过映射;手工命令见 docs)")
                 finally:
@@ -387,6 +409,10 @@ def main(argv=None):
                 # **不要**在这里关掉可视化插件:它是跨局共享的 HTTP 服务,
                 # 关掉等于把整个界面弄没(实测:重开一局后 5010 不再监听)。
                 # 真正的关闭放到进程退出时(finally 外层)。
+                # 干预层的引擎句柄跟着撤掉:局跑完/失败之后 game 已 close,
+                # 再让"纠正回流"往里写就是往结束的局里塞体验(标识 sim_name 留着,
+                # 事后标记仍要能归到这一条记录)。
+                live.app.state.intervention_engine = None
                 bridge.close(keep_visualizers=True)
             if not restart_flag.is_set():
                 # 保持期到了,但**页面上还挂着「重开一局」按钮**:这时如果直接退出,
