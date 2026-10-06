@@ -422,8 +422,13 @@ class TestBothFaces:
         assert r.status_code == 200
         ids = {x["strategy"] for x in r.json()["strategies"]}
         assert {"goals", "undo", "mark", "corrective_feedback"} <= ids
-        # 旧路径别名也在(前端零改动)
-        assert c.post("/api/goals", json={}).json()["errors"] == ["缺少角色名"]
+        # 旧路径别名也在(前端零改动)——但"端点在"不等于"本面能用":
+        # 两条治理类策略在 case01 面必须**拒绝**(injector 的 Game 是
+        # governance=None,写了 governance.json 没有实例会读它)。2026-10-06 修:
+        # 此前它返回 ok:true 并把角色名落进仓根的追踪文件,现场看不出来是空操作。
+        r = c.post("/api/goals", json={})
+        assert r.status_code == 409, r.text
+        assert "不挂治理" in r.json()["errors"][0], r.text
         assert c.post("/api/reflections/mark", json={}).status_code == 200
         # 统一分发口未知策略 404 带清单
         r = c.post("/api/intervention/nope", json={})
@@ -439,7 +444,12 @@ class TestBothFaces:
         from fastapi.testclient import TestClient
         from case01.vizkit.live_run import build_service
         monkeypatch.setattr(ivm, "sandbox_rollback_blocked", lambda base_dir="": True)
-        c = TestClient(build_service().app, raise_server_exceptions=False)
+        svc = build_service()
+        # 本面默认声明"不挂治理",undo 会先撞上那层 409(另有专测:见
+        # test_case01_face_exposes_interventions 的 goals 断言)。这里要验的是
+        # **状态码透传**,所以把这个 app 的声明改回 True。
+        svc.app.state.engine_has_governance = True
+        c = TestClient(svc.app, raise_server_exceptions=False)
         for path in ("/api/undo-intervention", "/api/intervention/undo"):
             r = c.post(path, json={})
             assert r.status_code == 403, (path, r.status_code, r.text)

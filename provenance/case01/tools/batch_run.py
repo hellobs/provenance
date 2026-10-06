@@ -31,8 +31,10 @@
 ----
 - 每条案例:`case01/runs/<run_id>/run.json`(由 `case01.run` 自己落盘);
 - 调度台账:`results/analysis/batch_runs/<批次号>/ledger.jsonl`
-  (每条一行:run_id/分支/反思质量/issues/耗时/重试次数,供事后统计);
-- 失败明细:同目录 `failures.jsonl`(含 stderr 尾部,便于判断是模型崩还是代码崩);
+  (每条一行:run_id/分支/反思质量/issues/耗时/重试次数,供事后统计;
+   **例外**:收尾真的越过界限弃等某条 lane 时,那条不会有台账行 —— 去 failures 里看);
+- 失败明细:同目录 `failures.jsonl`(含 stderr 尾部,便于判断是模型崩还是代码崩;
+   越过界限弃等的在飞条目也在这一份里,带 `abandoned:true` 与 `lane`,没有 `log_tail`);
 - 收尾汇总:`summary.json` + `summary.md`(分布与均值)。
 
 依赖
@@ -317,7 +319,7 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
 
 
 def _worker(idx: int, args_ns, job_q: "queue.Queue", out_dir: str,
-            stop_at: float, stats: Dict) -> None:
+            stop_at: float, stats: Dict, inflight: Dict = None) -> None:
     """一条并发通道:取任务、跑到出结果或到点。"""
     while time.time() < stop_at:
         try:
@@ -329,7 +331,16 @@ def _worker(idx: int, args_ns, job_q: "queue.Queue", out_dir: str,
             job_q.task_done()
             return
         _log("lane{}: 开始 {}".format(idx, run_id))
-        rec = _one_run(args_ns, run_id, out_dir)
+        # 在飞记录:收尾放弃等待时,"哪几条正在跑"必须是查得出的,不能只说"有 lane 没退出"
+        if inflight is not None:
+            with _write_lock:
+                inflight[idx] = run_id
+        try:
+            rec = _one_run(args_ns, run_id, out_dir)
+        finally:
+            if inflight is not None:
+                with _write_lock:
+                    inflight.pop(idx, None)
         with _write_lock:
             stats["done"] += 1
             if rec["ok"]:
@@ -526,13 +537,15 @@ def main(argv=None) -> int:
 
     stop_at = time.time() + args.duration_min * 60
     stats = {"done": 0, "ok": 0, "failed": 0}
+    inflight: Dict = {}
     _log("批次 {} 开始 · 目标 {} 分钟 · 并发 {} · 模型 {} · 分支 {} · 备任务 {} 条".format(
         batch, args.duration_min, args.lanes, args.model,
         args.timeline or "auto", planned))
     _log("台账目录: {}".format(out_dir))
 
     threads = [threading.Thread(target=_worker,
-                                args=(i + 1, args, job_q, out_dir, stop_at, stats),
+                                args=(i + 1, args, job_q, out_dir, stop_at, stats,
+                                      inflight),
                                 daemon=True)
                for i in range(max(1, args.lanes))]
     for t in threads:
@@ -541,17 +554,29 @@ def main(argv=None) -> int:
     # 每条子进程自身有 --timeout(见 _run_with_probe),但**线程退出**此前是无限
     # `t.join()`:若某条卡在 kill 不掉的子进程或收尾 I/O 上,整批会一直挂着,
     # 到点自停的语义等于失效(2026-10-03 h120seed 的 8h25m 就是这一类)。
-    # 现在:先等 `--timeout * (retries+1) + 60` 秒(单条最坏耗时 + 余量),
-    # 仍不退出的**如实报出来**(不静默),线程是 daemon,主进程照常收尾出汇总。
+    # 界要锚在 stop_at(lane 不再开新任务的时刻),不是批次起点:到点时在跑的那条
+    # 必然在 budget 内自己退出。锚在起点会把"最后几条正在正常收尾"当成卡死放弃
+    # ——2026-10-06 批2 实测:台账 35 行而磁盘 38 条,缺的 -036/-037/-038 正是
+    # 17:22–17:29 刚领到任务、17:31:12 被父进程弃等的那三条(daemon 线程随主进程退出
+    # 被杀,子进程却跑完了并写出 run.json ⇒ 磁盘比台账多,而 summary 报 failed=0)。
     budget = int(args.timeout) * (int(args.retries) + 1) + 60
-    deadline = time.time() + budget
+    deadline = max(time.time(), stop_at) + budget
     for t in threads:
         t.join(timeout=max(1, deadline - time.time()))
     stuck = [t for t in threads if t.is_alive()]
     if stuck:
-        _log("⚠️ {} 条 lane 在 {}s 内没退出(可能卡在不可杀的子进程上);"
-             "已放弃等待,按其已落盘的台账出汇总。未完成的 run 见 failures.jsonl"
-             .format(len(stuck), budget))
+        with _write_lock:
+            left = sorted(inflight.items())
+        for lane_idx, rid in left:
+            _append_jsonl(os.path.join(out_dir, "failures.jsonl"), {
+                "run_id": rid, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "lane": lane_idx, "ok": False, "abandoned": True,
+                "returncode": None, "seconds": None,
+                "note": "批次收尾放弃等待时该条仍在跑;它之后落的 run.json 不会进台账"})
+        _log("⚠️ {} 条 lane 越过收尾界限 {}s 未退出;在飞 {} 条{}已写入 failures.jsonl,"
+             "按其已落盘的台账出汇总(台账会少这么多条,磁盘上的 run.json 不会)".format(
+                 len(stuck), budget, len(left),
+                 "" if left else "(取不到 run_id:卡在收尾 I/O)"))
 
     summary = _summarize(out_dir, batch, stats, args)
     _log("批次 {} 结束:成功 {} / 失败 {}".format(

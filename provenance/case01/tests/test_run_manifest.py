@@ -296,8 +296,37 @@ def test_truncations_are_surfaced_in_manifest():
         m["manifest_warnings"]
 
 
+def test_truncations_count_every_client_the_run_used():
+    """回归(2026-10-06):此前只看判定那一个客户端,别的客户端的截断被说成没发生。
+
+    生产路径 `run_case01(llm, ethan_llm, router_llm)` 把判定交给 `router_llm`,
+    而对话/Ethan 用的 `llm` 可以是**另一个对象** —— 那种配置下 llm 的截断永远进不了
+    清单,总数比真实发生的小;而清单里"小"与"没有"读起来是同一回事。
+    """
+    judge = FakeJudge("local", "qwen3:8b")
+    judge.truncations = 2
+    other = FakeJudge("local", "qwen3:8b")
+    other.truncations = 5
+    m = build_manifest(collect_run_meta({}, judge_llm=judge,
+                                        llms={"对话 llm": other}))
+    assert m["truncations"] == 7, "别的客户端的截断也要算进总数"
+    w = [x for x in m["manifest_warnings"] if "truncations=" in x][0]
+    assert "判定 2 次" in w and "对话 llm 5 次" in w, w
+    assert "truncation_detail" not in m, "归因只进 warnings,不新增清单键"
+
+
+def test_same_client_under_two_labels_counts_once():
+    """llm/ethan_llm/router_llm 常是同一个对象:按对象去重,不许重复计数。"""
+    judge = FakeJudge("local", "qwen3:8b")
+    judge.truncations = 4
+    m = build_manifest(collect_run_meta({}, judge_llm=judge,
+                                        llms={"llm": judge, "ethan": judge}))
+    assert m["truncations"] == 4, m["truncations"]
+
+
 def test_zero_truncations_does_not_add_a_warning():
     """没截断是常态:顶层记 0,但不占位 warnings。"""
+
     judge = FakeJudge("local", "qwen3:8b")
     judge.truncations = 0
     m = build_manifest(collect_run_meta({}, judge_llm=judge))

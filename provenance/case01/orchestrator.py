@@ -492,6 +492,11 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
                          branch_mode=BRANCH_MODE_BY_SOURCE.get(branch_source, ""),
                          branch_source=branch_source,
                          judge_llm=judge_client,
+                         # 截断计数要收齐:这一局实际会用到 llm / ethan_llm / router_llm
+                         # 三个客户端(常常是同一两个对象),而判定只认其中一个 ——
+                         # 只报判定那份会把另外两处的截断说成"没发生"。
+                         llms={"对话 llm": llm, "Ethan": ethan_llm,
+                               "router": router_llm},
                          backend_kind="" if judge_client is not None else "rules"),
         financial_dir=FIN_DIR(), engine_id=RUN_ENGINE_ID)
     if (rec.data.get("consistency") or {}).get("method") == "quick_scan":

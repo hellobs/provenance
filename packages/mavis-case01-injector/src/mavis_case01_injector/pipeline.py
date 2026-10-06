@@ -51,12 +51,16 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
                         "expert_pool_version": rout.get("expert_pool_version", "")}
     # 截断不许静默:反思/路由的答案被 max_tokens 截断时,记录本身要带这一条
     # (manifest 段是"这次跑有什么不对"的既有落点)。工具:case01/tools/reflection_audit.py
-    truncated = int(getattr(local, "truncations", 0) or 0)
-    if router is not local:
-        truncated += int(getattr(router, "truncations", 0) or 0)
+    # 算法与清单侧共用 `truncation_counts`(此前两边各写一份、两套文案,同一个
+    # 记录里可能出现两条"截断"警告却数的是不同窗口的同一件事)。
+    from mavis_case01_injector.manifest import truncation_counts
+    counts = truncation_counts({"反思": local, "路由": router})
+    truncated = sum(counts.values())
     if truncated:
         warnings = record.setdefault("manifest", {}).setdefault("manifest_warnings", [])
-        warnings.append("LLM 输出被 max_tokens 截断 {} 次(反思/路由可能不完整)".format(truncated))
+        warnings.append("映射期反思/路由输出被 max_tokens 截断 {} 次({}):反思/路由可能不完整"
+                        .format(truncated, "、".join(
+                            "{} {} 次".format(k, v) for k, v in counts.items())))
         print("[!] 反思/路由有 {} 次输出被截断,已记进 manifest_warnings".format(truncated))
     # 这两个字段已补齐,从 gaps 里移除
     gaps = [g for g in record.get("compat", {}).get("gaps", [])

@@ -370,25 +370,45 @@ def detect_seed(client: Any) -> Optional[int]:
         return None
 
 
-def _detect_truncations(client: Any) -> int:
-    """这次运行里被 max_tokens 截断的输出条数(0 表示没有 / 客户端不记账)。
+def truncation_counts(clients: Dict[str, Any]) -> Dict[str, int]:
+    """各客户端各自的 max_tokens 截断次数(只留非零项,同一对象不重复计数)。
 
-    客户端(`_ChatMixin` / `Case01SafeProvider`)在 `finish_reason == "length"`
-    时给实例的 `.truncations` 加一。取不到就返回 0 —— 0 与"没有该属性"在
-    warnings 里语义相同(都不告警),但真发生截断时**必须**在清单里留痕,
-    否则"截断的输出与完整输出长得一模一样",事后无从分辨(2026-10-05 体检 §七)。
+    客户端(`_ChatMixin` / `Case01SafeProvider`)在 `finish_reason == "length"` 时给
+    实例的 `.truncations` 加一。取不到就当中 0 —— 0 与"没有该属性"在 warnings 里
+    语义相同(都不告警),但真发生时**必须**留痕,否则"截断的输出与完整输出长得一模
+    一样",事后无从分辨(2026-10-05 体检 §七)。
+
+    为什么要一次收多个客户端:此前只看判定那一个对象,而生产路径把 `router_llm`
+    交给判定后 `llm`(本地,跑对话与反思)就成了另一个对象、永不被数 ——
+    报出来的数比真实发生的小,而清单里"小"和"没有"看起来是同一回事。
     """
-    val = getattr(client, "truncations", 0)
-    try:
-        return int(val or 0)
-    except (TypeError, ValueError):
-        return 0
+    out: Dict[str, int] = {}
+    seen = set()
+    for label, client in (clients or {}).items():
+        if client is None or id(client) in seen:
+            continue
+        seen.add(id(client))
+        try:
+            n = int(getattr(client, "truncations", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if n:
+            out[label] = n
+    return out
+
+
+def _detail_text(counts: Dict[str, int]) -> str:
+    """把 {标签: 次数} 拼成一句人话(空则空串)。"""
+    if not counts:
+        return ""
+    return "(" + "、".join("{} {} 次".format(k, v) for k, v in counts.items()) + ")"
 
 
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                      branch_mode: str = "", judge_llm: Any = None,
                      backend_kind: str = "",
-                     branch_source: str = "") -> Dict[str, Any]:
+                     branch_source: str = "",
+                     llms: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """从原始记录/调用参数里抽"这次运行是什么"的全部输入(纯提取,不做哈希)。
 
     raw:injector 原始记录(或已映射记录);空表示"由调用方直接给参数"。
@@ -396,9 +416,14 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     branch_source:调用方直接给的分支来源(preset/judge/rules);生产路径
         (`case01/orchestrator`)把它记在 `branch_action.source` 里而不是顶层字段,
         所以需要一个显式入口,否则清单里的 branch_source 会留空。
+    llms:这次运行**另外还用到的**模型客户端 {标签: 客户端}。截断计数要收齐所有
+        客户端,只看判定那一个会把别处的截断漏掉(见 `truncation_counts`)。
     单一来源:raw 里已经带了 `manifest_meta` 时**直接沿用**(那是最贴近真实调用点
     的一份:桥自己记的判定后端),不再让映射器重新猜一遍。
     """
+    clients: Dict[str, Any] = {"判定": judge_llm}
+    clients.update(llms or {})
+    counts = truncation_counts(clients)
     raw = raw if isinstance(raw, dict) else {}
     if raw.get("injector") and not raw.get("nodes"):
         raw = raw["injector"]                       # 误把成品记录当输入时下钻
@@ -420,7 +445,8 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
         meta["judge_model"] = meta.get("judge_model") or ""
         if meta.get("seed") is None:
             meta["seed"] = detect_seed(judge_llm)
-        meta.setdefault("truncations", _detect_truncations(judge_llm))
+        meta.setdefault("truncations", sum(counts.values()))
+        meta.setdefault("truncation_detail", counts)
         return meta
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
@@ -458,7 +484,9 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     # 记在实例的 .truncations 上。此前这个数只 print 一次就没了 —— 32 次截断只活在
     # lane 日志里,台账/清单读不到(2026-10-05 体检 §七)。这里把它抽进 meta,
     # 由 build_manifest 升级成 manifest_warnings 的一条(读侧一律按嵌套路径取)。
-    meta["truncations"] = _detect_truncations(judge_llm)
+    # 收的是这次运行用到的**所有**客户端;detail 只进 meta(清单键集另有全等守卫)。
+    meta["truncations"] = sum(counts.values())
+    meta["truncation_detail"] = counts
     return meta
 
 
@@ -559,9 +587,13 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     # 非零才进 warnings —— 0 是常态,不占位。
     truncations = int(meta.get("truncations") or 0)
     if truncations:
+        # 前缀 `truncations=N` 是读侧与测试认的形态;括号里补"哪几处各几次",
+        # 否则一个光秃秃的总数没法定位是判定的输出短了还是对话被压了。
         warnings.append(
-            "truncations={}:本次有 {} 条输出被 max_tokens 截断(截断文本与完整文本"
-            "外观一致,引用其内容前需人工核对)".format(truncations, truncations))
+            "truncations={}{}:本次有 {} 条输出被 max_tokens 截断(截断文本与完整文本"
+            "外观一致,引用其内容前需人工核对)".format(
+                truncations, _detail_text(meta.get("truncation_detail") or {}),
+                truncations))
 
     manifest = {
         "manifest_version": MANIFEST_VERSION,

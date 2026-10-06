@@ -31,6 +31,7 @@ import time
 import mavis_vizkit
 from ..injector.bridge import DEFAULT_ROLES, MavisBridge
 from ..injector.nodes import default_nodes
+from ..rngchain import apply_chain, resolve_master, write_side_record
 from ..run_naming import live_run_id, unique_run_id
 from ..safestream import run_text, tolerant_stdout, utf8_env
 
@@ -108,6 +109,11 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     live.app.include_router(history_router)
     # 干预策略端点与 case00 面同源共享(2026-09-27 体检:case01 面此前缺全部
     # 干预端点——M4 专家的反思标记(/api/reflections/mark)在这里会 404)。
+    # 但共享的是整个注册表,里面两条治理类策略(goals/undo)对本面是空操作:
+    # injector 的 Game 是 governance=None,而它们的"有没有模拟在跑"探的是
+    # live.state.server(只有 case00 的入口会填)——取不到清单连角色名都拦不住。
+    # 所以在这个 app 上声明本面引擎不挂治理,让它们明确拒绝而不是回一句 ok:true。
+    live.app.state.engine_has_governance = False
     from live.interventions import router as interventions_router
     live.app.include_router(interventions_router)
     return live
@@ -158,6 +164,13 @@ def main(argv=None):
     ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
+    ap.add_argument("--seed", default="",
+                    help="唯一种子入口(整数):固定模型采样 + 小镇世界动力学;"
+                         "不设=非确定。派生参数会留痕在记录旁的 rng.json")
+    ap.add_argument("--think-workers", dest="think_workers", type=int, default=None,
+                    help="并行思考线程数。缺省:设了 --seed 就是 1(串行,让同一个种子"
+                         "落到同一个角色的同一次抽样上),没设 seed 则按角色数。"
+                         "0=总是按角色数(快,但轨迹分配仍随线程调度变)")
     ap.add_argument("--port", type=int, default=5010)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--max-retries", type=int, default=3)
@@ -294,6 +307,24 @@ def main(argv=None):
             # 面板是建服务时挂上去的,那时 run_id 还没生成;这里补告一次,
             # 好让面板能写出"本次实跑 <run_id> 还没成品记录(跑完自动生成)"。
             set_current_run(run_id, "实跑跑完会自动映射成成品记录")
+            # 每一局都重新应用种子链:世界流按 master+run_id 派生,而"重开一局"会
+            # 现铸新 run_id —— 若只在启动时播一次,重开的那局会沿用上一局的轨迹。
+            rng_master = resolve_master(args.seed)
+            rng_info = apply_chain(rng_master, run_id=run_id, log=print)
+            # 并行思考线程数:设了种子就默认**串行**。
+            # 理由:引擎那 15 个 random.* 走进程全局 RNG,种子钉住了"数流",
+            # 但多个 agent 同时 think 时"谁拿到哪个数"仍由线程调度决定 ⇒
+            # 位置/目的地/retry_prob 会在角色间串味,同一个种子跑两次轨迹还是会分叉。
+            # 想换回速度就显式 `--think-workers 0`(按角色数)或给个 >1 的数。
+            workers = args.think_workers
+            if workers is None:
+                workers = 1 if rng_master is not None else 0
+            if rng_info is not None:
+                rng_info["engine_think_workers"] = workers
+                print("思考线程数:{}({})".format(
+                    workers or "按角色数",
+                    "种子链默认串行,保证同种子同抽样" if args.think_workers is None
+                    else "由 --think-workers 指定"))
             bridge = MavisBridge(
                 nodes=nodes, roles=roles, scenario_dir=scenario,
                 run_id=run_id,
@@ -301,6 +332,7 @@ def main(argv=None):
                 branch_mode=branch_mode,
                 debug_note=debug_note,
                 visualizers=[live],
+                think_workers=workers,
             )
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
             # 于是小镇一边动、右栏的对话/检索/事件/状态/审计一边长出来(用户要的"同步看全程")。
@@ -316,6 +348,8 @@ def main(argv=None):
                     record.get("branch"), record.get("branch_source"), run_id))
                 bridge.save(out)
                 print("记录已保存 ->", out)
+                # 派生参数随记录同目录留痕(不动 run.json 的键集)
+                write_side_record(os.path.dirname(out), rng_info, log=print)
                 # 跑完必须**明确告诉页面**(而不是留着服务静悄悄):此后连进来的人
                 # 会收到 done,知道"推演结束、服务只是在保持",不会以为可视化坏了。
                 live.finish(record.get("finish_reason") or "run_finished")

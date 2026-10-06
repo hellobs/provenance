@@ -53,6 +53,7 @@ class InterventionContext:
     ckpt_dir: str = ""
     sim_name: str = ""
     sim_time: str = ""
+    supports_governance: bool = True
 
 
 class InterventionResult(dict):
@@ -82,6 +83,23 @@ def _live_governance_of(ctx: InterventionContext):
     if server is not None and getattr(server, "game", None) is not None:
         return getattr(server.game, "governance", None)
     return None
+
+
+def _governance_unsupported(ctx: InterventionContext):
+    """本面引擎压根不挂治理时的拒绝(返回 None = 可以继续)。
+
+    为什么不能只靠 `_live_governance_of`:case01 的面不填 `live.state.server`
+    (那是 case00 的注入点),所以取到 None 有两种意思——"没在跑"和"这一局没有
+    治理实例",而前者在 case00 是合法的(专家可以开跑前预设权重)。得由挂面的进程
+    自己声明。不声明的后果实测过:goals 返回 ok:true、把角色名写进
+    governance.json(仓根、git 追踪),而这一局行为一点都不变。
+    """
+    if ctx.supports_governance:
+        return None
+    return InterventionResult({"ok": False, "errors": [
+        "本面引擎不挂治理约束(如 case01:Game(governance=None)),"
+        "写了 governance.json 也没有实例读它 ⇒ 拒绝执行,不返回成功假象。"]},
+        status=409)
 
 
 def _audit_path(ctx: InterventionContext) -> str:
@@ -181,6 +199,9 @@ class WeightAdjustStrategy(InterventionStrategy):
     name = "调整治理约束权重"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
+        blocked = _governance_unsupported(ctx)
+        if blocked is not None:
+            return blocked
         name = str(payload.get("name", "")).strip()
         goals = payload.get("goals")
         if not name:
@@ -299,6 +320,9 @@ class UndoInterventionStrategy(InterventionStrategy):
     name = "撤销干预(权重回滚)"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> Any:
+        blocked = _governance_unsupported(ctx)
+        if blocked is not None:
+            return blocked
         if sandbox_rollback_blocked(ctx.base_dir):
             return InterventionResult({"ok": False, "errors": [
                 "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
@@ -573,8 +597,13 @@ from fastapi.responses import JSONResponse  # noqa: E402
 router = APIRouter()
 
 
-def _http_ctx() -> InterventionContext:
-    """从 live.state 构建上下文(HTTP 层专用;测试直接构造 ctx 即可)。"""
+def _http_ctx(app) -> InterventionContext:
+    """从 live.state + 挂了这个 router 的那个 app 构建上下文。
+
+    `supports_governance` 取自 **app.state** 而不是 live.state 的全局:两面在测试里
+    会建在同一进程内,做成模块全局就会互相污染(case01 面一建,后面的 case00 用例
+    全部被判成"不挂治理")。生产里两 case 互斥共用 5010,但按进程声明本来就是错的粒度。
+    """
     from live import state as _state
 
     try:
@@ -587,6 +616,7 @@ def _http_ctx() -> InterventionContext:
         ckpt_dir=ckpt_dir or "",
         sim_name=_state.current_sim_name(),
         sim_time=_state.current_sim_time("%Y%m%d-%H:%M"),
+        supports_governance=getattr(app.state, "engine_has_governance", True),
     )
 
 
@@ -630,7 +660,7 @@ async def dispatch(strategy_id: str, request: Request):
             {"ok": False,
              "errors": ["未知干预策略: {!r};已注册: {}".format(
                  strategy_id, " / ".join(all_ids()))]}, status_code=404)
-    res = get(strategy_id)().apply(_http_ctx(), body)
+    res = get(strategy_id)().apply(_http_ctx(request.app), body)
     return _wrap(strategy_id, res)
 
 
@@ -645,7 +675,7 @@ async def goals_alias(request: Request):
     body, err = await _read_body(request)
     if err is not None:
         return err
-    return _wrap("goals", get("goals")().apply(_http_ctx(), body))
+    return _wrap("goals", get("goals")().apply(_http_ctx(request.app), body))
 
 
 @router.post("/api/undo-intervention")
@@ -653,7 +683,7 @@ async def undo_alias(request: Request):
     body, err = await _read_body(request)
     if err is not None:
         return err
-    return _wrap("undo", get("undo")().apply(_http_ctx(), body))
+    return _wrap("undo", get("undo")().apply(_http_ctx(request.app), body))
 
 
 @router.post("/api/reflections/mark")
@@ -661,4 +691,4 @@ async def mark_alias(request: Request):
     body, err = await _read_body(request)
     if err is not None:
         return err
-    return _wrap("mark", get("mark")().apply(_http_ctx(), body))
+    return _wrap("mark", get("mark")().apply(_http_ctx(request.app), body))
