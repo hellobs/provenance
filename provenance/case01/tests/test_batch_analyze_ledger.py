@@ -134,11 +134,23 @@ def test_ledger_and_scan_paths_agree_end_to_end(sandbox):
         "台账行的 source 应为 ledger,实际 {}".format(from_ledger[0].get("source"))
     assert from_runs[0]["source"] == "primary", \
         "目录扫出的行应为 primary,实际 {}".format(from_runs[0].get("source"))
-    # 除 source 外两条链必须完全同形
-    lhs = {k: v for k, v in from_ledger[0].items() if k != "source"}
-    rhs = {k: v for k, v in from_runs[0].items() if k != "source"}
+    # 两条链在**进统计的字段**上必须逐键相等;`source` 与台账独有字段除外。
+    # 2026-10-07:`_row` 开始真的带出 seconds/attempt/model_actual/model_requested/seed
+    # —— 这些一手 run.json 里根本没有,目录链取不到就是空。这条断言以前能过,
+    # 不是因为两链同形,而是因为 _row 压根不产出它们;上面 docstring 讲的
+    # "台账独有字段只在台账侧为真"到今天才第一次成立,断言随之改成钉住这个方向。
+    LEDGER_ONLY = {"seconds", "attempt", "model_actual", "model_requested", "seed"}
+    lhs = {k: v for k, v in from_ledger[0].items() if k not in LEDGER_ONLY | {"source"}}
+    rhs = {k: v for k, v in from_runs[0].items() if k not in LEDGER_ONLY | {"source"}}
     assert lhs == rhs, \
         "台账链与目录链口径分叉:\n{} vs\n{}".format(lhs, rhs)
+    # 台账独有字段:台账侧是真值,目录侧必须是空(有值却标 primary 就是来源写反)
+    for key, want in (("seconds", 495.4), ("attempt", 1),
+                      ("model_actual", "qwen3:8b"), ("model_requested", "qwen3:8b")):
+        assert from_ledger[0][key] == want, \
+            "{}:台账侧应为 {!r},实际 {!r}".format(key, want, from_ledger[0][key])
+        assert not from_runs[0][key], \
+            "{}:目录链(run.json 无此字段)应为空,实际 {!r}".format(key, from_runs[0][key])
 
 
 # ---------------------------------------------------------------------------

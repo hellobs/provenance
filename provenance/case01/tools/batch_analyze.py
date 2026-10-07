@@ -33,7 +33,10 @@
 - 反思字数按 `reflection.text` 长度;质量分取 `reflection.quality.score`。
 - 台账行(`--batch`)是扁平摘要:字数/质量分/status/失败原因/issue 计数以
   `reflection_*`、`issues*` 为准,run.json 在场时仍以明细覆盖 —— 两条链
-  (`--batch` 与 `--scan-runs`)必须给同一份 row。
+  (`--batch` 与 `--scan-runs`)在**进统计的字段**上必须给同一份 row。
+  例外是台账独有字段 `seconds/attempt/model_actual/model_requested/seed`:
+  一手 `run.json` 里没有这些键,`--scan-runs` 链上恒为空 ⇒ §5 的模型身份
+  只有走 `--batch` 才取得到(走目录链会明说"未检出",不猜)。
 - 基线数字来自 `results/analysis/答辩速查表.md`(25 条,4b 本地模型),
   与本批次(8b)**不是同口径**,对比只作量级参照,不宣称显著性。
 """
@@ -134,6 +137,18 @@ def _row(run_id: str, d: Dict, source: str = "ledger") -> Dict:
                              if (refl.get("text") or "").strip() in ("(反思生成失败)", "(失败)")
                              else "")),
         "router_error": (router.get("error") or "") if router.get("status") in ("error", "skipped") else "",
+        # 台账独有字段(2026-10-07 补):`source` 那整段说明一直在讲"哪几条的
+        # seconds/attempt/model_actual 是真的、哪几条是拿 run.json 造的",可这三个键
+        # **从来没进过 row**(实测 21 份 analysis.json 的 per_run 里都没有)——行级来源
+        # 因此无从判断,下游只能 KeyError。这里如实带上:一手行取不到就是 None/空,
+        # 而那正是 "source=primary" 想表达的意思。
+        # `model_actual` 是 batch_run 从响应里**检出**的服务端模型名(不是 --model 声明值),
+        # §5 的"本批次用的什么模型"必须有真来源,以前那里写的是字面量 "qwen3:8b"。
+        "seconds": d.get("seconds"),
+        "attempt": d.get("attempt"),
+        "model_actual": d.get("model_actual") or "",
+        "model_requested": d.get("model_requested") or "",
+        "seed": d.get("seed"),
     }
     # 台账行是**扁平摘要**(`reflection_chars/_score/_status/_failure_reasons`
     # 与 `issues/issues_final`,见 batch_run._digest),run.json 是嵌套结构。
@@ -351,6 +366,18 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
         # 这个布尔量负责把那种形态单独标出来,别让它混进"无缺口"里。
         "ledger_missing": bool(gap and gap.get("ledger_missing")),
         "ledger_gap_detail": gap,
+        # 模型身份(2026-10-07):`model_actual` 取台账里**检出**的服务端模型名,
+        # 不是 `--model` 声明值,也不是 run.json 的 `manifest.judge_model`(那是客户端声明)。
+        # 去重后是列表 —— 同一批里模型可能不止一个(换过模型、或检出为空)。
+        "llm": {
+            "model_actual": sorted({r["model_actual"] for r in rows
+                                    if r.get("model_actual") and r["model_actual"] != "(未检出)"}),
+            "model_requested": sorted({r["model_requested"] for r in rows
+                                        if r.get("model_requested")
+                                        and r["model_requested"] != "(默认)"}),
+            "n_rows_with_model_actual": sum(1 for r in rows if r.get("model_actual")
+                                            and r["model_actual"] != "(未检出)"),
+        },
         "branches": br,
         "branch_top": {"branch": top_branch, "count": top_n,
                        "share": round(top_n / n, 3) if n else None,
@@ -430,8 +457,17 @@ def _md(a: Dict) -> str:
                      "已从一手 `run.json` 补入;本表 **{}** 条 == 一手条数。".format(
                          filled, a["n_runs"]))
         else:
+            # 光说"一手 N 条、本表 M 条"在 N==M 时读起来像假警报,而真实的差**在侧别上**
+            # (台账有、盘上没)。所以把差在哪一侧直接写进这句,而不是只给两个数。
+            why = []
+            if miss:
+                why.append("台账少记 {} 条".format(len(miss)))
+            if extra:
+                why.append("台账有 {} 条的一手 run.json 已不在盘上".format(len(extra)))
             L.append("> ⚠ **本表与一手产物不一致**:一手 `run.json` **{}** 条,"
-                     "本表基于 **{}** 条。".format(gap.get("n_primary"), a["n_runs"]))
+                     "本表基于 **{}** 条 —— {}。".format(
+                         gap.get("n_primary"), a["n_runs"],
+                         "、".join(why) or "两侧条数同但 id 集不同"))
         if miss:
             L.append("> 缺(一手有、台账无){} 条:{}{}".format(
                 len(miss), ", ".join(miss[:12]), " …" if len(miss) > 12 else ""))
@@ -515,13 +551,37 @@ def _md(a: Dict) -> str:
     ]
     for k, v in sorted(a["consistency"].items(), key=lambda kv: -kv[1]):
         L.append("| {} | {} |".format(k, v))
+    # §5 的"本批次用什么模型"以前是**字面量** "qwen3:8b"(实测 25 份产物里连 4b 批次
+    # 都写着 8b,连带那句"不同模型只作量级参照"一起成了假话)。现在取台账里检出的
+    # model_actual;检不出就明说"未检出、本节先别引用",不替读者猜。
+    llm = a.get("llm") or {}
+    models = llm.get("model_actual") or []
+    if models:
+        b_label = " / ".join(models)
+        caveat = ("与基线同为 4b 档,差异只来自批次条件——可以横向比,但仍**不宣称显著性**。"
+                  if all("4b" in m for m in models)
+                  else "与基线(本地 4b)**不是同一模型**,只作量级参照,不宣称显著性。")
+    else:
+        req = " / ".join(llm.get("model_requested") or [])
+        b_label = "(台账未检出模型名{})".format("·请求值 " + req if req else "")
+        caveat = "本批次模型**未检出** ⇒ 与基线是否同口径无从判断,本节对比**先别引用**。"
     L += [
         "",
         "## 5. 与答辩基线对比（25 条 · 本地 4b）",
         "",
-        "> **不同模型,只作量级参照,不宣称显著性。** 本批次用 qwen3:8b。",
+        "> **本批次模型:** {} —— {}".format(b_label, caveat),
+    ]
+    # 检出≠请求时单独说一行:`model_actual` 来自"当时驻留的是谁"的探针,2026-10-07 实测
+    # 261007-110702-seedOn8b 第 1 条请求 8b、检成 4b(第 2 条检成 8b)。
+    # 不说,读者就会把检出值当成该条真正用过的模型。
+    if models and llm.get("model_requested") and set(models) != set(llm["model_requested"]):
+        L.append("> ⚠ **检出模型 ≠ 请求模型**:请求 {} / 检出 {} —— `model_actual` 记的是"
+                 "探针那一刻 Ollama 驻留的模型,不等于本条实际用的;以 `model_requested` "
+                 "与行级 `model_actual` 并排看。".format(" / ".join(llm["model_requested"]),
+                                                    b_label))
+    L += [
         "",
-        "| 指标 | 基线(4b, n=25) | 本批次(8b, n={}) |".format(a["n_runs"]),
+        "| 指标 | 基线(4b, n=25) | 本批次(n={}) |".format(a["n_runs"]),
         "| --- | --- | --- |",
         "| 反思均字 | {} | {} |".format(
             BASELINE["reflection_chars_mean"], a["reflection"]["chars_mean"]),
@@ -628,12 +688,22 @@ def main(argv=None) -> int:
                                         os.path.join(out_dir, "analysis.md")))
     if gap:
         miss = gap.get("missing") or []
+        extra = gap.get("extra") or []
         filled = gap.get("filled") or 0
-        tag = ("台账缺段(已用一手补齐)" if miss and filled == len(miss)
-               else "与一手不一致")
-        print("⚠ {}:一手 {} 条,本表 {} 条;缺 {} 条:{}{}".format(
-            tag, gap["n_primary"], a["n_runs"], len(miss),
-            ", ".join(miss[:8]), " …" if len(miss) > 8 else ""))
+        if gap.get("ledger_missing"):
+            # 整份台账不在,但一手全在:条数对得上,这里**不是**"与一手不一致"
+            # (旧写法会打那一句,实测 261004-203137-h120b 报成"一手 29 条,本表 29 条;
+            # 缺 0 条" —— 数字自相矛盾的假警报)。要说的是"这些行的台账字段天然为空"。
+            print("⚠ 台账整份缺失:本表 {} 条全部由一手 run.json 重建,"
+                  "seconds/attempt/model_actual 在本表全空".format(a["n_runs"]))
+        elif miss or extra:
+            tag = ("台账缺段(已用一手补齐)" if miss and filled == len(miss) and not extra
+                   else "与一手不一致")
+            print("⚠ {}:一手 {} 条,本表 {} 条;缺(台账少记){} 条:{};多(盘上无 run.json){} 条:{}{}"
+                  "  {}".format(tag, gap["n_primary"], a["n_runs"], len(miss),
+                                ", ".join(miss[:8]), " …" if len(miss) > 8 else "",
+                                len(extra), ", ".join(extra[:8]),
+                                " …" if len(extra) > 8 else ""))
     print("分支分布:{}".format(a["branches"]))
     print("反思均字 {} · 质量分均值 {} · issues 合计 {}".format(
         a["reflection"]["chars_mean"], a["reflection"]["score_mean"],

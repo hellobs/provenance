@@ -45,6 +45,7 @@ EXPECTED_KEYS = frozenset({
     "ledger_gap_resolved",          # 缺口已用一手补齐(此时 n_runs == 一手条数)
     "ledger_missing",               # 台账**整份**不存在(体检 N5;与 resolved 区分)
     "ledger_gap_detail",            # 对账明细:missing/extra/filled/ledger_missing
+    "llm",                          # 模型身份(台账检出的 model_actual / 请求值,2026-10-07)
     "branches",                     # 分支分布
     "branch_top",                   # 最高分支 + 塌缩警告
     "excluded_failed",              # "没跑成"的记录(不摘进质量统计)
