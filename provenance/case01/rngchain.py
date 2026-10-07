@@ -30,6 +30,11 @@ ENV_PROBE_KEYS = (
     "OLLAMA_NUM_PARALLEL", "OLLAMA_KEEP_ALIVE", "OLLAMA_FLASH_ATTENTION",
     "CUDA_VISIBLE_DEVICES", "CASE01_LLM_PROVIDER", ENV_LLM_BASE_URL,
     "CASE01_LLM_MODEL",
+    # 2026-10-07 补两个"改了它就改了总体"却没进旁证的开关(`batch_run` 都真的往子进程发了):
+    # 思考档决定 hybrid 模型的正文预算(llm.py:331 消费),embed 档决定检索命中。
+    # 实测痛点:今天为判 `--keep-thinking` 生效与否跑了 8b/4b 各若干条,而 **产物里分辨不出
+    # 哪条开了思考**——只能回去翻我当时的命令记录。旁证的存在意义就是"设定级复现不靠记忆"。
+    "CASE01_LLM_DISABLE_THINKING", "CASE01_EMBED_MODEL",
 )
 
 
