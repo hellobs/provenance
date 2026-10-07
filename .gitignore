@@ -244,3 +244,7 @@ provenance/frontend/static/assets/village/maze.json.bak*
 # 的 SKIP_DIRS 跳过,但漏了 gitignore,于是每次 `git status` 都冒出来。
 # 记忆文件是本机工作状态,不是项目约定,不入库。
 .workbuddy/
+# Trae IDE 的工作区(2026-10-07 补,与上一条同理由):别人在这台机器上用 Trae 时
+# 落在 ../.trae/ 的 plans/skills/documents 是 IDE 工作状态,不是本仓文档。
+# 它已进 doc_audit.py 的 SKIP_DIRS;这里补 gitignore,免得 `git add .` 吃进来。
+.trae/

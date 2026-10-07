@@ -240,7 +240,11 @@ SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              # 2026-10-03 加:.workbuddy 是 agent 工具的工作区(记忆/日志/草稿),
              # 不是本仓文档 —— 记忆文件没有状态块,把它们按项目文档治理会红测试
              # (test_docs_status)。工具目录与项目文档分开管。
-             ".workbuddy")
+             # 2026-10-07 同理加 .trae(Trae IDE 的工作区)。实测:别人落进来的
+             # ../.trae/documents/*.md、../.trae/skills/*/SKILL.md 会让外层
+             # tests/test_docs_status.py 本地红(CI 绿,因为 CI 机器上没这目录)。
+             # 注意 .gitignore 管不到这里 —— 本函数按文件系统 walk,不按 git 索引。
+             ".workbuddy", ".trae")
 
 
 def md_files(root):

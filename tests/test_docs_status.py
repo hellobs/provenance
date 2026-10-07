@@ -27,7 +27,11 @@ SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              # `.venv`/`.venv-live` 两个名字,于是 `tools/setup_all.py --venv-name` 建出来的
              # 自定义 venv 里的 site-packages/**/LICENSE.md 会被当成"没状态块的文档",
              # 让新机使用者看到 4 条假红(实测)。同机制:tools/doc_audit.py。
-             ".workbuddy")
+             # 2026-10-07 同理加 .trae(Trae IDE 的工作区:plans/skills/documents)。
+             # 实测:别人在这台机器上跑出来的 .trae/**/*.md 让本文件三条断言本地红
+             # (CI 绿 —— CI 机器上没有这个目录)。同机制:tools/doc_audit.py、仓库根
+             # .gitignore —— 三处的名单要一起改,只改一处就出现"工具说干净、测试说脏"。
+             ".workbuddy", ".trae")
 BANNER = re.compile(r"^>\s*\*\*(状态|Status)\*\*", re.M)
 # 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起);
 # 英文版 README 用英文键 `> **Status**`。
