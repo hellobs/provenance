@@ -1,0 +1,201 @@
+{
+  "title": "261007-152209-probeAC",
+  "n_runs": 6,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "model_requested": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "n_rows_with_model_actual": 6
+  },
+  "branches": {
+    "B": 6
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 6,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 6,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 2315.3,
+    "chars_median": 2317.5,
+    "chars_min": 1987,
+    "chars_max": 2674,
+    "score_mean": 100.0,
+    "score_median": 100.0,
+    "score_n": 6,
+    "status_dist": {
+      "pass": 6
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 22,
+    "issues_mean": 3.7,
+    "issues_median": 5.0,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 4,
+      "1": 2
+    },
+    "n_scored": 6,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 6
+    },
+    "n": 6,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 6
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-152209-probeAC-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2294,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 135.2,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280101
+    },
+    {
+      "run_id": "batch-261007-152209-probeAC-002",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2364,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 140.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280102
+    },
+    {
+      "run_id": "batch-261007-152209-probeAC-003",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2232,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 1,
+      "issues_final": 1,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 140.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280103
+    },
+    {
+      "run_id": "batch-261007-152209-probeAC-004",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2341,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 125.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280104
+    },
+    {
+      "run_id": "batch-261007-152209-probeAC-005",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1987,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 135.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280105
+    },
+    {
+      "run_id": "batch-261007-152209-probeAC-006",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2674,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 1,
+      "issues_final": 1,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 130.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20280106
+    }
+  ]
+}
