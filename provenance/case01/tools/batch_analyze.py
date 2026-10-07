@@ -591,7 +591,8 @@ def _md(a: Dict) -> str:
                                           r["issues_total"]),
         "| issues/条 | {:.1f} | {} |".format(
             BASELINE["issues_total"] / BASELINE["n"], r["issues_mean"]),
-        "| 分支 A/B/C | 2/16/7 | {} |".format(
+        "| 分支 A/B/C | {} | {} |".format(
+            "/".join(str(BASELINE["branches"].get(x, 0)) for x in "ABC"),
             "/".join(str(a["branches"].get(x, 0)) for x in "ABC")),
         "",
         "## 6. 结论",
