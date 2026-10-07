@@ -491,10 +491,12 @@ def _md(a: Dict) -> str:
         L.append("| {} | {} | {:.1%} |".format(b, c, c / tot))
     bt = a["branch_top"]
     L += ["", "**判定:{}**".format(
-        "⚠️ 出现塌缩倾向——`{}` 占 {:.1%},单跑一条时分支不再由内容决定,"
-        "批量统计分支占比意义有限,需改用 `--timeline` 强制均衡铺。"
-        .format(bt["branch"], bt["share"]) if bt["collapse_warning"]
-        else "分布未塌缩,分支由 LLM 判定自然产生。")]
+        "⚠️ 分布集中——`{}` 占 {:.1%}(判据:条数≥10 且多数派>60%)。"
+        "**这只说明占比,不说明成因**:实测分支由 T0 文本内容决定,所以不能据此写"
+        "\"分支不再由内容决定\";要一份铺开的分支对照,得用 `--timeline` 强制"
+        "(那是**对照条件**,不解释成行为结论)。".format(bt["branch"], bt["share"])
+        if bt["collapse_warning"]
+        else "占比未过 60% 门槛(判据:条数≥10 且多数派>60%),分布未触发集中告警。")]
     if a["branch_top"]["branch"]:
         L.append("（最高分支:{} · {} 条 · {:.1%}）".format(
             bt["branch"], bt["count"], bt["share"]))

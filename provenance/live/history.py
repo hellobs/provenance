@@ -518,7 +518,8 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,
             "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
-                      "debug=调试跑(内容不完整);deprecated=记录已被显式标废弃(样本作废)。"
+                      "debug=调试跑(内容不完整);deprecated=记录已被显式标废弃(样本作废);"
+                      "unreadable=有 run 目录但 run.json 不在(该次 run 未落盘)。"
                       "加 ?include_questionable=1 取全量",
         }
     return JSONResponse(body)
