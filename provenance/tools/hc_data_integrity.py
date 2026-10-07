@@ -4,6 +4,7 @@ import json, os, glob
 
 BASE = r"D:\zzr\provenance\provenance"
 issues = []
+col = None   # §2 里才赋值;tilemap 不可读时 §3/§5 要拿到 None 而不是 NameError 崩在半路
 
 def load(p, default=None):
     try:
@@ -43,26 +44,40 @@ tm_w = {(x, y) for y in range(col["height"]) for x in range(col["width"]) if col
 fe_w = {tuple(t["coord"]) for t in (fs or {}).get("tiles", []) if t.get("collision")}
 print("maze(frontend) collision=%d; tilemap墙=%d; 交集=%d; frontend缺=%d" % (
     len(fe_w), len(tm_w), len(fe_w & tm_w), len(tm_w - fe_w)))
+# 守的不变式是"前端 maze 碰撞 ⊇ tilemap 墙格"(缺席 tile = 前端把墙当可走,
+# align_frontend_maze.py 补的就是这个上界)。旧判据只在**交集为空**时才报,
+# 于是"244 个墙里只对上 1 个"这种半对齐状态是绿的 —— 打印了 frontend缺 却没人判。
+if tm_w and (tm_w - fe_w):
+    issues.append("前端 maze 少 %d 个 tilemap 墙格(缺席即被前端当可通行): %s" % (
+        len(tm_w - fe_w), sorted(tm_w - fe_w)[:8]))
 if not (fe_w & tm_w):
     issues.append("前端 maze 碰撞与 tilemap 完全没有交集(前端仍无法反映新墙)")
 
-# 4) checkpoints run 记录可读(抽前 3 个最新,读最后一个 simulate-* 快照)
+# 4) checkpoints run 记录可读(取**按 mtime 最新的几个目录**,读其最后一个 simulate-* 快照)
 ck = os.path.join(BASE, "results", "checkpoints")
 if os.path.isdir(ck):
-    runs = sorted(os.listdir(ck))
-    print("checkpoints runs: %d 个" % len(runs))
+    # 只数目录:`reflection_marks.json` / `reflection_marks.jsonl` / `interventions.json` 是散文件,
+    # 不是 run。而且原先按 `sorted(os.listdir)` 取**名字尾巴**当"最新",尾巴落到的往往是
+    # `visual-path-test` 这类测试目录;更要紧的是"一条快照都没取到"那种情况既不计数也不报
+    # ——2026-10-07 实测它打印"最近3个 run 可读: 2/3"却"问题清单(0)"、退出 0。
+    runs = sorted((d for d in os.listdir(ck) if os.path.isdir(os.path.join(ck, d))),
+                  key=lambda d: os.path.getmtime(os.path.join(ck, d)))
+    print("checkpoints runs: %d 个(只算目录)" % len(runs))
     readable = 0
-    for r in runs[-3:]:
+    sample = runs[-3:]
+    for r in sample:
         snaps = sorted(glob.glob(os.path.join(ck, r, "simulate-*.json")))
-        if snaps:
-            snap = load(snaps[-1])
-            if snap is not None:
-                nagent = len(snap.get("agents") or {})
-                readable += 1
-                print("   run '%s' 快照=%d步 最后agents=%d readable=OK" % (r, len(snaps), nagent))
-            else:
-                issues.append("run %s 最后快照不可读" % r)
-    print("   最近3个 run 可读: %d/3" % readable)
+        if not snaps:
+            issues.append("最新 run %s 没有 simulate-* 快照(取样落空,这一条等于没被读到)" % r)
+            continue
+        snap = load(snaps[-1])
+        if snap is None:
+            issues.append("run %s 最后快照不可读" % r)
+            continue
+        nagent = len(snap.get("agents") or {})
+        readable += 1
+        print("   run '%s' 快照=%d步 最后agents=%d readable=OK" % (r, len(snaps), nagent))
+    print("   最新 %d 个 run 可读: %d/%d" % (len(sample), readable, len(sample)))
 else:
     print("checkpoints 目录不存在(离线存档无)")
     issues.append("checkpoints 目录缺失")

@@ -19,6 +19,18 @@ MAVIS = os.path.join(os.path.dirname(REPO), "mavis")
 PY = sys.executable
 ISSUES = []
 
+# 本脚本没有开关,但以前会把任何参数当空气照跑全量(实测:敲 --help 想问用法,结果
+# 直接起四套 pytest + 全仓扫描,跑了几分钟)。误传参数必须出声,不能静默开跑。
+if any(a in ("-h", "--help") for a in sys.argv[1:]):
+    print(__doc__.strip())
+    print("\n用法:\"python tools/deep_check.py\" —— 不带参数即跑全部维度。")
+    print("注意:B 段会实跑四套测试,单次约数分钟;跑批期间别敲(会和批抢 GPU/模型驻留)。")
+    sys.exit(0)
+if len(sys.argv) > 1:
+    print("deep_check 没有开关,不认参数:{} —— 要跑全部就去掉参数,要单项就单独跑对应 "
+          "tools/hc_*.py。".format(" ".join(sys.argv[1:])), file=sys.stderr)
+    sys.exit(2)
+
 
 def say(tag, ok, text):
     mark = "✓" if ok else "⚠"
