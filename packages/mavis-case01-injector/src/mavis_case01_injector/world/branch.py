@@ -299,13 +299,30 @@ PLAN_PROMPT = (
 )
 
 
-# C 计划 JSON 的输出预算(2026-10-03 实测,qwen3:8b + Ollama /v1/chat/completions):
-# 400 时 content **恒为空**(0/3),推理链先吃光预算 → 解析拿不到 JSON → 整份计划退化成
-# 全默认 wait/none/0.0 → condition_monitor 无触发条件 → fired 永远为 false;
-# 800 时 3/3 解析成功并给出真触发条件(keyword: 签约/订单/采购协议)。
-# 注意:Ollama 的 OpenAI 兼容端点**不认 think 参数**(实测 400 预算下 think=false
-# 依旧 0/3),所以这条只能加预算,不能靠关思考解决。与分支判官 256→512 同一类病。
-PLAN_MAX_TOKENS = 800
+# C 计划 JSON 的输出预算。两段实测,别只看后一段:
+# 2026-10-03(qwen3:8b + Ollama /v1/chat/completions):400 时 content **恒为空**(0/3),
+#   推理链先吃光预算 → 解析拿不到 JSON → 整份计划退化成全默认 wait/none/0.0 →
+#   condition_monitor 无触发条件 → fired 永远 false;800 时 3/3 解析成功并给出真触发条件。
+#   当时还测到"OpenAI 兼容端点不认 think 参数"(400 预算下 think=false 依旧 0/3),
+#   于是结论停在"只能加预算"。与分支判官 256→512 同一类病。
+# 2026-10-07(同一模型、Ollama 0.35、批处理已带 CASE01_LLM_DISABLE_THINKING=1):**800 又不够了**。
+#   全库 102 条 C 记录里 20 条 `llm-plan-error`,当日两批(同一条不是批内第一条、预热已按
+#   num_ctx=32768 做过)各复现一次,失败形状是**两次尝试正文都空**、`truncations=2`。
+#   同一份 plan 输入四发探针(脚本 `D:\zzr\GTC\logs\_e11_plan_think_probe.py`):
+#     A /v1 @800            → 空正文(复现失败)
+#     B /v1 @2048           → 256 字合法 JSON
+#     C /v1 @800 + 顶层 think=false → 空正文(**Ollama 0.35 仍然不认这个键**,10-03 那句复查成立)
+#     D /api/chat @800 + think=False → 249 字合法 JSON
+#   ⇒ 根因是 `chat()` 走 /v1、**关不掉思考**,而 qwen3 的思考与正文共享 num_predict 预算;
+#   `CASE01_LLM_DISABLE_THINKING` 只映射成 `OllamaClient(think=...)`,而 `think` 只在
+#   `native_chat` 里生效 —— 所以那个环境变量在这三处结构化调用(判官/立场/计划)上是空转的。
+#   这里先按 B 把预算给足(同端点、不改判定行为,新老记录仍同语义);
+#   真正的修法(把结构化调用改走 `native_chat(think=False)`,即 D)会换端点 ⇒ 措辞与历史不可比,
+#   要重跑重核,单独拍过再动。
+# ⚠ 顺记一条同族现象(本条不改):分支判官也是 /v1、预算 512,当日一条 B 记录的
+#   `raw_outputs=[0, 57]` —— 第 1 次尝试就是空正文,靠 `max_attempts=3` 重试掩盖掉了。
+#   判官有 3 次而计划只有 2 次(`PLAN_MAX_ATTEMPTS`),这就是"计划更容易失败"的全部差别。
+PLAN_MAX_TOKENS = 2048
 # 解析不出 JSON 时的重试次数(初调 + 1 次重试)。原来 0 次:空 content 直接当
 # "AI 建议继续等待"存盘,失败与真决策不可区分。
 PLAN_MAX_ATTEMPTS = 2
