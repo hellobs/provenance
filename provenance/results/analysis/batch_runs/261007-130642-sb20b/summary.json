@@ -1,0 +1,42 @@
+{
+  "batch": "261007-130642-sb20b",
+  "finished_at": "2026-10-07 13:44:28",
+  "settings": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 180.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 20,
+    "ok": 20,
+    "failed": 0,
+    "ledger_rows": 20
+  },
+  "branches": {
+    "B": 20
+  },
+  "reflection": {
+    "n": 20,
+    "chars_mean": 1961.2,
+    "chars_min": 47,
+    "chars_max": 2870,
+    "score_mean": 88.7,
+    "score_n": 20,
+    "status_dist": {
+      "review": 4,
+      "pass": 14,
+      "fail": 2
+    }
+  },
+  "router": {
+    "issues_mean": 3.1,
+    "issues_total": 63,
+    "zero_issue_runs": 2
+  },
+  "seconds_mean": 113.3,
+  "seconds_total": 2265.2,
+  "seconds_n": 20
+}
