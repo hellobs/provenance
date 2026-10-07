@@ -238,6 +238,25 @@ def stop(case, quiet=False):
     return len(pids)
 
 
+def _warn_overwrite(explicit_run_id, run_id, out_rel):
+    """沿用同一个 `--run-id` 起面会把上一条记录**原地盖掉**(raw 与成品都是覆盖写,不报错)。
+
+    演示日这条最容易踩:彩排那条若与现场那条同名,彩排的产物就在跑完那一刻没了,而界面上
+    看不出任何异常(2026-10-07 实测被坑:拿"文件在不在"当"跑完没跑完"的判据,读到的正是上一局
+    的旧文件,于是紧接着的 `--stop` 把自己那局杀在 20 秒处)。只在**显式给了 run_id** 时提示——
+    自动现铸的名字按设计就不会撞,报了只是噪音。
+    """
+    if not explicit_run_id:
+        return
+    for p in (os.path.join(HERE, out_rel),
+              os.path.join(HERE, "case01", "runs", run_id, "run.json")):
+        if os.path.isfile(p):
+            print("  ⚠ {} 已存在 —— run_id={} 是覆盖写,旧那条会没。"
+                  "要留着对照就换个 --run-id,或先把 {} 整个目录挪走。".format(
+                      p, run_id, os.path.dirname(p)))
+            return
+
+
 def _start_mapper(run_id, args, raw_out):
     """【已停用】原来看护进程的事,现在由实时面进程自己顺序做。
 
@@ -292,6 +311,7 @@ def start(case, args):
             # 重开一局时循环里现铸的名字也走同一套口径(见 live_run.py)。
             run_id = args.run_id or live_run_id("auto" if args.branch_mode == "judge" else args.branch)
             out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
+            _warn_overwrite(args.run_id, run_id, out)
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                    "--branch-mode", args.branch_mode,
                    "--host", args.host,
@@ -306,6 +326,10 @@ def start(case, args):
             if args.no_map:
                 cmd += ["--no-map"]
     else:
+        if str(getattr(args, "seed", "") or "").strip():
+            # 对外口径是"只有一个种子",所以种子**接不住的那一面**必须自己说清楚,
+            # 不能让人以为 case00 也被固定了(help 里写的是 `case01:`)。
+            print("  ⚠ --seed 只作用于 case01;case00 这一面不接种子,这一局是**非确定**的。")
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
                "--stride", str(args.stride), "--port", str(LIVE["case00"]),
                "--host", args.host]
