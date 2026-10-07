@@ -226,6 +226,13 @@ class OllamaClient(_ChatMixin):
                     headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     obj = json.loads(resp.read().decode("utf-8"))
+                # 原生端点用 `done_reason` 表态(`"length"` = 被 `num_predict` 截),
+                # 而**反思正是唯一主要走这条路的长输出** —— 少这一行时,反思被预算截了
+                # 清单里仍是 `truncations: 0`,事后无从分辨"模型只写这么短"和"写到一半断了"
+                # (2026-10-07 实测:批 261007-130642-sb20b 的 `-012` 只有 47 字/质量分 15、
+                # `-011` 194 字/30 分,当场答不出是不是截断;而 `_ChatMixin` 只接了
+                # OpenAI 兼容端的 `finish_reason`,原生端一个字段都没读)。
+                self._note_truncation(obj.get("done_reason"), max_tokens)
                 return obj["message"]["content"]
             except (urllib.error.URLError, KeyError, json.JSONDecodeError,
                     TimeoutError) as e:
