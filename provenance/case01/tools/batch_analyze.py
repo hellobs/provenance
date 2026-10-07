@@ -37,8 +37,11 @@
   例外是台账独有字段 `seconds/attempt/model_actual/model_requested/seed`:
   一手 `run.json` 里没有这些键,`--scan-runs` 链上恒为空 ⇒ §5 的模型身份
   只有走 `--batch` 才取得到(走目录链会明说"未检出",不猜)。
-- 基线数字来自 `results/analysis/答辩速查表.md`(25 条,4b 本地模型),
-  与本批次(8b)**不是同口径**,对比只作量级参照,不宣称显著性。
+- 基线数字来自 `results/analysis/答辩速查表.md`(25 条小镇面记录,2026-09-19~09-25)。
+  这些记录**没有 manifest 键、也没有 rng.json**(2026-10-07 实测:目录里只有
+  `run.json`/`run.json.bak`),模型身份没有任何一手字段;而它们的 T0 回答 24/25 是
+  纯英文、反思却是中文(今日 4b 批的 T0 已是中文)⇒ "基线=4b"只是当期部署的推断。
+  所以本节对比只作量级参照,不宣称显著性,也不宣称同档可比。
 """
 import argparse
 import glob
@@ -52,7 +55,7 @@ PROV_DIR = os.path.dirname(CASE01_DIR)
 RUNS_DIR = os.path.join(CASE01_DIR, "runs")
 BATCH_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 
-# 答辩基线(25 条,本地 4b)——只作量级参照,不同模型不构成显著性比较
+# 答辩基线(25 条小镇面记录;记录内无模型字段,身份只能推断)——只作量级参照
 BASELINE = {
     "n": 25,
     "branches": {"A": 2, "B": 16, "C": 7},
@@ -558,16 +561,15 @@ def _md(a: Dict) -> str:
     models = llm.get("model_actual") or []
     if models:
         b_label = " / ".join(models)
-        caveat = ("与基线同为 4b 档,差异只来自批次条件——可以横向比,但仍**不宣称显著性**。"
-                  if all("4b" in m for m in models)
-                  else "与基线(本地 4b)**不是同一模型**,只作量级参照,不宣称显著性。")
+        caveat = ("基线那 25 条**没有 manifest**,模型身份无从取证 ⇒ 不断言两边同档,"
+                  "两列只作量级参照,不宣称显著性。")
     else:
         req = " / ".join(llm.get("model_requested") or [])
         b_label = "(台账未检出模型名{})".format("·请求值 " + req if req else "")
         caveat = "本批次模型**未检出** ⇒ 与基线是否同口径无从判断,本节对比**先别引用**。"
     L += [
         "",
-        "## 5. 与答辩基线对比（25 条 · 本地 4b）",
+        "## 5. 与答辩基线对比（25 条 · 模型未记档）",
         "",
         "> **本批次模型:** {} —— {}".format(b_label, caveat),
     ]
@@ -581,7 +583,7 @@ def _md(a: Dict) -> str:
                                                     b_label))
     L += [
         "",
-        "| 指标 | 基线(4b, n=25) | 本批次(n={}) |".format(a["n_runs"]),
+        "| 指标 | 基线(25 条·无 manifest) | 本批次(n={}) |".format(a["n_runs"]),
         "| --- | --- | --- |",
         "| 反思均字 | {} | {} |".format(
             BASELINE["reflection_chars_mean"], a["reflection"]["chars_mean"]),
