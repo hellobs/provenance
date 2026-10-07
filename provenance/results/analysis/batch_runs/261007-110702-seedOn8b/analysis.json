@@ -1,0 +1,104 @@
+{
+  "title": "261007-110702-seedOn8b",
+  "n_runs": 2,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "branches": {
+    "B": 1,
+    "C": 1
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 1,
+    "share": 0.5,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 2,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 1645.0,
+    "chars_median": 1645.0,
+    "chars_min": 1239,
+    "chars_max": 2051,
+    "score_mean": 75.0,
+    "score_median": 75.0,
+    "score_n": 2,
+    "status_dist": {
+      "review": 1,
+      "pass": 1
+    },
+    "fail_reason_top": {
+      "缺少实质维度：判断质量、行动与后果、结果与判断过程、进一步帮助、经验迁移": 1,
+      "未明确区分最终结果与当时判断过程": 1,
+      "未指出具体的自身判断或行为不足": 1
+    }
+  },
+  "router": {
+    "issues_total": 9,
+    "issues_mean": 4.5,
+    "issues_median": 4.5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "4": 1,
+      "5": 1
+    },
+    "n_scored": 2,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 2
+    },
+    "n": 2,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 2
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-110702-seedOn8b-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1239,
+      "refl_score": 50,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "缺少实质维度：判断质量、行动与后果、结果与判断过程、进一步帮助、经验迁移",
+        "未明确区分最终结果与当时判断过程",
+        "未指出具体的自身判断或行为不足"
+      ],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-110702-seedOn8b-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 2051,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}

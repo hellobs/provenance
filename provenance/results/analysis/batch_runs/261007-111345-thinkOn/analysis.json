@@ -1,0 +1,94 @@
+{
+  "title": "261007-111345-thinkOn",
+  "n_runs": 2,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "branches": {
+    "B": 2
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 2,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 2,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 2669.5,
+    "chars_median": 2669.5,
+    "chars_min": 1952,
+    "chars_max": 3387,
+    "score_mean": 100.0,
+    "score_median": 100.0,
+    "score_n": 2,
+    "status_dist": {
+      "pass": 2
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 9,
+    "issues_mean": 4.5,
+    "issues_median": 4.5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 1,
+      "4": 1
+    },
+    "n_scored": 2,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 2
+    },
+    "n": 2,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 2
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-111345-thinkOn-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1952,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-111345-thinkOn-002",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 3387,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}

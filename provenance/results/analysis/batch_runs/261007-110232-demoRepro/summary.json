@@ -1,0 +1,40 @@
+{
+  "batch": "261007-110232-demoRepro",
+  "finished_at": "2026-10-07 11:07:02",
+  "settings": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 180.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 2,
+    "ok": 2,
+    "failed": 0,
+    "ledger_rows": 2
+  },
+  "branches": {
+    "B": 2
+  },
+  "reflection": {
+    "n": 2,
+    "chars_mean": 2387.0,
+    "chars_min": 2387,
+    "chars_max": 2387,
+    "score_mean": 100.0,
+    "score_n": 2,
+    "status_dist": {
+      "pass": 2
+    }
+  },
+  "router": {
+    "issues_mean": 5.0,
+    "issues_total": 10,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 135.1,
+  "seconds_total": 270.1,
+  "seconds_n": 2
+}

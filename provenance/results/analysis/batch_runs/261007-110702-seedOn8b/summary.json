@@ -1,0 +1,42 @@
+{
+  "batch": "261007-110702-seedOn8b",
+  "finished_at": "2026-10-07 11:13:43",
+  "settings": {
+    "model": "qwen3:8b",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 180.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 2,
+    "ok": 2,
+    "failed": 0,
+    "ledger_rows": 2
+  },
+  "branches": {
+    "B": 1,
+    "C": 1
+  },
+  "reflection": {
+    "n": 2,
+    "chars_mean": 1645.0,
+    "chars_min": 1239,
+    "chars_max": 2051,
+    "score_mean": 75.0,
+    "score_n": 2,
+    "status_dist": {
+      "review": 1,
+      "pass": 1
+    }
+  },
+  "router": {
+    "issues_mean": 4.5,
+    "issues_total": 9,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 200.1,
+  "seconds_total": 400.1,
+  "seconds_n": 2
+}
