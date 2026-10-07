@@ -1,0 +1,127 @@
+{
+  "title": "261007-085813-presetB4",
+  "n_runs": 4,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "branches": {
+    "B": 4
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 4,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 4,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 2227.8,
+    "chars_median": 2228.5,
+    "chars_min": 2195,
+    "chars_max": 2259,
+    "score_mean": 100.0,
+    "score_median": 100.0,
+    "score_n": 4,
+    "status_dist": {
+      "pass": 4
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 20,
+    "issues_mean": 5.0,
+    "issues_median": 5.0,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 4
+    },
+    "n_scored": 4,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 4
+    },
+    "n": 4,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 4
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-085813-presetB4-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2195,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-085813-presetB4-002",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2238,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-085813-presetB4-003",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2219,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-085813-presetB4-004",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2259,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "batch": "261007-090629-presetC4",
+  "finished_at": "2026-10-07 09:14:19",
+  "settings": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "timeline": "C",
+    "lanes": 1,
+    "duration_min": 30.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 4,
+    "ok": 4,
+    "failed": 0,
+    "ledger_rows": 4
+  },
+  "branches": {
+    "C": 4
+  },
+  "reflection": {
+    "n": 4,
+    "chars_mean": 2263.5,
+    "chars_min": 1958,
+    "chars_max": 2467,
+    "score_mean": 100.0,
+    "score_n": 4,
+    "status_dist": {
+      "pass": 4
+    }
+  },
+  "router": {
+    "issues_mean": 3.8,
+    "issues_total": 15,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 117.5,
+  "seconds_total": 470.1,
+  "seconds_n": 4
+}

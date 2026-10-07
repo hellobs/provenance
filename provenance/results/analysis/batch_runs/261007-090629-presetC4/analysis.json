@@ -1,0 +1,129 @@
+{
+  "title": "261007-090629-presetC4",
+  "n_runs": 4,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "branches": {
+    "C": 4
+  },
+  "branch_top": {
+    "branch": "C",
+    "count": 4,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 4,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 2263.5,
+    "chars_median": 2314.5,
+    "chars_min": 1958,
+    "chars_max": 2467,
+    "score_mean": 100.0,
+    "score_median": 100.0,
+    "score_n": 4,
+    "status_dist": {
+      "pass": 4
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 15,
+    "issues_mean": 3.8,
+    "issues_median": 4.5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "4": 1,
+      "1": 1,
+      "5": 2
+    },
+    "n_scored": 4,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 4
+    },
+    "n": 4,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "inconsistent": 4
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-090629-presetC4-001",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 2467,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 4,
+      "issues_final": 4,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-090629-presetC4-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 2411,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 1,
+      "issues_final": 1,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-090629-presetC4-003",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 2218,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    },
+    {
+      "run_id": "batch-261007-090629-presetC4-004",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 1958,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": ""
+    }
+  ]
+}
