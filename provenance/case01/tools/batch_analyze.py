@@ -678,7 +678,32 @@ def main(argv=None) -> int:
         title = "runs 扫描{}".format("/" + args.prefix if args.prefix else "")
 
     if not rows:
-        print("没有可用记录(bad={}）——确认 run.json 是否已落盘".format(bad))
+        # ⚠ 这句原先只说"确认 run.json 是否已落盘",而批次**整批失败**时 run.json 本来就不该有:
+        # 台账旁边躺着 failures.jsonl,读的人却被告知去查产物(261007-163008-rep6h 就是这样,
+        # 两条全死在 T0 超时,按旧提示会往"产物没落盘"的方向查,而真原因就在同一个目录里)。
+        msg = "没有可用记录(bad={}）".format(bad)
+        fails_p = os.path.join(BATCH_ROOT, args.batch, "failures.jsonl") if args.batch else ""
+        if fails_p and os.path.isfile(fails_p):
+            with open(fails_p, encoding="utf-8") as f:
+                fails = [json.loads(x) for x in f if x.strip()]
+            if fails:
+                # 失败行的 schema 在 batch_run 里:原因躺 `log_tail`(traceback 尾),
+                # 不是 `error`/`reason`(那两个键压根不存在,写成那样就又报"原因未记")。
+                last = fails[-1]
+                lines = [ln.strip() for ln in (last.get("log_tail") or "").splitlines() if ln.strip()]
+                # `log_tail` 是 stdout/stderr 的尾巴,末行往往是台词正文而不是异常行,
+                # 直接取末行会把"HCM 当前并不值得买入"当成失败原因(实测踩过)。
+                why = next((ln for ln in reversed(lines)
+                            if ("Error" in ln or "Exception" in ln or "error:" in ln)), "")
+                if not why:
+                    why = lines[-1][:200] if lines else "(log_tail 为空)"
+                msg += "——台账 0 条成功、failures.jsonl 有 {} 条失败,最后一条 rc={} 用时 {}s,原因:{}".format(
+                    len(fails), last.get("returncode"), last.get("seconds"), why[:200])
+            else:
+                msg += "——failures.jsonl 存在但是空的,确认批次是否真跑过"
+        else:
+            msg += "——确认 run.json 是否已落盘"
+        print(msg)
         return 1
 
     a = analyze(rows, bad, title, gap)
