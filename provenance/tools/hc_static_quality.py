@@ -5,7 +5,13 @@ import os, re
 ROOTS = [
     r"D:\zzr\provenance\provenance",
 ]
-SKIPS = ("node_modules", "dist", ".git", "__pycache__", "runs", "checkpoints", ".conda", "archive")
+# 子串匹配(SKIPS 里每一项都是路径子串,不是目录名精确比对):
+# 第三方目录必须列全,否则"命中总数"把 site-packages 里的第三方代码算成我们的。
+# 2026-10-07 实测:不加这几条时扫到 2072 个文件、其中 1667 个是第三方;
+# localhost:port 的 22 命中里只有 8 处属于本仓。
+# 已知副作用:".git" 这一条同时跳过 .github/(CI 配置不在本工具射程,要看用 git grep)。
+SKIPS = ("node_modules", "dist", ".git", "__pycache__", "runs", "checkpoints", ".conda", "archive",
+         ".venv", "site-packages", ".uv-cache", "egg-info")
 
 def iter_files():
     for root in ROOTS:

@@ -397,19 +397,31 @@ def truncation_counts(clients: Dict[str, Any]) -> Dict[str, int]:
     为什么要一次收多个客户端:此前只看判定那一个对象,而生产路径把 `router_llm`
     交给判定后 `llm`(本地,跑对话与反思)就成了另一个对象、永不被数 ——
     报出来的数比真实发生的小,而清单里"小"和"没有"看起来是同一回事。
+
+    标签为什么可能带 "/":同一个实例常挂在多个标签下(批路径 `router_llm =
+    router_llm or llm`,且 C 线仓位计划也用同一个对象),而计数记在**实例**上,
+    阶段信息不在里面。此前只取表里第一个标签,于是落在仓位计划上的截断被写成
+    "判定 1 次" —— 那是标签,不是测量点(2026-10-07 实测:8b 两条截断真落
+    `max_tokens=800` 的 C 线计划,判官输出反而完整)。现在把该实例的全部标签并列,
+    至少读者知道这一处不是单一阶段;要精确到阶段得让客户端自己记 caller,未做。
     """
-    out: Dict[str, int] = {}
-    seen = set()
+    groups: Dict[int, list] = {}       # id(client) → [实例, 该实例的标签列表]
     for label, client in (clients or {}).items():
-        if client is None or id(client) in seen:
+        if client is None:
             continue
-        seen.add(id(client))
+        group = groups.get(id(client))
+        if group is None:
+            groups[id(client)] = [client, [label]]
+        elif label not in group[1]:
+            group[1].append(label)
+    out: Dict[str, int] = {}
+    for client, labels in groups.values():
         try:
             n = int(getattr(client, "truncations", 0) or 0)
         except (TypeError, ValueError):
             continue
         if n:
-            out[label] = n
+            out["/".join(labels)] = n
     return out
 
 
