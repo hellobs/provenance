@@ -2,19 +2,25 @@
 """分支判定对照评估:关键词规则 vs LLM 判定 vs 实际走的线。
 
 回答的问题(2026-09-27 用户立项"LLM 判定分支,你来做"):
-- 25 条成品记录的 T0 AI 回答,规则表(scenario.yaml 词表)和 LLM 判定
+- 成品记录的 T0 AI 回答,规则表(scenario.yaml 词表)和 LLM 判定
   各判到哪个分支?与记录实际走的线一致吗?
 - judge 模式的记录:actual = LLM 判定结果,可量"判定准确率";
   preset 模式的记录:actual = 操作者预设(可能与 AI 立场矛盾,那是另一回事)——
   对这类记录,有意义的指标是 **规则 vs LLM 的一致性**。
 
+默认语料是 `case01/runs/*/run.json` 里有 T0 回答的那些。2026-10-07 前只认
+speaker="ai" 的小镇面记录,而批次面的 speaker 是 "investment_ai",于是 490 多条
+批次记录被静默排除在对照之外;现在两种都收。要固定语料复测用 `--cases-json`。
+
 用法:
   python -m case01.tools.branch_judge_eval --llm glm      # BigModel 免费档(默认)
-  python -m case01.tools.branch_judge_eval --llm ollama   # 本地 qwen3:4b
+  python -m case01.tools.branch_judge_eval --llm ollama   # 本地 Ollama(取 CASE01_LLM_MODEL,未设则 4b)
   python -m case01.tools.branch_judge_eval --llm vllm     # 本地 Qwen3-8B/vLLM
-  python -m case01.tools.branch_judge_eval --llm glm --tune-prompt  # 改 prompt 后复跑
+  python -m case01.tools.branch_judge_eval --llm glm --tune-prompt  # 见 --tune-prompt 说明
 
 产物:results/analysis/branch_judge_eval/{json,md}
+每份产物的 summary 里带 `judge_model`/`prompt_sha8` —— 换模型或换 prompt 复跑时,
+对照的是哪一跑全靠这两个字段,目录名不算记录。
 """
 import json
 import os
@@ -99,7 +105,7 @@ def load_cases() -> List[dict]:
         with open(p, encoding="utf-8") as f:
             d = json.load(f)
         t0 = next((t.get("text", "") for t in d.get("turns", [])
-                   if t.get("speaker") == "ai"), "")
+                   if t.get("speaker") in ("ai", "investment_ai")), "")
         if not t0.strip():
             continue
         out.append({
@@ -201,9 +207,38 @@ def summarize(rows: List[dict]) -> dict:
     }
 
 
+def _judge_identity(llm, channel: str, prompt: str) -> dict:
+    """这份对照是"谁、用哪版 prompt"判的 —— 必须落进产物。
+
+    C/B 分布本身就是被判定模型的属性(同一份冻结 T0 语料:4b 判 25 条全 B,
+    qwen3:8b 判 C=17/B=8),而三份既有产物里没有任何模型字段,只有目录名在说模型。
+    """
+    import hashlib
+    import inspect
+
+    while isinstance(llm, _Retry429):
+        llm = llm._inner
+    from mavis_case01_injector.world.branch import LLMBranchJudge
+    default_prompt = inspect.signature(
+        LLMBranchJudge.__init__).parameters["prompt"].default
+    effective = prompt or default_prompt
+    return {
+        "llm_channel": channel,
+        "judge_model": getattr(llm, "chat_model", None) or "(未检出)",
+        # ollama/vllm 通道的模型来自环境变量;没设就是客户端签名里的默认值
+        "model_env_requested": os.environ.get("CASE01_LLM_MODEL") or "(未设)",
+        "prompt_sha8": hashlib.sha256(effective.encode("utf-8")).hexdigest()[:8],
+        "prompt_is_shipped_default": effective == default_prompt,
+    }
+
+
 def _md(rows: List[dict], s: dict) -> str:
     lines = ["# 分支判定对照 — 规则表 vs LLM", "",
              "| 指标 | 值 |", "|---|---|",
+             "| 判定模型 | {} · --llm {} · CASE01_LLM_MODEL={}|".format(
+                 s["judge_model"], s["llm_channel"], s["model_env_requested"]),
+             "| 判定 prompt | sha8={} · 与出厂默认相同={}|".format(
+                 s["prompt_sha8"], s["prompt_is_shipped_default"]),
              "| 记录数 | {} |".format(s["n"]),
              "| LLM 有效判定 | {} |".format(s["llm_ok"]),
              "| 规则 vs LLM 一致 | {}({}) |".format(
@@ -238,7 +273,8 @@ def main() -> int:
     ap.add_argument("--cases-json", default="",
                     help="从既有 branch_judge_eval.json 读取冻结 T0 语料")
     ap.add_argument("--tune-prompt", action="store_true",
-                    help="prompt 调优复跑:跳过已有结果的记录?现版为全量重跑")
+                    help="用 ACTION_FIRST_PROMPT 复跑;2026-10-07 实测它和出厂 JUDGE_PROMPT "
+                         "是同一个字符串,所以现在加了也是 no-op(会出声),等真有候选 prompt 再用")
     ap.add_argument("--out-root", default=OUT_ROOT)
     args = ap.parse_args()
 
@@ -249,9 +285,13 @@ def main() -> int:
         print("没有可评估的记录")
         return 2
     llm = make_llm(args.llm, args.max_tokens)
-    rows = evaluate(cases, llm, args.max_tokens,
-                    prompt=ACTION_FIRST_PROMPT if args.tune_prompt else "")
+    prompt = ACTION_FIRST_PROMPT if args.tune_prompt else ""
+    rows = evaluate(cases, llm, args.max_tokens, prompt=prompt)
     s = summarize(rows)
+    s.update(_judge_identity(llm, args.llm, prompt))
+    if args.tune_prompt and s["prompt_is_shipped_default"]:
+        print("[!] --tune-prompt 传进去的文本和出厂 JUDGE_PROMPT 逐字相同"
+              "(sha8={}),这一跑和默认跑没有区别。".format(s["prompt_sha8"]), flush=True)
     os.makedirs(args.out_root, exist_ok=True)
     with open(os.path.join(args.out_root, "branch_judge_eval.json"), "w",
               encoding="utf-8") as f:
