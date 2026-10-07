@@ -1,5 +1,5 @@
 {
-  "title": "261007-113243-embedWarm2",
+  "title": "261007-134453-thinkOn8b",
   "n_runs": 1,
   "n_unreadable": 0,
   "ledger_gap": 0,
@@ -11,7 +11,7 @@
       "qwen3:4b-instruct-2507-q4_K_M"
     ],
     "model_requested": [
-      "qwen3:4b-instruct-2507-q4_K_M"
+      "qwen3:8b"
     ],
     "n_rows_with_model_actual": 1
   },
@@ -31,25 +31,27 @@
     "records": []
   },
   "reflection": {
-    "chars_mean": 3387.0,
-    "chars_median": 3387,
-    "chars_min": 3387,
-    "chars_max": 3387,
-    "score_mean": 100.0,
-    "score_median": 100,
+    "chars_mean": 1653.0,
+    "chars_median": 1653,
+    "chars_min": 1653,
+    "chars_max": 1653,
+    "score_mean": 95.0,
+    "score_median": 95,
     "score_n": 1,
     "status_dist": {
-      "pass": 1
+      "review": 1
     },
-    "fail_reason_top": {}
+    "fail_reason_top": {
+      "缺少实质维度：经验迁移": 1
+    }
   },
   "router": {
-    "issues_total": 4,
-    "issues_mean": 4.0,
-    "issues_median": 4,
+    "issues_total": 5,
+    "issues_mean": 5.0,
+    "issues_median": 5,
     "zero_issue_runs": 0,
     "issues_dist": {
-      "4": 1
+      "5": 1
     },
     "n_scored": 1,
     "n_excluded_not_scored": 0,
@@ -65,25 +67,27 @@
   },
   "per_run": [
     {
-      "run_id": "batch-261007-113243-embedWarm2-001",
+      "run_id": "batch-261007-134453-thinkOn8b-001",
       "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
-      "refl_chars": 3387,
-      "refl_score": 100,
-      "refl_status": "pass",
-      "refl_fail_reasons": [],
-      "issues": 4,
-      "issues_final": 4,
+      "refl_chars": 1653,
+      "refl_score": 95,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "缺少实质维度：经验迁移"
+      ],
+      "issues": 5,
+      "issues_final": 5,
       "turns": 4,
       "events": 13,
       "router_status": "",
       "refl_error": "",
       "router_error": "",
-      "seconds": 155.1,
+      "seconds": 240.1,
       "attempt": 1,
       "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
-      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:8b",
       "seed": 20270601
     }
   ]

@@ -6,6 +6,16 @@
   "ledger_gap_resolved": false,
   "ledger_missing": false,
   "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:4b-instruct-2507-q4_K_M",
+      "qwen3:8b"
+    ],
+    "model_requested": [
+      "qwen3:8b"
+    ],
+    "n_rows_with_model_actual": 2
+  },
   "branches": {
     "B": 1,
     "C": 1
@@ -81,7 +91,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 180.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:8b",
+      "seed": 20270601
     },
     {
       "run_id": "batch-261007-110702-seedOn8b-002",
@@ -98,7 +113,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 220.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20270601
     }
   ]
 }

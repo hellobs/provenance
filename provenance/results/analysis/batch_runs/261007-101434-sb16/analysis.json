@@ -6,6 +6,15 @@
   "ledger_gap_resolved": false,
   "ledger_missing": false,
   "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "model_requested": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "n_rows_with_model_actual": 16
+  },
   "branches": {
     "B": 16
   },
@@ -82,7 +91,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 85.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270802
     },
     {
       "run_id": "batch-261007-101434-sb16-002",
@@ -99,7 +113,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 130.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270803
     },
     {
       "run_id": "batch-261007-101434-sb16-003",
@@ -116,7 +135,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 130.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270804
     },
     {
       "run_id": "batch-261007-101434-sb16-004",
@@ -136,7 +160,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 80.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270805
     },
     {
       "run_id": "batch-261007-101434-sb16-005",
@@ -153,7 +182,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 130.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270806
     },
     {
       "run_id": "batch-261007-101434-sb16-006",
@@ -170,7 +204,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 140.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270807
     },
     {
       "run_id": "batch-261007-101434-sb16-007",
@@ -187,7 +226,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 130.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270808
     },
     {
       "run_id": "batch-261007-101434-sb16-008",
@@ -204,7 +248,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 115.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270809
     },
     {
       "run_id": "batch-261007-101434-sb16-009",
@@ -221,7 +270,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 120.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270810
     },
     {
       "run_id": "batch-261007-101434-sb16-010",
@@ -238,7 +292,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 105.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270811
     },
     {
       "run_id": "batch-261007-101434-sb16-011",
@@ -255,7 +314,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 125.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270812
     },
     {
       "run_id": "batch-261007-101434-sb16-012",
@@ -274,7 +338,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 85.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270813
     },
     {
       "run_id": "batch-261007-101434-sb16-013",
@@ -291,7 +360,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 125.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270814
     },
     {
       "run_id": "batch-261007-101434-sb16-014",
@@ -308,7 +382,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 135.1,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270815
     },
     {
       "run_id": "batch-261007-101434-sb16-015",
@@ -325,7 +404,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 120.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270816
     },
     {
       "run_id": "batch-261007-101434-sb16-016",
@@ -342,7 +426,12 @@
       "events": 13,
       "router_status": "",
       "refl_error": "",
-      "router_error": ""
+      "router_error": "",
+      "seconds": 125.0,
+      "attempt": 1,
+      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
+      "seed": 20270817
     }
   ]
 }

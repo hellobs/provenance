@@ -1,5 +1,5 @@
 {
-  "title": "261007-113243-embedWarm2",
+  "title": "261007-141617-demo1015repro",
   "n_runs": 1,
   "n_unreadable": 0,
   "ledger_gap": 0,
@@ -8,10 +8,10 @@
   "ledger_gap_detail": null,
   "llm": {
     "model_actual": [
-      "qwen3:4b-instruct-2507-q4_K_M"
+      "qwen3:8b"
     ],
     "model_requested": [
-      "qwen3:4b-instruct-2507-q4_K_M"
+      "qwen3:8b"
     ],
     "n_rows_with_model_actual": 1
   },
@@ -31,12 +31,12 @@
     "records": []
   },
   "reflection": {
-    "chars_mean": 3387.0,
-    "chars_median": 3387,
-    "chars_min": 3387,
-    "chars_max": 3387,
-    "score_mean": 100.0,
-    "score_median": 100,
+    "chars_mean": 1480.0,
+    "chars_median": 1480,
+    "chars_min": 1480,
+    "chars_max": 1480,
+    "score_mean": 95.0,
+    "score_median": 95,
     "score_n": 1,
     "status_dist": {
       "pass": 1
@@ -44,12 +44,12 @@
     "fail_reason_top": {}
   },
   "router": {
-    "issues_total": 4,
-    "issues_mean": 4.0,
-    "issues_median": 4,
+    "issues_total": 5,
+    "issues_mean": 5.0,
+    "issues_median": 5,
     "zero_issue_runs": 0,
     "issues_dist": {
-      "4": 1
+      "5": 1
     },
     "n_scored": 1,
     "n_excluded_not_scored": 0,
@@ -65,26 +65,26 @@
   },
   "per_run": [
     {
-      "run_id": "batch-261007-113243-embedWarm2-001",
+      "run_id": "batch-261007-141617-demo1015repro-001",
       "source": "ledger",
       "branch": "B",
       "consistency": "consistent",
-      "refl_chars": 3387,
-      "refl_score": 100,
+      "refl_chars": 1480,
+      "refl_score": 95,
       "refl_status": "pass",
       "refl_fail_reasons": [],
-      "issues": 4,
-      "issues_final": 4,
+      "issues": 5,
+      "issues_final": 5,
       "turns": 4,
       "events": 13,
       "router_status": "",
       "refl_error": "",
       "router_error": "",
-      "seconds": 155.1,
+      "seconds": 205.2,
       "attempt": 1,
-      "model_actual": "qwen3:4b-instruct-2507-q4_K_M",
-      "model_requested": "qwen3:4b-instruct-2507-q4_K_M",
-      "seed": 20270601
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261004
     }
   ]
 }
