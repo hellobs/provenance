@@ -81,9 +81,36 @@ def marked_node_ids() -> set:
     return {str(m.get("node_id", "")) for m in load_marks() if m.get("node_id")}
 
 
+def mark_gate_errors(agent: str, text: str, verdict: str,
+                     correction: str) -> list:
+    """一条标记进训练集前的判定门(唯一实现处)。
+
+    为什么单独抽出来:干预策略 `/api/reflections/mark` 与参照面板
+    `/api/expert/decision` 写的是**同一份** reflection_marks.json,门必须一模一样;
+    复制两份的话,将来只改一处就会出现"同一个 verdict 从一个口进得去、另一个口进不去"。
+    返回问题列表(空 = 放行),文案里带修法,面板直接显示给用户。
+    """
+    errs = []
+    if not agent or not text:
+        errs.append("缺少 agent/text")
+    if verdict not in VALID_VERDICTS:
+        errs.append("verdict 必须是 correct/incorrect/partial 之一")
+    if verdict in ("incorrect", "partial") and not correction:
+        errs.append("incorrect/partial 必须填写纠正文本")
+    # 反向也要拦(2026-10-07):correct 却带着文本,历史写法会让训练侧把那段文本当
+    # 标准答案(output = correction if correction else thought),等于用一条"判定
+    # 正确"的记录教模型"其实该改"。面板切回复"正确"时文本框只是隐藏、值还在,
+    # 所以这条是真实可达路径,不是假想输入。
+    if verdict == "correct" and correction:
+        errs.append("verdict=correct 不应带纠正文本(训练侧会把这段文本当标准答案);"
+                    "请清空文本,或改判 partial/incorrect")
+    return errs
+
+
 def new_mark(agent: str, simulation: str, sim_time: str, node_id: str,
-             thought: str, verdict: str, correction: str, context: dict) -> dict:
-    return {
+             thought: str, verdict: str, correction: str, context: dict,
+             origin: str = "expert", review=None, operator: str = "expert") -> dict:
+    record = {
         "agent": agent,
         "simulation": simulation,
         "sim_time": sim_time,
@@ -96,8 +123,21 @@ def new_mark(agent: str, simulation: str, sim_time: str, node_id: str,
         # 同一条时间再给一份**带时区**的(2026-09-24 体检):marked_time 是本地墙钟,
         # 跨机不可比;新增字段而不是改旧格式,免得 LoRA 侧解析被改坏。
         "marked_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "operator": "expert",
+        # 提交主体(2026-10-07):此前写死 "expert",审计里分不清谁。规则是
+        # **内部可留痕、外部不可指定** —— 这个值只能由服务端自己填(面板填的是
+        # 它观测到的连接方),请求体里同名键一律不采信,见 expert_review_app。
+        "operator": operator,
+        # 这条判定**是谁产的**(2026-10-07,实测出来的必要性):同一个家族的模型扮专家
+        # 写的意见,格式与真专家逐字节看不出区别(4 条模拟标记全部过校验门、rejected 0),
+        # 所以"来源"必须是一个字段,不能靠人眼。缺键按 expert 读(历史 2 条不回填)。
+        "origin": origin,            # expert / simulated / backfilled / probe
     }
+    if review:
+        # 治理侧的定位信息(哪条 run 的哪个问题的哪个专业、专家看了哪几句)。放在
+        # **子对象**里而不是摊平到顶层:训练侧只读顶层那几个字段,把平台键混进去会让
+        # "哪些字段进训练集"变成巧合。缺键=没经过审核面板(实时面手工标记),与历史同形。
+        record["review"] = dict(review)
+    return record
 
 
 def build_lora_sample(mark: dict) -> dict:
@@ -123,7 +163,11 @@ def build_lora_sample(mark: dict) -> dict:
         "请根据判定结果输出修正后的反思(如果判定为正确,请重申该反思的核心判断)。"
     )
     inp = f"近期行动: {action} | 价值倾向: {tend_str} | 你的反思: {thought}"
-    output = correction if correction else thought
+    # 按 verdict 取,不按"有没有文本"取(2026-10-07):一条"判定为正确"的样本,标准答案
+    # 必须是原反思。旧写法 `correction if correction else thought` 只要记录里躺着文本
+    # 就当纠正用 —— 与《专家审核流程补充规范》§5「approved 的最终文本指向原始片段」相反。
+    output = (correction if verdict in ("incorrect", "partial") and correction
+              else thought)
 
     sample = {
         "instruction": instruction,

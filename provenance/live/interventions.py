@@ -422,7 +422,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
     name = "反思标记(专家审核)"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
-        from live.reflections import (VALID_VERDICTS, append_mark, new_mark,
+        from live.reflections import (append_mark, mark_gate_errors, new_mark,
                                       rebuild_jsonl)
 
         agent = str(payload.get("agent", "")).strip()
@@ -431,14 +431,11 @@ class ReflectionMarkStrategy(InterventionStrategy):
         verdict = str(payload.get("verdict", "")).strip()
         correction = str(payload.get("correction", "") or "").strip()
         sim_time = str(payload.get("sim_time", "")).strip() or ctx.sim_time
-
-        if not agent or not text:
-            return {"ok": False, "errors": ["缺少 agent/text"]}
-        if verdict not in VALID_VERDICTS:
-            return {"ok": False,
-                    "errors": ["verdict 必须是 correct/incorrect/partial 之一"]}
-        if verdict in ("incorrect", "partial") and not correction:
-            return {"ok": False, "errors": ["incorrect/partial 必须填写纠正文本"]}
+        # 判定门与审核面板共用一处实现(live/reflections.mark_gate_errors),
+        # 免得两个口对同一个 verdict 给出不同结论。
+        errs = mark_gate_errors(agent, text, verdict, correction)
+        if errs:
+            return {"ok": False, "errors": errs}
         if len(text) > 200_000:
             return {"ok": False, "errors": ["text 超长(>200k 字符),疑似滥用"]}
         # 行为上下文:最近快照的倾向/对齐 + decisions.json 最后一条决策

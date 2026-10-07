@@ -64,6 +64,18 @@ def validate_dpo(dpo: dict) -> List[str]:
             errs.append("{}.空".format(k))
     if dpo.get("chosen") and dpo.get("chosen") == dpo.get("rejected"):
         errs.append("chosen==rejected(无偏好信号)")
+    # 量纲对等(2026-10-07,真跑出来的缺陷):rejected 存的是**整篇反思**,而按
+    # 《专家审核流程补充规范》§7 专家给的是 edited_segment(一个片段)。实测模拟专家
+    # 四条对子全是 chosen 111–163 字 vs rejected 1591–3387 字,逐字相似度 0.026–0.071
+    # —— 这种对子训出来的是"偏好短回答",不是"偏好专家判断",而旧校验门只查空值与
+    # 全等,4/4 全放过。缺 `anchor`(原文定位)时无法把片段回填成完整反思,所以这里
+    # 判它不合格并写明原因,而不是产出一条看起来合法的坏样本。
+    c, r = str(dpo.get("chosen") or ""), str(dpo.get("rejected") or "")
+    if c.strip() and r.strip():
+        ratio = min(len(c), len(r)) / max(len(c), len(r))
+        if ratio < 0.5:
+            errs.append("chosen/rejected 量纲不对等(片段 vs 全文,ratio={:.2f});"
+                        "需要 anchor 定位或改为整篇重写".format(ratio))
     return errs
 
 
@@ -94,6 +106,13 @@ def export(marks: List[dict], out_root: str = OUT_ROOT) -> dict:
             errs.append("verdict.非法:{}".format(v))
         if v in ("incorrect", "partial") and not str(m.get("correction", "")).strip():
             errs.append("correction.空({})".format(v))
+        # 来源门(2026-10-07):模拟/回填的意见**不进训练集**。必要性是实测的 ——
+        # 用 4b 扮专家造的 4 条标记在校验门眼里与真专家意见无法区分(全过、rejected 0),
+        # 而《LoRA 预准备》§四 自己写着"不从成品反思造自模仿 SFT:那是在教模型模仿自己"。
+        # 缺 `origin` 键按 expert 读(历史标记不回填)。
+        org = str(m.get("origin", "expert") or "expert")
+        if org != "expert":
+            errs.append("非专家来源(origin={})".format(org))
         key = _dedup_key(s)
         if key in seen:
             errs.append("重复样本")
@@ -111,7 +130,25 @@ def export(marks: List[dict], out_root: str = OUT_ROOT) -> dict:
             if not derrs:
                 dpo.append(d)
                 stats["dpo"] += 1
+            else:
+                # DPO 对不合格不牵连 SFT 那条(同一条意见可以只进 SFT)
+                stats["dpo_rejected"] = stats.get("dpo_rejected", 0) + 1
+                for e in derrs:
+                    stats["reject_reasons"]["DPO:" + e] = \
+                        stats["reject_reasons"].get("DPO:" + e, 0) + 1
         report_rows.append({"verdict": v, "ok": True, "errors": []})
+
+    # 序列长度实测(2026-10-07):训练起点配置写的是 seq<=1024,而 input 里装着整篇反思
+    # —— 真实标记一到位就会撞上限。不写进产物,配置就只能靠猜,而截断恰好切掉反思尾部
+    # (反思质量分析:扣分集中在"经验迁移/不确定性/过程"这几维,都在尾部)。
+    if sft:
+        ins = sorted(len(str(x.get("input", ""))) for x in sft)
+        outs = sorted(len(str(x.get("output", ""))) for x in sft)
+        stats["char_len"] = {
+            "input_min": ins[0], "input_median": ins[len(ins) // 2], "input_max": ins[-1],
+            "output_min": outs[0], "output_median": outs[len(outs) // 2],
+            "output_max": outs[-1],
+            "note": "input 含整篇反思;seq 上限须覆盖它,否则截断落在反思尾部"}
 
     os.makedirs(out_root, exist_ok=True)
     with open(os.path.join(out_root, "sft.jsonl"), "w", encoding="utf-8") as f:

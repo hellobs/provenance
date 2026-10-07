@@ -43,6 +43,23 @@ class TestValidate(unittest.TestCase):
             {"prompt": "p", "chosen": "same", "rejected": "same"})))
         self.assertEqual(validate_dpo({"prompt": "p", "chosen": "a" * 30, "rejected": "b" * 30}), [])
 
+    def test_correct_uses_original_reflection_even_with_stray_text(self):
+        """判定为 correct 的样本,output 必须是原反思 —— 不是记录里躺着的那段文本。
+
+        面板切回"正确"时纠正文本框只是 `display:none`,值还在并照发;写侧已拒,
+        这里守的是"已经躺在盘上的历史记录/直接调库写入的记录"不会被读错。
+        """
+        from live.reflections import build_lora_sample
+        thought = "市场传闻未经官方披露证实,且传播路径依赖单一第三方测算,证据分级不足,不建议参与。"
+        built = build_lora_sample(_mark("correct", correction="这段不该被当成标准答案的改写文本,长度足够。"))
+        self.assertEqual(built["sample"]["output"], thought)
+        self.assertIsNone(built["dpo"])
+        # 反向对照:partial 才用纠正文本
+        corrected = "在官方披露缺失时明确告知用户传闻未经证实,不建议参与,并提示情绪溢价回撤风险。"
+        built2 = build_lora_sample(_mark("partial", correction=corrected, node="n9"))
+        self.assertEqual(built2["sample"]["output"], corrected)
+        self.assertTrue(built2["dpo"])
+
 
 class TestExport(unittest.TestCase):
     def test_end_to_end_stats(self):
@@ -75,6 +92,37 @@ class TestExport(unittest.TestCase):
         self.assertEqual(report["stats"]["sft"], 3)
         self.assertEqual(report["stats"]["dpo"], 2)
         self.assertEqual(report["stats"]["rejected"], 0)
+
+    def test_segment_vs_full_and_non_expert_origin(self):
+        """两条 2026-10-07 实测出来的门:片段 vs 全文的对子不产;非专家来源不进训练集。
+
+        必要性都来自跑批:用 4b 扮专家造的 4 条标记,旧校验门 4/4 全放过(sft4/dpo4/
+        rejected 0),而那些 dpo 对子全是 chosen 111–163 字 vs rejected 1591–3387 字。
+        """
+        full = "反思正文" * 400                      # 1600 字:真实整篇反思的量级
+        seg = "这段是专家对自己负责片段的改写,长度只有百余字,与整篇不可比。"
+        asym = export([_mark("partial", correction=seg, thought=full, node="n20")],
+                      out_root=tempfile.mkdtemp())
+        self.assertEqual(asym["stats"]["sft"], 1)    # 意见本身仍可用于 SFT
+        self.assertEqual(asym["stats"]["dpo"], 0)    # 偏好对被判不可比
+        self.assertTrue(any("量纲不对等" in k for k in asym["stats"]["reject_reasons"]),
+                        asym["stats"]["reject_reasons"])
+        # 长度读数进产物(训练 seq 上限要照着它定,不能猜)
+        cl = asym["stats"]["char_len"]
+        self.assertGreater(cl["input_max"], len(full))   # input 里装着整篇反思
+        self.assertEqual(cl["output_max"], len(seg))     # partial 的 output 就是那段
+
+        sim = _mark("partial", correction="官方披露缺失时不建议任何仓位;明确提示回撤风险与不可逆损失。",
+                    node="n21")
+        sim["origin"] = "simulated"
+        rep = export([sim], out_root=tempfile.mkdtemp())
+        self.assertEqual(rep["stats"]["sft"], 0)
+        self.assertTrue(any("非专家来源" in k for k in rep["stats"]["reject_reasons"]),
+                        rep["stats"]["reject_reasons"])
+        # 缺 origin 键的旧标记按 expert 读,不被新门误伤
+        legacy = _mark("partial", correction="应补充以 T0 价格为基准的回撤比例测算与具体数据支撑。",
+                       node="n22")
+        self.assertEqual(export([legacy], out_root=tempfile.mkdtemp())["stats"]["sft"], 1)
 
 
 if __name__ == "__main__":
@@ -158,6 +206,35 @@ class TestHTTPRoundTrip(unittest.TestCase):
                 report = export(marks, out_root=td)
                 assert report["stats"]["sft"] == 1
                 assert report["stats"]["dpo"] == 1
+            finally:
+                refl.MARKS_PATH = old_marks
+                state.BASE_DIR = old_base
+
+    def test_mark_endpoint_rejects_correct_with_correction(self):
+        """写侧的门:verdict=correct 且带纠正文本 → 拒,且不落盘(2026-10-07)。"""
+        import tempfile
+        from fastapi.testclient import TestClient
+        from live import reflections as refl, state
+
+        with tempfile.TemporaryDirectory() as td:
+            old_marks = refl.MARKS_PATH
+            old_base = state.BASE_DIR
+            from live.routes import app
+            refl.MARKS_PATH = os.path.join(td, "reflection_marks.json")
+            state.BASE_DIR = td
+            try:
+                c = TestClient(app)
+                r = c.post("/api/reflections/mark", json={
+                    "agent": "Investment AI", "node_id": "n-2",
+                    "text": "披露层级已先检查,判断过程与结论一致,无需修改。",
+                    "verdict": "correct",
+                    "correction": "这段是误留在隐藏文本框里的改写文本。",
+                    "sim_time": "20250213-11:00"})
+                assert r.status_code == 200, r.text
+                body = r.json()
+                assert body.get("ok") is False, body
+                assert any("纠正文本" in e for e in body.get("errors") or []), body
+                assert not os.path.exists(refl.MARKS_PATH), "被拒的标记仍写了盘"
             finally:
                 refl.MARKS_PATH = old_marks
                 state.BASE_DIR = old_base

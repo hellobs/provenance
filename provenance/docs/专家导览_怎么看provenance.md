@@ -167,7 +167,12 @@ python live_switch.py --start case01 --review-only
    `/api/runs?include_questionable=1` 对照默认视图,理解"被隐藏的那几条是什么样";
 4. 用 `/api/run-detail/review/<run_id>` 拿一次专家安全视图,确认它没有实验元信息
    (想看差异再 `?raw=1` 比一次);
-5. 打开 `router_review_sheet.csv` 试着标十条,跑一次 `--score`,先感受三个指标的定义。
+5. 打开 `router_review_sheet.csv` 试着标十条,跑一次 `--score`,感受三个指标的定义;
+6. 打开 `/review/expert`(专家审核面板的**参照实现**):左边一条"问题＋专业"一份意见,
+   右边是 approve/edit/reject 三个按钮 + 自由文本框。提交后响应里的 `training_effect`
+   会当场说出这份意见进训练集取的是哪份文本、被哪道校验门拦了 ——
+   想理解"专家的文本最后变成什么"就看这一步。字段口径在
+   `docs/给平台侧_专家意见字段与训练线映射.md`。界面正式由治理平台实现。
 
 ## 九、最容易误读的五件事
 

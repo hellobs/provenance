@@ -25,6 +25,8 @@
 
 - `/review`            面板页(带大标题)
 - `/embed/review`      嵌入面:同一页,压缩版式,贴合 iframe
+- `/review/expert`     专家审核面板(**判**的那一面,参照实现,见 `expert_review_app.py`)
+- `/embed/expert`      同一页的嵌入版式;平台 iframe 若已有自己的界面可忽略这两条
 - `/api/review/health` 本面板自己的健康检查(避开实时面的 `/health`)
 - `/api/review/runs`   记录列表(+ 当前实跑 run_id,用于提示"这条还没成品记录")
 - `/api/review/run/<id>`  单条记录全文(白名单校验,杜绝路径穿越)
@@ -309,6 +311,9 @@ _PAGE = r"""<!DOCTYPE html>
   header select { font:inherit; font-size:13px; color:var(--ink); background:var(--card);
                   border:1px solid var(--line); border-radius:8px; padding:5px 8px; max-width:420px; }
   header select:hover { border-color:#cfd6e0; }
+  .expertlink { margin-left:auto; font-size:13px; color:#0b5cad; text-decoration:none;
+                border:1px solid #a8cfe8; border-radius:8px; padding:5px 10px; background:#f0f7fd; }
+  .expertlink:hover { background:#e1f0fb; }
   header .meta { font-size:12px; color:var(--mut); margin-left:auto; min-width:0;
                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   header .meta a { color:var(--accent); text-decoration:none; }
@@ -412,6 +417,8 @@ _PAGE = r"""<!DOCTYPE html>
   <h1>GTC Case 01 · 成品记录审阅</h1>
   <select id="pick"></select>
   <span class="meta" id="hmeta">加载中…</span>
+  <!-- 只读面与审核面是一体的两件事:看 → 判。入口放在这里,专家不必记第二个地址。 -->
+  <a class="expertlink" href="/review/expert" title="对一条「问题＋专业类别」下结论并写回训练线">去专家审核 →</a>
 </header>
 <div class="wrap">
   <nav id="nav"></nav>
@@ -1015,10 +1022,16 @@ def attach_to(target, current_run_id="", note=""):
 
     case01 的实时面这样用:小镇(实时)+ 结果(九块)在**同一个服务、同一个界面**,
     不再需要单独占端口的 5004 面板服务。
+
+    专家审核面板(`expert_review_app`,/review/expert 与 /api/expert/*)**一起带上来**:
+    它是"判"的那一面,写的就是 LoRA 线的标记,与九块只读面同一个服务才不需要
+    再多占一个端口、多一套 CORS。
     """
     if current_run_id or note:
         set_current_run(current_run_id, note)
     target.include_router(router)
+    from .expert_review_app import router as expert_router
+    target.include_router(expert_router)
     return target
 
 
@@ -1026,6 +1039,8 @@ def build_app():
     """独立跑法(排障/单测用):`python -m case01.review_app --port 5004`。"""
     a = FastAPI(title="GTC Case 01 · 成品记录审阅")
     a.include_router(router)
+    from .expert_review_app import router as expert_router
+    a.include_router(expert_router)
 
     @a.get("/health")
     def _standalone_health():
