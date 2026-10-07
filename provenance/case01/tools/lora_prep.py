@@ -151,16 +151,36 @@ def export(marks: List[dict], out_root: str = OUT_ROOT) -> dict:
             "note": "input 含整篇反思;seq 上限须覆盖它,否则截断落在反思尾部"}
 
     os.makedirs(out_root, exist_ok=True)
-    with open(os.path.join(out_root, "sft.jsonl"), "w", encoding="utf-8") as f:
-        for s in sft:
-            f.write(json.dumps(s, ensure_ascii=False) + "\n")
-    with open(os.path.join(out_root, "dpo.jsonl"), "w", encoding="utf-8") as f:
-        for d in dpo:
-            f.write(json.dumps(d, ensure_ascii=False) + "\n")
+    sft_text = "".join(json.dumps(s, ensure_ascii=False) + "\n" for s in sft)
+    dpo_text = "".join(json.dumps(d, ensure_ascii=False) + "\n" for d in dpo)
     report = {"stats": stats, "rows": report_rows}
-    with open(os.path.join(out_root, "dataset_report.json"), "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+    _write_atomic(os.path.join(out_root, "sft.jsonl"), sft_text)
+    _write_atomic(os.path.join(out_root, "dpo.jsonl"), dpo_text)
+    _write_atomic(os.path.join(out_root, "dataset_report.json"),
+                  json.dumps(report, ensure_ascii=False, indent=2))
     return report
+
+
+def _write_atomic(path: str, text: str) -> None:
+    """整份写完再原子换名 —— 训练文件不能留半份(与 `batch_analyze._write_atomic` 同法)。
+
+    为什么这里也要:原来三份都是 `open(path, "w")`,**先 truncate 再逐块写**。
+    写到一半(磁盘满/进程被杀)就留下一份被截断的 `sft.jsonl`,而下一棒是训练脚本,
+    它读到半行 JSON 会直接炸,且没人知道少了几条 —— 截断文件比缺文件更难查。
+    同目录是硬要求(`os.replace` 跨文件系统会报错)。
+    """
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    tmp = os.path.join(d, "." + os.path.basename(path) + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def load_marks_any() -> Tuple[List[dict], str]:

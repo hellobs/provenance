@@ -168,11 +168,16 @@ python live_switch.py --start case01 --review-only
 4. 用 `/api/run-detail/review/<run_id>` 拿一次专家安全视图,确认它没有实验元信息
    (想看差异再 `?raw=1` 比一次);
 5. 打开 `router_review_sheet.csv` 试着标十条,跑一次 `--score`,感受三个指标的定义;
+   ⚠ 这张表判的是 **Router 的输出**(路由到哪个专业、风险等级、summary 是不是陈述句),
+   算的是科研里的"专家一致率";
 6. 打开 `/review/expert`(专家审核面板的**参照实现**):左边一条"问题＋专业"一份意见,
    右边是 approve/edit/reject 三个按钮 + 自由文本框。提交后响应里的 `training_effect`
    会当场说出这份意见进训练集取的是哪份文本、被哪道校验门拦了 ——
    想理解"专家的文本最后变成什么"就看这一步。字段口径在
    `docs/给平台侧_专家意见字段与训练线映射.md`。界面正式由治理平台实现。
+   ⚠ 第 5、6 步**判的不是同一个对象,也不共用存储**:CSV 的标注进一致率统计,
+   面板的意见进 LoRA 训练线(`reflection_marks.json`)。同一个概念两边名字也不同
+   (CSV 叫 `field`,面板/交接包叫 `expert_category_id`)—— 别把两份混成一份。
 
 ## 九、最容易误读的五件事
 
