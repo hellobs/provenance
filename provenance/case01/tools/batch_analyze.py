@@ -555,32 +555,37 @@ def _md(a: Dict) -> str:
     for k, v in sorted(a["consistency"].items(), key=lambda kv: -kv[1]):
         L.append("| {} | {} |".format(k, v))
     # §5 的"本批次用什么模型"以前是**字面量** "qwen3:8b"(实测 25 份产物里连 4b 批次
-    # 都写着 8b,连带那句"不同模型只作量级参照"一起成了假话)。现在取台账里检出的
-    # model_actual;检不出就明说"未检出、本节先别引用",不替读者猜。
+    # 都写着 8b,连带那句"不同模型只作量级参照"一起成了假话)。上一版改成取台账的
+    # `model_actual`,但那是**"探针那一刻 Ollama 驻留的是谁"**,不是这条记录用的模型:
+    # 2026-10-07 实测 thinkOn 批两条全请求 4b,第 1 条却检成 8b(上一批的 8b 还没卸载),
+    # 于是标题写成"本批次(8b)"。标题取**请求值**(`--model`,整批一个值),
+    # 检出值只在下面那行 ⚠ 里并排给;两个都取不到就明说"未检出",不替读者猜。
     llm = a.get("llm") or {}
+    req = llm.get("model_requested") or []
     models = llm.get("model_actual") or []
-    if models:
-        b_label = " / ".join(models)
-        caveat = ("基线那 25 条**没有 manifest**,模型身份无从取证 ⇒ 不断言两边同档,"
-                  "两列只作量级参照,不宣称显著性。")
+    caveat = ("基线那 25 条**没有 manifest**,模型身份无从取证 ⇒ 不断言两边同档,"
+              "两列只作量级参照,不宣称显著性。")
+    if req:
+        b_label = " / ".join(req)
+    elif models:
+        b_label = "{}(台账无请求值,只能用检出值)".format(" / ".join(models))
     else:
-        req = " / ".join(llm.get("model_requested") or [])
-        b_label = "(台账未检出模型名{})".format("·请求值 " + req if req else "")
-        caveat = "本批次模型**未检出** ⇒ 与基线是否同口径无从判断,本节对比**先别引用**。"
+        b_label = "(台账未记模型名)"
+        caveat = "本批次模型**未记** ⇒ 与基线是否同口径无从判断,本节对比**先别引用**。"
     L += [
         "",
         "## 5. 与答辩基线对比（25 条 · 模型未记档）",
         "",
-        "> **本批次模型:** {} —— {}".format(b_label, caveat),
+        "> **本批次模型(请求值):** {} —— {}".format(b_label, caveat),
     ]
     # 检出≠请求时单独说一行:`model_actual` 来自"当时驻留的是谁"的探针,2026-10-07 实测
-    # 261007-110702-seedOn8b 第 1 条请求 8b、检成 4b(第 2 条检成 8b)。
+    # 261007-110702-seedOn8b 第 1 条请求 8b、检成 4b(第 2 条检成 8b),thinkOn 反向同理。
     # 不说,读者就会把检出值当成该条真正用过的模型。
-    if models and llm.get("model_requested") and set(models) != set(llm["model_requested"]):
-        L.append("> ⚠ **检出模型 ≠ 请求模型**:请求 {} / 检出 {} —— `model_actual` 记的是"
-                 "探针那一刻 Ollama 驻留的模型,不等于本条实际用的;以 `model_requested` "
-                 "与行级 `model_actual` 并排看。".format(" / ".join(llm["model_requested"]),
-                                                    b_label))
+    if req and models and set(models) != set(req):
+        L.append("> ⚠ **驻留探针检出的模型 ≠ 请求模型**:请求 {} / 检出 {} —— `model_actual` 记的是"
+                 "探针那一刻 Ollama 驻留的模型,不等于本条实际用的;逐条对照看行级 "
+                 "`model_requested` 与 `model_actual`。".format(" / ".join(req),
+                                                          " / ".join(models)))
     L += [
         "",
         "| 指标 | 基线(25 条·无 manifest) | 本批次(n={}) |".format(a["n_runs"]),
