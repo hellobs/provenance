@@ -1,0 +1,42 @@
+{
+  "batch": "261007-181309-planBase8b",
+  "finished_at": "2026-10-07 18:34:24",
+  "settings": {
+    "model": "qwen3:8b",
+    "timeline": "auto",
+    "lanes": 1,
+    "duration_min": 180.0,
+    "disable_thinking": true,
+    "python": "D:/zzr/mavis/.venv/Scripts/python.exe"
+  },
+  "counts": {
+    "done": 6,
+    "ok": 6,
+    "failed": 0,
+    "ledger_rows": 6
+  },
+  "branches": {
+    "B": 5,
+    "C": 1
+  },
+  "reflection": {
+    "n": 6,
+    "chars_mean": 1858.8,
+    "chars_min": 1356,
+    "chars_max": 2469,
+    "score_mean": 93.0,
+    "score_n": 6,
+    "status_dist": {
+      "pass": 4,
+      "review": 2
+    }
+  },
+  "router": {
+    "issues_mean": 4.7,
+    "issues_total": 28,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 212.6,
+  "seconds_total": 1275.4,
+  "seconds_n": 6
+}

@@ -1,0 +1,210 @@
+{
+  "title": "261007-181309-planBase8b",
+  "n_runs": 6,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:8b"
+    ],
+    "model_requested": [
+      "qwen3:8b"
+    ],
+    "n_rows_with_model_actual": 6
+  },
+  "branches": {
+    "B": 5,
+    "C": 1
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 5,
+    "share": 0.833,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 6,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 1858.8,
+    "chars_median": 1837.5,
+    "chars_min": 1356,
+    "chars_max": 2469,
+    "score_mean": 93.0,
+    "score_median": 95.0,
+    "score_n": 6,
+    "status_dist": {
+      "pass": 4,
+      "review": 2
+    },
+    "fail_reason_top": {
+      "未提出可执行的后续改进动作": 2
+    }
+  },
+  "router": {
+    "issues_total": 28,
+    "issues_mean": 4.7,
+    "issues_median": 5.0,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 5,
+      "3": 1
+    },
+    "n_scored": 6,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 6
+    },
+    "n": 6,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 5,
+    "inconsistent": 1
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-181309-planBase8b-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1701,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 200.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271016
+    },
+    {
+      "run_id": "batch-261007-181309-planBase8b-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 2469,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 270.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271017
+    },
+    {
+      "run_id": "batch-261007-181309-planBase8b-003",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1974,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 210.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271018
+    },
+    {
+      "run_id": "batch-261007-181309-planBase8b-004",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1578,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 185.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271019
+    },
+    {
+      "run_id": "batch-261007-181309-planBase8b-005",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2075,
+      "refl_score": 83,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 3,
+      "issues_final": 3,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 205.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271020
+    },
+    {
+      "run_id": "batch-261007-181309-planBase8b-006",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "inconsistent",
+      "refl_chars": 1356,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 205.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20271021
+    }
+  ]
+}

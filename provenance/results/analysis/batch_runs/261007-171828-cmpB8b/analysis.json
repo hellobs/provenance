@@ -1,0 +1,135 @@
+{
+  "title": "261007-171828-cmpB8b",
+  "n_runs": 3,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:8b"
+    ],
+    "model_requested": [
+      "qwen3:8b"
+    ],
+    "n_rows_with_model_actual": 3
+  },
+  "branches": {
+    "B": 1,
+    "C": 2
+  },
+  "branch_top": {
+    "branch": "C",
+    "count": 2,
+    "share": 0.667,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 3,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 1788.3,
+    "chars_median": 2051,
+    "chars_min": 1263,
+    "chars_max": 2051,
+    "score_mean": 98.3,
+    "score_median": 100,
+    "score_n": 3,
+    "status_dist": {
+      "pass": 3
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 15,
+    "issues_mean": 5.0,
+    "issues_median": 5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 3
+    },
+    "n_scored": 3,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 3
+    },
+    "n": 3,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 3
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-171828-cmpB8b-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1263,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 1035.3,
+      "attempt": 2,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20270601
+    },
+    {
+      "run_id": "batch-261007-171828-cmpB8b-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 2051,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 215.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20270601
+    },
+    {
+      "run_id": "batch-261007-171828-cmpB8b-003",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 2051,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 305.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20270601
+    }
+  ]
+}
