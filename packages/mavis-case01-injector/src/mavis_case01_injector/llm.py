@@ -131,10 +131,16 @@ class _ChatMixin:
 
 
 class OllamaClient(_ChatMixin):
+    # timeout 120 → 300(2026-10-07 实测):8 GB 单机上"刚加载完/刚把 num_ctx 从小升到 32768"
+    # 的第一发请求要 ~185 s(只把权重拉进驻留是 ~14 s),120 s 会在 3 次重试内全部超时,
+    # 表现为 `OllamaClient chat failed after 3 retries: timed out` 并把整条 run 打死
+    # —— 两次独立复现(批次 261007-163008-rep6h 死在 T0;261007-171828-cmpB8b 首条重试后才出产物)。
+    # 预热按 num_ctx=32768 做可以把这 185 s 压成 16 s(见《10月15日演示_运行手册》),
+    # 但彩排/现场的预热不一定每次都按这条走,所以默认值本身要给余量。
     def __init__(self, base_url: str = "http://127.0.0.1:11434",
                  chat_model: str = "qwen3:4b-instruct-2507-q4_K_M",
                  embed_model: str = "qwen3-embedding:0.6b-q8_0",
-                 timeout: float = 120.0, retries: int = 3,
+                 timeout: float = 300.0, retries: int = 3,
                  num_ctx: int = 32768, think: Optional[bool] = None,
                  seed: Optional[int] = None):
         self.base_url = base_url.rstrip("/")
