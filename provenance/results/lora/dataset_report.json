@@ -1,11 +1,44 @@
 {
   "stats": {
-    "marks": 0,
-    "verdicts": {},
-    "sft": 0,
+    "marks": 3,
+    "verdicts": {
+      "correct": 3
+    },
+    "sft": 1,
     "dpo": 0,
-    "rejected": 0,
-    "reject_reasons": {}
+    "rejected": 2,
+    "reject_reasons": {
+      "非专家来源(origin=probe)": 2
+    },
+    "char_len": {
+      "input_min": 1937,
+      "input_median": 1937,
+      "input_max": 1937,
+      "output_min": 1912,
+      "output_median": 1912,
+      "output_max": 1912,
+      "note": "input 含整篇反思;seq 上限须覆盖它,否则截断落在反思尾部"
+    }
   },
-  "rows": []
+  "rows": [
+    {
+      "verdict": "correct",
+      "ok": false,
+      "errors": [
+        "非专家来源(origin=probe)"
+      ]
+    },
+    {
+      "verdict": "correct",
+      "ok": false,
+      "errors": [
+        "非专家来源(origin=probe)"
+      ]
+    },
+    {
+      "verdict": "correct",
+      "ok": true,
+      "errors": []
+    }
+  ]
 }

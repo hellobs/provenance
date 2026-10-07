@@ -1,0 +1,93 @@
+{
+  "title": "261007-163008-rep6h",
+  "n_runs": 1,
+  "n_unreadable": 0,
+  "ledger_gap": 1,
+  "ledger_gap_resolved": true,
+  "ledger_missing": false,
+  "ledger_gap_detail": {
+    "n_primary": 1,
+    "missing": [
+      "batch-261007-163008-rep6h-002"
+    ],
+    "extra": [],
+    "filled": 1
+  },
+  "llm": {
+    "model_actual": [],
+    "model_requested": [],
+    "n_rows_with_model_actual": 0
+  },
+  "branches": {
+    "B": 1
+  },
+  "branch_top": {
+    "branch": "B",
+    "count": 1,
+    "share": 1.0,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 1,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 2636.0,
+    "chars_median": 2636,
+    "chars_min": 2636,
+    "chars_max": 2636,
+    "score_mean": 100.0,
+    "score_median": 100,
+    "score_n": 1,
+    "status_dist": {
+      "pass": 1
+    },
+    "fail_reason_top": {}
+  },
+  "router": {
+    "issues_total": 1,
+    "issues_mean": 1.0,
+    "issues_median": 1,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "1": 1
+    },
+    "n_scored": 1,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 1
+    },
+    "n": 1,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 1
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261007-163008-rep6h-002",
+      "source": "primary",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 2636,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 1,
+      "issues_final": 1,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "refl_error": "",
+      "router_error": "",
+      "seconds": null,
+      "attempt": null,
+      "model_actual": "",
+      "model_requested": "",
+      "seed": null
+    }
+  ]
+}
