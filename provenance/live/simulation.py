@@ -123,7 +123,9 @@ def run_simulation(name, sim_config, start_step, step, stride):
         # 全球时区场景:所有角色(含 user)全天在线不睡觉
         sim_config.setdefault("agent_base", {})["no_sleep"] = True
         relationships, story = [], []
-        scenario_dir = os.path.join(state.BASE_DIR, "scenarios/investment")
+        # 2026-10-08:运行期素材(关系/剧情)从 `scenarios/investment/` 归并到
+        # `cases/case00_village/assets/` —— 与声明式 scenario.yaml 同一棵树,一处装场景。
+        scenario_dir = os.path.join(state.BASE_DIR, "cases", "case00_village", "assets")
         rel_path = os.path.join(scenario_dir, "relationships.json")
         if os.path.exists(rel_path):
             with open(rel_path, "r", encoding="utf-8") as f:
@@ -132,6 +134,12 @@ def run_simulation(name, sim_config, start_step, step, stride):
         if os.path.exists(story_path):
             with open(story_path, "r", encoding="utf-8") as f:
                 story = json.load(f).get("events", [])
+        # **不许静默降级**(2026-10-08 补):素材缺失时这里原来只是空列表,推演照样跑完 ——
+        # 结果是一局"没有关系、没有剧情"的场景,而日志里一个字都没有。素材搬过家(旧路径
+        # `scenarios/investment/` 已废弃),所以这条警告是防"下次再搬一次就悄悄失效"。
+        if not relationships and not story:
+            print("[warn] 场景素材缺失,本局将没有关系/剧情(不是空场景,是路径下找不到文件):"
+                  "{}".format(scenario_dir), flush=True)
         # 每个 Agent 都能查到与任意角色的关系(注入到 agent_base 供所有角色共享)
         if relationships:
             sim_config.setdefault("agent_base", {})["relationships"] = relationships

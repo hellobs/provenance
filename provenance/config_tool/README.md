@@ -77,7 +77,7 @@ python app.py
 
 ```
 agents/<角色名>/agent.json + portrait.png + texture.png
-scenarios/<业务>/relationships.json + story.json
+cases/<case_id>/assets/relationships.json + story.json
 ```
 
 > 适合把配置发给他方合并(打包后直接发送,无需逐文件寻找)。
@@ -91,15 +91,15 @@ scenarios/<业务>/relationships.json + story.json
 | 填什么 | 产物 | 落盘位置(相对平台仓库) |
 |---|---|---|
 | 角色 | `agent.json` + `portrait.png` + `texture.png` | `frontend/static/assets/village/agents/<角色名>/` |
-| 关系 | `relationships.json`(追加) | `scenarios/<business>/relationships.json` |
-| 剧情 | `story.json`(追加) | `scenarios/<business>/story.json` |
+| 关系 | `relationships.json`(追加) | `cases/<case_id>/assets/relationships.json` |
+| 剧情 | `story.json`(追加) | `cases/<case_id>/assets/story.json` |
 
 典型路径:
 
 ```
 D:\zzr\provenance\provenance\frontend\static\assets\village\agents\<角色名>\agent.json
-D:\zzr\provenance\provenance\scenarios\investment\relationships.json
-D:\zzr\provenance\provenance\scenarios\investment\story.json
+D:\zzr\provenance\provenance\cases\case00_village\assets\relationships.json
+D:\zzr\provenance\provenance\cases\case00_village\assets\story.json
 ```
 
 **路径解析(顺序:显式参数 → 环境变量 → 本地设置文件 → 自动发现)**:
@@ -109,7 +109,7 @@ D:\zzr\provenance\provenance\scenarios\investment\story.json
 | `CASE_ENGINE_DIR` | **引擎包所在目录**(`case_engine/` 的父目录) | 依次尝试本地设置文件、自动发现;都没有才置灰,并提示在「运行方式」页补填 |
 | `MAVIS_PLATFORM_DIR` | 平台仓根(产物落盘/地图/实时入口联动) | 同 `CASE_ENGINE_DIR`(自动发现要求同时含 `frontend/` 与引擎包,避免认错仓) |
 | `MAVIS_ASSETS_ROOT` | 平台前端资源根(`frontend/static/assets/village`) | 由平台根推导 |
-| `MAVIS_SCENARIOS_DIR` | 平台场景目录(`scenarios`) | 由平台根推导 |
+| `MAVIS_SCENARIOS_DIR` | 场景素材目录(**已废弃:** 素材在 `cases/<case_id>/assets/`) | 由平台根推导 |
 | `MAVIS_MAZE_PATH` | 默认地图文件 | 优先平台根下 `case00/scenario/maze.json`,否则资源根下 `maze.json` |
 | `CASE_ENGINE_CASES_ROOT` | 场景根目录(实现侧同名变量) | 平台根下 `cases/` |
 
@@ -161,7 +161,7 @@ D:\zzr\provenance\provenance\scenarios\investment\story.json
 - **不允许静默**(与产线铁律一致):运行方式不可用 → 页面置灰 + 原因可见;地图缺失 → 接口返回
   可读错误而不是空数组;`governance.json` 拿不到运行方式口径 → 返回值里标 `used_engine=False`。
 - 角色配置是"三层":行为层(人设/关系/剧情)+ 制度层(组织/职责/权限/规则)+ 价值层(人物初始底色 initial_tendency;制度约束 governance.json 由治理面板维护)
-- 关系 → `scenarios/<business>/relationships.json`,剧情 → `scenarios/<business>/story.json`,与角色独立维护
+- 关系 → `cases/<case_id>/assets/relationships.json`,剧情 → `cases/<case_id>/assets/story.json`,与角色独立维护
 - 迁移 Unity 时:角色→贴图的映射依赖需在 Unity 端同样处理(读 `texture_ref`)
 - **本工具属于 provenance 仓**:`mavisframework` 仅作为已安装的通用框架依赖使用；场景、
   运行方式、组合记录和平台联动全部在本仓维护。

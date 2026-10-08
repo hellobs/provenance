@@ -137,17 +137,27 @@ def test_maze_path_reads_env_at_call_time(tmp_path, monkeypatch):
 
 
 def test_module_aliases_are_startup_snapshots(tmp_path, monkeypatch):
-    """模块级别名(`VILLAGE_ROOT` 等)是**启动快照**,不随 env 变 —— 这是缺陷不是特性。
+    """模块级别名(`VILLAGE_ROOT`/`MAZE_PATH`)是**启动快照**,不随 env 变 —— 这是缺陷不是特性。
 
     保留别名是为了兼容既有模板引用(以及若干测试 monkeypatch);真正要用"实时值"
     的地方一律调函数。这条把两种语义的差别钉下来,免得后人以为别名会跟着变。
+
+    2026-10-08:素材目录不再是模块别名 —— `SCENARIOS_DIR` 已删(关系/剧情归并进
+    `cases/<case_id>/assets/`,由 `case_assets_dir()` 按 case 实时解析)。这条同时钉住
+    "函数必须实时"与"旧别名不许回来"。
     """
     app_mod = _tool_module()
-    before = app_mod.SCENARIOS_DIR
-    monkeypatch.setenv("MAVIS_SCENARIOS_DIR", str(tmp_path / "late"))
-    assert app_mod.SCENARIOS_DIR == before, "别名不该随环境变量变"
-    assert app_mod.scenarios_dir() == os.path.normpath(str(tmp_path / "late")), \
+    before_village = app_mod.VILLAGE_ROOT
+    before_assets = app_mod.case_assets_dir("case00_village")
+    monkeypatch.setenv("MAVIS_ASSETS_ROOT", str(tmp_path / "late"))
+    monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", str(tmp_path / "late_cases"))
+    assert app_mod.VILLAGE_ROOT == before_village, "别名不该随环境变量变"
+    assert app_mod.village_root() == os.path.normpath(str(tmp_path / "late")), \
         "函数必须实时读"
+    assert app_mod.case_assets_dir("case00_village") != before_assets, \
+        "素材目录必须实时解析(它按 CASE_ENGINE_CASES_ROOT 走)"
+    assert not hasattr(app_mod, "SCENARIOS_DIR"), \
+        "旧别名已删:素材在 cases/<case_id>/assets/,别再引入一个固定的场景根"
 
 
 def test_relative_env_is_rejected_by_the_functions(monkeypatch):

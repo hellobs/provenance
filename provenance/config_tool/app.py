@@ -2,7 +2,9 @@
 
 业务方通过网页表单填写角色/职责/权限/目标/关系/剧情,
 工具按 MAVIS 的 Schema 生成 agent.json / relationships.json / story.json,
-并经 MAVIS validator 校验后写入 scenarios/ 目录。
+并经 MAVIS validator 校验后写入 `cases/<case_id>/assets/` 目录
+(2026-10-08 前写的是 `scenarios/<业务>/`:那一层已经归并到 `cases/` 下,见
+`docs/仓库布局说明.md`)。
 
 设计原则:
 - 独立于仿真服务(live_fastapi):本工具只做配置生成,不跑模拟
@@ -86,7 +88,7 @@ def _abs_or_empty(raw: str) -> str:
 # 界面横幅与启动日志用 `path_config_problems()` 显示原因,不静默。
 _ENV_PATHS = {
     "MAVIS_ASSETS_ROOT": "village 静态资源根",
-    "MAVIS_SCENARIOS_DIR": "场景目录",
+    "MAVIS_SCENARIOS_DIR": "场景目录(**已废弃**:设了也被忽略,素材改在 cases/<case_id>/assets/)",
     "MAVIS_MAZE_PATH": "地图文件",
 }
 
@@ -128,9 +130,34 @@ def village_root() -> str:
 
 
 def scenarios_dir() -> str:
-    """场景目录:MAVIS_SCENARIOS_DIR 优先(须绝对),否则平台目录下 `scenarios/`。"""
-    return _env_path("MAVIS_SCENARIOS_DIR") or (
-        os.path.join(_PLATFORM_DIR, "scenarios") if _PLATFORM_DIR else "")
+    """【已废弃】旧的运行期素材根(`scenarios/<业务>/`)。
+
+    2026-10-08:关系/剧情素材已归并进 `cases/<case_id>/assets/`,这个根**不再用于拼接路径**
+    —— 保留函数只为"设了旧变量时给出可读提示"(设了也不生效,免得旧目录被重新长出来)。
+    新代码请用 `case_assets_dir(case_id)`。
+    """
+    return _env_path("MAVIS_SCENARIOS_DIR")
+
+
+# 旧业务名 → case_id。历史 UI/表单发的是业务名(`investment`),而目录按 case_id 组织;
+# 显式映射一次,别让"发旧名字就写到旧目录"这种事再发生。
+_BUSINESS_ALIASES = {"investment": "case00_village"}
+
+
+def as_case_id(name: str) -> str:
+    """把(可能是旧业务名的)名字规范成 case_id。"""
+    n = (name or "").strip()
+    return _BUSINESS_ALIASES.get(n, n or "case00_village")
+
+
+def case_assets_dir(case_id: str = "") -> str:
+    """某个场景的**运行期素材**目录:`<cases 根>/<case_id>/assets/`(关系/剧情)。
+
+    与声明式的 `cases/<case_id>/scenario.yaml` 同一棵树 —— 一处装场景,不再分家。
+    """
+    cid = as_case_id(case_id)
+    root = engine_runner._resolve_root(_PLATFORM_DIR)      # 与"场景根"同一解析口径
+    return os.path.join(root, cid, "assets") if root else ""
 
 
 def maze_path() -> str:
@@ -149,7 +176,8 @@ def maze_path() -> str:
 # 供 `tests` 与模板沿用的模块级别名:启动时求值一次(此时环境变量已定)。
 # **注意**:运行中改环境变量请调用上面的函数;别名只是"启动快照"。
 VILLAGE_ROOT = village_root()
-SCENARIOS_DIR = scenarios_dir()
+# 2026-10-08:`SCENARIOS_DIR` 别名去掉 —— 素材目录按 case 走,见 `case_assets_dir()`;
+# 保留它只会让"旧根"继续被引用。
 MAZE_PATH = maze_path()
 # agents 派生目录跟随 VILLAGE_ROOT(启动快照,同上面的说明)。
 AGENTS_ROOT = os.path.join(VILLAGE_ROOT, "agents") if VILLAGE_ROOT else ""
@@ -182,9 +210,14 @@ def _print_startup_banner() -> None:
         "  (来源:{})".format(_pst["source"]) if _PLATFORM_DIR else ""), flush=True)
     print("[dirs] 本地设置文件 = {} (可在「运行方式」页填写;不入库)".format(
         engine_bridge.SETTING_FILE), flush=True)
-    print("[platform] 资源根 = {} ; 场景目录 = {} ; 地图 = {}".format(
-        village_root() or "(未声明)", scenarios_dir() or "(未声明)",
+    print("[platform] 资源根 = {} ; 场景素材 = {} ; 地图 = {}".format(
+        village_root() or "(未声明)",
+        case_assets_dir("case00_village") or "(未声明)",
         maze_path() or "(未声明)"), flush=True)
+    if scenarios_dir():
+        # 设了也不生效 —— **必须出声**,否则用户会以为素材还往那儿写(旧目录会被重新长出来)。
+        print("[dirs] 注意:MAVIS_SCENARIOS_DIR={} 已废弃并**被忽略**;"
+              "关系/剧情现在写在 cases/<case_id>/assets/ 下。".format(scenarios_dir()), flush=True)
     # 路径配置问题（相对路径等）**启动就说**，别等用户发现场景没了。
     for _p in path_config_problems():
         print("[path.ERROR] {} -> {}".format(_p["var"], _p["problem"]), flush=True)
@@ -526,11 +559,11 @@ def save_agent(business: str, agent_json: dict, agents_root: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
-# 关系 / 剧情:追加到 scenarios/<业务>/relationships.json / story.json
-# (框架从 scenarios/investment/ 加载)
+# 关系 / 剧情:追加到 `cases/<case_id>/assets/relationships.json` / `story.json`
+# (实时面从同一处加载;旧名 investment 会被 `as_case_id()` 映射成 case00_village)
 # ---------------------------------------------------------------------------
 def append_relationship(business: str, rel: dict) -> str:
-    path = os.path.join(SCENARIOS_DIR, business, "relationships.json")
+    path = os.path.join(case_assets_dir(business), "relationships.json")
     data = {"relations": []}
     if os.path.exists(path):
         try:
@@ -546,7 +579,7 @@ def append_relationship(business: str, rel: dict) -> str:
 
 
 def append_story(business: str, ev: dict) -> str:
-    path = os.path.join(SCENARIOS_DIR, business, "story.json")
+    path = os.path.join(case_assets_dir(business), "story.json")
     data = {"events": []}
     if os.path.exists(path):
         try:
@@ -634,7 +667,7 @@ async def index():
 @app.get("/relationships", response_class=HTMLResponse)
 async def relationships_page(request: Request):
     """关系录入页:追加关系到 relationships.json,并展示已添加条目"""
-    path = os.path.join(SCENARIOS_DIR, "investment", "relationships.json")
+    path = os.path.join(case_assets_dir("case00_village"), "relationships.json")
     relations = []
     if os.path.exists(path):
         try:
@@ -651,7 +684,7 @@ async def relationships_page(request: Request):
 @app.get("/story", response_class=HTMLResponse)
 async def story_page(request: Request):
     """剧情录入页:追加事件到 story.json,并展示已添加条目"""
-    path = os.path.join(SCENARIOS_DIR, "investment", "story.json")
+    path = os.path.join(case_assets_dir("case00_village"), "story.json")
     events = []
     if os.path.exists(path):
         try:
@@ -1569,7 +1602,7 @@ async def upgrade(request: Request):
 async def add_relationship(request: Request):
     """追加一条角色关系到 relationships.json"""
     body = await _json_body(request)
-    business = body.get("business", "investment").strip()
+    business = as_case_id(body.get("business", "case00_village"))
     agents = [a.strip() for a in body.get("agents", "").split(",") if a.strip()]
     if len(agents) != 2:
         return JSONResponse({"ok": False, "errors": ["关系需要恰好两个角色,用逗号分隔"]})
@@ -1591,11 +1624,11 @@ async def add_relationship(request: Request):
 async def delete_relationship(request: Request):
     """按序号删除一条关系(序号 = 列表页行号,从 0 开始)"""
     body = await _json_body(request)
-    business = body.get("business", "investment").strip()
+    business = as_case_id(body.get("business", "case00_village"))
     index = body.get("index")
     if not isinstance(index, int) or index < 0:
         return JSONResponse({"ok": False, "errors": ["缺少有效的 index(从 0 开始的行号)"]})
-    path = os.path.join(SCENARIOS_DIR, business, "relationships.json")
+    path = os.path.join(case_assets_dir(business), "relationships.json")
     if not os.path.exists(path):
         return JSONResponse({"ok": False, "errors": ["relationships.json 不存在"]})
     with open(path, "r", encoding="utf-8") as f:
@@ -1614,7 +1647,7 @@ async def delete_relationship(request: Request):
 async def add_story(request: Request):
     """追加一条剧情事件到 story.json"""
     body = await _json_body(request)
-    business = body.get("business", "investment").strip()
+    business = as_case_id(body.get("business", "case00_village"))
     time_ = body.get("time", "").strip()
     event_type = body.get("event_type", "").strip()
     content = body.get("content", "").strip()
@@ -1642,11 +1675,11 @@ async def add_story(request: Request):
 async def delete_story(request: Request):
     """按 id 删除一条剧情事件"""
     body = await _json_body(request)
-    business = body.get("business", "investment").strip()
+    business = as_case_id(body.get("business", "case00_village"))
     ev_id = str(body.get("id", "")).strip()
     if not ev_id:
         return JSONResponse({"ok": False, "errors": ["缺少剧情 id"]})
-    path = os.path.join(SCENARIOS_DIR, business, "story.json")
+    path = os.path.join(case_assets_dir(business), "story.json")
     if not os.path.exists(path):
         return JSONResponse({"ok": False, "errors": ["story.json 不存在"]})
     with open(path, "r", encoding="utf-8") as f:
@@ -1682,10 +1715,10 @@ async def delete_agent(request: Request):
 async def export_configs():
     """把所有已配置角色 + 关系/剧情打包成 zip 下载
 
-    zip 结构:
+    zip 结构(2026-10-08 起与仓内布局一致:素材就在 cases/ 下):
         agents/<角色名>/agent.json + portrait.png + texture.png
-        scenarios/<业务>/relationships.json
-        scenarios/<业务>/story.json
+        cases/<case_id>/assets/relationships.json
+        cases/<case_id>/assets/story.json
     """
     import zipfile
     import io as _io
@@ -1704,17 +1737,18 @@ async def export_configs():
                     if os.path.isfile(fp):
                         zf.write(fp, f"agents/{name}/{fname}")
                 count_agents += 1
-        # 2) 场景(每个业务目录下的 relationships.json / story.json)
-        if os.path.isdir(SCENARIOS_DIR):
-            for biz in sorted(os.listdir(SCENARIOS_DIR)):
-                biz_dir = os.path.join(SCENARIOS_DIR, biz)
+        # 2) 场景素材(每个 case 的 assets/ 下 relationships.json / story.json)
+        cases_root = engine_runner._resolve_root(_PLATFORM_DIR)
+        if cases_root and os.path.isdir(cases_root):
+            for cid in sorted(os.listdir(cases_root)):
+                biz_dir = os.path.join(cases_root, cid, "assets")
                 if not os.path.isdir(biz_dir):
                     continue
                 wrote = False
                 for fname in ("relationships.json", "story.json"):
                     fp = os.path.join(biz_dir, fname)
                     if os.path.isfile(fp):
-                        zf.write(fp, f"scenarios/{biz}/{fname}")
+                        zf.write(fp, f"cases/{cid}/assets/{fname}")
                         wrote = True
                 if wrote:
                     count_scenarios += 1

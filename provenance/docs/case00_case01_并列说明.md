@@ -25,7 +25,7 @@ case00 原先没有单独的目录——它就是 provenance 平台原本就有�
 first-class 容器 `case00/`（见下一小节），但容器只是**冻结留档**：实时运行读的仍是平台本体。
 下面是构成 case00 的平台文件：
 
-- 场景设定：`scenarios/investment/`——`relationships.json`（12 条角色关系）、
+- 场景设定：`cases/case00_village/assets/`——`relationships.json`（12 条角色关系）、
   `story.json`（17 个剧情事件 `s-001`…`s-017`）、`README.md`
 - 制度约束：`governance.json`——6 个角色各自的 3~4 维价值权重
 - 角色底色与贴图：`frontend/static/assets/village/agents/`（6 个目录，各含 `agent.json` + 行走图）
@@ -51,7 +51,7 @@ cd D:\zzr\provenance\provenance
 
 - `case00/scenario/`——场景快照 110 KB：6 个角色的 `agent.json` + `portrait.png` + `texture.png`、
   `maze.json`、`relationships.json`、`story.json`、`config.json`。这是建容器当时的**拷贝**，
-  用于冻结留档；实时运行读的仍是平台本体（`frontend/static/assets/village/`、`scenarios/investment/`）。
+  用于冻结留档；实时运行读的仍是平台本体（`frontend/static/assets/village/`、`cases/case00_village/assets/`）。
 - `case00/runs/`——只有说明：2.2 GB 存档（38 个 run，`stock-en8` 单个 1849 MB）留在
   `results/checkpoints/`，**不复制**，并写明不要删。
 - `case00/serve.py`——**只读**服务，端口 **5003**：`/`（存档列表）、`/api/runs`、
