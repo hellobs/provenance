@@ -1,0 +1,242 @@
+[
+  {
+    "id": "bg-0e0952ce983a5aa0f40f",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "company_profile",
+    "source": "GSK plc；公司官方新闻稿",
+    "time": "2025-07-28",
+    "title": "GSK and Hengrui Pharma enter agreements to develop up to 12 innovative medicines across Respiratory, Immunology & Inflammation and Oncology（About Hengrui Pharma）",
+    "content": "Hengrui Pharma is an innovative, global pharmaceutical company dedicated to the research, development and commercialisation of high-quality medicines to address unmet clinical needs. With a global R&D team that includes 14 R&D centres and more than 5,500 professionals, Hengrui Pharma's therapeutic areas of focus include oncology, metabolic and cardiovascular diseases, immunological and respiratory diseases, and neuroscience. To date, Hengrui has commercialised 23 new molecular entity drugs and 4 other innovative drugs in China. Founded in 1970 with the core principle of putting patients first, Hengrui Pharma remains committed to advancing human health by striving to conquer diseases, improve health, and extend lives through the power of science and technology.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 41,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "0e0952ce983a5aa0f40f6d410f7db9cc4af43be7f493bafe0ea728924d8ecf63",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-e2da2bb7ede3784499e2",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "financial",
+    "source": "恒瑞医药；巨潮资讯披露平台",
+    "time": "2026-08-20",
+    "title": "2026年半年度报告摘要",
+    "content": "2026年上半年，营业收入154.56亿元，同比下降1.94%；归母净利润44.65亿元，同比增长0.34%；扣非归母净利润37.30亿元，同比下降12.71%。经营活动现金流量净额19.87亿元，同比下降53.80%。截至6月30日，总资产707.73亿元，归母净资产644.66亿元。基本每股收益0.68元。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-08-20",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 42,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "e2da2bb7ede3784499e2ef18dc18aa309e4e75a260d75c9a0cff4794fffe407e",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-492353e4d4bc8a06b762",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "disclosure",
+    "source": "恒瑞医药；香港交易所披露易",
+    "time": "2025-07-28",
+    "title": "关于与GlaxoSmithKline Intellectual Property (No. 3) Limited和GlaxoSmithKline Intellectual Property (No. 4) Limited签署合作、选择权和许可协议的公告",
+    "content": "Jiangsu Hengrui Pharmaceuticals Co., Ltd.\n\n江蘇恒瑞醫藥股份有限公司\n\n（於中華人民共和國註冊成立的股份有限公司）\n\n（股份代號：1276）\n\n內幕消息公告\n\n及海外監管公告\n\n本公告乃江蘇恒瑞醫藥股份有限公司（「本公司」）根據香港聯合交易所有限公司證券上市規則第13.09(2)條、第13.10B條及香港法例第571章《證券及期貨條例》第XIVA部項下內幕消息條文作出。\n\n根據中華人民共和國的有關法例規定，本公司於2025年7月28日在上海證券交易所網站(  )刊發了公告，內容有關本公司與GlaxoSmithKline Intellectual Property (No. 3) Limited和GlaxoSmithKline Intellectual Property (No. 4) Limited簽署合作、選擇權和許可協議。\n\n本公司股東及潛在投資者於買賣本公司股份時務請審慎行事。\n\n茲載列上述公告如下。\n\n承董事會命\n\n江蘇恒瑞醫藥股份有限公司\n\n董事長\n\n孫飄揚先生\n\n中國上海\n\n2025年7月28日\n\n於本公告日期，董事會成員包括(i)執行董事孫飄揚先生、戴洪斌先生、馮佶女士、張連山先生、江寧軍先生及孫杰平先生；(ii)非執行董事郭叢照女士；及(iii)獨立非執行董事董家鴻先生、曾慶生先生、孫金雲先生及周紀恩先生。\n\n证券代码：600276 证券简称：恒瑞医药 公告编号：临2025-109江苏恒瑞医药股份有限公司关于与 GlaxoSmithKline Intellectual Property(No. 3) Limited 和 GlaxoSmithKline Intellectual Property (No. 4) Limited签署合作、选择权和许可协议的公告本公司董事会及全体董事保证本公告内容不存在任何虚假记载、误导性陈述或者重大遗漏，并对其内容的真实性、准确性和完整性承担法律责任。\n\n江苏恒瑞医药股份有限公司（以下简称“恒瑞”或“公司”）与GlaxoSmithKline Intellectual Property (No. 3) Limited 和GlaxoSmithKline Intellectual Property (No. 4) Limited 公司（以下统称“GSK”）达成协议，将HRS-9821项目的全球独家权利（不包括中国大陆、香港特别行政区、澳门特别行政区及台湾地区）和至多 11 个项目的全球独家许可的独家选择权（不包括中国大陆、香港特别行政区、澳门特别行政区及台湾地区）有偿许可给GSK。\n\n一、许可产品基本信息\n\n（一）HRS-9821 项目信息\n\nHRS-9821是一款潜在的同类最佳PDE3/4抑制剂，目前正处于临床开发阶段，可用于治疗慢性阻塞性肺病(COPD)，作为辅助维持治疗，无需考虑既往治疗方案。\n\n该药物已在早期临床和临床前研究中显示出强效的 PDE3和PDE4抑制作用，从而增强支气管扩张和抗炎作用，并为开发便捷的干粉吸入器(DPI)制剂提供了机会。\n\nHRS-9821 其他相关情况可参见公司披露于上海证券交易所网站的《恒瑞医药关于获得药物临床试验批准通知书的公告》（公告编号：临 2025-100）。\n\n（二）其他项目信息\n\n其他 11 个项目涉及肿瘤、呼吸、自免和炎症等多个治疗领域的创新药物，目前均处于非临床研究阶段。恒瑞将主导这些项目的研发，最晚至完成包括海外受试者数据的Ⅰ期临床试验。\n\n二、交易对方基本信息\n\nGSK 是一家全球性的生物制药公司，总部位于英国伦敦，在伦敦证券交易所和纽约证券交易所上市(证券代码：GSK)。\n\n三、协议主要条款\n\n许可人：江苏恒瑞医药股份有限公司\n\n被许可人：GlaxoSmithKline Intellectual Property (No. 3) Limited 和GlaxoSmithKline Intellectual Property (No. 4) Limited（一）许可范围根据协议，恒瑞将授予 GSK PDE3/4 抑制剂 HRS-9821 的全球独家许可权利（不包括中国大陆、香港特别行政区、澳门特别行政区和台湾地区）。\n\n除 HRS-9821外，协议还包括合作开发最多11个项目，每个项目均拥有各自的财务结构。恒瑞将主导这些项目的研发，最晚至完成包括海外受试者数据的Ⅰ期临床试验。 GSK将拥有在最晚至Ⅰ期临床完成时，行使全球（不包括中国大陆、香港特别行政区、澳门特别行政区和台湾地区）进一步开发和商业化每个项目的独家选择权，以及某些项目替换权。\n\n（二）财务条款\n\n1.首付款：GSK 将向恒瑞支付5亿美元的首付款。\n\n2.选择权行使费和里程碑付款： 如果所有项目均获得行使选择权且所有里程碑均已实现，恒瑞将有资格获得未来基于成功开发、注册和销售里程碑付款的潜在总金额约120亿美元*。\n\n3.销售提成：恒瑞将有权向GSK收取相应的分梯度的销售提成（不包括中国大陆、香港特别行政区、澳门特别行政区和台湾地区）。\n\n*协议中所约定的未来基于成功开发的里程碑等付款需要满足一定的条件，最终选择权行使费和里程碑付款金额尚存在不确定性。\n\n（三）协议期限\n\n恒瑞就 HRS-9821 项目授予的许可权利将在获得所有适用的反垄断审批后生效。除非合同约定提前终止，本协议将持续有效，直至各项目在各个授权国家的特许权使用费期限届满为止。\n\n（四）适用法律\n\n本协议受美国纽约州法律约束并按其解释。\n\n四、本次交易对公司的影响\n\n本协议的签署有助于拓宽 HRS-9821 和多个在肿瘤、呼吸、自免和炎症等治疗领域创新产品的海外市场，为全球患者提供优质的治疗选择，也将进一步提升公司创新品牌和海外业绩。公司坚持自主研发与开放合作并重，在内生发展的基础上加强国际合作，实现研发成果的快速转化，借助国际领先的合作伙伴覆盖海外市场，加速融入全球药物创新网络，实现产品价值最大化，让公司创新产品服务全球患者。\n\n五、风险提示\n\n药品从研制、临床试验报批到投产的周期长、环节多，药品研发及至上市容易受到一些不确定性因素的影响，最终 HRS-9821 和其他项目能否成功在海外获批上市存在一定风险。此外，协议中所约定的未来基于成功开发的里程碑等付款需要满足一定的条件，最终选择权行使费和里程碑付款金额尚存在不确定性。敬请广大投资者谨慎决策，注意防范投资风险。公司将按国家有关规定及时对项目后续进展情况履行信息披露义务。\n\n特此公告。\n\n江苏恒瑞医药股份有限公司董事会\n\n2025 年7月28日",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 43,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "492353e4d4bc8a06b7626e6dc3aa0a3abb8fcd133379926ec0569639d10a58e0",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-157b0b2c09389b9947ca",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "disclosure",
+    "source": "交易对方GSK plc；美国SEC Form 6-K",
+    "time": "2025-07-28",
+    "title": "GSK and Hengrui Pharma enter agreements to develop up to 12 innovative medicines across Respiratory, Immunology & Inflammation and Oncology",
+    "content": "●     Includes license for potential best-in-class PDE3/4 inhibitor (HRS-9821) in clinical development for treatment of COPD\n\n●     Additional 11 programmes to be developed by Hengrui Pharma and optioned by GSK following phase I completion\n\nGSK plc (LSE/NYSE: GSK) today announced it has entered into agreements with Hengrui Pharma (600276.SH; 01276.HK) to develop up to 12 innovative medicines, adding significant new growth opportunities to the company beyond 2031. The programmes were selected to complement GSK's extensive Respiratory, Immunology & Inflammation (RI&I) and Oncology pipeline, and assessed for their potential best- or first-in class profiles. GSK will pay $500 million in upfront fees across the agreements.\n\nThe agreements include an exclusive worldwide license (excluding mainland China, Hong Kong, Macau and Taiwan) for a potential best-in-class, PDE3/4 inhibitor (HRS-9821) in clinical development for the treatment of chronic obstructive pulmonary disease (COPD) as an add-on maintenance treatment, irrespective of background therapy. The addition of HRS-9821 supports GSK's ambition to treat patients across the widest spectrum of COPD by including those who face continued dyspnoea (shortness of breath) or who are unlikely to receive inhaled corticosteroids or biologics, based on their disease profile.\n\nHRS-9821 has demonstrated potent PDE3 and PDE4 inhibition, leading to increased bronchodilation and anti-inflammatory effects in early clinical and preclinical studies. In addition, HRS-9821 provides the opportunity for a convenient dry-powder inhaler (DPI) formulation that strategically fits GSK's established inhaled portfolio.\n\nThe agreements also include a pioneering scaled collaboration to generate up to 11 programmes in addition to HRS-9821, each with its own financial structure. Hengrui Pharma will lead the development of these programmes up to completion of phase I trials, including patients outside of China. GSK will have the exclusive option to further develop and commercialise each programme worldwide (excluding mainland China, Hong Kong, Macau and Taiwan), at the end of phase I or earlier at GSK's election, as well as certain programme substitution rights.\n\nTony Wood, Chief Scientific Officer, GSK said: \"We're delighted to announce these exciting agreements with Hengrui Pharma which complement our already-extensive pipeline. This deal reflects our strategic investment in programmes that address validated targets, increasing the likelihood of success, and with the option to advance those assets with the greatest potential for patient impact.\"\n\nFrank Jiang, Executive Vice President and Chief Strategy Officer of Hengrui Pharma, said: \"This strategic collaboration with GSK marks yet another significant milestone in Hengrui's globalisation journey and our mission to innovate and deliver higher-quality, cutting-edge therapies for patients worldwide. GSK brings additional R&D expertise, a robust global clinical network, and broad regulatory capabilities that will accelerate our PDE3/4 inhibitor as well as an array of other innovative therapy programs to overseas markets, potentially delivering breakthrough treatments to patients globally.\"\n\nThe collaboration enables scale and speed to proof-of-concept to develop up to 11 additional innovative medicines. It benefits from GSK's therapy area expertise, deep understanding of disease biology, clinical development capability and global commercial scale with Hengrui Pharma's early discovery engine, platform technologies, extensive pre-clinical pipeline of high-value programmes and speed of clinical evaluation.\n\nFinancial considerations\n\nGSK will pay $500 million in upfront fees across the agreements including for the license of the PDE3/4 programme. The potential total value of future success-based development, regulatory and commercial milestone payments to Hengrui Pharma is approximately $12 billion if all programmes are optioned and all milestones are achieved. In addition, Hengrui Pharma will be eligible to receive tiered royalties on global product net sales (excluding mainland China, Hong Kong, Macau and Taiwan).\n\nThe license to HRS-9821 is subject to customary conditions, including applicable regulatory agency clearances under the Hart-Scott-Rodino Act in the US.\n\nAbout Hengrui Pharma\n\nHengrui Pharma is an innovative, global pharmaceutical company dedicated to the research, development and commercialisation of high-quality medicines to address unmet clinical needs. With a global R&D team that includes 14 R&D centres and more than 5,500 professionals, Hengrui Pharma's therapeutic areas of focus include oncology, metabolic and cardiovascular diseases, immunological and respiratory diseases, and neuroscience. To date, Hengrui has commercialised 23 new molecular entity drugs and 4 other innovative drugs in China. Founded in 1970 with the core principle of putting patients first, Hengrui Pharma remains committed to advancing human health by striving to conquer diseases, improve health, and extend lives through the power of science and technology.\n\nAbout GSK\n\nGSK is a global biopharma company with a purpose to unite science, technology, and talent to get ahead of disease together.\n\nCautionary statement regarding forward-looking statements GSK cautions investors that any forward-looking statements or projections made by GSK, including those made in this announcement, are subject to risks and uncertainties that may cause actual results to differ materially from those projected. Such factors include, but are not limited to, those described in the \"Risk Factors\" section in GSK's Annual Report on Form 20-F for 2024, and GSK's Q1 Results for 2025.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 44,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "157b0b2c09389b9947cacce3538e97212eff16c8b5dd2dcae5ff995cc3ad0fdd",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-371551d538f469323bf1",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "industry_media",
+    "source": "每日经济新闻；许立波，编辑张益铭",
+    "time": "2025-07-29",
+    "title": "深度 | 恒瑞医药与GSK百亿美元大单背后的生意经",
+    "content": "7月28日，恒瑞医药与葛兰素史克（GSK）达成合作协议，共同开发至多12款创新药物。GSK将支付5亿美元首付款，并可能支付高达120亿美元的里程碑付款。受此消息影响，恒瑞医药A股涨停，市值重回4000亿元。合作重点药物HRS-9821为PDE3/4抑制剂，针对慢阻肺病。此次合作显示国产创新崛起，跨国药企越来越倾向于在更早阶段与国内药企合作，中国正逐渐成为全球创新药研发中心。\n\n每经记者｜许立波    每经编辑｜张益铭\n\n7月28日早间，医药圈被恒瑞医药的公告刷屏了。根据公告，恒瑞医药与葛兰素史克公司（GSK）达成合作协议，双方将共同开发至多12款创新药物。根据协议，GSK将向恒瑞医药支付5亿美元的首付款，后者还将有资格获得未来基于成功开发、注册和销售里程碑付款的潜在总金额约120亿美元。\n\n受此利好消息提振，资本市场上，恒瑞医药A股当天涨停收盘，股价报62.04元/股，市值重回4000亿元大关；港股报84.75港元/股，上涨24.54%。\n\n7月28日，青侨阳光基金经理林伟在接受《每日经济新闻》记者微信采访时指出，上述交易的达成，表明国产创新崛起态势更加确立，高价值对外授权的涌现浪潮仍在强化。特别是在一些底层技术已经充分扩散但改良/升级/拓展机会依然众多的领域中，全球研发中心正逐渐向中国迁移。\n\n恒瑞医药或用一笔“血亏”的交易打动了GSK\n\nHRS-9821是此次合作意向最明确的在研产品。作为一款潜在的同类最佳PDE3/4抑制剂，HRS-9821目前正处于临床开发阶段，可用于治疗慢性阻塞性肺病（COPD，慢阻肺病）。恒瑞医药称，该药已在早期临床和临床前研究中显示出强效的PDE3和PDE4抑制作用，从而增强支气管扩张和抗炎作用，并为开发便捷的干粉吸入器（DPI）制剂提供了机会。\n\nHRS-9821所瞄准的慢阻肺病是一种会损伤肺部并导致肺功能逐渐下降的呼吸系统疾病，具有高发病率、高死亡率、高社会经济负担等特征。有数据显示，中国慢阻肺病患者60岁以上人群患病率超过27％，已成为国内第三大致死性疾病。\n\n目前，临床上常用的慢阻肺病治疗药物以支气管扩张剂和吸入糖皮质激素为主，但单一机制往往难以全面控制这一疾病的多重病理特征。相比之下，PDE3/4双重抑制剂凭借同时具备支气管扩张与抗炎作用的机制，有望实现疗效上的“协同增益”。\n\n从竞争格局上看，PDE3/4抑制剂仍算得上是蓝海市场。据恒瑞医药此前披露的公告，目前全球同类产品仅Ensifentrine（恩塞芬汀）于2024年7月在美国获批上市，用于慢阻肺病的维持治疗。经查询EvaluatePharma数据库，2024年Ensifentrine全年销售额约为4200万美元。截至目前，HRS-9821相关项目累计研发投入约3843万元。\n\n不只是GSK，其他跨国药企也已对PDE3/4抑制剂这一新兴靶点及其在慢阻肺病治疗中的潜力表现出浓厚兴趣。实际上，就在本月上旬，默沙东宣布以100亿美元的价格收购Ensifentrine的原研企业Verona Pharma，以此将这一药物收入囊中。\n\n一直以来，GSK都被视作全球呼吸赛道龙头，其2024年呼吸业务收入约90亿英镑，占公司整体收入的29%。国泰海通证券在研报中指出，GSK在呼吸赛道上重点布局慢阻肺病新药，旗下IL5单抗已获批用于慢阻肺病治疗，后续也有自研长效IL5进行迭代。此外，GSK还布局了IL33、TSLP等新机制药物。\n\n从管线策略方面看，通过引入恒瑞医药的PDE3/4抑制剂，GSK几乎填补了其在慢阻肺病领域所有的关键空缺，构建了一套相当完整的产品组合。\n\n《每日经济新闻》记者还注意到，GSK此次选择与恒瑞医药达成合作，最初的契机或许可以追溯到一笔曾引发市场争议的交易。2023年，恒瑞医药曾将其自主研发的TSLP抗体SHR-1905（后更名为AIO-001）除中国外的全球权益以2500万美元的首付款授予Aiolos Bio，但仅数月后，Aiolos Bio便被GSK以10亿美元的预付款完成收购。\n\n彼时，业内大多认为恒瑞医药在上述交易中被“中间商”Aiolos Bio赚了差价，将“金子卖出了白菜价”。但回过头来看，或许正是这笔让恒瑞医药“血亏”的交易，让GSK认识到了恒瑞医药的价值所在。\n\n跨国药企越来越倾向于在更早阶段达成合作\n\n除了重点披露的HRS-9821，上述协议还包含一项开创性的规模化合作计划，双方将共同开发最多11个项目，涉及肿瘤、呼吸、自免和炎症等多个治疗领域的创新药物，目前均处于非临床研究阶段。不过，恒瑞医药方面并未披露其他11个项目的适应证、靶点等具体信息。\n\n以往国内创新药所达成的BD（商务拓展）交易，通常都是至少经历过II、III期临床试验数据验证的成熟管线，比如此前引起广泛热议的三生制药与辉瑞超60亿美元的对外授权，辉瑞就曾派团队在中国待了数周，深入研究现场并逐一查看了扫描结果，并采访了负责这项研究的医生，最终才得以拍板。\n\n但此次GSK看中的11个项目，却均是临床前候选药物。即便是上文提及的进展最快的交易标的HRS-9821，也才刚刚在7月上旬拿到临床试验批文。从表面上看，GSK高价押注恒瑞医药这11项尚处在临床前阶段的管线，背后并没有详细临床数据的验证和支撑，似乎是一场高风险的“开盲盒”式交易。\n\n与之类似的，在今年6月，阿斯利康与石药集团达成的超50亿美元规模的合作中，合作标的也均是临床前候选药物。\n\n日前，埃格林医药联合创始人、首席医学官曾对《每日经济新闻》记者分析道，目前中外合作的逻辑正在发生变化。以前国内药企更多是作为技术服务提供者，而现在正在转型成为真正的价值共创者。这一变化的背后，实际上也体现了中国创新药企在全球行业中的“信誉”正在持续提升。正因为中国企业的研发能力、数据质量和合作可信度不断增强，越来越多跨国药企愿意在更早的阶段就与国内药企建立合作关系，希望能够提前锁定优质资产。\n\n林伟也表达了类似的观点，他认为目前，全球研发环节里附加值更高的IP创意创造（原创/设计）环节正开始向中国迁移，中国正在逐渐成为全球创新药的研发中心。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-29 10:04:36",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 45,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "371551d538f469323bf1bb830761674af953f5e425ea9eed174cafffddd09aa7",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-c0e45ea0f64849cf093e",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "industry_media",
+    "source": "广州日报；涂端玉；东方财富转载",
+    "time": "2025-07-28",
+    "title": "120亿美元重磅交易！恒瑞医药携葛兰素史克推进创新药全球化",
+    "content": "恒瑞医药7月28日宣布与葛兰素史克公司（GSK）达成合作协议，将HRS—9821项目的全球独家权利（不包括中国）和至多11个项目的全球独家许可的独家选择权（不包括中国）有偿许可给GSK。28日，恒瑞医药A股涨停。\n\n根据协议条款，GSK将向恒瑞支付5亿美元的首付款。如果所有项目均获得行使选择权且所有里程碑均实现，恒瑞将有资格获得未来基于成功开发、注册和销售里程碑付款的潜在总金额约120亿美元。\n\n据悉，此次合作将为恒瑞医药全球化进程注入强劲动能，同时为GSK创造2031年后重大增长机遇。这些项目经严格筛选，旨在扩充GSK在呼吸、自免和炎症、肿瘤等治疗领域已建立的研发管线，且所有项目经评估均具有成为“同类最优”或“同类第一”的潜力。\n\n据了解，HRS-9821目前正处于临床开发阶段，可用于治疗慢性阻塞性肺病，作为辅助维持治疗，无须考虑既往治疗方案。此次协议还包含一项开创性的规模化合作计划，除HRS-9821外，双方将共同开发最多11个项目，恒瑞医药将主导这些项目的研发，最晚至完成包括海外受试者的Ⅰ期临床试验，每个项目均拥有各自的财务结构。\n\n恒瑞医药执行副总裁、首席战略官江宁军表示：“此次与GSK的战略合作，是恒瑞医药国际化进程中的重要里程碑，彰显了我们以创新惠及全球患者的使命。GSK在药物研发、全球临床网络及注册申报等方面的优势，将加速我们的PDE3/4抑制剂及其他一系列创新疗法进入海外市场，有望为全球患者带来突破性治疗方案。”\n\nGSK首席科学官Tony Wood表示：“我们很高兴宣布与恒瑞医药达成这些激动人心的合作协议，这些合作将进一步扩充我们本就丰富的研发管线。此项交易体现了我们对已验证靶点项目的战略投资，这种投资能显著提高研发成功率，同时我们也拥有推进那些对患者具有最大潜在影响力的资产的选择权。”",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28 19:33（转载页面时间）",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 46,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "c0e45ea0f64849cf093ebc83526e623708e66669cfa7a0025b61e2743255c186",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-087ebbe19b4b1c7c6094",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "self_media",
+    "source": "雪球账号“睿致Capital”",
+    "time": "2025-07-28",
+    "title": "无独立标题",
+    "content": "$三生国健(SH688336)$\n\n从恒瑞交易看三生国健产品线的价值重估\n\n恒瑞医药与GSK达成的125亿美元重磅交易为评估中国创新药资产提供了新的价值标尺，也促使市场重新审视三生国健产品线的潜在价值。从靶点选择、临床定位到交易结构设计，恒瑞交易对三生国健的价值重估具有多方面启示意义。\n\n呼吸系统药物价值的重新评估对三生国健具有直接启示。恒瑞此次授权给GSK的HRS-9821是一款针对慢性阻塞性肺病(COPD)的创新药，采用干粉吸入制剂，具有同时抑制PDE3和PDE4的双重机制。这一交易凸显了呼吸系统疾病药物在国际市场的巨大潜力，而三生国健在该领域同样有所布局。其IL-33靶点的SSGJ-621正是针对COPD适应症，目前处于临床I期。虽然进度较恒瑞的HRS-9821更为早期，但IL-33作为新型靶点，具有成为同类最优药物的潜力。全球范围内，阿斯利康和赛诺菲/再生元的IL-33项目已进入III期临床，预示着该靶点的广阔前景。参考恒瑞交易，三生国健的呼吸系统管线价值可能被市场低估。\n\n自免领域靶点的价值重估对三生国健影响更为深远。恒瑞与GSK的交易不仅包括HRS-9821，还涵盖多达11个前期项目的选择权，涉及肿瘤、呼吸、自免和炎症等领域。这一交易结构表明，跨国药企对差异化靶点的渴求已从临床后期产品延伸至早期研发管线。三生国健布局的TL1A、BDCA2等创新靶点正符合这一趋势。TL1A靶点近年来已成为全球医药并购的热门标的：2023年MSD以108亿美元收购Prometheus（核心资产为TL1A单抗MK-7240），罗氏以71亿美元收购Telavant获得TL1A抗体RVT-3101。三生国健的TL1A项目SSGJ-627作为国内首个进入临床的国产TL1A单抗，其价值显然未被当前市值充分反映。\n\n早期研发管线的溢价能力在恒瑞交易中得到充分体现。恒瑞授权给GSK的11个前期项目均处于非临床阶段，却能为公司带来可观的潜在收益。这提示市场应当重新评估三生国健早期管线的价值。三生国健目前有多个创新靶点项目处于临床前或临床I期，包括BDCA2（红斑狼疮）、TL1A（炎症性肠病）和IL-33（COPD）等。这些项目虽然风险较高，但一旦成功可能带来超额回报。参考2024年明济生物将临床前阶段的TL1A抗体以1.5亿美元首付款授权给艾伯维的案例，三生国健的早期管线即使部分成功，也将显著提升公司价值。\n\n平台技术价值的认可度提升有利于三生国健。恒瑞与GSK的交易部分反映了对其技术平台的认可，特别是呼吸系统给药技术。三生国健同样拥有值得重视的技术平台，其双抗技术已通过PD-1/VEGF双抗SSGJ-707得到验证，该药物2025年与辉瑞达成总金额346亿元的授权合作。公司还具备从早期研发到商业化生产的全产业链能力，是中国第一批专注于抗体药物的创新型生物医药企业。在创新药估值体系中，平台技术的价值往往高于单个产品，三生国健在这方面的潜力有待市场进一步发掘。\n\n表：恒瑞GSK交易启示下的三生国健价值重估要点\n\n重估维度\n\n恒瑞-GSK交易启示\n\n三生国健对应价值点\n\n呼吸系统药物价值\n\nCOPD药物获高额交易对价\n\nIL-33靶点SSGJ-621针对COPD，临床I期自免靶点溢价自免与炎症领域项目受青睐TL1A、BDCA2等创新靶点国内领先早期管线估值非临床阶段项目也能创造价值多个创新靶点项目处于临床前/I期平台技术认可技术平台获得高溢价双抗平台已验证，全产业链能力完备交易结构创新\"核心产品+选择权包\"模式可借鉴于未来对外授权谈判临床推进策略的差异化也影响价值评估。恒瑞医药采取的是快速跟进与自主创新并重的策略，其临床管线覆盖从me-better到first-in-class的各类项目。三生国健则更加聚焦，在自免领域采取\"成熟靶点快速推进+创新靶点前瞻布局\"的双轨策略。在IL-17A、IL-4Rα等成熟靶点上，三生国健处于国内第二梯队；而在TL1A、BDCA2等新靶点上，公司则是国内首个申报临床的企业。这种策略既确保了中短期有产品上市，又为长期发展储备了爆发点，应当获得更高的估值溢价。\n\n国际化潜力的重新评估也是价值重估的重要组成部分。恒瑞交易显示，具备全球权益的中国创新药资产正获得越来越多跨国药企的认可。三生国健部分项目已实施中美双报策略（如BDCA2、TL1A靶点药物），为未来国际化打下基础。虽然目前公司与辉瑞的合作仅限于特定产品，但随着更多临床数据的积累，其海外授权潜力有望进一步释放。参考恒瑞案例，国际化能力应当成为评估三生国健价值的重要维度。\n\n综合来看，恒瑞医药125亿美元的BD交易为整个中国创新药行业树立了新的价值标杆。在这一背景下，三生国健丰富且差异化的自免管线、已验证的双抗平台以及前瞻性的早期研发项目，其价值应当被全面重估。特别是公司在TL1A、BDCA2等全球热门靶点上的布局，有望吸引更多跨国药企的关注，成为未来对外授权的潜在增长点。\n\n三生国健未来发展的战略建议与投资启示\n\n基于恒瑞医药BD交易的启示和三生国健自身的产品线特点，公司未来发展需要在战略层面做出系统性规划，以充分释放其潜在价值。这些战略考量不仅对公司管理层具有参考意义，也为投资者提供了评估公司长期价值的重要维度。\n\n管线优化战略应当成为三生国健未来发展的核心。与恒瑞医药广泛覆盖多个治疗领域不同，三生国健聚焦自身免疫赛道的策略有其合理性，但也需要动态调整以应对市场变化。建议公司采取\"核心聚焦+选择性拓展\"的管线策略：一方面，继续深耕自免领域，将资源集中于IL-17A、IL-4Rα、IL-5等临床后期项目，确保短期内有产品接力；另一方面，针对TL1A、BDCA2等创新靶点，可考虑引入战略合作伙伴分担研发风险。特别是TL1A靶点，在跨国药企争相布局的背景下，三生国健可借鉴恒瑞经验，探索与大型药企的联合开发或授权合作，提前实现管线价值。\n\nBD战略升级是三生国健价值释放的关键路径。与辉瑞在PD-1/VEGF双抗SSGJ-707上的合作证明了三生国健具备优质资产创造能力，但单一交易远未充分释放公司潜力。未来，公司应从三方面提升BD水平：首先，学习恒瑞\"核心产品+选择权包\"的交易模式，在谈判中将临床阶段项目与早期管线打包授权，提高整体对价；其次，针对IL-33、TL1A、BDCA2等具有国际竞争力的靶点，积极推进中美双报，增加海外授权筹码；第三，建立专业的BD团队，系统性地与国际药企对接，变被动等待为主动推介。通过这些措施，三生国健有望在未来2-3年内实现BD交易的常态化与规模化。\n\n国际化战略的推进将显著提升三生国健的估值水平。恒瑞医药等一线药企的经验表明，国际化能力是中国创新药企突破估值天花板的关键。对三生国健而言，国际化可从三个层面展开：在研发层面，继续推进中美双报策略，确保临床试验设计符合国际标准；在合作层面，与跨国药企建立多产品、多领域的合作关系，不局限于单一项目授权；在商业化层面，针对人种差异小的自免疾病适应症，探索自主出海可能。特别是公司的BDCA2靶点药物，作为国内首个布局且针对红斑狼疮的创新药，具备差异化竞争优势，可作为国际化重点突破项目。\n\n资本战略的优化有助于三生国健获得更合理的市场估值。与三生制药(01530.HK)的市值联动关系值得关注。根据分析，三生制药与三生国健按7:3比例分配与辉瑞合作的权益，这种分成机制为两家公司的市值评估提供了参考。当三生制药市值达到1000亿时，三生国健理论市值约为428.57亿；若三生制药对标百利天恒1200亿市值，三生国健市值可能达到514.29亿。公司应充分利用这种联动效应，通过协同发展提升整体估值。此外，三生国健作为科创板上市公司，可考虑利用A股较高的流动性溢价，通过再融资等方式增强资金实力，反哺研发投入。\n\n研发效率提升是三生国健保持竞争力的基础。尽管公司2024年研发投入达5.41亿元，同比增长72.06%，但相比恒瑞等龙头仍显不足。提高研发效率可从三方面入手：一是建立重点突破的研发机制，将资源集中于2-3个最具潜力的项目，避免过度分散；二是加强临床开发能力，特别是II/III期临床试验的设计和执行水平，提高成功率；三是探索外部创新，通过license-in或并购方式补充管线，快速获得关键技术或产品。通过这些措施，三生国健可以在有限投入下实现产出最大化。\n\n风险控制体系的完善对三生国健尤为重要。与恒瑞多元布局相比，三生国健高度聚焦自免领域，面临较高的集中度风险。建议公司建立系统的风险管理机制：在研发风险方面，平衡成熟靶点与创新靶点的比例，避免过度冒险；在商业化风险方面，加快建立专业的自免药物销售团队，提高新药上市后的变现能力；在财务风险方面，虽然目前资产负债率仅6.69%，但自由现金流连续为负的状况需要关注。通过健全风险控制体系，三生国健可以实现更加稳健的发展。\n\n对投资者而言，三生国健的价值评估需要多维视角：短期看已上市产品的现金流贡献，中期看临床后期项目的推进节奏，长期看创新靶点的突破潜力。当前市值可能低估了公司在以下方面的价值：一是TL1A、BDCA2等靶点的国际授权潜力；二是与三生制药的协同效应带来的联动价值；三是自免领域专业化发展带来的溢价空间。随着中国创新药BD交易日益活跃，三生国健有望复制恒瑞医药的价值重估路径，迎来市值提升的新阶段。\n\n总之，借鉴恒瑞医药125亿美元交易的经验，三生国健未来发展需要在保持战略定力的同时，更加积极地推进BD战略升级、国际化拓展和资本运作，充分释放其差异化管线的潜在价值。在这一过程中，公司有望从\"中国版修美乐\"的追随者，蜕变为全球自免领域的创新引领者",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28 11:22",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 47,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "087ebbe19b4b1c7c60947764dce28c2b91d2e66dd1867050612b907611a5071f",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-761ef5ad84db6ef23aa7",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "research",
+    "source": "中泰国际证券有限公司",
+    "time": "2025-07-29",
+    "title": "每日大市点评（2025年7月29日）",
+    "content": "7 月 28 日，恒生指数早盘一度涨超 1%，最终回落收涨 0.7%，收报 25,562 点；恒生科技指数微跌 0.2%，收报 5,664 点。\n\n大市成交额 2503 亿港元，交投保持活跃。港股通净流入 92.5 亿港元。市场情绪总体表现平稳。盘面上，科网股表现分化，阿里巴巴（9988 HK）上涨 2.2%，腾讯（700 HK）、京东（9618 HK）小幅收涨，网易（9999 HK）、美团（3690 HK）则分别下跌 1.4%、0.5%。金融板块领涨湖畔，友邦保险（1299 HK）涨近 5%，中国太保（2601 HK）上涨 3.9%。受到与GSK 达成潜在 125 亿美元组合授权协议的消息提振，恒瑞医药（1276 HK）大涨 24.5%且创上市新高，带动创新药板块表现亮眼，三生制药（1530 HK）、中生制药（1177 HK）分别大涨 12%、7%。AI 概念、机器人多数明显回落，部分周期股和消费股明显承压，受“反内卷”影响的光伏、煤炭、钢铁全线走弱，汽车、餐饮股普遍弱势。\n\n当前港股盘面虽然表现分化，延续板块轮动，但交投活跃和港股通持续流入，印证市场逐渐有转向基本面改善与政策预期向好的迹象，有望向“盈利驱动”靠拢。美国与欧盟、日本等多国达成贸易协议，全球供应链焦虑大幅缓和，对于中美即将开启的第三轮贸易会谈，市场对于谈判已有了“延长豁免”、“关税换投资”、“技术换资源”等预期，不确定性有所下降也有助于削弱关税威胁对港股的冲击。若中美达成有限协议并与国内政策催化共振，港股或延续“基本面主导”的渐进式修复，关注恒生科指、医药生物、AI 概念等。\n\n宏观动态：\n\n房地产方面，上周新房成交量持续同比下跌。根据初步数字，上周(至 7 月 27 日)30 大中城市商品新房成交量达 140 万平方米，同比下跌16.8%，差于前周的14.5%同比下跌，环比上升4.7%，优于前周的3.5%环比增长。不同类别城市皆同比下跌。上周同比变化率：一、二、三线城市分别为-26.1%、-6.9%、-25.2%(前周同比：-16.5%、-23.5%、+8.5%)。\n\n行业动态：\n\n周一港股汽车板块走势疲软。盘面上几乎全部整车企业下跌，比亚迪（1211 HK）和吉利汽车（175 HK）单天下跌 1.1%-\n\n1.9%；以蔚小理为代表的一众新势力车企同样下跌 0.8%-4%，唯蔚来（9866 HK）上扬 1.3%。从月初至今来看，大部分汽车股仍保持向上走势。汽车智能化相关个股，地平线机器人（9660 HK）和黑芝麻智能（2533 HK）等周一同样下跌。\n\n医药板块，恒瑞医药（1276 HK）昨日公布与 GSK（GSK US）达成协议，将慢性阻塞性肺病药物（CPOD）HRS-9821 项目的全球独家权利(不包括中国大陆与港澳台）和最多 11 个项目的全球独家许可的独家选择权(不包括中国大陆与港澳台) 有偿许可给 GSK。恒瑞医药将获 5 亿美元首付款，未来还可能获最高 120 亿美元里程碑付款。以上新闻导致恒瑞股价昨日飙升，创新药板块与 CXO 板块的主要企业也跟随上涨。另外，国家医保局召开第三次医保支持创新药械系列座谈会，与 24家药企、保险公司、金融机构及地方政府探讨将医保数据用于创新药研发的可能性，表明国家医保局对创新药的支持，而且从参会机构构成来看，我们预计国家医保与商保公司将加大合作，商保的发展对高价药物销售有好处。\n\n昨日新能源及公用事业港股表现分化。光伏板块延续上周五跌势。信义光能(968 HK)、福莱特玻璃(6865 HK)、协鑫科技(3800 HK)分别下跌 1.2%、2.0%、4.9%。个别电力设备股也回吐。哈尔滨电气(1133 HK)及上海电气(2727 HK)分别下跌\n\n2.2%及 2.1%。另一方面，燃气股及香港公用事业股普遍上升，其中电能实业(6 HK)及长江基建(1038 HK)分别上涨 1.8%及\n\n3.1%。根据市场消息，长江基建已经同意出售英国铁路资产持股，我们认为这有利释放企业价值。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-29",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 48,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "761ef5ad84db6ef23aa72f9e2f029aae522687ee4872ca5ad41236e66bf54cb2",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-b72fb62bdd50443bb055",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "social",
+    "source": "雪球账号“认知与兑现”",
+    "time": "2025-07-28",
+    "title": "无独立标题",
+    "content": "$联环药业(SH600513)$ LH1901,从中国药科大学转让而来的LH1901,目前临床I期，比恒瑞医药COPD进展慢2年，只针对单靶点，而不是双靶点，恒瑞医药毕竟是国内top级别的医药公司，联环药业是小小弟呀。不过LH1901已经研发了6年，今年已经临床I期了，市场有250亿.\n\n而恒瑞医药的HRS-9821总里程碑可获得GSK的120亿美元，这对联环药业的LH1901有很大的想象力。\n\nLH-1901是国家1类标准的原创创新药，具备全新靶点机制和吸入剂型优势, CHRM3靶点成熟，成药问题不大，风险较小",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28 16:26",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 49,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "b72fb62bdd50443bb055a05b28e2da069e0d0e2f871ff8ef52ea33961afcd382",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-6f882cfa1980fce1c178",
+    "company": "600276_sh",
+    "company_name": "江苏恒瑞医药股份有限公司；600276.SH；01276.HK",
+    "tickers": [
+      "600276.SH",
+      "01276.HK"
+    ],
+    "type": "social",
+    "source": "雪球账号“硬核逻辑2025”；文内署名“天风医药杨松团队”",
+    "time": "2025-07-28",
+    "title": "【天风医药杨松团队】恒瑞医药：与GSK达成合作协议，至多12个项目总包120亿美金",
+    "content": "事件：7月28日，江苏恒瑞医药股份有限公司宣布与 GSK达成协议，将HRS-9821项目的全球独家权利（不包括中国大陆、香港 特别行政区、澳门特别行政区及台湾地区）和至多11个项目的全球独家许可的独家选择权（不包括中国大陆、香港特别行政区、澳门特别行政区及台湾地区）有偿许可给GSK。\n\n授权项目包括PDE3/4抑制剂HRS-9821等至多12个项目，HRS-9821具有BIC潜力\n\nGSK为此将向恒瑞支付5亿美元的首付款。如果所有项目均获得行使选择权且所有里程 碑均已实现，恒瑞将有资格获得未来基于成功开发、注册和销售里程碑付款的潜在总金额约120亿美元。同时，恒瑞将有权向GSK收取相应的分梯度的销售提成。\n\nHRS-9821 是一款潜在的同类最佳PDE3/4抑制剂，目前正处于临床开发阶段， 可用于治疗慢性阻塞性肺病(COPD)，作为辅助维持治疗，无需考虑既往治疗方案。 该药物已在早期临床和临床前研究中显示出强效的PDE3和PDE4抑制作用，从而 增强支气管扩张和抗炎作用，并为开发便捷的干粉吸入器(DPI)制剂提供了机会。除HRS-9821外，其余11个项目均处于临床前阶段，涉及肿瘤、呼吸、自免和炎症等多个治疗领域。\n\n公司平台价值大，管线丰厚，全面布局全球BIC创新药，具有持续兑现能力\n\n恒瑞医药具有多个技术平台，管线储备丰厚。公司具有PROTAC、肽类、单克隆抗体、双特异性抗体、多特异性抗体、ADC及放射性配体疗法等技术平台等平台覆盖全疗法类型，公司未来三年（2025-2027年）预计获批上市创新产品及适应症约47项。并且公司出海授权事件持续发生，已完成十多项授权事件，涉及项目包括PARP1抑制剂、 CLDN18.2 ADC、DLL3 ADC、Lp(a)小分子抑制剂等。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-07-28 09:13",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 50,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "6f882cfa1980fce1c178536b8e3413d415a9674e635c557cee54c121026c4dcf",
+      "verification": "source_not_independently_verified"
+    }
+  }
+]

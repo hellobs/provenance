@@ -1,0 +1,242 @@
+[
+  {
+    "id": "bg-5f4315f487a708c3392c",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "company_profile",
+    "source": "JD.com, Inc.；投资者关系官网",
+    "time": "2026-08-13",
+    "title": "JD.com Announces Second Quarter and Interim 2026 Results（About JD.com）",
+    "content": "JD.com is a leading supply chain-based technology and service provider. The company’s cutting-edge retail infrastructure seeks to enable consumers to buy whatever they want, whenever and wherever they want it. The company has opened its technology and infrastructure to partners, brands and other sectors, as part of its Retail as a Service offering to help drive productivity and innovation across a range of industries.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-08-13",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 61,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "5f4315f487a708c3392c1f1b27a814bdcbace0b7dd2a14361e79284d684b837e",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-c70b60dfa5ccb19176c1",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "financial",
+    "source": "JD.com, Inc.；投资者关系官网",
+    "time": "2026-08-13",
+    "title": "JD.com Announces Second Quarter and Interim 2026 Results",
+    "content": "BEIJING, Aug. 13, 2026 (GLOBE NEWSWIRE) -- JD.com, Inc. (NASDAQ: JD and HKEX: 9618 (HKD counter) and 89618 (RMB counter), the “Company” or “JD.com”), a leading supply chain-based technology and service provider, today announced its unaudited financial results for the three and six months ended June 30, 2026.\n\nSecond Quarter 2026 Highlights\n\nNet revenues were RMB346.4 billion (US$1 51.1 billion) for the second quarter of 2026, a decrease of 2.9% from the second quarter of 2025, primarily due to a high base effect.\n\nIncome from operations was RMB4.5 billion (US$0.7 billion) for the second quarter of 2026, compared to a loss of RMB0.9 billion for the second quarter of 2025. Operating margin was 1.3% for the second quarter of 2026, compared to negative 0.2% for the second quarter of 2025. Non-GAAP2 income from operations was RMB5.5 billion (US$0.8 billion) for the second quarter of 2026, compared to RMB0.9 billion for the second quarter of 2025. Non-GAAP operating margin was 1.6% for the second quarter of 2026, compared to 0.3% for the second quarter of 2025.\n\nNet income attributable to the Company’s ordinary shareholders was RMB7.1 billion (US$1.1 billion) for the second quarter of 2026, compared to RMB6.2 billion for the second quarter of 2025. Net margin attributable to the Company’s ordinary shareholders was 2.1% for the second quarter of 2026, compared to 1.7% for the second quarter of 2025. Non-GAAP net income attributable to the Company’s ordinary shareholders was RMB8.9 billion (US$1.3 billion) for the second quarter of 2026, compared to RMB7.4 billion for the second quarter of 2025. Non-GAAP net margin attributable to the Company’s ordinary shareholders was 2.6% for the second quarter of 2026, compared to 2.1% for the second quarter of 2025.\n\nDiluted net income per ADS3 was RMB5.01 (US$0.74) for the second quarter of 2026, compared to RMB4.15 for the second quarter of 2025. Non-GAAP diluted net income per ADS was RMB6.29 (US$0.93) for the second quarter of 2026, compared to RMB4.97 for the second quarter of 2025.\n\nJD Retail reported income from operations of RMB13.5 billion (US$2.0 billion) for the second quarter of 2026, compared to RMB13.9 billion for the second quarter of 2025. Operating margin of JD Retail was 4.6% for the second quarter of 2026, compared to 4.5% for the second quarter of 2025.\n\n“Our second quarter results reflect our resilient and high-quality operations,” said Sandy Xu, Chief Executive Officer of JD.com. “Despite near-term revenue headwinds, we achieved strong bottom-line growth, marking a clear inflection in our profit trajectory. This improvement was primarily driven by solid profitability in our core JD Retail business and continued narrowing of loss at JD Food Delivery. These results underscore the resilience of our supply chain-driven business model and our team’s focus on operational efficiency—strengths that we will continue to build upon for unlocking further potential as we navigate the second half of the year.”\n\n“We delivered solid profitability in the second quarter despite moderating top-line momentum,” said Ian Su Shan, Chief Financial Officer of JD.com. “JD Retail’s operating margin hit a record high for peak promotional seasons. This performance was driven by margin improvement in certain key categories, as well as a favorable revenue mix as high-margin marketplace and marketing revenues continued to outperform. Losses in our New Businesses segment narrowed significantly year-on-year, primarily driven by continued loss reduction at JD Food Delivery, while our strategic investments in Joybuy and Jingxi remained on track. Looking ahead, our robust business ecosystem will continue to underpin sustained business resilience and a healthy financial trajectory. Backed by our solid financial performance, we repurchased approximately 2.5% of our ordinary shares outstanding in the first half of the year, underscoring our commitment to delivering sustainable shareholder returns.”\n\nUpdates of Share Repurchase Program\n\nPursuant to the Company’s share repurchase program of up to US$5.0 billion adopted in August 2024 and effective through August 2027, the Company repurchased a total of approximately 69.9 million Class A ordinary shares (equivalent to 34.9 million ADSs) for a total of US$1.0 billion during the six months ended June 30, 2026. The total number of shares repurchased by the Company during the six months ended June 30, 2026 amounted to approximately 2.5% of its ordinary shares outstanding as of December 31, 20254.\n\nAll of these ordinary shares were repurchased from Nasdaq and the Hong Kong Stock Exchange pursuant to the share repurchase program. The remaining amount under the share repurchase program was US$1.0 billion as of June 30, 2026.\n\nBusiness Highlights\n\nJD Retail:\n\nDuring this year’s JD 618 Grand Promotion, JD MALL stores were successively launched in Shanghai and Hong Kong. By the end of the second quarter, JD MALL had a total of 30 stores in operation, completing its strategic layout in high-tier cities across China.\n\nJD.com continues to deepen its strategic presence in the fashion sector, collaborating with business partners to drive high-quality development of the industry. JD.com has established itself as a premier online destination for international luxury beauty brands, with its guaranteed product authenticity, efficient logistics, and comprehensive services. On May 11, 2026, JD.com entered into a strategic partnership with French luxury brand CHANEL, launching the official CHANEL flagship store on the platform with a full range of the brand’s classic perfume, makeup, and skincare products, alongside JD-exclusive limited-edition items. Moving forward, JD Beauty and CHANEL will continue to deepen their collaboration and set new trends in luxury beauty consumption. Additionally, JD.com has emerged as one of the fastest-growing platforms for fashion brands. During this year’s JD 618 Grand Promotion, approximately 2,000 fashion brands doubled their transaction value year-on-year on the platform, while 42 fashion categories led the industry in growth, including women’s and men’s apparel, sportswear, outdoor gear, and gold and jewelry.\n\nOn July 22, 2026, Costco entered into a partnership with JD.com, making JD.com its sole official e-commerce partner in China. Leveraging JD’s supply chain advantages, the Costco flagship store on JD’s platform brings a curated selection of high-quality global goods to consumers across China, with delivery available as fast as the same day.\n\nThe advancement of AI technology has unlocked new consumption opportunities for JD.com. Leveraging the Company's proprietary JoyAI LLM, its AI agent for hardware, JoyInside, empowers AI toys, robotics, home appliances, and medical devices with intelligent interaction capabilities to tap into emerging consumption potential. As of this year’s JD 618 Grand Promotion, JoyInside has established partnerships with nearly 200 brands, with the cumulative number of connected devices surging over threefold compared to that as of last year's JD 11.11 Grand Promotion.\n\nJD Logistics:\n\nAs of the second quarter of 2026, JD Logistics (“JDL”) had deployed thousands of unmanned vehicles into regular operations across more than 20 provinces nationwide. JDL launched its first “night-time autonomous delivery” routes in Shenzhen, enabling 24-hour uninterrupted vehicle operations. This effectively expands the geographical and operating-time boundaries for unmanned vehicle operations while unlocking further efficiency potential in last-mile fulfillment.\n\nJD Health:\n\nIn the second quarter of 2026, JD Health (“JDH”) continued to drive service innovation and its integrated online-offline strategy, while accelerating AI deployment across business scenarios. In terms of offline business model innovation, in April, JDH launched its first integrated healthcare center in Beijing, covering physical examination, dental care, and medical aesthetics services. The clinic provides users with online post-examination health management, representing a strategic upgrade from one-time health checkups to diversified and continuous healthcare services. Regarding AI applications, JDH upgraded its AI agent “Dr. Da Wei”, powered by its proprietary “Jingyi Qianxun” healthcare LLM. “Dr. Da Wei” brings together full-spectrum capabilities including online consultations, at-home rapid testing, home care services, and medication fulfillment. During the JD 618 Grand Promotion, the number of users served by “Dr. Da Wei” grew nearly fourfold year-on-year, leading the transition of user behavior from one-off transactions to long-term health management.\n\nJD Industrials:\n\nDuring the second quarter of 2026, JD Industrials (“JDI”) continued to strengthen its end-to-end AI capabilities. Its LLM, JoyIndustrial, was upgraded from an AI tool to an AI expert, shifting focus toward comprehensive industrial deployment. In the first half of 2026, JDI deployed over 70 AI agents across the entire value chain from procurement to fulfillment, driving AI-powered growth and improving workforce efficiency. To address procurement pain points for micro, small and medium-sized customers, JDI introduced its AI-Powered Smart Procurement Assistant, enabling customers to conduct efficient product selection and price comparison through multimodal interactions, delivering a seamless “conversation-as-procurement” experience. Additionally, JDI launched the “Baichuan Initiative” in June, collaborating with leading brand partners to build vertical industry models, which transform scattered product manuals and massive data into structured, standardized datasets.\n\nNew Businesses:\n\nIn the second quarter of 2026, JD Food Delivery maintained high-quality development, with its investment size narrowing significantly year-on-year, primarily driven by improved operational efficiency and revenue diversification. Other new businesses also achieved steady development during the quarter. Joybuy, JD.com’s online retail business in Europe, launched its “Summer Black Friday” campaign in the quarter. During the event, quality home appliances and technology products saw surging sales, driven by the Company’s signature “Double 11” (211) delivery and integrated delivery-and-installation services.\n\nEnvironmental, Social and Governance\n\nAs a testament to JD.com’s unwavering commitment to creating more jobs and making contribution to the society, the total personnel under the JD Ecosystem5 was over 900,000 as of June 30, 2026, including the Company’s employees, part-time staff and interns, as well as the personnel of the Company’s affiliates in the JD Ecosystem. The total expenditure for such human resources, together with the expenditure for external personnel who work for the JD Ecosystem, amounted to RMB171.7 billion for the twelve months ended June 30, 2026.\n\nSecond Quarter 2026 Financial Results\n\nNet Revenues. Net revenues decreased by 2.9% to RMB346.4 billion (US$51.1 billion) for the second quarter of 2026 from RMB356.7 billion for the second quarter of 2025. Net product revenues decreased by 5.4%, primarily due to a high base effect in the second quarter of 2025, while net service revenues increased by 6.8% for the second quarter of 2026, compared to the second quarter of 2025.\n\nCost of Revenues. Cost of revenues decreased by 4.3% to RMB287.1 billion (US$42.3 billion) for the second quarter of 2026 from RMB300.0 billion for the second quarter of 2025.\n\nFulfillment Expenses. Fulfillment expenses, which primarily include procurement, warehousing, delivery, customer service and payment processing expenses, increased by 10.4% to RMB24.5 billion (US$3.6 billion) for the second quarter of 2026 from RMB22.1 billion for the second quarter of 2025. Fulfillment expenses as a percentage of net revenues was 7.1% for the second quarter of 2026, compared to 6.2% for the second quarter of 2025, as the Company continued to upgrade fulfillment capabilities and invest in human capital to enhance user experience while building the operational infrastructure for new business initiatives.\n\nMarketing Expenses. Marketing expenses decreased by 24.8% to RMB20.3 billion (US$3.0 billion) for the second quarter of 2026 from RMB27.0 billion for the second quarter of 2025. Marketing expenses as a percentage of net revenues was 5.9% for the second quarter of 2026, compared to 7.6% for the second quarter of 2025, primarily due to the optimization of promotional spending on new business initiatives.\n\nResearch and Development Expenses. Research and development expenses increased by 37.7% to RMB7.3 billion (US$1.1 billion) for the second quarter of 2026 from RMB5.3 billion for the second quarter of 2025. Research and development expenses as a percentage of net revenues was 2.1% for the second quarter of 2026, compared to 1.5% for the second quarter of 2025, as the Company continued to invest in technology capabilities and talents.\n\nGeneral and Administrative Expenses. General and administrative expenses decreased by 4.7% to RMB3.1 billion (US$0.5 billion) for the second quarter of 2026 from RMB3.3 billion for the second quarter of 2025. General and administrative expenses as a percentage of net revenues remained stable at 0.9% for both the second quarter of 2026 and 2025.\n\nIncome from Operations and Non-GAAP Income from Operations. Income from operations for the second quarter of 2026 was RMB4.5 billion (US$0.7 billion), compared to a loss of RMB0.9 billion for the second quarter of 2025. Operating margin was 1.3% for the second quarter of 2026, compared to negative 0.2% for the second quarter of 2025. Non-GAAP income from operations was RMB5.5 billion (US$0.8 billion) for the second quarter of 2026, compared to RMB0.9 billion for the second quarter of 2025. Non-GAAP operating margin was 1.6% for the second quarter of 2026, compared to 0.3% for the second quarter of 2025.\n\nIncome from operations of JD Retail was RMB13.5 billion (US$2.0 billion) for the second quarter of 2026, compared to RMB13.9 billion for the second quarter of 2025. Operating margin of JD Retail for the second quarter of 2026 was 4.6%, compared to 4.5% for the second quarter of 2025.\n\nNon-GAAP EBITDA. Non-GAAP EBITDA was RMB7.9 billion (US$1.2 billion) for the second quarter of 2026, compared to RMB3.0 billion for the second quarter of 2025. Non-GAAP EBITDA margin was 2.3% for the second quarter of 2026, compared to 0.8% for the second quarter of 2025.\n\nNet Income Attributable to the Company’s Ordinary Shareholders and Non-GAAP Net Income Attributable to the Company’s Ordinary Shareholders. Net income attributable to the Company’s ordinary shareholders was RMB7.1 billion (US$1.1 billion) for the second quarter of 2026, compared to RMB6.2 billion for the second quarter of 2025. Net margin attributable to the Company’s ordinary shareholders was 2.1% for the second quarter of 2026, compared to 1.7% for the second quarter of 2025. Non-GAAP net income attributable to the Company’s ordinary shareholders was RMB8.9 billion (US$1.3 billion) for the second quarter of 2026, compared to RMB7.4 billion for the second quarter of 2025. Non-GAAP net margin attributable to the Company’s ordinary shareholders was 2.6% for the second quarter of 2026, compared to 2.1% for the second quarter of 2025.\n\nDiluted EPS and Non-GAAP Diluted EPS. Diluted net income per ADS was RMB5.01 (US$0.74) for the second quarter of 2026, compared to RMB4.15 for the second quarter of 2025. Non-GAAP diluted net income per ADS was RMB6.29 (US$0.93) for the second quarter of 2026, compared to RMB4.97 for the second quarter of 2025.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-08-13",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 62,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "c70b60dfa5ccb19176c119769696e33129db56fbf10be047b2805aba72f9e1d3",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-9c68813fd3095ac26cb7",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "disclosure",
+    "source": "JD.com, Inc.；美国SEC披露附件",
+    "time": "2025-08-14",
+    "title": "JD.com Announces Second Quarter and Interim 2025 Results",
+    "content": "Net Income Attributable to the Company’s Ordinary Shareholders and Non-GAAP Net Income Attributable to the Company’s Ordinary Shareholders. Net income attributable to the Company’s ordinary shareholders was RMB6.2 billion (US$0.9 billion) for the second quarter of 2025, compared to RMB12.6 billion for the second quarter of 2024. Net margin attributable to the Company’s ordinary shareholders was 1.7% for the second quarter of 2025, compared to 4.3% for the second quarter of 2024. Non-GAAP net income attributable to the Company’s ordinary shareholders was RMB7.4 billion (US$1.0 billion) for the second quarter of 2025, compared to RMB14.5 billion for the second quarter of 2024. Non-GAAP net margin attributable to the Company’s ordinary shareholders was 2.1% for the second quarter of 2025, compared to 5.0% for the second quarter of 2024.\n\n收入数据：2025年第二季度净收入人民币356.7 billion（人民币3,567亿元），同比增长22.4%；京东零售收入人民币310.1 billion（人民币3,101亿元），同比增长20.6%。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-14",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 63,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "9c68813fd3095ac26cb7cb61ff2d360c5e3c08d04993604b1188a466a7174e13",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-77456aebe4ea4f1d2ebd",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "industry_media",
+    "source": "澎湃新闻；范佳来",
+    "time": "2025-08-15",
+    "title": "京东外卖带动业务增长：营收增速刷新纪录，建设骑手、商家、平台生态平衡",
+    "content": "8月14日，据京东集团(Nasdaq:JD；09618.HK)发布2025年二季度业绩显示，今年第二季度收入为3567亿元，较去年同期增长22.4%，刷新近三年收入增速的新纪录，新业务健康发展并已达成初期战略目标。\n\n二季度，京东集团绝大多数品类实现加速增长，带电等核心品类优势愈发巩固。日百品类收入同比加速增长了16.4%，其中商超品类连续6个季度保持收入同比双位数增长。服务收入同比加速增长29.1%。京东外卖带动新业务的收入同比大幅增长199%。\n\n二季度，得益于核心零售业务和外卖等新业务的发展势头，京东集团的季度活跃用户数和购物频次均实现超过40%的同比增长，季度活跃用户数实现了连续7个季度的同比双位数增长。\n\n“二季度，京东平台的用户流量、季度活跃用户数以及用户购买频次等均取得显著增长，这主要得益于核心京东零售业务和外卖等新业务的持续发展势头，”京东CEO许冉表示。\n\n“本季度，京东零售收入同比增长20.6%，表现强劲，经营利润率达到4.5%，创下公司历史上所有大促季度的最高纪录。同期，京东外卖业务也取得健康发展，不仅在订单量增长、商家数量扩大、全职骑手招聘等方面稳步推进，更重要的是与京东零售以及其他现有业务形成有效协同，成功达成我们的初期战略目标。展望未来，随着我们持续聚焦用户体验、成本和效率，我们相信核心零售业务将始终是京东业务版图的基石，同时我们也将按照长期战略规划，持续布局新增长领域。”\n\n坚决反内卷，抵制“0元购”制造市场泡沫\n\n二季度，京东外卖业务日单量突破2500万单，京东绝不为体现市场地位恶意冲单量、制造市场泡沫。目前，京东外卖业务覆盖全国350个城市，超150万家品质餐饮门店入驻，构建起较为完善的服务网络，已有近200个餐饮品牌销量破百万，京东与超15万名全职骑手直签劳动合同、为其缴纳五险一金。京东外卖还与众多行业头部企业展开合作，为其带来多场景、高品质的企业用餐解决方案，覆盖重点企业数量超15,000家。\n\n京东表示，坚持反内卷立场，坚决杜绝不正当竞争，坚决抵制“0元购”等恶性补贴，“比品质”、“比服务”，坚守品质定位和食品安全底线，以技术赋能、供应链创新等打造核心竞争力。\n\n七鲜小厨定位“品质餐饮合营制作平台”，坚决不让合伙商家亏损，坚决摒弃“二房东”模式，是京东以供应链创新推动餐饮外卖行业健康发展的重要实践。首店上线一周日均订单超1000单，复购率高于行业220%，带动周边3公里商圈数千家餐厅总体订单环比增长12%。七鲜小厨启动的“菜品合伙人”计划，租金、人力、运营成本都由京东出资，截至7月底已收到超6.6万份报名，京东计划3年内在全国建设10,000家七鲜小厨，让品质餐厅摆脱经营压力实现规模化销售。\n\n二季度，京东旗下首个餐饮实体基础设施品牌“七鲜美食MALL”首店正式开业，通过“100%后厨直播”、“品质餐饮发展计划”双举措，从消费者信任与商家经营效率双向破局，为餐饮行业提供可持续增长新范式。\n\n值得注意的是，京东做外卖不是简单为了市场规模和地位冲击单量，而是要建立起订单和骑手以及后台商家、运营系统之间的生态平衡，同时还能够与京东的用户活跃度以及核心零售业务形成飞轮效应，以高频业务带低频业务，以有纪律的投入带动整体业务的增长和利润的提升。\n\n谈到外卖业务的投入，许冉表示，外卖业务为京东带来了明显的流量和用户增长，未来在整体市场投放和营销费用上有很大协同空间。未来更多精力还是放在完善京东的平台系统，外卖业务的每单盈利正在逐步改善。接下来会有针对不同地域、用户群体更加精细的促销策略，“规模效率带动的履约效率提升、系统能力提升，都将带动外卖业务自身盈利能力的提升。”\n\n“京东做外卖业务追求的不是一个月、两个月的成绩，而是希望能够长期做下去，5年、10年，甚至是20年。”许冉表示。\n\n数实融合助力行业降本增效 把员工成长写进发展基因\n\n今年的“京东618”再创新高，下单用户数同比增长超100%领跑行业，京东零售线上业务、线下业态及京东外卖整体订单量超22亿单。京东618期间，京东APP的日活跃用户创历史新高，3C、家电品类的规模、增速稳居行业第一，服饰美妆、日百品类增速领跑行业。\n\n自2017年全面向技术转型以来，截至二季度京东体系的研发投入已累计超1500亿元。技术创新只有在更广泛地应用，才能迸发出更大的价值。截至二季度，京东供应链基础设施资产规模近1700亿元，为技术应用提供了广阔的场景。\n\n京东零售首次将“京东立影-裸眼3D广告”等创新3D内容产品应用于多个品类或场景。京东健康“AI京医”，包括AI医生、AI营养师、AI药师、AI心理咨询师等专业角色智能体，自2025年1月上线以来已累计服务超5,000万用户。京东工业启动“万亿降本”行动，帮助十余个工业产业重点城市的企业实现全链路降本增效。\n\n京东表示，以AI为代表的先进技术竞争正在从堆算力拼规模，到比融合、比应用、比场景、比产出，未来谁拥有更多元的应用场景，谁能为数字技术找到最合适的应用场景，谁就能创造出更大的价值，京东是一家供应链企业，从上下游的深度到宽度建立起了庞大的数字技术应用场景优势。\n\n截至6月30日，京东体系人员总数约90万人。京东2026校园招聘将开放3.5万个岗位，同时推出“顶尖青年技术天才计划”招募全球技术天才。京东不断加大在青年人才培养上的持续投入和福利待遇的提升，在生活福利上，仅在北京就投入70亿元建设近5,000套青年公寓，9月起首批实习生公寓可申请免费入住。\n\n自首批全职外卖骑手加入以来，短短4个月间，在京东的“快递员+全职外卖骑手”亲属搭档已超千人。二季度，京东荣获扶残助残国家最高荣誉，截至目前，京东安置就业的残疾人已超4000人，并还在持续增长中。京东还通过免费提供开店培训、运营指导、补贴推广等方式，间接带动了数十万残疾人实现就业创业和稳定增收。未来，京东计划将“阳光天使”进一步扩充至1000人。\n\n秉承“创造价值”的初心，京东希望以技术和创新，为每一位用户、合作伙伴、员工、以及社会中的所有人带来更多的价值。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-15 16:04",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 64,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "77456aebe4ea4f1d2ebd5eff47ab9fb3e76371ce37ca8b8d62eca23742875aab",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-a571d41abaa4502d5084",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "industry_media",
+    "source": "第一财经；陆涵之；编辑李娜",
+    "time": "2025-08-14",
+    "title": "京东Q2成绩单出炉:营收增利润降，外卖成关键变量",
+    "content": "京东的外卖业务在第二季度财报中存在感十足。\n\n8月14日，京东发布了第二季度财报。财报显示，京东第二季度收入为3567亿元，同比增加22.4%。第二季度归属于本公司普通股股东的净利润为62亿元，同比下滑50.8%。\n\n京东2025年第二季度经营损失为9亿元，2024年第二季度经营利润为105亿元。京东表示这一变化主要是由于对新业务的战略投入增加导致。\n\n分业务看，包括京东外卖在内的新业务在今年二季度的表现与往年相比有着巨大差异。\n\n京东零售（包括京东健康及京东工业等经营分部）主要从事中国的自营业务、平台业务及广告服务。二季度京东零售收入为3101亿元，同比增加20.6%。其中电子产品及家用电器商品收入同比增长23.4%，日用百货商品收入同比增长16.4%。2025年二季度，京东MALL在北京、深圳、南京、武汉和太原等多城市迎来新店开业。\n\n京东物流包括内部及外部物流业务。京东物流第二季度收入为515.6亿元，同比增长16.6%。\n\n2025年上半年，京东物流在全球多个国家新开海外仓，包括美国、英国、法国、波兰、韩国、越南、沙特阿拉伯等国家。截至2025年6月30日，京东物流拥有超过130个保税仓库、直邮仓库和海外仓库。京东物流的海外仓已覆盖全球23个国家和地区。\n\n2025年6月，京东物流在沙特阿拉伯启动配送业务，推出自营快递品牌“JoyExpress”。\n\n新业务主要包括京东外卖、京东产发、京喜及海外业务。京东在今年2月正式推出了外卖业务，并且在4月为了发展该业务推出了“百亿补贴”，二季度新业务营收出现了巨大变化。\n\n新业务第二季度收入为138.5亿元，同比增长198.8%。但同时带来了144.1亿元的营业成本以及144.5亿元的经营费用，因此新业务在第二季度产生了147.8亿元的经营损失，去年同期新业务的经营损失为6.95亿元。\n\n新业务也对二季度集团的营销开支带来了影响。京东二季度营销开支由2024年第二季度的119亿元增加127.6%至2025年第二季度的270亿元，该增加主要是由于用于新业务推广活动的支出增加。\n\n京东在财报中表示，2025年二季度，京东外卖继续健康发展，京东618期间外卖业务日单量突破2500万单，入驻品质商家超150万家，截至二季度末全职骑手规模已突破15万人。\n\n此外，2025年7月，京东推出七鲜小厨，通过“菜品合伙人模式”，与合伙人共同开发招牌菜。\n\n京东集团首席执行官许冉表示，“二季度，京东平台的用户流量、季度活跃用户数以及用户购买频次等均取得显著增长，这主要得益于核心京东零售业务和外卖等新业务的持续发展势头。”\n\n就业方面，截至2025年6月30日，京东生态系统下（包括兼职员工和实习生，以及关联公司的人员）的人员总数约为90万名。截至2025年6月30日止十二个月，京东生态系统的人力资源总支出（包括本公司的自有员工和外部人员）达到了1360亿元。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-14 19:05:05",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 65,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "a571d41abaa4502d50848db2f7827bdd44e61613b06f194d03b7e21c5f43e103",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-1d33b914851a48041377",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "self_media",
+    "source": "港股研究社；36氪授权转载",
+    "time": "2025-08-15",
+    "title": "京东Q2增收653亿却少赚50%：外卖狂飙成\"利润刺客\"，这笔账到底怎么算？",
+    "content": "这场燃烧了2025年整个夏天的外卖大战，正在迎来首个业绩检验。\n\n8月14日，京东披露了2025年第二季度及中期业绩公告：二季度实现收入3566.6亿元，同比增长22.4%，继一季度后再次刷新了近三年来同比增速的纪录。\n\n但另一边，归母净利润61.78亿元，同比锐减50.8%，上半年归母净利润同比下滑13.7%。\n\n这份“增收不增利”的成绩单，恰是京东当下“核心零售稳增长、新业务高投入”的真实写照。\n\n外卖带飞！京东零售\"压舱石\"更稳了\n\n在京东的业绩版图中，核心零售始终是最坚实的“压舱石”。2025年第二季度，京东零售收入达3100.8亿元，同比增长20.6%；经营利润139亿元，同比增长37.9%，增速优于机构预期；同时经营利润率攀升至4.5%，创下京东历史上所有大促季度的最高纪录。\n\n这一数据的背后，是基于国补利好刺激，平台实现了用户粘性、供应链效率与平台生态的三重共振。\n\n用户端的增长是核心动力。京东集团CEO许冉在财报会上透露，二季度京东平台的用户流量、季度活跃用户数（MAU）及购买频次均显著提升，其中PLUS会员与普通用户的同比增速均超50%，季度活跃用户数和购物频次同比增长均超40%，季度活跃用户数更是连续7个季度实现双位数增长。\n\nQuestMobile数据进一步印证了这一趋势：“618”期间，京东APP日活跃用户数（DAU）达2.12亿，同比增长52.1%；下单用户数同比增速超100%，用户从“浏览”到“下单”的转化效率大幅提升。\n\n供应链与履约能力的升级则是利润优化的关键。京东零售的经营利润率连续多个季度提升，得益于其在仓储、配送端、客户服务及支付处理开支的持续投入——2025年Q2履约开支221亿元，同比增长28.6%，但履约开支占比仅从5.9%微增至6.2%，“降本增效”的本质是“用技术换效率”。\n\n例如，京东通过智能仓储系统缩短了商品从入库到发货的时间，通过动态路由规划降低了配送成本，这些“隐性投入”最终转化为用户端的“次日达”“当日达”体验，进而反哺订单量与复购率。财报显示，上半年平台持续优化履约能力并加大人力投入以提升用户体验。\n\n最重要的是，在京东零售大生态中，外卖新业务为零售业务带来强大的协同效应和乘数效应。例如，外卖等新业务的快速起量带动了整体用户流动，许多原本只使用外卖的用户，开始在京东APP浏览3C、家电等核心品类，“外卖用户向零售业务的转化率明显提升”。\n\n这种“流量反哺”效应，让零售业务在行业竞争加剧的背景下，依然保持了强劲的增长韧性。\n\n另外，国补是重点布局家电零售市场的京东平台必谈的一点。二季度其带电品类收入同增23.4%至1790亿元，增速较上一季的17.1%进一步提升，反映出以旧换新行动的有效贡献；2Q25日用百货收入同增16.4%至1034亿元，增速延续环比提升趋势，商超品类连续6个季度实现双位数增长。\n\n最终在国补带动下京东零售业务实现明显的经营效率改善和超预期收入增长。\n\n199%增长VS -107%利润率：京东果然跌了\n\n零售是京东的“防御阵地”，外卖与即时零售则是其“进攻矛头”。\n\n自2月上线以来，京东外卖以“狂飙”姿态闯入赛道：二季度业务收入由去年同期的46亿元暴涨199%至139亿元；覆盖350个城市，引入超150万家品质商家，618期间外卖业务日单量更是突破2500万单，截至二季度末全职骑手规模已突破15万人。\n\n爆发生长的背后少不了一些必然的成长代价。二季度新业务（含外卖、折扣超市等）经营亏损148亿元，运营利润率低至-107%。\n\n在饿了么、美团外卖的夹击中，为了快速抢占市场，京东大笔以持续砸钱进去。摩根士丹利等机构估算，京东外卖Q2单均亏损约6-12元，按2500万日单量计算，日亏损最高达1.5亿元。\n\n这与京东的“补贴换增长”策略直接相关——4月推出的“百亿补贴”最高减20元，PLUS用户额外享“满25减20”券，虽快速拉动订单，但也推高了营销费用。\n\n细究成本变动来看，京东2025年第二季度费用为575亿元，较上年同期的354亿元增长62%，增速明显快于同期收入增速。\n\n上半年京东营销开支较上年同期的119亿元增长127.6%；营销开支占收入比列从2024年同期的4.1%大幅增至7.6%，2024年第二季度为，新业务推广活动支出的增加便是主要原因。\n\n再加上大增了25.7%的研发开支（53亿元）、增长了53.2%的一般及行政开支（33亿元），第二季度京东整体运营亏损了9亿元，经营利润率更是从去年同期的3.6%转负至-0.2%。\n\n整体由于由于对新业务的战略投入增加导致，第二季度其经调整运营利润为从去年同期的116亿元大幅夭折至9亿元；对应经调整经营利润率从4％降至0.3%。\n\n好在得益于零售经营利润率的支撑，其整体经营利润表现还算稳健，从2024年同期的101亿元扩张至139亿元。\n\n外卖大战明显拖累利润。此外，监管加严也带来了一定不确定行。7月，京东外卖因“0元购”等非理性营销被多次约谈，随后发布《共建健康生态》声明，缩减补贴并转向服务与技术投入。策略调整后，日订单量维持在2000万单左右，亏损有所收窄，但也意味着“以补贴换增长”的粗放模式难以为继。\n\n资本市场虽然早有预料，业绩发布前后京东集团美港股（JD.US；09618.HK）股价还是出现明显的负反馈。8月15日开盘，京东集团港股跳空低开，跌超3％。\n\n事实上，按照市场预期，此次参加外卖大战的三大巨头，阿里、京东、美团都将在外卖业务上承受一定盈利压力。早在7月中旬，高盛在研报中指出，外卖与即时零售领域竞争超预期，该行下调阿里巴巴（2025-2027年盈利预测下调1%-10%）和京东的盈利预期。\n\n后续这些预期预计将随着企业财报的逐步到来一一验证。\n\n对此，京东集团CEO许冉在财报业绩会上强调，会持续释放外卖和核心零售业务之间的协同潜力，为整个集团长期健康增长提供动力。他表示“长期来看，我们做外卖业务不是追求一、两个月的成绩，而是希望能够长期做5年、10年、20年，所以我们追求的可持续发展的商业模式。”\n\n烧钱不止！要破长周期增长天花板\n\n用更宽广的视角范围来看，外卖业务的战略价值并不止于短期规模。\n\n许冉强调，外卖与零售的协同效应已初步显现：外卖业务为京东带来了增量用户与流量，其中向核心电商品类的转化率显著提升，且三季度将上线“交叉购买”工具。\n\n京东集团CFO单甦也直言，新业务投入的核心是为京东突破增长瓶颈，开拓更大增长空间——与零售生态的协同潜力、用户增长的长期价值，使其成为一场长期战略选择。\n\n面对外卖业务的亏损与行业竞争，京东的应对策略不再只是用价格抢市场，而是尽力依托“零售+即时”的生态协同，构建更可持续的增长体系。\n\n其一，线下业态创新，夯实“最后一公里”网络。7月，京东首家自营外卖门店“七鲜小厨”在北京开业，主打“外卖+自提”模式，商品单价10-30元，据悉首周日均订单超1000单，复购率高于行业220%；\n\n同时推出“菜品合伙人”计划，未来三年投入10亿元扶持1000道招牌菜，建设1万家七鲜小厨，并斥资百亿打造新型供应链。这一自营模式虽推高成本，但通过标准化运营与供应链整合，有望提升外卖业务的盈利能力。\n\n其二，全渠道零售扩张，打通线上线下场景。除外卖外，京东的线下布局已覆盖折扣超市、3C数码、养车、奥莱等多业态：8月计划在宿迁、涿州开设5家“全品类、大面积”折扣超市；3C数码门店突破3000家，MALL达24家，养车门店超2500家，其中80%城市门店盈利。\n\n这些线下场景在贡献增量收入的同时，通过“线上下单+线下自提/配送”的融合，提升用户全场景消费体验。\n\n其三，国际化布局，拓展增长新空间。7月，京东宣布拟以22亿欧元收购欧洲电子零售巨头Ceconomy（旗下拥有MediaMarkt、Saturn两大品牌，覆盖12国超1000家门店）。\n\n与单纯跨境购不同，京东更看重Ceconomy的本地供应链与前置仓网络价值。这些门店可改造为即时零售的前置仓，支撑欧洲市场的“小时达”服务。尽管交易尚需审批，但这一动作释放了京东“全球供应链+本地化运营”的野心。\n\n此外此举也被看作是京东继续强化全球品类丰富度、供应链能力的一环。早在7月京东曾宣布启动“百亿千品新增长计划”，计划三年内通过跨境模式引入1000个海外新品牌，并助力其实现累计100亿元的销售增长。\n\n京东的长期战略核心是“生态协同”——通过外卖、线下业态、国际化等业务，与零售基本盘形成用户、履约、供应链的资源共享，最终从“流量驱动”转向“生态驱动”，构建更可持续的增长壁垒。\n\n不破不立，京东外卖的投入期大概率还将继续，这场外卖大战远未到结束之时！\n\n本文来自微信公众号 “港股研究社”（ID：ganggushe），作者：港股研究社，36氪经授权发布。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-15 20:40",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 66,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "1d33b914851a480413777a5e4635bd722dba7eb4ff9ca7b3a23945bd2ec0d0a7",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-f140dc70987576b0feee",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "self_media",
+    "source": "雪球；股海五谷丰登",
+    "time": "2025-08-15",
+    "title": "京东2025半年报：外卖闪电战点燃增长引擎，百亿亏损暗藏现金流考题",
+    "content": "一、业绩全景：增长提速与利润塌陷的“冰火两重天”\n\n收入增速创三年新高，零售基本盘强势巩固\n\nQ2收入3567亿元（同比+22.4%），上半年总收入6577.42亿元（同比+19.28%），增速为2022年以来最高。\n\n核心零售韧性凸显：Q2零售收入3101亿元（同比+20.6%），经营利润率4.5%创大促季度历史纪录，毛利率连续13季度提升。\n\n用户活跃度爆发：季度活跃用户数、购物频次均超40%增长，Plus会员转化率提升50%+，618期间日活用户达2.12亿（同比+52.1%）。\n\n利润腰斩的残酷现实\n\n净利润断崖式下跌：Q2归母净利润62亿元（同比-50.8%），上半年净利润170.68亿元（同比-13.68%），为近三年最大降幅。\n\n现金流警报：上半年经营现金流净额61.47亿元（同比-84.41%），自由现金流220亿元（同比-56%）。\n\n二、最大惊喜：外卖业务的协同价值与生态破局\n\n闪电式增长：单量、用户、商家的三重跃迁\n\n日单量突破2500万单：618大促期间创峰值，覆盖350城、150万商家，200个餐饮品牌销售额破百万。\n\n全职骑手15万人：行业首创直签+五险一金模式，提升履约稳定性。\n\n流量反哺核心零售的乘数效应\n\n用户协同：外卖用户向电商转化率显著提升，3C/家电品类浏览率增长30%+，Plus会员购物频次提升超50%。\n\n生态闭环初现：七鲜小厨复购率超行业220%，“菜品合伙人”计划吸引6.6万商户报名，3年拟建1万家门店。\n\n京东外卖战略价值矩阵\n\n指标\n\n当前状态\n\n协同效应\n\n日单量\n\n2500万单\n\n带动MAU占流量26.6%\n\n用户月均使用频次\n\n同比+51.1%\n\n电商转化率提升30%+\n\n全职骑手覆盖率\n\n100%五险一金\n\n配送投诉率降40%\n\n三、最大隐忧：百亿亏损与现金流的生死时速\n\n外卖业务的“利润黑洞”\n\n经营亏损148亿元：新业务利润率-106.7%，单均亏损6-12元，日亏损峰值达1.5亿元。\n\n营销费用激增127.6%：Q2达270亿元，费用率从4.1%飙升至7.6%，补贴成本吞噬利润。\n\n现金流承压的连锁反应\n\n自由现金流锐减：Q2同比降55%至220亿元，12个月滚动自由现金流仅101亿元（同比-82%）。\n\n骑手成本刚性化：15万骑手社保年化支出超45亿元，叠加“0元购”监管约谈后补贴转向隐蔽化。\n\n四、最大机遇：三驾马车重构增长天花板\n\n国际化：185亿并购撬动欧洲市场\n\n收购Ceconomy：22亿欧元（约185亿元）并购MediaMarkt/Saturn母公司，获取欧洲12国1000家门店网络，可改造为即时零售前置仓。\n\n全球织网计划：海外仓覆盖23国，沙特自营品牌Joy Express实现当日达，跨境业务目标三年引入1000个海外品牌。\n\n技术底座：1500亿研发的长期主义\n\n智能仓储革命：“智狼”系统实现秒级拣货，仓内效率提升30%，物流成本占比仅微增至6.2%。\n\nAI商业化落地：京东健康AI医生服务超5000万用户，3D广告技术提升营销转化率。\n\n线下业态：万店计划打通“最后一公里”\n\n全渠道网络：京东MALL（24家）、3C门店（3000家）、养车店（2500家80%盈利）形成多业态矩阵。\n\n折扣店下沉：宿迁、涿州试点全品类折扣超市，对标Costco模式。\n\n五、最大挑战：补贴依赖症与生态协同的平衡术\n\n外卖恶性竞争的不可持续性\n\n监管重拳出击：7月因“0元购”遭约谈，行业单均补贴仍达10-15元，美团、饿了么伺机反扑。\n\n盈利模型待验证：七鲜小厨虽复购率高，但租金、人力全包模式推高固定成本，万家门店年化投入超30亿元。\n\n零售基本盘的三重压力测试\n\n国补退坡风险：家电收入23.4%增长依赖“以旧换新”政策，若退坡或致增速腰斩。\n\n品类增长分化：日百增速（16.4%）低于带电品类，商超竞争陷入胶着。\n\n六、核心优势VS致命劣势：供应链壁垒VS现金流困局\n\n维度\n\n优势劣势\n\n供应链实力\n\n基础设施资产1700亿元，仓储周转效率行业第一\n\n物流成本同比+28.6%，人力成本刚性上升\n\n用户生态\n\n外卖引流提升活跃度40%+，年轻用户占比增至35%补贴用户占比过高，自然留存率未披露技术储备累计研发投入1500亿元，智狼系统降本增效显著技术回报周期长，2025Q2研发开支53亿元（+25.7%）现金流能力现金储备2234亿元，回购15亿美元护盘自由现金流同比-56%，新业务年化烧钱率超500亿元\n\n七、未来胜负手：三阶段战略路径图\n\n短期（2025Q3-Q4）：止血与协同验证\n\n外卖减亏：压缩单均亏损至5元内，七鲜小厨单店日均订单突破1500单。\n\n现金流管理：暂缓非核心投资，确保自由现金流回正。\n\n中期（2026）：生态盈利模型跑通\n\n外卖毛利率转正：依赖供应链整合（中央厨房+预制菜）降本30%。\n\n欧洲整合收益：Ceconomy门店改造前置仓，跨境业务收入占比突破10%。\n\n长期（2027+）：技术驱动利润率修复\n\nAI降本：物流人力成本占比降至15%以下（当前21%）。\n\n全球化ROE：海外业务贡献25%利润，对冲本土竞争压力。\n\n京东2025-2027关键指标阈值\n\n指标\n\n2025目标\n\n2026目标\n\n警戒线\n\n外卖单均亏损\n\n<5元\n\n盈亏平衡\n\n>8元\n\n自由现金流\n\n>150亿元\n\n>300亿元\n\n<100亿元\n\n海外收入占比\n\n8%\n\n12%\n\n<5%\n\n结语：在闪电战与持久战间走钢丝\n\n京东的半年报呈现一场教科书级的战略博弈：以短期百亿亏损为赌注，押注外卖业务重构用户生态，换取突破增长天花板的可能性。当2500万日单量点燃增长引擎时，现金流警报却拉响生存倒计时。未来三年，京东需在三个战场证明自己：\n\n成本战场：将外卖亏损压缩至可持续区间（单均亏<3元）；\n\n技术战场：让1500亿研发投入转化为履约成本结构性下降；\n\n全球化战场：以Ceconomy为支点撬动百亿级海外利润池。\n\n“所有伟大的战略，终要回答一个朴素问题：烧掉的钱能否变成护城河里的水？”——京东的答案，藏在下一份财报的现金流数字里",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-15 21:36",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 67,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "f140dc70987576b0feee69bbdb9abb83717626fe5e3d6f06b75b92e0be998d44",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-78d53f98afa84e7e5654",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "research",
+    "source": "国信证券；张伦可、王颖婕；东方财富承载原研报PDF",
+    "time": "2026-03-11",
+    "title": "2025Q4点评：京东零售业绩稳健，2025年股东回报率10%",
+    "content": "本季度收入稳健增长： 本季度公司实现营业收入 3523 亿元， 同比+1.53%，分拆看，1）本季度京东零售收入 3019 亿元，同比-2%，主要受带电品类拖累。我们测算自营收入同比-3%，其中带电品类收入增速-12%，商超品类增速约 12%。自营增速环比持续显著回落，主要受国补政策退坡及 Q4 多地补贴额度用尽影响，带电品类销售动能减弱。本季度平台活跃用户数及购物频次均实现 30%以上增长。2）京东物流收入 635 亿元，同比+22%，延续稳健增长。3）新业务收入 141 亿元，同比+201%，主要受京东外卖业务快速增长推动， Q4 外卖单量环比进一步提升。 值得一提的是， 零售与外卖业务的协同效应开始体现， Q4 外卖业务为广告业务贡献 2-3%的增量收入。\n\n公司利润： 公司 non-GAAP 净利润 10.8 亿元， non-GAAP 净利率 0.3%， 与去年同期相比下降 3pct。其中经调 EBITDA 利润率从 3.6%降至-0.2%。\n\n分业务看，京东零售经营利润率 3.2%，同比下降 0.1pct，我们推测主要由于营销费率小幅提升（国补退坡后平台提升自补比例）。京东物流经营利润率 3.0%， 低于去年同期的 3.50%， 新业务经营亏损约 148 亿元，亏损绝对值较 Q3 的 157 亿元略有收窄，我们测算本季度京东外卖亏损约 100 亿元，日均单量升至 1900 万单，单均亏损收窄至 7.3 元。未来外卖业务将以减亏为核心目标，预计 2026 年启动佣金收取后将加速减亏进程。此外国际业务和京喜亏损环比小幅提升。\n\n股东回报：2025 年股东回报约 10%。1）回购：2025 年公司回购 30 亿美元，占截至 2024 年 12 月 31 日流通普通股 6.3%，股份回购计划下剩余金额约为 20 亿美元。2）股息：2025 年公司每股 ADS 派发 1 美元，股息总额预计约为 14 亿美元。\n\n投资建议： 维持“优于大市”评级。我们保持 2026-2027 年公司收入预测不变，新增 2028 年收入预测 15793 亿元；调整 2026-2027 年公司经调净利分别为 299/417 亿元， 调整幅度为+1%/+25%，主要反映京东零售经营稳健以及外卖业务持续减亏， 新增 2028 年经调净利预测 454 亿元， 目前公司对应 26 年 PE 约为 10x，维持“优于大市”评级。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-03-11",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 68,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "78d53f98afa84e7e5654a29fa9d39850f558da9bf8175397fc616ae5e6eee4bf",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-48eed89b0e76ed763706",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "social",
+    "source": "雪球；数字炼金术士",
+    "time": "2025-08-15",
+    "title": "无独立标题",
+    "content": "120多持有了几天美团感觉不对劲，还是换回去快手了。京东的财报也出来了，外卖打的直接少了一半利润，真是衰败\n\n评论与回复：\n\n买入买入在买入2025-08-15 12:10 · 北京\n\n其实这种外卖大战最伤的就是中概互联这种基金，基本等于池子里三家公司的利润全部烧掉给了消费者。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-15 11:57",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 69,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "48eed89b0e76ed763706545c18234443a1bc81f0af3cfbf9082f75ace989dd69",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-3c4f5a600f3005fbf151",
+    "company": "09618_hk",
+    "company_name": "京东集团（JD.com, Inc.）；09618.HK；NASDAQ: JD",
+    "tickers": [
+      "09618.HK",
+      "NASDAQ: JD"
+    ],
+    "type": "social",
+    "source": "雪球；不明真相的群友",
+    "time": "2025-08-15",
+    "title": "京东2025年第2季度业绩电话会议纪要",
+    "content": "一、业务回顾\n\n第二季度京东实现了22%的稳健收入增长，总收入达到3567亿元人民币。强劲的增长势头主要来自我们大部分业务板块的加速发展，包括电子产品、家电、一般商品类别以及服务收入。第二季度的非国际财务报告准则净利润为74亿元人民币，相较去年同期的145亿元人民币有所下降，原因在于我们对新业务的投资的快速增长。\n\n不过，我们的核心业务——京东零售，仍继续保持健康的盈利能力。京东零售在第二季度实现了38%的运营利润年增长，达到了139亿元人民币，运营利润率为4.5%，较去年同期的3.9%有所上升。总的来说，我们对核心零售业务充满信心，并且我们包括京东外卖在内的新业务也按计划顺利推进，与我们的战略发展路线图高度一致，推动长期可持续增长。在这些业绩的背后，我尤其受到京东团队高涨的士气和合作精神的鼓舞。团队的共同努力为我们的上升势头和战略目标的有效执行奠定了坚实基础。\n\n我想强调我们在本季度取得的三项关键进展，这些进展支撑了我们的强劲表现，并将继续推动未来的健康增长。\n\n首先，用户增长和参与度是我们在第二季度的一个重要成就。\n\n我们始终围绕用户并全力提供最佳用户体验，季度活跃用户增长明显加速，同比增长超过40%，总活跃用户数量创下新高。强劲的用户增长势头主要来源于京东零售有机用户基础的加速增长，以及京东食品配送和惊喜业务的贡献。\n\n除了用户增长，我们还看到了更强的用户参与度。特别是京东平台上的用户购物频率在第二季度同比增长超过40%，这一增幅相较于前几个季度有显著提高。对于京东Plus会员，他们的购物频率同比增长超过50%。这清晰地证明了我们的食品配送服务在我们最高质量的用户群体中产生了强烈共鸣。我们还在今年的618大促期间创下了破纪录的成绩，购买用户总数同比增长了两倍，订单总量超过了22亿单。\n\n用户增长和购物行为的积极势头强有力地证明了我们新业务与核心零售业务之间的协同效应，我们将继续深化协同效应并释放更大价值，预计这将增强整体用户对我们平台的粘性，并推动京东生态系统内更高的生命周期价值。\n\n其次，我们的核心业务——京东零售，继续在进一步加强供应链能力的支持下稳步增长。第二季度，京东零售在收入和利润上都实现了强劲的增长。\n\n具体来说，电子产品和家电在本季度继续保持强劲的增长，收入同比增长23%。这反映了我们日益强大的供应链优势，使我们能够进一步增强采购能力，提供丰富的产品选择、竞争力价格和卓越的服务。这些优势使我们在行业中处于领先地位，无论是在交易活动期间还是日常运营中，我们都展现了强大的竞争力。我们的综合商品业务在第二季度也交出了强劲的成绩单，收入同比增长15%，尤其是在我们的供应链优势的推动下。我们的超市业务更是将其连续六个季度的双位数收入增长延续了下来。同时，时尚类业务也保持了双位数的收入增长。\n\n第二季度，京东零售的强劲收入增长伴随着更强的运营利润和利润率的提升，朝着长期目标稳步推进。京东零售盈利能力的持续提升主要得益于我们更强大的供应链能力，这最终转化为更好的用户体验、更低的成本和更高的运营效率。\n\n第三，我们对新业务的健康发展感到鼓舞。京东食品配送业务自推出以来经历了快速增长，第二季度日订单量呈指数级增长，并成功达成多个关键里程碑。\n\n我们在招募优质商户方面取得了显著进展，且全职配送员的数量迅速增加。\n\n更重要的是，京东食品配送开始与我们的核心零售业务产生明显的协同效应。除了刚才分享的用户相关的洞察，我们还在积极利用食品配送业务带来的交叉销售机会。特别是食品配送、超市、生活方式服务和电子配件等类别都从这一趋势中受益。\n\n此外，随着食品配送业务的扩展，我们相信它将进一步丰富本地商户的供应，并为我们的所有支付商户带来更多的用户流量和参与度，帮助在我们的平台上建立一个更加动态和全面的生态系统。对于京东，当前食品配送业务的优先任务是提升核心系统能力，从优化订单调度算法到完善运输规划技术，所有这些努力都旨在增强京东食品配送的能力，更好地服务用户，并推动商户的流量和用户增长。得益于这些努力，我们非常高兴看到，尽管行业形势复杂，京东食品配送仍然保持着健康的订单量增长，尤其是在餐饮订单方面。我要再次强调，我们并不将食品配送业务视为独立的业务，而是它与京东的更广泛生态系统深度融合。我们旨在进一步释放京东食品配送与京东零售、京东物流以及其他生态业务之间的协同效应。这正是我们未来战略重点所在。我们将继续专注于战略优先事项，并根据食品配送市场的动态发展，进行高效的投资。\n\n除了在国内市场稳健运营和逐步上升的市场地位外，我们也在积极寻找全球增长机会，并迈出了令人激动的早期步伐。走向全球是京东的长期愿景，并具有战略价值，我们旨在利用京东在供应链知识和技术方面的独特优势。近年来，京东零售、京东物流和京东地产等都在测试和建立海外零售模式、仓储网络、运输基础设施和本地运营能力，尤其是在欧洲和中东地区。随着我们的国际化进程推进，我们将分享更多关于国际业务发展的信息。\n\n总结来说，第二季度是一个非常富有成效的季度。我们交出了不错的短期业绩，并加强了我们的长期战略定位。我们的核心零售业务实现了收入的加速增长，同时利润扩张，凸显了基于供应链的零售商业模式的韧性。第二季度还标志着我们长期发展的一个重要里程碑，一些关键举措在国内外稳步推进，并开始显现出早期的实质性成果。\n\n二、财务数据\n\n第二季度，我们在核心零售业务中实现了强劲的收入增长和稳健的利润改善。我们的总收入同比增长22%，较上季度进一步加速，显著超过了中国整体零售销售的增长。我们看到大多数业务线都有两位数的增长，包括电子产品、家电、一般商品以及服务收入，这些领域的增长势头较前几个季度加速。\n\n关于盈利能力，我们的毛利率在第二季度达到了15.9%，这是连续第13个季度的毛利率同比扩展，主要得益于我们核心零售业务的表现。我们的non GAAP净利润率下降至2.1%，主要是由于我们在食品配送业务上的投资。尽管短期盈利受到战略投资的影响，但我们仍然相信这些努力将为公司持续增长和长期价值创造打下基础。\n\n接下来，我们来看一下第二季度的财务业绩。我们的总收入继续保持强劲的增长势头，第二季度总净收入同比增长22%，达到了3567亿元人民币。按业务划分，产品收入增长21%，其中电子产品和家电收入同比增长23%，一般商品收入同比增长16%，这表明电子产品和家电业务的增长势头较前几个季度有了显著加速。\n\n在政府持续的刺激政策和国内消费复苏的推动下，京东在这些品类上有着强大的竞争优势，包括用户基础、强大的产品供应能力以及卓越的执行能力，这些优势使我们能够有效支持地方政府的促销活动。主要品类如超市、时尚、家居和健康等在第二季度实现了两位数的收入增长。我们继续看到超市业务的巨大增长潜力，并且对在这一品类中提供优质体验、最佳产品组合、价格和服务保持充足的信心，同时维持健康的增长势头。\n\n服务收入在第二季度实现了显著加速，同比增长29%。其中，市场和营销收入的增长率为22%，这是连续六个季度的加速增长。无论是佣金收入还是广告收入，都保持了两位数的增长势头，平台生态系统的主要运营指标在商户基础和用户参与度方面也取得了显著进展。物流及其他服务收入同比增长34%。物流和其他服务的增长率是第二季度的最高点，主要得益于我们食品配送业务的扩展，带来了额外的配送收入。\n\n第二季度，京东零售的收入同比增长21%，主要得益于我们多个关键品类的出色表现。此外，京东零售继续实现毛利率的同比增长，这一趋势已持续13个季度。这一强劲的业绩主要得益于我们供应链能力的持续提升。在第二季度的运营收入方面，京东零售的非GAAP运营收入同比增长38%，达到了139亿元人民币，运营利润率提升56个基点，达到了4.5%，保持稳步上升的趋势。我们有信心进一步巩固市场领先地位，并推动稳健的利润提升。\n\n关于京东物流，第二季度京东物流收入同比增长17%，无论是内部还是外部收入，都保持了数字化增长的势头，京东物流继续加大对用户体验的投资。尽管第二季度京东物流的non GAAP运营收入下降了10.3%，降至20亿元人民币，但京东物流仍将重点投资于最后一公里的提货和配送能力以及路线优化。这些有针对性的投资预计将在长期内为提高效率和利润率奠定基础。\n\n关于新业务，第二季度新业务收入同比增长三倍。与此同时，其非GAAP运营亏损扩大至148亿元人民币，主要由食品配送和京喜业务的快速扩展所推动。尽管短期财务影响较大，但食品配送业务已驱动了显著的流量和用户增长，并大幅提升了用户的购物频率。我们还观察到与核心零售业务的交叉销售明显上升。\n\n展望未来，我们将继续专注于商户供应、配送效率和用户体验的提升，推动食品配送业务的进一步发展。此外，我们的京喜业务在第二季度也实现了显著增长，特别是在向低线城市渗透，扩大性价比产品的供应。\n\n对于整体的利润表现，第二季度我们的毛利润同比增长23%，达到566亿元人民币。我们已经连续13个季度实现毛利率的同比扩展，第二季度达到了15.9%。这主要得益于京东零售毛利率的提升，显示了我们核心业务的高质量发展。非GAAP净收入为74亿元人民币，同比下降49%，非GAAP净利润率降至2.1%。这一短期的利润压力主要反映了我们对食品配送业务的战略投资。\n\n截至第二季度末，我们过去12个月的自由现金流为人民币100亿元，相较于去年同期的人民币560亿元，下降主要是由于与股票回购计划相关的现金支出以及第二季度末经营收入的下降。到第二季度末，我们的现金及现金等价物、受限现金和短期投资总额为人民币2230亿元。\n\n总结来说，第二季度的表现主要体现了强劲的收入增长和核心零售板块的健康毛利扩展，反映了我们在动态市场环境中的强大执行能力和日益提高的运营效率。展望未来，我们对新业务充满信心，预计它将进一步加速用户和购物频率的增长，并创造出巨大的协同效应潜力。随着核心业务持续增长并有条不紊地实施新举措，我们对长期健康增长充满信心。\n\n三、Q&A\n\nQ:随着国补的不确定性和其他平台竞争加剧，下半年和明年对家电品类的策略？\n\n国补政策落地期间，京东无论是响应能力还是表现都稳定扎实，以旧换新国补政策推进产业升级取得很好进展，国家重申政策持续，资金也分批下达，京东持续响应政策发挥积极作用，驱动力包括本身有很强供应链能力，保证稳定充足货源，系统能力也使得京东可以和政府快速对接，我们也看到京东平台上消费者很旺盛的需求，2季度带电品类消费增长超过20%。\n\n京东的差异化竞争优势并不来自国补，我们围绕产品、价格、服务来发挥供应链能力、规模优势以及全渠道优势，以实现带电品类的市占率提升。在产品结构优化方面，京东联合品牌方开发了一系列智能化的家电新品来推动产品升级，做更多产品的定制化，来满足用户品质以旧换新的需求，同时推动产业的升级；在价格优势方面，我们通过规模化的采购和定制供应链的专业能力来降低采购成本，始终致力于为用户带来更低的价格和更好性价比的商品；在服务能力方面，我们也在不断推荐送装一体，甚至回收一体，在行业里提供了以旧换新最极致的服务体验。\n\n长期来看，京东的带电品类会持续发挥供应链优势，积极推动行业升级，进一步加强用户的心智，我们也非常有信心可以持续保持增速好于行业，继续夯实和获得市场份额。\n\nQ:如何看待在外卖业务上的投入和长期决心？\n\n外卖和即时零售是京东重要的长期战略方向，我们会始终聚焦用户体验、成本、效率几个方面，持续建设和完善所有跟即时零售、外卖相关的运营和系统能力，不断优化我们的用户体验。我们看到这个行业无论是在商家端、骑手端、用户端都存在很多痛点，也正在通过品质外卖的模式去更好地满足这些用户的需求。\n\n从二季度的具体进展来看，在骑手端，京东外卖骑手规模已突破15万人，我们让全职骑手的工作更有尊严、保障，增加他们幸福感的同时，保障用户的配送体验以及订单准时率的服务体验；在供给端，京东更专注品质外卖，入驻商家已超过150万家，并且品质正餐的订单占比也在持续上升。同时，京东不断对供应链的源头进行创新，近期推出“七鲜小厨”模式，来帮助消费者吃到有品质又便宜的菜品；在系统能力上，我们的外卖研发和运营团队也在快速迭代系统能力，包括派单系统、补贴、广告系统能力的效率提升，为商家、用户提供更好的体验。\n\n经过一个多季度的运营，外卖业务正在与核心电商业务产生协同价值，而这也符合我们最初的预期。首先，外卖为京东带来了明显的流量和用户增长，在二季度用户的活跃度、用户数、购物频次等都出现了大幅提升。第二是用外卖购买核心电商品类的转化率也在持续提升，尤其是在商超等品类出现大量的交叉购买，而我们的业务团队也在更大力度地来推动内部的协同。在二季度我们建设了算法系统方面的交叉购买的能力，在三季度这些工具会陆续上线。第三是外卖和零售在整体的市场投放和营销费用上也有很大的协同空间，我们团队也会权衡各个不同渠道的投放的ROI，来提升整体的营销效率。\n\n我们认为即时零售是各类消费场景的补充，它可以满足用户对于应急性商品的需求，但在产品丰富度和性价比上，传统的核心电商业务有更大优势，所以在整个零售大盘中，我们认为即时零售是核心电商或整个零售业务的较好补充。京东的超市团队也在积极布局即时零售，进一步丰富用户多场景的需求。同时，在核心电商业务里面，我们会持续地去打造和加强经营能力。长期来看，我们对日百品类的持续的增长充满信心，并且这些品类在今年的增长是没有国补的影响下的业绩，核心得益于团队经营能力的提升，这将成为我们长期的增长驱动力。\n\nQ:如何看待UE的长期改善？\n\n7月以来，行业竞争加剧。我们认为这些过度竞争的行为并没有产生模式的创新，也不给行业带来增量的价值，反而在一定程度上扰乱行业的价格体系，给商家带来了很多困扰，因此是不可持续的。\n\n现阶段，京东更多精力在完善平台系统，去提升用户、商家和骑手的体验。我们看到自己外卖业务的UE正在逐步改善，接下来针对不同地域和用户群体更加精细的促销策略、规模效率所带动履约效率的提升，还有系统能力的提升，都将带动外卖业务自身的盈利能力的提升。\n\n长期来看，我们追求可持续发展的商业模式，外卖也会逐渐释放规模效应来改善效率。同时我们也会持续释放外卖和核心零售业务之间的巨大的协同潜力，为整个集团长期健康的增长来提供动力。\n\nQ:新业务投入的方向是什么？对收入增长、利润以及派息、回购的影响？\n\n新业务创新方向有两类，一类是商业模式的创新，比如外卖、京喜、国际业务等；另一类是用新技术改善现有业务模式，比如AI在零售业务中的应用，物流自动化的提升等。内部创新整体围绕供应链展开，以用户体验为核心，做核心业务的自然延申。\n\n除国内市场外，国际化是京东长期目标和重要战略，我们希望构建起全球的更高效零售及物流履约网络，来为全球的消费者带来极致的购物体验，成为全球领先的零售商。我们相信所有新业务和新业务模式都会进一步加强京东的供应链优势、提升用户体验，以实现长期健康增长。我们也会关注投入效率和可持续的增长，对于一些新业务模式，我们本着小布快跑的模式去探索和驱动发展。\n\n上半年回购总额是15亿美金，总计划是35美金额度。京东已连续4年分红，今年4月派发14.4亿美金，接下来也会持续进行年度分红，未来我们也会继续通过增长分红和回馈股东。我们将持续深耕核心业务，积极投入，开拓新的增长曲线，构建长期可持续增长的商业模式，以推动公司实现收入和利润长期的稳健增长，并持续与股东共享业务发展的成功。\n\nQ:日百品类的持续增长的核心驱动因素？\n\n日百品类已连续四个季度收入稳健加速，其中贡献最大的商超品类已经连续六个季度实现双位数增长。主要驱动因素是采销团队不断强化的经营能力，我们坚信这将持续推动商超品类的稳健增长。\n\n接下来主要的增长策略，一是继续强化自营能力，以京东特有的业务模式和差异化能力，不断降低采购成本，提升供应链效率，为用户带来更好的商品和更低的价格。第二是提升用户的转化，目前我们初步看到外卖的用户在商超品类的跨品类购买，面对外卖给我们的巨大流量，京东的商超品类也将优化自己的运营，更好来承接外卖用户的需求。\n\nQ:用户增长趋势、新用户画像和留存？下一步用户的长期策略？\n\n二季度季度购买用户数和用户购频的同比增速都超过50%，是这几年用户最强劲的增长势头。一方面零售自身的获客及留存效率也在持续提升，核心得益于过往两年在低价心智和平台生态的努力，带来更加丰富的供给和更好的体验，提升转化效率。持续完善的内容和互动等精细化运营也帮我们更好吸引和留存用户；\n\n另一方面，京东外卖上线不到半年的时间，已经快速起量，对京东整体的流量、频次带来新的增长驱动力。外卖给我们带来了更多的年轻用户，并且对Plus会员的拉动更加明显，二季度Plus会员的购频同比增长超过50%。我们会加快外卖向即时零售和B2C电商的交叉销售，包括针对老用户的促活和新用户的电商转化，将带动京东整体购物用户数量和购频的快速增长。\n\n长期来看，京东的目标始终是为全中国10亿电商用户提供更优质的购物体验，并在供应链里实现更低的成本和更高的效率。我们看到在服务用户的多元化场景、商品和服务类目以及服务用户的能力上有很多提升空间，我们也在持续投入，驱动京东的用户规模和用户价值的长期可持续增长。\n\nQ:如何看待盈利水平和利润率？\n\n京东短期利润率可能随着行业竞争及自身业务的头部节奏出现波动，但长期利润率达到高个位数的目标坚定不变，特别是核心零售业务的利润率趋势非常健康。核心零售可以持续提升盈利的驱动力，包括自营带来的供应链效率的提升。我们持续为供应链的上下游降本增效的同时，也会带动利润的改善，包括提升商品的毛利率和物流成本的降本增效。另一方面，商超等品类的利润率仍然有很大的提升空间，相对成熟的带电品类的利润率也有小幅提升空间。在平台生态，随着3P业务在整个京东长期占比的不断提高，佣金和广告收入也将保持快速增长，带来利润率的持续提升。\n\n在新业务的投入上，我们的思考核心是为京东进一步突破增长的天花板，打开更大的增长空间，我们相信会带来用户GMV和利润的长期增长。前期投入布局的周期会短期影响集团的利润率，长期来看新业务会逐步转化成新的增长驱动力，并产生与核心业务更大的协同价值，最终产生更大的利润空间。\n\n在投入的过程中，我们会持续关注投入的策略，保持投入的纪律性，关注回报率、ROI，而后根据效果动态循环。\n\nQ: 京东在海外业务扩张未来几年的战略？\n\n国际化一直都是京东的重要战略，与其他的跨境电商模式不同，京东的国际业务会更加聚焦供应链能力。一方面我们希望能够抓住中国优质品牌出海的机遇，帮助众多的优秀的中国品牌高效地拓展海外市场，也为海外的用户提供高性价比的商品。另一方面京东也将坚持本地化，打造本地零售和电商业务，建立本地团队和员工，本地采购、本地发货，与当地市场的参与者建立长期的共赢关系。而且我们会更加侧重于品牌、有品质的商品。京东在欧洲其实已经耕耘了几年时间，这二年以来我们也在创新和试点在欧洲本地的创新零售业务，在今年晚期时候，我们也会升级成为交易品牌，到时候也会跟大家分享更多的进展。\n\n关于收购Ceconomy，那我们认为其在欧洲本地市场所建立的品牌力、供应链能力和市场地位对京东来讲具有很大的价值，而我们的线上电商运营和技术能力也能够和他们的能力进行相互互补，目前交易仍需要进一步审批",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-08-15 15:13",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 70,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "3c4f5a600f3005fbf151edf5df32c29a7b27527ce16ea2db10d764baa7251190",
+      "verification": "source_not_independently_verified"
+    }
+  }
+]

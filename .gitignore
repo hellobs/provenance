@@ -254,3 +254,9 @@ provenance/frontend/static/assets/village/maze.json.bak*
 # 落在 ../.trae/ 的 plans/skills/documents 是 IDE 工作状态,不是本仓文档。
 # 它已进 doc_audit.py 的 SKIP_DIRS;这里补 gitignore,免得 `git add .` 吃进来。
 .trae/
+
+# Versioned input corpus (the broad data/ rule above is for runtime archives).
+!provenance/case01/data/
+provenance/case01/data/*
+!provenance/case01/data/financial/
+!provenance/case01/data/financial_sources/
