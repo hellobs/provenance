@@ -49,6 +49,24 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     rout = _refl.run_router(router, ref["text"])
     record["router"] = {"raw": rout["raw"], "issues": rout["issues"],
                         "expert_pool_version": rout.get("expert_pool_version", "")}
+    # 04 §五 问的是"这条的 Router 由谁执行"。批路径 10-08 已经把答案落进产物
+    # (`router.executed_by`),而**演示那一面走的是这条路** —— 以前它一个字都不写,
+    # 于是面板/报告对小镇记录只能说"该条跑在字段落地之前",那是**错的解释**
+    # (它不是早于字段,是这条路本来没写)。身份一律用共享的 `router_identity()`
+    # 从对象属性探测,不读配置字符串 —— 与批路径同一份实现。
+    from mavis_case01_injector.llm import router_identity
+    executed_by = dict(router_identity(router))
+    # source 只描述**这条路自己的**选择方式,不与批路径那四个词
+    # (reflect_router / shared_router_llm / local_by_config / local_fallback)混用:
+    # 小镇面从不查 `CASE01_ROUTER_PROVIDER`,所以它没有"按配置刻意本地"这一档。
+    executed_by["source"] = ("injected_router" if router_llm is not None else
+                             ("external_router_flag" if external_router else "local_default"))
+    executed_by["separate_client_from_reflection"] = router is not local
+    executed_by["external_api"] = executed_by.get("provider") == "api"
+    record["router"]["executed_by"] = executed_by
+    print("[case01.pipeline] Router 后端={} {}@{}(与反思共用客户端={})".format(
+        executed_by["source"], executed_by["model"], executed_by["host"] or "local",
+        not executed_by["separate_client_from_reflection"]))
     # 截断不许静默:反思/路由的答案被 max_tokens 截断时,记录本身要带这一条
     # (manifest 段是"这次跑有什么不对"的既有落点)。工具:case01/tools/reflection_audit.py
     # 算法与清单侧共用 `truncation_counts`(此前两边各写一份、两套文案,同一个

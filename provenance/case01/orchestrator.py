@@ -234,9 +234,13 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     # 以后两条批的措辞/分支分布对不上时又只能靠猜(= #13 那条陷阱)。
     from .agents.investment_ai import REASONING_HINT, SYSTEM_PROMPT, reasoning_hint_on
     _hint = reasoning_hint_on()
+    # 哈希对象是**模板本身**(未代入 `{current_date}` 的 SYSTEM_PROMPT + 可选 hint),
+    # 不是发出去的那段正文:正文每轮都带模拟日期,哈希会逐条变,就当不了"这一批的条件指纹"了。
+    # 键名 10-08 由 `ai_system_prompt_sha8` 改为 `ai_system_template_sha8` —— 旧名会让读者
+    # 以为能还原发给模型的原文,而它还原不了(#59:字段名不许超出测量对象)。
     rec.data["prompt_flags"] = {
         "ai_reasoning_hint": _hint,
-        "ai_system_prompt_sha8": hashlib.sha256(
+        "ai_system_template_sha8": hashlib.sha256(
             (SYSTEM_PROMPT + (REASONING_HINT if _hint else "")).encode("utf-8")
         ).hexdigest()[:12],
     }

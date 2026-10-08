@@ -26,7 +26,8 @@
 - `/review`            面板页(带大标题)
 - `/embed/review`      嵌入面:同一页,压缩版式,贴合 iframe
 - `/review/expert`     专家审核面板(**判**的那一面,参照实现,见 `expert_review_app.py`)
-- `/embed/expert`      同一页的嵌入版式;平台 iframe 若已有自己的界面可忽略这两条
+- `/embed/expert`      **只是别名,没有压缩版式**(压缩逻辑在 `review_app` 这边,`expert_review_app`
+                       没接);iframe 请直接用 `/review/expert`,平台已有自己的界面就两条都忽略
 - `/api/review/health` 本面板自己的健康检查(避开实时面的 `/health`)
 - `/api/review/runs`   记录列表(+ 当前实跑 run_id,用于提示"这条还没成品记录")
 - `/api/review/run/<id>`  单条记录全文(白名单校验,杜绝路径穿越)
@@ -46,9 +47,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _resolve_runs_dir() -> str:
-    """记录根:环境变量优先(**须绝对**),否则 case01/runs。
+    """记录根:环境变量(**须绝对**)优先,否则仓根 `data/case01/runs`。
 
-    可覆盖是因为 case01/runs/ 是 gitignored、CI 的全新 checkout 里没有它,
+    可覆盖是因为记录目录不入库、CI 的全新 checkout 里没有它,
     测试要指向入库的 tests/fixtures/records —— 这与 case01/viz.py 的
     `load_run(run_id, runs_dir=...)` 是同一个道理。
 
@@ -286,6 +287,28 @@ def get_run(run_id: str, safe: int = 0):
 #   第十五轮补:页签可用性用 AVAILABLE_TABS(安全模式去掉实验相关页签),
 #   深链与宿主消息都按它判断 —— 以前那句守卫写在读 WANT_TAB 之前是死代码,
 #   于是 /embed/review?tab=injector 会把主区域渲染成导航里根本没有的那一块。
+#   2026-10-08 补 paneOverview 里那两行(!SAFE 分支的"Investment AI 提示形态"与
+#   "Router 后端"):它们是 #54/#55 拍板要落进产物的**实验条件**,平台侧会当场问
+#   (04 §五 要求 Router 是独立 API 模型;#55 问带没带来源可信度清单)。此前字段
+#   在 run.json 里、页面上却没有,于是只能回去翻 analysis.json。按契约这类实验条件
+#   不进专家视图,所以只在内部面渲染。指纹那行**按 _sha8 后缀取**而不是点名键名:
+#   `ai_system_prompt_sha8` 今天改名为 `ai_system_template_sha8`(哈希对象是模板而非
+#   发出去的正文),点名旧键会让 10-08 那批记录显示成"没有",而真相是"键名不同"。
+#   同一次还修了"引擎记录"那一格与"节点 / 注入器"那行:以前没有注入器段就一律写
+#   "旧引擎",于是今天**批量跑**出来的记录(case01.tools.batch_run → orchestrator,
+#   名字以 batch- 开头)被标成历史遗留。内部面按 run_id 前缀说清是哪一种;专家面只换成
+#   不带机制词的"批量运行",既不再谎称旧引擎,也不多发一个实验词。
+#   2026-10-08 晚(#71):"Investment AI 提示形态"那行的**空值成因有两种**,以前一句
+#   "跑在字段落地之前"把它们糊在一起,于是小镇面当天产的那条也被读成旧记录:
+#     · 代 —— 批路径(case01-run)在 10-08 之前的记录确实没有这个键;
+#     · 路 —— 小镇面(mavis 注入器映射)的 Investment AI 台词由镇内引擎的 agent 写,
+#       **不经** case01/agents/investment_ai.py 那份 SYSTEM_PROMPT/REASONING_HINT,
+#       所以那个开关在它身上没有对应物,再新的记录也不会带。
+#   判据用记录里已经算好的 hasInj(=有注入器段,或 ENGINE_OF 标了 mavis),JS 里**没有**
+#   新写 injector/branch 字面量 —— 棘轮 test_expert_face_ships_no_experiment_prose 数的
+#   正是 served HTML 里这两个词的字面次数(注释也算),所以这段说明留在 Python 侧。
+#   Router 后端那行不改文案:小镇面从同一次改动起在 pipeline._attach_reflection 里用
+#   同一个 router_identity() 落 executed_by,那之前映射的小镇记录"跑在字段之前"是真话。
 #   两条相关守卫:case01/tests/test_review_app.py 的棘轮(专家面源码里的机制名只许维持)
 #   与 test_review_panel_probe.py(用 node 探针真跑页面 JS 查深链行为)。
 _PAGE = r"""<!DOCTYPE html>
@@ -568,7 +591,10 @@ function paneOverview(d) {
     ["run_id", esc(d.run_id)],
     ["引擎记录", hasInj
       ? '<span class="chip k">mavis</span>'
-      : '<span class="chip">旧引擎</span>'],
+      : (/^batch-/.test(d.run_id || "")
+          ? (SAFE ? '<span class="chip">批量运行</span>'
+                  : '<span class="chip">批路径</span> 这条不经小镇注入器那一站')
+          : '<span class="chip">旧引擎</span>')],
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
     ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
     ["判定方式", dash(ba.judge)],
@@ -587,7 +613,28 @@ function paneOverview(d) {
     rows.push(["节点", `<span class="num">${dash(s.node_count)} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</span>`]);
     rows.push(["交互", `<span class="num">interaction_started ${dash(s.interaction_started)} · 重试 ${dash(s.retries)} · 耗时 ${dash(s.elapsed_s)} 秒</span>`]);
   } else if (!SAFE) {
-    rows.push(["节点 / 注入器", '该记录早于 mavis 路径，<b>没有 <code>injector</code> 与 <code>summary</code> 段</b>；不是"0 个节点"']);
+    rows.push(["节点 / 注入器", /^batch-/.test(d.run_id || "")
+      ? '这条是<b>批量跑</b>的产物(不经小镇注入器那一站)⇒ 记录里没有注入器段与节点统计；不是"0 个节点"'
+      : '该记录早于 mavis 路径，<b>没有 <code>injector</code> 与 <code>summary</code> 段</b>；不是"0 个节点"']);
+  }
+  if (!SAFE) {
+    const pf = d.prompt_flags || {}, rb = (d.router || {}).executed_by || {};
+    const sha = Object.keys(pf).filter(k => /_sha8$/.test(k))
+                  .map(k => `${esc(k)} ${esc(pf[k])}`).join(" · ");
+    rows.push(["Investment AI 提示形态", Object.keys(pf).length
+      ? (pf.ai_reasoning_hint
+          ? '<span class="chip k">带来源可信度清单</span>'
+          : '<span class="chip">不带来源可信度清单</span>')
+        + (sha ? ` <span class="m">模板指纹 ${sha}</span>` : "")
+      : (hasInj
+          ? '<span class="chip">不适用</span> 这条由小镇面产出:镇内 Investment AI 的台词不经那份模板 ⇒ 这个开关在它身上没有对应物'
+          : '<span class="chip warn">未记录</span> 该条跑在提示形态记入产物之前(2026-10-08 起新记录才带)')]);
+    rows.push(["Router 后端（04 §五 要独立 API）", rb.source
+      ? `${esc(rb.source)} · ${dash(rb.model)}`
+        + ("external_api" in rb ? ` · 外部 API ${rb.external_api ? "是" : "否"}` : "")
+        + (rb.separate_client_from_reflection === false
+            ? ' <span class="chip warn">与反思共用同一个客户端</span>' : "")
+      : '<span class="chip warn">未记录</span> 该条跑在 Router 后端记入产物之前']);
   }
   if ("compat" in d) {
     rows.push(["记录完整度", `compat.level=${dash(cp.level)} · 缺键 ${((cp.missing_keys || []).length)} 个 · 反思已附 ${esc(cp.reflection_attached)}`]);

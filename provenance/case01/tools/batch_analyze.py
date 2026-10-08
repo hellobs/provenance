@@ -47,18 +47,21 @@ import argparse
 import glob
 import json
 import os
+import sys
 from typing import Dict, List, Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CASE01_DIR = os.path.dirname(HERE)
 PROV_DIR = os.path.dirname(CASE01_DIR)
-RUNS_DIR = os.path.join(CASE01_DIR, "runs")
 # 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
-try:
-    from case_engine.paths import data_root as _data_root
-    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
-except Exception:  # noqa: BLE001
-    pass
+# 原先包在 `try/except: pass` 里,而**脚本形态**(`python case01/tools/batch_analyze.py`)的
+# sys.path[0] 是 `case01/tools`,import case_engine 必然失败 ⇒ 异常被吞、静默用老根,
+# 于是同一份代码换个敲法就得出不同结论(261008 实测:那批明明有 `router.executed_by`
+# 与 `prompt_flags`,报告却说"跑在这些字段落地之前")。老根不该当兜底答案。
+sys.path.insert(0, PROV_DIR)
+from case_engine.paths import data_root  # noqa: E402
+
+RUNS_DIR = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 BATCH_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 
 # 答辩基线(25 条小镇面记录;记录内无模型字段,身份只能推断)——只作量级参照
@@ -366,6 +369,10 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
 
     return {
         "title": title,
+        # 本表扫的是**哪一个记录根**(2026-10-08 补)。"字段落地之前""0 条"这类结论
+        # 全部依赖根解析对了,而它此前只写在代码注释里、产物里没有 ⇒ 报告的身份无主:
+        # 读者拿到一份 analysis.json,没法判断它是从新根还是老根扫出来的。
+        "runs_root": RUNS_DIR,
         "n_runs": n,
         "n_unreadable": bad,
         # 一手对账(2026-10-05,体检 G1):台账与一手产物不等时非空,机器可读。
@@ -394,9 +401,15 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
             # 清单"是一个**实验条件**,不是实现细节:两条批的措辞/分支分布对不上时,
             # 先看这两个字段,别再去猜。2026-10-08 之前的记录没有 prompt_flags ⇒ 读成
             # "该批跑在字段落地之前",不能读成"当时没带 hint"。
-            "ai_system_prompt_sha8": sorted({
-                (r.get("prompt_flags") or {}).get("ai_system_prompt_sha8", "")
-                for r in rows} - {""}),
+            # 汇总**整份 prompt_flags** 而不是点某一个键名:键名 10-08 由
+            # `ai_system_prompt_sha8` 改成了 `ai_system_template_sha8`(哈希对象是模板,
+            # 不是发出去的正文),而点名一个旧键会把"新旧两代记录键名不同"报成"这批根本没
+            # 这个字段" —— 正是本文件刚修掉的那类假结论。
+            "prompt_flags_variants": _dist([
+                json.dumps(r.get("prompt_flags") or {}, sort_keys=True,
+                           ensure_ascii=False) for r in rows]),
+            "prompt_flags_keys": sorted({k for r in rows
+                                         for k in (r.get("prompt_flags") or {})}),
             "n_rows_without_prompt_flags": sum(
                 1 for r in rows if not r.get("prompt_flags")),
         },
@@ -582,7 +595,11 @@ def _md(a: Dict) -> str:
         "- Router 后端(04 §五 要独立 API 模型):{}".format(
             ", ".join("{}→{}次".format(k, v)
                       for k, v in sorted(r.get("router_backend_dist", {}).items()))
-            or "(这一批跑在 `router.executed_by` 字段落地之前,后端无从可查)"),
+            # 空表有两种成因(记录本身没有该字段 / 根本没扫到记录),必须把条数与根一起打出来,
+            # 否则"字段落地之前"这句假结论会顶着真结论的格式出现。
+            or "(本批 {} 条没有一条带 `router.executed_by` ⇒ 这些记录产在该字段落地之前"
+               "(批路径 2026-10-08 起带;小镇面那条路 10-08 晚起才带),后端无从可查;"
+               "记录根:{})".format(a["n_runs"], a.get("runs_root") or "(未记录)")),
         "",
         "## 4. 一致性",
         "",
