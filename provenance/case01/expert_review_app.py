@@ -95,12 +95,24 @@ def expert_queue(limit: int = 10):
     建单资格 —— 否则平台和面板看到的是两套判据,而它们会分叉。
     """
     from .review_export import build_review_package
+    from live.reflections import load_marks
+
+    # 每条任务已有几份意见、结论是否一致(只到状态为止,见 _review_state 的说明)
+    n_by_task, verdicts_by_task = {}, {}
+    for m in load_marks():
+        rv = m.get("review") if isinstance(m.get("review"), dict) else {}
+        k = "|".join([str(rv.get("run_id", "")), str(rv.get("issue_id", "")),
+                      str(rv.get("expert_category_id", ""))])
+        n_by_task[k] = n_by_task.get(k, 0) + 1
+        verdicts_by_task.setdefault(k, set()).add(str(m.get("verdict", "")))
+    pool_rows, pool_at = _pool_rows()
 
     picked, scanned = _recent_runs(limit)
     tasks, triage, blocked = [], [], []
     for run_id, data in picked:
         pkg = build_review_package(data, run_id)
         for c in pkg["task_candidates"]:
+            k = "|".join([run_id, c["issue_id"], c["expert_category_id"]])
             tasks.append({
                 "run_id": run_id,
                 "issue_id": c["issue_id"],
@@ -112,6 +124,11 @@ def expert_queue(limit: int = 10):
                 # anchor:意见要落在原文哪几句上。构造偏好对时必填,见映射页 §三·补 ①。
                 "anchor": {"sentence_ids": c["evidence_sentence_ids"],
                            "quote": c["evidence_quote"]},
+                # 05 §一:任务未点开也要能看见"当前审核状态";05 §六:池状态。
+                "review_state": _review_state(n_by_task.get(k, 0),
+                                              len(verdicts_by_task.get(k, ()))),
+                "pool": _pool_state(pool_rows, run_id, c["issue_id"],
+                                    c["expert_category_id"]),
             })
         for t in pkg["manual_triage"]:
             triage.append({"run_id": run_id, "issue_id": t["issue_id"],
@@ -122,7 +139,10 @@ def expert_queue(limit: int = 10):
             "n_manual_triage": len(triage), "n_blocked": len(blocked),
             "tasks": tasks, "manual_triage": triage, "blocked": blocked,
             "verdict_words": sorted(VERDICT_ALIAS),
-            "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责"}
+            "pool_generated_at": pool_at,
+            "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
+                    "review_state 是给统筹看的状态词,不含任何一份意见的结论或文本;"
+                    "pool 来自上次 lora_prep --export 的产物(generated_at 标明新鲜度),不是实时真值"}
 
 
 @router.get("/api/expert/read")
@@ -312,6 +332,59 @@ def _training_effect(verdict: str, correction: str, thought: str, anchor: dict) 
                     "训练侧要不要把它当 chosen 属于研究侧待拍,见映射页 §三·补"}
 
 
+def _pool_rows() -> tuple:
+    """训练材料池:从 dataset_report.json 的 rows 按任务身份取(0904doc 05 §六)。
+
+    rows 里的身份是 2026-10-07 补的 —— 之前只有 verdict/ok,一个任务对不上号,
+    "进没进池"就没有证据可对。报告只在有人跑 `lora_prep --export` 时重写,
+    所以必须连 `generated_at` 一起透出来,否则读的人不知道它落后磁盘多久。
+    """
+    import case01.tools.lora_prep as lp
+
+    path = os.path.join(lp.OUT_ROOT, "dataset_report.json")
+    if not os.path.isfile(path):
+        return {}, None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            rep = json.load(f)
+    except Exception:            # noqa: BLE001 —— 读不动就照实说读不动
+        return {}, "unreadable"
+    by_task = {}
+    for row in rep.get("rows") or []:
+        key = "|".join([row.get("run_id", ""), row.get("issue_id", ""),
+                        row.get("expert_category_id", "")])
+        by_task.setdefault(key, []).append(row)
+    return by_task, rep.get("generated_at")
+
+
+def _pool_state(by_task: dict, run_id: str, issue_id: str, category: str) -> dict:
+    key = "|".join([run_id, issue_id, category])
+    rows = by_task.get(key) or []
+    if not rows:
+        return {"state": "最近一次导出里没有这条任务", "n_rows": 0}
+    sft = sum(1 for r in rows if r.get("sft_in"))
+    dpo = sum(1 for r in rows if r.get("dpo_in"))
+    errs = sorted({e for r in rows for e in (r.get("errors") or [])})
+    return {"state": "进 SFT {} 份 / 进偏好对 {} 份".format(sft, dpo),
+            "n_rows": len(rows), "rejected_reasons": errs}
+
+
+def _review_state(n: int, n_distinct_verdicts: int) -> str:
+    """任务级审核状态(0904doc 05 §一 要求队列显示"当前审核状态")。
+
+    只给状态,不给结论分布 —— 首轮两份意见互不可见(《补充规范》§3)。这里能说的
+    上限是"两份一致/不一致",这正是 04 §八.3 判定 Disputed 所需的最小信息。
+    """
+    if n == 0:
+        return "待领取(0 份意见)"
+    if n == 1:
+        return "首轮进行中(1/2 份)"
+    if n == 2:
+        return ("首轮齐·两份结论一致" if n_distinct_verdicts <= 1
+                else "首轮齐·两份互斥 → Disputed,需追加 3 位")
+    return "争议轮(累计 {} 份)".format(n)
+
+
 @router.get("/api/expert/marks")
 def expert_marks():
     """只回计数。结论与文本一律不给 —— 首轮两份意见互不可见(《补充规范》§3:71)。
@@ -323,17 +396,24 @@ def expert_marks():
 
     marks = load_marks()
     by_category, by_task = {}, {}
+    verdicts_by_task = {}
     for m in marks:
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
         cat = rv.get("expert_category_id") or "(未标专业)"
         by_category[cat] = by_category.get(cat, 0) + 1
         key = "{}|{}".format(rv.get("run_id", "(无 run_id)"), rv.get("issue_id", "-"))
         by_task[key] = by_task.get(key, 0) + 1
+        tkey = "|".join([str(rv.get("run_id", "")), str(rv.get("issue_id", "")),
+                         str(rv.get("expert_category_id", ""))])
+        verdicts_by_task.setdefault(tkey, set()).add(str(m.get("verdict", "")))
+    disputed = sum(1 for k, v in by_task.items()
+                   if len(verdicts_by_task.get(k, ())) > 1 and v >= 2)
     return {"total": len(marks), "with_review_block": sum(
         1 for m in marks if isinstance(m.get("review"), dict)),
         "by_category": by_category,
         "opinions_per_task": sorted(by_task.items(), key=lambda kv: -kv[1])[:20],
         "tasks_with_two_or_more": sum(1 for v in by_task.values() if v >= 2),
+        "tasks_disputed": disputed,
         "visibility": "本接口只给条数;结论与文本不在响应里"}
 
 
@@ -387,6 +467,11 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
         overflow: auto; font-size: 12px; }
   .warn { background: #fff1e5; border: 1px solid #ffd8b5; border-radius: 8px;
           padding: 8px 10px; margin: 8px 0; font-size: 12px; }
+  .rubric { margin: 8px 0 0; font-size: 12px; color: #1f2328; }
+  .rubric summary { cursor: pointer; color: #0b5cad; }
+  .rubric ol { margin: 6px 0 6px 18px; padding: 0; }
+  .task .st { color: #57606a; }
+  .task .st b { color: #cf222e; }
 </style>
 </head>
 <body>
@@ -395,9 +480,23 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
   <p>一条「问题 + 专业类别」一份意见。界面由平台侧重写,这里是<b>字段与后果的样子</b>。
      <span class="meta" id="counts"></span>
      <a href="/review" class="meta">← 回到只读面(看记录)</a></p>
-  <p class="how">怎么做:<b>①</b> 左边选一条任务(可按风险高低筛) → <b>②</b> 读右边的反思正文 →
-     <b>③</b> 选一个结论:认可 = 这段反思照原样用;<b>建议修改</b> = 写下你认为对的文本;
-     <b>不成立</b> = 写清核心逻辑哪里错。选「认可」时文本框会锁住(写了会被拒)。</p>
+  <p class="how">怎么做:<b>①</b> 左边选一条任务(可按风险高低筛) → <b>②</b> 右边<b>默认只给
+     你要审的那条问题</b>和它在原文里的定位,想看整篇再点"读整篇反思原文" →
+     <b>③</b> 选一个结论:认可 = 这段反思核心成立、无需实质修改;<b>建议修改</b> = 方向有价值但有
+     遗漏/表述错/泛化过度,只改你负责那几句;<b>不成立</b> = 核心逻辑有实质问题。
+     选「认可」时文本框会锁住(写了会被拒)。</p>
+  <details class="rubric">
+    <summary>审核基准(《技术集成流程》§七:所有专家共用这一套,不分工各写一套答案)</summary>
+    <ol>
+      <li><b>事实与因果是否成立</b>:有没有事实错误、错误归因,或把相关直接写成因果。</li>
+      <li><b>是否真正吸收了本次经历</b>:是识别了判断里的关键问题,还是只把结果复述了一遍。</li>
+      <li><b>结果偏见</b>：不能因为后来涨了/跌了,就倒推当时的判断必然对或必然错。</li>
+      <li><b>不合理泛化</b>:一次经历不能直接变成一条过宽的未来规则。</li>
+      <li><b>是否遗漏重要价值因素</b>:例如用户的风险暴露、不可逆后果、行动与不行动的机会成本。</li>
+    </ol>
+    <div class="meta">这一栏只是把研究侧定的审核规则摆在你手边;怎么判、判成哪一档都由你决定,
+      系统不替你打分。原文见 0904doc《04｜Reflection → Governance Platform 技术集成流程》第七节。</div>
+  </details>
 </header>
 <main>
   <div id="left">
@@ -422,9 +521,11 @@ var TASK = null, FULL = "";
 function esc(s) { var d = document.createElement("div"); d.textContent = (s == null ? "" : String(s)); return d.innerHTML; }
 function api(u, o) { return fetch(u, o).then(function (r) { return r.json(); }); }
 
-var TASKS = [], RISK_ORDER = { high: 0, medium: 1, low: 2 };
+var TASKS = [], RISK_ORDER = { high: 0, medium: 1, low: 2 }, POOL_AT = "";
 
 api("/api/expert/queue?limit=10").then(function (q) {
+  POOL_AT = q.pool_generated_at ? ("(上次导出 " + q.pool_generated_at + ")")
+                               : "(还没有导出产物)";
   TASKS = q.tasks.slice().sort(function (a, b) {          // 高风险的排前面
     var r = RISK_ORDER[a.risk] - RISK_ORDER[b.risk];
     return r !== 0 ? r : (a.run_id < b.run_id ? 1 : -1);
@@ -458,7 +559,11 @@ function drawQueue() {
     d.className = "task";
     d.innerHTML = "<div><span class='risktag risk-" + esc(t.risk) + "'>" + esc(t.risk) +
                   "</span> " + esc(t.summary) + "</div><div class='s'>" +
-      esc(t.expert_category_id) + " · " + esc(t.run_id) + " / " + esc(t.issue_id) + "</div>";
+      esc(t.expert_category_id) + " · " + esc(t.run_id) + " / " + esc(t.issue_id) +
+      // 05 §一:未点开也要显示"当前审核状态";05 §四:Disputed 要看得出来
+                  "</div><div class='s st'>状态:" + (
+      String(t.review_state || "?").indexOf("Disputed") >= 0
+        ? "<b>" + esc(t.review_state) + "</b>" : esc(t.review_state || "?")) + "</div>";
     d.onclick = function () { pick(t, d); };
     box.appendChild(d);
   });
@@ -477,8 +582,18 @@ function pick(t, node) {
       "<span class='err'>" + esc((r.errors || []).join("; ")) + "</span>"; return; }
     FULL = r.reflection_text;
     document.getElementById("chars").textContent = r.reflection_chars + " 字";
-    document.getElementById("body").innerHTML = "<pre>" + esc(FULL) + "</pre>" +
-      "<button id='ctxbtn'>展开自然语言 Full Context</button><pre id='ctx' style='display:none'></pre>";
+    // 默认不给整篇反思:《HCI 增量需求》§二"默认展示该专家需要审核的具体问题,
+    // 而不是整篇 Reflection"。整篇与 Full Context 都放在点了之后才出现。
+    document.getElementById("body").innerHTML =
+      "<div class='meta'>正文按 05 §二 默认收起:下面两个按钮按需展开(全文 " +
+      r.reflection_chars + " 字)。</div>" +
+      "<button id='reflbtn'>读整篇反思原文</button>" +
+      "<button id='ctxbtn'>展开自然语言 Full Context</button>" +
+      "<pre id='refl' style='display:none'></pre><pre id='ctx' style='display:none'></pre>";
+    document.getElementById("reflbtn").onclick = function () {
+      document.getElementById("refl").textContent = FULL;
+      document.getElementById("refl").style.display = "block"; this.style.display = "none";
+    };
     document.getElementById("ctxbtn").onclick = function () {
       var p = document.getElementById("ctx");
       p.textContent = r.full_context; p.style.display = "block"; this.style.display = "none";
@@ -491,12 +606,15 @@ function pick(t, node) {
 
 function renderForm() {
   var t = TASK, w = document.getElementById("work");
+  var pl = t.pool || {};
   w.innerHTML =
     "<h2>问题 " + esc(t.issue_id) + " · 专业 " + esc(t.expert_category_id) + "</h2>" +
     "<div>" + esc(t.summary) + "</div>" +
     "<div class='meta'>路由理由:" + esc(t.routing_reason) + "</div>" +
     "<div class='quote'>" + esc(t.evidence_quote) + "</div>" +
-    "<div class='meta'>反思正文:<span id='chars'>…</span> 字 · 原文定位 <code id='anch'>…</code></div>" +
+    "<div class='meta'>审核状态:" + esc(t.review_state || "?") +
+      " · 训练材料池:" + esc(pl.state || "?") + POOL_AT + "</div>" +
+    "<div class='meta'>反思正文:<span id='chars'>…</span> 字 · 你负责的原文定位 <code id='anch'>…</code></div>" +
     "<div id='body'><div class='meta'>正文加载中…</div></div>" +
     "<h3>你的结论(必填)</h3>" +
     "<div>" +
@@ -507,8 +625,10 @@ function renderForm() {
     "</div>" +
     "<h3 id='th'>文本(先在上方选一个结论)</h3>" +
     "<textarea id='text' disabled placeholder='选完结论这里才解锁'></textarea>" +
-    "<div class='warn' id='seg' style='display:none'>你写的是<b>一段</b>而反思是整篇:导出时会被"
-      + "「量纲门」剔出偏好对(chosen 与 rejected 长度差太多)。要么按整篇重写,要么接受这一条只进审核材料、不进训练集。</div>" +
+    "<div class='warn' id='seg' style='display:none'>只写<b>你负责的这几句</b>的改文就对了:"
+      + "《HCI 增量需求》§二明确 Edit「仅修改自己负责的问题 / 反思片段,不直接重写整篇 Reflection」。"
+      + "<br>但要提前说清后果:导出侧现在还<b>不会</b>把片段合回整篇,所以这份改文会进审核材料、"
+      + "<b>暂时进不了偏好对</b>(量纲门)。这是导出侧的待办,不是你写错了,也不需要你改成整篇。</div>" +
     "<h3>为什么这么判(选填,不影响训练集)</h3>" +
     "<input type='text' id='reason' placeholder='一句理由即可;审核材料里会保留'>" +
     "<div style='margin-top:10px'>" +
@@ -531,21 +651,14 @@ function renderForm() {
         seg.style.display = "none";
       } else {
         box.disabled = false;
-        th.textContent = b.dataset.v === "edit" ? "你建议定稿的文本(必填)" : "为什么这条不成立(必填)";
+        th.textContent = b.dataset.v === "edit" ? "你建议的改文(只改你负责的片段,必填)"
+                                               : "为什么这条不成立(必填)";
         box.placeholder = b.dataset.v === "edit"
-          ? "写你认为正确的说法。整篇重写才能生成偏好对;只写一段会被量纲门拦下"
+          ? "照上面「原文定位」那几句改就行,不用重写整篇反思"
           : "写清核心逻辑哪里错(这段文字进审核材料,不当标准答案)";
-        seg.style.display = "none";
+        seg.style.display = b.dataset.v === "edit" ? "block" : "none";
       }
       document.getElementById("vw").textContent = "已选:" + b.textContent;
-    };
-  });
-  Array.prototype.forEach.call(w.querySelectorAll("#text"), function (box) {
-    box.oninput = function () {                        // 写够一段就提醒一次量纲问题
-      var seg = document.getElementById("seg");
-      if (TASK && TASK._v === "edit" && FULL.length) {
-        seg.style.display = box.value.length < FULL.length * 0.5 ? "block" : "none";
-      }
     };
   });
   document.getElementById("send").onclick = send;
