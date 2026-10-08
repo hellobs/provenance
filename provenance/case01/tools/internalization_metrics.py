@@ -30,8 +30,13 @@ CK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 try:
     from case_engine.paths import data_root as _data_root
     CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+    TABLEDGER = _data_root("ledgers")          # 跨局登记簿(干预台账/专家标记)现在单独一层
 except Exception:  # noqa: BLE001 —— 独立运行时不该因为 import 失败就打不开工具
-    pass
+    TABLEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "..", "results", "checkpoints")
+# 分析产物根(报表,入库):`<包根>/results/analysis`;与存档层无关,所以用包根显式拼。
+ANALYSIS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "..", "results", "analysis")
 
 DEFAULT_WINDOW_MIN = 60.0
 
@@ -351,12 +356,15 @@ def _md(result: dict, sim: str) -> str:
 def main() -> int:
     import argparse
     ap = argparse.ArgumentParser(description="内化定量分析(干预前后位移 vs 对照维度)")
-    ap.add_argument("--checkpoints", default="", help="results/checkpoints 下的模拟目录名或绝对路径")
-    ap.add_argument("--interventions", default=os.path.join(CK_DIR, "interventions.json"))
+    ap.add_argument("--checkpoints", default="", help="模拟存档根下的模拟目录名或绝对路径")
+    # 2026-10-08:登记簿与模拟存档**不是同一层**了(前者 data/ledgers,后者 data/case00/state),
+    # 所以默认值要指向 ledgers —— 继续拼在 CK_DIR 下会 FileNotFoundError。
+    ap.add_argument("--interventions", default=os.path.join(TABLEDGER, "interventions.json"))
     ap.add_argument("--window", type=float, default=DEFAULT_WINDOW_MIN,
                     help="干预后观测窗(分钟,按 sim_time)")
     ap.add_argument("--all", action="store_true", help="跑有干预记录的全部模拟")
-    ap.add_argument("--out-root", default=os.path.join(CK_DIR, "..", "analysis"))
+    # 分析产物根:报表留在 `provenance/results/analysis`(与存档不同层,别用 `..` 拼)
+    ap.add_argument("--out-root", default=ANALYSIS_ROOT)
     args = ap.parse_args()
 
     with open(args.interventions, encoding="utf-8") as f:

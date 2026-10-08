@@ -65,6 +65,22 @@ WHOLE = [
 ]
 # 只删(空壳/空目录): 相对仓根 —— 删之前会核对"确实没有文件"
 DROP_IF_EMPTY = ["provenance/case01/results", "results"]
+
+# ---------------------------------------------------------------------------
+# case00 存档(第二批):`provenance/results/checkpoints/` 里**混着三类东西**,搬之前必须分类,
+# 否则测试残留会跟着进"数据家":
+#   a) 跨局登记簿(根下的 `*.json` / `*.jsonl`)→ data/ledgers/
+#   b) 真存档(有现场数据的模拟)→ data/case00/state/<模拟名>/
+#   c) 测试/探针残留 → data/_quarantine/case00/<名字>/(**不进** case00/state;
+#      隔离而不是删,台账留痕,确认后可一把删)
+# 判据(c):名字带测试语义,或整个目录里一个文件都没有(只剩空壳)。
+# ---------------------------------------------------------------------------
+CASE00_SRC = "provenance/results/checkpoints"
+CASE00_DEST = "data/case00/state"
+LEDGER_DEST = "data/ledgers"
+QUARANTINE = "data/_quarantine/case00"
+_TEST_NAME_RE = re.compile(r"(^_|test|visual-path|^stage$|^hc$|mazecheck|ivd-|fresh-check)",
+                           re.IGNORECASE)
 # 拆分搬: 老根 → (记录去哪, 其余去哪)
 SPLIT = [("provenance/case01/runs_injector", "data/case01/raw", "data/case01/runtime")]
 RECORD_NAMES = {"raw.json"}          # 只有它算"记录";其余(日志/pid/探针/修复副本)算运行残渣
@@ -113,6 +129,38 @@ def build_plan(groups=None):
             continue
         for f in files:
             moves.append((f, os.path.join(new, os.path.relpath(f, old))))
+    if on("case00"):
+        src = os.path.join(REPO, *CASE00_SRC.split("/"))
+        if os.path.isdir(src):
+            for name in sorted(os.listdir(src)):
+                p = os.path.join(src, name)
+                if os.path.isfile(p):                    # (a) 跨局登记簿 → data/ledgers/
+                    # 带 `.bak` 的是**备份**不是现行账本 → 进 ledgers/_bak/(同一族,但一眼看得出不是活的)
+                    sub = "_bak" if ".bak" in name else ""
+                    dest = os.path.join(REPO, *LEDGER_DEST.split("/"), sub, name) if sub \
+                        else os.path.join(REPO, *LEDGER_DEST.split("/"), name)
+                    if os.path.exists(dest):
+                        try:
+                            same = (os.path.getsize(p) == os.path.getsize(dest)
+                                    and sha256(p) == sha256(dest))
+                        except OSError:
+                            same = False
+                        if same:
+                            continue
+                        problems.append("登记簿目标已存在且内容不同,拒绝覆盖:{}".format(name))
+                        continue
+                    moves.append((p, dest))
+                    continue
+                files = list(walk_files(p))
+                # (c) 测试/探针残留:名字带测试语义,或整个目录一个文件都没有 → 隔离
+                test_like = bool(_TEST_NAME_RE.search(name)) or not files
+                root_rel = QUARANTINE if test_like else CASE00_DEST
+                dest_root = os.path.join(REPO, *root_rel.split("/"), name)
+                for f in files:
+                    new = os.path.join(dest_root, os.path.relpath(f, p))
+                    if os.path.exists(new):
+                        continue                              # 已搬过:跳过(可重复跑)
+                    moves.append((f, new))
     for old_root_rel, rec_rel, rest_rel in SPLIT:
         if not on("injector"):
             continue
@@ -344,7 +392,7 @@ def main(argv=None) -> int:
         return 0
     entries, dropped, failed, ledger = do_move(moves, drops, True, prune_roots=[
         os.path.join(REPO, *r.split("/")) for r in
-        [w[0] for w in WHOLE] + [s[0] for s in SPLIT]])
+        [w[0] for w in WHOLE] + [s[0] for s in SPLIT] + [CASE00_SRC]])
     print("\n已搬 {} 个文件;台账:{}".format(len(entries), ledger))
     for rel, why in failed:
         print("  [!] {} {}".format(rel, why))

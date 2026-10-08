@@ -38,8 +38,11 @@ CHECKPOINTS = os.path.join(CK, "results", "checkpoints")
 try:
     from case_engine.paths import data_root as _data_root
     CHECKPOINTS = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+    TABLEDGER = _data_root("ledgers")      # 跨局登记簿现在单独一层
 except Exception:  # noqa: BLE001
-    pass
+    TABLEDGER = CHECKPOINTS
+# 分析产物根(报表,入库):与存档不在同一层,用包根显式拼,不要 `..`。
+ANALYSIS_ROOT = os.path.join(CK, "results", "analysis")
 
 DEFAULT_WINDOW_MIN = 120.0
 DEFAULT_SAMPLE = 30          # 离线补算时每侧最多抽多少条行动文本
@@ -519,10 +522,11 @@ def main() -> int:
     import argparse
     ap = argparse.ArgumentParser(description="行为追随分析(约束调整→行动内容偏移)")
     ap.add_argument("--sims", default="stock-en7,stock-en8,demo-0921-222949")
-    ap.add_argument("--interventions", default=os.path.join(CHECKPOINTS, "interventions.json"))
+    # 2026-10-08:登记簿与模拟存档不是同一层了(前者 data/ledgers,后者 data/case00/state)
+    ap.add_argument("--interventions", default=os.path.join(TABLEDGER, "interventions.json"))
     ap.add_argument("--window", type=float, default=DEFAULT_WINDOW_MIN)
     ap.add_argument("--sample", type=int, default=DEFAULT_SAMPLE)
-    ap.add_argument("--out-root", default=os.path.join(CHECKPOINTS, "..", "analysis"))
+    ap.add_argument("--out-root", default=ANALYSIS_ROOT)
     ap.add_argument("--no-noise-floor", action="store_true",
                     help="跳过底噪对照(默认开启;对照窗需本地 embedding)")
     args = ap.parse_args()

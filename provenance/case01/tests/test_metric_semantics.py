@@ -40,6 +40,9 @@ except Exception:  # noqa: BLE001
     CK_DIR = os.path.join(REPO_ROOT, "provenance", "results", "checkpoints")
     _LEDGERS = CK_DIR
 INTERVENTIONS = os.path.join(_LEDGERS, "interventions.json")
+# 分析产物根(报表,入库):`provenance/results/analysis` —— 与存档不在同一层了,不能靠 `..` 拼。
+ANALYSIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "results", "analysis")
 
 
 def _tv_replica(v, tgt):
@@ -407,11 +410,14 @@ class TestNoiseFloorReproducibility(unittest.TestCase):
         if not os.path.isdir(CK_DIR):
             cls.files = []
             return
-        cls.files = sorted(
-            os.path.join(CK_DIR, "..", "analysis", d, "behavior_follow.json")
-            for d in os.listdir(os.path.join(CK_DIR, "..", "analysis"))
-            if os.path.isfile(os.path.join(CK_DIR, "..", "analysis", d,
-                                           "behavior_follow.json")))
+        # 2026-10-08:分析产物留在 `provenance/results/analysis`(报表入库),**不再**在存档隔壁 ——
+        # 存档搬去 `data/case00/state` 后 `CK_DIR/../analysis` 会指到不存在的地方(实测 2 个 error)。
+        cls.files = []
+        if os.path.isdir(ANALYSIS_DIR):
+            cls.files = sorted(
+                os.path.join(ANALYSIS_DIR, d, "behavior_follow.json")
+                for d in os.listdir(ANALYSIS_DIR)
+                if os.path.isfile(os.path.join(ANALYSIS_DIR, d, "behavior_follow.json")))
 
     def setUp(self):
         if not self.files:
