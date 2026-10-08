@@ -26,7 +26,24 @@ from case01 import orchestrator as OR  # noqa: E402
 from case01.orchestrator import run_case01  # noqa: E402
 from live import history as LH  # noqa: E402
 
-DEFAULT_ROOT = os.path.join(_PKG, "case01", "runs")
+DEFAULT_ROOT = os.path.join(_PKG, "case01", "runs")          # 老位置(搬迁前)
+NEW_ROOT = os.path.join(os.path.dirname(_PKG), "data", "case01", "runs")   # 新位置(搬迁后)
+
+
+def _expected_default_root() -> str:
+    """默认根按**优先级规则**判定,而不是钉死某一条路径。
+
+    2026-10-08 归类搬迁:成品记录的家从 `case01/runs` 挪到仓根 `data/case01/runs`,
+    读侧由 `case_engine.paths.data_root()` 决定 —— 新位置存在就用新,否则老位置存在就用老,
+    两个都没有就用新(待创建)。所以"默认根是什么"取决于**盘上现状**:
+    本机(有老数据)解析到老位置,CI 干净检出解析到新位置,搬完都解析到新位置。
+    这条测试于是钉"规则",同时把两个候选都认下来 —— 钉死某一条会在另一侧假红。
+    """
+    if os.path.isdir(NEW_ROOT):
+        return NEW_ROOT
+    if os.path.isdir(DEFAULT_ROOT):
+        return DEFAULT_ROOT
+    return NEW_ROOT
 
 
 def test_env_var_has_priority_over_default_root(tmp_path, monkeypatch):
@@ -41,7 +58,10 @@ def test_blank_or_unset_falls_back_to_repo_runs(tmp_path, monkeypatch, value):
     else:
         monkeypatch.setenv("CASE01_RUNS_ROOT", value)
     got = OR.RUNS_ROOT()
-    assert os.path.normcase(got) == os.path.normcase(DEFAULT_ROOT), got
+    assert os.path.normcase(got) == os.path.normcase(_expected_default_root()), got
+    # 无论解析到哪一代,都必须是"仓内那两处候选之一",不许漂到别处
+    cands = {os.path.normcase(DEFAULT_ROOT), os.path.normcase(NEW_ROOT)}
+    assert os.path.normcase(got) in cands, got
 
 
 def test_write_side_and_read_side_resolve_the_same_root(tmp_path, monkeypatch):
@@ -120,5 +140,32 @@ def test_run_lands_in_env_root_and_read_side_finds_it(tmp_path, monkeypatch):
     brief = LH._brief_review("env-root-probe")
     assert brief["run_id"] == "env-root-probe"
     assert not brief.get("error"), "界面侧读不到刚写的记录: {}".format(brief["error"])
-    # 关键:默认根里不能留下这条(否则每次跑测都在污染真实记录目录)
-    assert not os.path.exists(os.path.join(DEFAULT_ROOT, "env-root-probe"))
+    # 关键:两代"默认根"里都不能留下这条(否则每次跑测都在污染真实记录目录)
+    for cand in (DEFAULT_ROOT, NEW_ROOT):
+        assert not os.path.exists(os.path.join(cand, "env-root-probe")), cand
+
+
+def test_data_root_priority_rule(tmp_path, monkeypatch):
+    """`data_root()` 的优先级规则本身:新位置 > 老位置 > 新位置(待创建)。
+
+    为什么单独钉:这条规则**随盘上现状变化**,于是同一次改动在本机(有老数据)与
+    CI(干净检出)**解析出不同结果** —— 2026-10-08 实测:`test_runs_root_env_parity`
+    就因为"钉死了老位置"而在 CI 上红。规则测清楚,两个环境就都能验。
+    """
+    from case_engine import paths as P
+    repo, pkg = tmp_path / "repo", tmp_path / "repo" / "pkg"
+    (repo / "data" / "x").mkdir(parents=True)
+    (pkg / "old").mkdir(parents=True)
+    monkeypatch.setattr(P, "REPO_ROOT", str(repo))
+    monkeypatch.setattr(P, "PKG_ROOT", str(pkg))
+    monkeypatch.setitem(P.DATA_KINDS, "t.kind", ("data/x", "old"))
+    monkeypatch.setattr(P, "_warned", set())
+
+    assert P.data_root("t.kind") == str(repo / "data" / "x")      # 新存在 → 新
+    import shutil
+    shutil.rmtree(repo / "data" / "x")
+    assert P.data_root("t.kind") == str(pkg / "old")             # 只老存在 → 老(并出声)
+    shutil.rmtree(pkg / "old")
+    assert P.data_root("t.kind") == str(repo / "data" / "x")     # 都没有 → 新(待创建)
+    monkeypatch.setenv("CASE01_RUNS_ROOT", str(tmp_path / "abs"))
+    assert P.data_root("t.kind", env_var="CASE01_RUNS_ROOT") == str(tmp_path / "abs")  # 环境变量最高优先
