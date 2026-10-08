@@ -338,6 +338,15 @@ def main(argv=None):
                     workers or "按角色数",
                     "种子链默认串行,保证同种子同抽样" if args.think_workers is None
                     else "由 --think-workers 指定"))
+            # 2026-10-08(防"第四棵树"):引擎的现场存档根此前由注入器 `setdefault` 成
+            # `<scenario>/checkpoints`,于是 case01 的引擎状态落在 `case01/injector/scenario/checkpoints/`
+            # (85 个模拟、和场景模板混在一起)。这里在起桥**之前**用引擎自己的开关把它指到
+            # `data/case01/state/`;因为桥那边是 setdefault,**不会覆盖**我们设的值。
+            try:
+                from case_engine.paths import data_root as _data_root
+                os.environ.setdefault("MAVIS_CHECKPOINTS_ROOT", _data_root("case01.state"))
+            except Exception:  # noqa: BLE001 —— 解析失败不该拦住推演(桥会用它自己的默认)
+                pass
             bridge = MavisBridge(
                 nodes=nodes, roles=roles, scenario_dir=scenario,
                 run_id=run_id,
