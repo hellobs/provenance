@@ -34,6 +34,7 @@ from ..injector.nodes import default_nodes
 from ..rngchain import apply_chain, resolve_master, write_side_record
 from ..run_naming import live_run_id, unique_run_id
 from ..safestream import run_text, tolerant_stdout, utf8_env
+from case_engine.paths import data_root
 
 # case01 业务侧的角色贴图别名与前端根(属于 case01,不属于 mavis-vizkit)
 ROLE_TEXTURE_ALIAS = {"Investment AI": "AI Advisor", "Ethan Lin": "Mr. Zhou"}
@@ -132,7 +133,12 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
     `PYTHONIOENCODING`)写的是 GBK 字节,严格解码失败后 stdout 交回 None,
     于是这句承诺恰恰会以"什么都打不出来"的形式落空。
     """
-    out = os.path.join("case01", "runs", run_id, "run.json")
+    # 成品记录的根必须与写侧权威 `orchestrator.RUNS_ROOT()`、读侧 5010 面板/5002 同源。
+    # 这里原先写死相对路径 `case01/runs`(子进程 cwd=PKG_ROOT ⇒ 落在老根),2026-10-08 记录
+    # 搬到仓根 `data/case01/runs` 之后,这一环会让"跑完自动映射"的成品记录**出现在面板读
+    # 不到的地方**,而且界面上看不出异常。取不到根就明确报错,不许静默回老位置。
+    out = os.path.join(data_root("case01.records", env_var="CASE01_RUNS_ROOT"),
+                       run_id, "run.json")
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
            "--branch", branch, "--run-id", run_id,
            "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
@@ -142,7 +148,7 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
     tail = (proc.stdout or "").strip()[-800:]
     if tail:
         print(tail)
-    if proc.returncode != 0 or not os.path.exists(os.path.join(PKG_ROOT, out)):
+    if proc.returncode != 0 or not os.path.exists(out):
         print("  [!] 映射失败(exit={}):可在 provenance/provenance 下手工重跑:\n      {}"
               .format(proc.returncode, " ".join(cmd)))
         if (proc.stderr or "").strip():
@@ -150,10 +156,12 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
         return False
     print("  成品记录已生成({:.0f}s) -> {}".format(time.time() - t0, out))
     # 种子链留痕也要落在**成品记录**旁边:起面时那份 `rng.json` 只跟着 `--out`
-    # 指向的原始记录(`case01/runs_injector/<run_id>/`),而结果面板与复盘读的是
-    # 这里这份 `case01/runs/<run_id>/run.json` —— 成品记录旁边没有 rng.json 的话,
+    # 指向的原始记录(`data/case01/raw/<run_id>/` 一带),而结果面板与复盘读的是
+    # 这里这份成品 `run.json` —— 成品记录旁边没有 rng.json 的话,
     # "这一条是用哪个种子/哪套派生参数跑出来的"在成品目录里就查不到(2026-10-06 修)。
-    write_side_record(os.path.dirname(os.path.join(PKG_ROOT, out)), rng_info, log=print)
+    # 目录一律从**绝对**的 `out` 取:10-08 之前这里是 `os.path.join(PKG_ROOT, out)`
+    # 配相对老根,记录搬走后会同时犯"写错地方"和"留痕写错地方"两个错。
+    write_side_record(os.path.dirname(out), rng_info, log=print)
     return True
 
 
@@ -183,7 +191,7 @@ def main(argv=None):
     ap.add_argument("--nodes", type=int, default=0, help="只跑前 N 个节点(0=全部;冒烟用)")
     ap.add_argument("--out", default="",
                     help="第一局原始记录的落盘路径(缺省按 run_id 派生到 "
-                         "case01/runs_injector/<run_id>/raw.json;重开一局总是按新 run_id 派生)")
+                         "仓根 data/case01/raw/<run_id>/raw.json;重开一局总是按新 run_id 派生)")
     ap.add_argument("--review-only", dest="review_only", action="store_true",
                     help="只服务界面(小镇 + 结果记录),不跑推演;用于随时翻成品记录")
     ap.add_argument("--no-restart", dest="no_restart", action="store_true",
@@ -255,7 +263,7 @@ def main(argv=None):
         # 不推演,只服务界面。告诉页面"没有在推演",别让人对着空小镇猜
         # (状态点会显示成"仅审阅模式")。这样它就是个可以随时开着的只读面。
         live.finish("review_only")
-        print("仅审阅模式:没有在推演,小镇为空;右栏“结果记录”卡片可翻 case01/runs/")
+        print("仅审阅模式:没有在推演,小镇为空;右栏“结果记录”卡片可翻仓根 data/case01/runs/")
         try:
             while True:
                 time.sleep(3600)
@@ -311,8 +319,11 @@ def main(argv=None):
             # 既把它传给本进程、又照它打印手工映射命令 —— 于是那条命令指向一个从不存在
             # 的文件)。重开一局会现铸新 run_id,若继续往同一个 --out 写,两局的原始记录
             # 会覆盖成同一份,所以重开一律按新 run_id 派生。
+            # 派生目标必须走 `data_root`:这里原先写死相对 `case01/runs_injector`,而进程
+            # cwd=包根 ⇒ 重开的那局会在包根**原地重建**老根并把原始记录写进去(10-08 搬迁后
+            # 老根已不存在),成品记录却在新根,两半不同源。
             out = (args.out if (first_round and args.out)
-                   else os.path.join("case01", "runs_injector", run_id, "raw.json"))
+                   else os.path.join(data_root("case01.raw"), run_id, "raw.json"))
             print("本次 run_id: {} (分支方式={} 兜底分支={})".format(run_id, branch_mode, branch))
             # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
             # 否则刷新后的页面会收到上一局的 done / 旧位置。

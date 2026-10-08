@@ -46,8 +46,8 @@
     python live_switch.py --start case00 [--stride 2]
     python live_switch.py --stop case01 | case00 | all
 
-`--start case01` **默认跑完自动映射**(看护进程等 `raw.json` 写好,再跑 pipeline 生成
-`case01/runs/<run_id>/run.json`)。理由见"不允许静默"那条铁律:实跑成功了却没有成品记录,
+`--start case01` **默认跑完自动映射**(`case01/vizkit/live_run.py` 在跑完当刻生成
+`data/case01/runs/<run_id>/run.json`)。理由见"不允许静默"那条铁律:实跑成功了却没有成品记录,
 面板上就是一片空白,而没人会知道为什么。`--no-map` 可关掉,手工映射的命令仍会打印出来。
 """
 import argparse
@@ -60,6 +60,8 @@ import time
 import urllib.request
 
 from case01.run_naming import live_run_id
+from case01.safestream import tolerant_stdout
+from case_engine.paths import data_root
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -70,6 +72,18 @@ LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
 CMD_NEEDLE = {"case00": "live_fastapi.py", "case01": "vizkit.live_run"}
 READONLY = {5002: "case01 只读契约", 5003: "case00 存档只读"}
 LOG_DIR = os.path.join(os.environ.get("TEMP", HERE), "dsh_srv")
+
+
+def records_root():
+    """成品记录根 —— 必须与 `case01/vizkit/live_run.py` 的映射目标同一算法。
+
+    2026-10-08 归类搬迁把记录的家从 `case01/runs` 挪到仓根 `data/case01/runs`。这里原先
+    写死老根,而老根搬迁后**根本不存在**,后果不是报错而是静默:
+    ① `_warn_overwrite` 查的是不存在的目录 ⇒ 沿用同一个 `--run-id` 重跑时"覆盖写"预警
+    不再出声,上一局产物被原地盖掉而界面无异常(正是它要防的那条铁律);
+    ② 打印出来的手动映射命令把人往老根引,照着敲会在老根**再造一份**记录,而面板读的是新根。
+    """
+    return data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +263,7 @@ def _warn_overwrite(explicit_run_id, run_id, out_rel):
     if not explicit_run_id:
         return
     for p in (os.path.join(HERE, out_rel),
-              os.path.join(HERE, "case01", "runs", run_id, "run.json")):
+              os.path.join(records_root(), run_id, "run.json")):
         if os.path.isfile(p):
             print("  ⚠ {} 已存在 —— run_id={} 是覆盖写,旧那条会没。"
                   "要留着对照就换个 --run-id,或先把 {} 整个目录挪走。".format(
@@ -311,7 +325,6 @@ def start(case, args):
             # 重开一局时循环里现铸的名字也走同一套口径(见 live_run.py)。
             run_id = args.run_id or live_run_id("auto" if args.branch_mode == "judge" else args.branch)
             # 2026-10-08:原始记录的家挪到仓根 `data/case01/raw/`(搬迁期新优先、老回落并出声)。
-            from case_engine.paths import data_root
             out = args.out or os.path.join(data_root("case01.raw"), run_id, "raw.json")
             _warn_overwrite(args.run_id, run_id, out)
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
@@ -366,7 +379,7 @@ def start(case, args):
     if run_id:
         print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
         print("  原始记录将落盘到: {}".format(out))
-        final = os.path.join("case01", "runs", run_id, "run.json")
+        final = os.path.join(records_root(), run_id, "run.json")
         print("  跑完自动映射成成品记录: {}".format(final))
         print("    (手动等价命令: python -m case01.injector.pipeline --branch {} --run-id {}"
               " --from-record {} --reflect --out {})".format(args.branch, run_id, out, final))
@@ -480,6 +493,11 @@ def _all_lan_ips() -> list:
 
 
 def main():
+    # 本文件满屏是 ⚠/▶ 这类 GBK 编不了的字,而 Windows 控制台默认就是 cp936:
+    # 不加这句,**预警本身会把开关打死** —— `--start case01 --run-id <已有名字>` 的
+    # 覆盖写预警发生在 `stop(other)`/`stop(case)` 之后,抛 UnicodeEncodeError 就等于
+    # 把两个实时面都停了却没起新的(正是本文件要防的"先弄没在跑的面")。
+    tolerant_stdout()
     ap = argparse.ArgumentParser(description="实时面开关:保证同时只有一个实时可视化在跑")
     ap.add_argument("--status", action="store_true", help="只看现状,不动任何进程")
     ap.add_argument("--start", choices=["case00", "case01"], help="起某个 case 的实时面(先停另一个与本 case 旧实例)")
@@ -494,7 +512,7 @@ def main():
                     choices=["judge", "preset"],
                     help="case01:judge=先跑 T0 再由 AI 的回答判定分支"
                          "(0904doc 01 §六 的设计原意,默认);preset=分支由 --branch 指定")
-    ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到 case01/runs_injector/<run_id>/raw.json)")
+    ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到仓根 data/case01/raw/<run_id>/raw.json)")
     ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
     ap.add_argument("--seed", default="",
                     help="case01:**唯一的种子入口**(整数)。设了会把模型采样与小镇世界动力学"

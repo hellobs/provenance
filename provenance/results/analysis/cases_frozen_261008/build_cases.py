@@ -8,11 +8,18 @@
         --out-root results/analysis/<新目录>
     同一份语料上跑旧判据要显式喂文本:--prompt-file <旧 JUDGE_PROMPT>
 """
-import glob, json, os
+import glob, json, os, sys
 
 BATCHES = ("batch-261007-212235-sample8b15-", "batch-261007-224436-sample4b15-")
 HERE = os.path.dirname(os.path.abspath(__file__))
-RUNS = os.path.join(HERE, "..", "..", "..", "case01", "runs")
+CK = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # provenance/provenance
+# 10-08 归类搬迁后成品记录在仓根 data/case01/runs;写死老路径会扫到 0 条而 cases.json
+# 照样生成(只是 n=0),下一次复算就拿着空语料当"同一份文本"。脚本形态运行时
+# sys.path[0] 是本目录,所以先把包根插进去再走 data_root。
+sys.path.insert(0, CK)
+from case_engine.paths import data_root  # noqa: E402
+
+RUNS = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 
 rows = []
 for p in sorted(glob.glob(os.path.join(RUNS, "*", "run.json"))):

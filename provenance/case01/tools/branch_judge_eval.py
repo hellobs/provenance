@@ -8,7 +8,8 @@
   preset 模式的记录:actual = 操作者预设(可能与 AI 立场矛盾,那是另一回事)——
   对这类记录,有意义的指标是 **规则 vs LLM 的一致性**。
 
-默认语料是 `case01/runs/*/run.json` 里有 T0 回答的那些。2026-10-07 前只认
+默认语料是成品记录根 `data/case01/runs/*/run.json`(10-08 搬迁后;老位置 `case01/runs` 由
+`data_root` 回落并出声)里有 T0 回答的那些。2026-10-07 前只认
 speaker="ai" 的小镇面记录,而批次面的 speaker 是 "investment_ai",于是 490 多条
 批次记录被静默排除在对照之外;现在两种都收。要固定语料复测用 `--cases-json`。
 
@@ -30,7 +31,16 @@ from collections import Counter
 from typing import Dict, List
 
 CK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-RUNS = os.path.join(CK, "case01", "runs")
+# 2026-10-08 归类搬迁:成品记录的家从 `case01/runs` 挪到仓根 `data/case01/runs`。
+# 这里必须走与 `batch_analyze` 同一个 `data_root("case01.records")`,否则本工具默认语料
+# 扫到 0 条(实测),而它正是 #56 判据对照的复算入口。老位置由 data_root 内部回落并出声。
+# `sys.path` 这句是为**脚本形态**(`python case01/tools/branch_judge_eval.py`)补的:
+# 那种跑法 sys.path[0] 是 `case01/tools`,import case_engine 会失败 —— 而下面原先用
+# `try/except` 兜老根,于是同一份代码换个敲法就**静默**扫老位置得 0 条(实测踩过同类)。
+sys.path.insert(0, os.path.abspath(CK))
+from case_engine.paths import data_root  # noqa: E402
+
+RUNS = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 SCENARIO = os.path.join(CK, "cases", "case01_stock", "scenario.yaml")
 OUT_ROOT = os.path.join(CK, "results", "analysis", "branch_judge_eval")
 

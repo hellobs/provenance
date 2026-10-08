@@ -112,9 +112,16 @@ print("=" * 88)
 print("D. 数据面")
 sys.path.insert(0, PKG)
 from case01.full_context import quality_of, _reflection_failed  # noqa: E402
+from case_engine.paths import data_root  # noqa: E402
+
+# 2026-10-08 归类搬迁:成品记录的家从包内 `case01/runs` 挪到仓根 `data/case01/runs`。
+# 这里原先写死老根,而老根搬走后**是空的** ⇒ 本段既不报错也不崩,而是把"0 条成品"
+# 打成 ✓(假绿),同时 E 段 `[-1]` 当场 IndexError。读侧体检必须跟写侧同源。
+RUNS = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+RECORDS = sorted(glob.glob(os.path.join(RUNS, "*", "run.json")))
 
 rows = []
-for p in sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json"))):
+for p in RECORDS:
     d = json.load(io.open(p, encoding="utf-8"))
     q = quality_of(d)
     iss = ((d.get("router") or {}).get("issues")) or []
@@ -124,8 +131,10 @@ for p in sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json")))
                  bool(((d.get("reflection") or {}).get("text") or "").strip()),
                  bool(_reflection_failed(d)),
                  len(iss), len(bad)))
-say("data", all(r[5] == 0 for r in rows), "{} 条成品:router 缺字段 {} 条".format(
-    len(rows), sum(1 for r in rows if r[5])))
+say("data", bool(rows) and all(r[5] == 0 for r in rows), "{} 条成品:router 缺字段 {} 条{}".format(
+    len(rows), sum(1 for r in rows if r[5]),
+    "" if rows else " —— 0 条**不算通过**:记录根 {} 里没扫到 run.json,"
+    "下面所有逐条检查都无样本".format(RUNS)))
 say("data", all(r[2] for r in rows), "无反思的成品:{} 条".format(sum(1 for r in rows if not r[2])))
 # 2026-10-03 加:反思 text 非空≠有反思 —— "(反思生成失败)"占位曾骗过上面那条检查
 # (实测 3 条占位记录在"无反思:0 条"的报告下混在成品里,其中 2 条还判成
@@ -163,23 +172,26 @@ if code == 200:
         "include_questionable=1 → count={}".format(j2.get("count")))
 else:
     _e_skipped.append("5010 include_questionable 口径")
-sample = sorted(glob.glob(os.path.join(PKG, "case01", "runs", "*", "run.json")))[-1]
-rid = os.path.basename(os.path.dirname(sample))
-code, body = http("http://127.0.0.1:5010/api/run-detail/review/{}".format(rid))
-if code == 200:
-    j = json.loads(body)
-    leak = [k for k in ("injector", "branch_action", "consistency", "debug", "quality")
-            if k in (j.get("data") or {})]
-    say("contract", j.get("view") == "expert-safe" and not leak,
-        "run-detail 默认视图={} 泄漏={}".format(j.get("view"), leak or "无"))
+if RECORDS:
+    rid = os.path.basename(os.path.dirname(RECORDS[-1]))
+    code, body = http("http://127.0.0.1:5010/api/run-detail/review/{}".format(rid))
+    if code == 200:
+        j = json.loads(body)
+        leak = [k for k in ("injector", "branch_action", "consistency", "debug", "quality")
+                if k in (j.get("data") or {})]
+        say("contract", j.get("view") == "expert-safe" and not leak,
+            "run-detail 默认视图={} 泄漏={}".format(j.get("view"), leak or "无"))
+    else:
+        _e_skipped.append("5010 run-detail expert-safe 泄漏面")
+    code, body = http("http://127.0.0.1:5002/api/runs/{}/full-context".format(rid))
+    if code == 200:
+        bad = [k for k in ("分支来源", "预设分支", "injector", "branch_action") if k in body]
+        say("contract", not bad, "full-context 实验元信息:{}".format(bad or "无"))
+    else:
+        _e_skipped.append("5002 full-context 实验元信息")
 else:
-    _e_skipped.append("5010 run-detail expert-safe 泄漏面")
-code, body = http("http://127.0.0.1:5002/api/runs/{}/full-context".format(rid))
-if code == 200:
-    bad = [k for k in ("分支来源", "预设分支", "injector", "branch_action") if k in body]
-    say("contract", not bad, "full-context 实验元信息:{}".format(bad or "无"))
-else:
-    _e_skipped.append("5002 full-context 实验元信息")
+    # 没有样本 rid 时**两项都得说**,不能靠 http("") 得到一个假的"服务没起"
+    _e_skipped.append("单条记录面 2 项(记录根 {} 里没有 run.json,取不到样本 rid)".format(RUNS))
 yaml_p = os.path.join(PKG, "case01", "docs", "case01_api.openapi.yaml")
 y = io.open(yaml_p, encoding="utf-8").read() if os.path.isfile(yaml_p) else ""
 say("contract", all(k in y for k in ("quality", "include_questionable", "excluded")),

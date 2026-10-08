@@ -23,8 +23,12 @@ import sys
 from collections import Counter
 from typing import Dict, List
 
+from case_engine.paths import data_root
+
 CK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-RUNS = os.path.join(CK, "case01", "runs")
+# 2026-10-08:成品记录已搬到仓根 data/case01/runs;写死老路径会**静默扫到 0 条**
+# (分析照样出一个漂亮的空表,只有 n=0 泄露真相)。
+RUNS = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 OUT_ROOT = os.path.join(CK, "results", "analysis", "router_sensitivity")
 
 
