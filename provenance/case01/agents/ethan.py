@@ -60,6 +60,44 @@ class Ethan:
         self.conflict_check = conflict_check
         self.max_regens = max_regens
         self.last_regens = 0
+        # 这一句是怎么来的(重试几次/撞了哪条规则/是否走了兜底)。调用方把它写进
+        # turns,否则"冲突门有没有生效"在产物里查不到(2026-10-08 补)。
+        self.last_event = {}
+
+    # ------------------------------------------------------------------
+    def _fallback_line(self, visible_state: dict, st: dict, events: list,
+                       pc: dict) -> str:
+        """重生成用尽后的兜底:**只用程序事实**拼一句第一人称陈述。
+
+        出处:06 §八 / 03 §九"如果 API 模型生成与当前交易状态冲突的内容……该内容
+        **不得发送**给 Investment AI,应重新生成符合当前状态的回复"。原实现循环用尽
+        后把最后那条冲突文本照发(等于让当事人对外说假事实),而且不留任何痕迹。
+        这里宁可少说,不可说错:内容只取程序状态、该节点已释放的公开事件,以及程序
+        在本节点才披露的个人后果文本。
+        """
+        holding = bool(st.get("hcm_shares"))
+        exited = bool(st.get("exited"))
+        cash = round(st.get("cash_rmb", 0) or 0)
+        if holding and not exited:
+            own = "我目前还持有 HCM,买入均价大约 ${} 附近,还没有卖出".format(
+                st.get("entry_price_usd"))
+        elif holding and exited:
+            own = "我之前买过 HCM,后来已经卖出,现在不持仓,可用现金约 {} 元".format(cash)
+        else:
+            own = "我没有买 HCM,现在不持仓,可用现金约 {} 元".format(cash)
+        bits = ["今天是 {},{}".format(visible_state.get("current_date", ""), own)]
+        if events:
+            e = events[-1]
+            summary = str(e.get("summary") or "").strip()
+            if summary:
+                bits.append("最近一条公开消息是 {} 的:{}".format(e.get("date", ""),
+                                                                 summary))
+        ctx = str((pc or {}).get("hidden_context")
+                  or (pc or {}).get("personal_note") or "").strip()
+        if ctx:
+            bits.append(ctx)
+        # 各段自带句号时不要再叠一个("……区间。。这笔钱……"实测出现过)
+        return "。".join(str(b).rstrip("。；;") for b in bits)
 
     # ------------------------------------------------------------------
     def _check_conflict(self, text: str, holding: bool, exited: bool) -> Optional[str]:
@@ -116,6 +154,9 @@ class Ethan:
                 extra=directive or "请自然表达你的现状/下一步。"))
         holding = bool(st.get("hcm_shares"))
         exited = bool(st.get("exited"))
+        self.last_event = {}
+        reply = ""
+        conflict = None
         for attempt in range(self.max_regens + 1):
             reply = self.llm.chat([
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -123,9 +164,14 @@ class Ethan:
             ], temperature=0.8)
             self.last_regens = attempt
             if not self.conflict_check:
+                self.last_event = {"attempts": attempt + 1, "checked": False}
                 return reply or ""
             conflict = self._check_conflict(reply or "", holding, exited)
             if conflict is None:
+                self.last_event = {"attempts": attempt + 1}
                 return reply or ""
-            # 冲突:不发送,重生成(record 由调用方记录 regen)
-        return reply or ""
+            # 冲突:不发送,重生成
+        # 用尽仍冲突 ⇒ **不发那条**(06 §八),换成只用程序事实的兜底陈述,并留痕。
+        self.last_event = {"attempts": self.max_regens + 1, "conflict_tag": conflict,
+                           "fallback_used": True}
+        return self._fallback_line(visible_state, st, events, pc)
