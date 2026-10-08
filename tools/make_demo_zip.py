@@ -28,15 +28,20 @@ import sys
 import zipfile
 
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def default_package() -> str:
-    """与 verify_demo_sync 同一口径:默认取与仓并列的 demo 包目录。"""
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from verify_demo_sync import DEFAULT_PKG      # 单一来源,别各写一份
-        return DEFAULT_PKG
-    except Exception:                                  # noqa: BLE001
-        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return os.path.join(os.path.dirname(repo), "demo-case01-20261015")
+    """与 verify_demo_sync 同一口径:默认取与仓根并列的 demo 包目录。
+
+    那句"单一来源"此前是假的(2026-10-08 实测):`verify_demo_sync` 在 `provenance/tools/`,
+    本文件在仓根 `tools/`,而旧实现插的是**自己所在目录** ⇒ import 必失败,永远走 except 里
+    的第二份推导。两份当时算出同一个值所以没有数值后果,但默认包目录是交付链上的参数,
+    改一处忘另一处就会漂移。现在真的只有一个来源,导不到就当场抛 —— 不在交付工具里留兜底。
+    """
+    sys.path.insert(0, os.path.join(REPO_ROOT, "provenance", "tools"))
+    from verify_demo_sync import DEFAULT_PKG
+    return DEFAULT_PKG
 
 
 def collect(package: str, out_zip: str, out_side: str):
