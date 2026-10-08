@@ -2,7 +2,7 @@
 """demo 记录双份同步守卫:**服务读的那份**与**交付包里的那份**必须逐字节相同。
 
 为什么要有它(2026-10-05 第六轮只读核查 P2-2):
-    5010/5002 服务实际读取的是**仓内** `case01/runs/demo1015-*`;
+    5010/5002 服务实际读取的是**仓内** `data/case01/runs/demo1015-*`;
     交给对方的 demo 包(`D:\\zzr\\demo-case01-20261015\\`,仓外)是它的副本。
     两处必须一致,否则"演示看到的"和"交付给对方的"是两份东西 ——
     而 `SHA256SUMS.txt` 只覆盖包内,对仓内那份**一无所知**,自证不了这一点。
@@ -25,6 +25,11 @@
 ----
     python -m tools.verify_demo_sync                      # 用默认包路径
     python -m tools.verify_demo_sync --package <目录>      # 指定包根
+    python provenance/tools/verify_demo_sync.py           # 脚本形态(手册/冻结流程教的就是这条)
+
+    ⚠ 两种形态必须给同一个答案。2026-10-08 实测曾分叉:脚本形态的 `sys.path[0]` 是本文件
+    所在目录,`import case_engine` 失败后被 except 兜到已删除的老根,于是 `-m` 报 16/16 一致、
+    手敲报 0/16 全缺。现在文件头显式把包根放上 `sys.path`,且默认根解析**不留兜底**。
 
 退出码:0 = 全同(或缺包目录,视为"没交付包可查");非 0 = 有差异/缺文件。
 """
@@ -36,6 +41,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.dirname(HERE)                      # provenance/provenance
 REPO_ROOT = os.path.dirname(PKG_ROOT)
+# 与 tools/deep_check.py:113 同一自救写法:脚本形态的 sys.path[0] 是本文件所在目录,
+# 而 case_engine 没装进任何 venv ⇒ 不补这一句,compare() 里的 data_root 就导入不到,
+# 于是静默落到 2026-10-08 已删除的老根,把 16/16 一致报成"0/16 全缺"(当晚实测)。
+sys.path.insert(0, PKG_ROOT)
 DEFAULT_PKG = os.path.join(os.path.dirname(REPO_ROOT),
                            "demo-case01-20261015")     # 仓外,默认位置
 
@@ -110,24 +119,24 @@ def check_zip(package: str, zip_path: str = "", require: bool = False) -> tuple:
     return problems
 
 
+def repo_runs_dir() -> str:
+    """仓内成品记录根 —— 与写侧同一个解析口,不在这里留任何兜底。"""
+    from case_engine.paths import data_root
+    return data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+
+
 def compare(package: str, repo_runs: str = "") -> tuple:
     """返回 (missing, diff, n_same)。missing/diff 为 (run, file, 说明) 列表。
 
-    `repo_runs` 默认取仓内 `case01/runs`。**可覆盖**是为了让守卫自测能
-    把两侧都指向 tmp 目录 —— 否则这条测试会隐式依赖"仓内正好有 demo 记录",
-    而 `case01/runs/` 是 gitignored 的(CI 干净检出上必然没有),
+    `repo_runs` 默认取 `repo_runs_dir()`(现为仓根 `data/case01/runs`)。**可覆盖**是为了
+    让守卫自测能把两侧都指向 tmp 目录 —— 否则这条测试会隐式依赖"仓内正好有 demo 记录",
+    而 `data/` 是 gitignored 的(CI 干净检出上必然没有),
     守卫自测就会在 CI 上红(2026-10-05 实测踩过:CI run 37297898731)。
     """
-    # 2026-10-08:仓内记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
-    # 只有显式传了 `repo_runs`(测试指向 tmp)时才用它 —— 那条路子必须保持可控。
-    if repo_runs:
-        in_repo = repo_runs
-    else:
-        try:
-            from case_engine.paths import data_root as _data_root
-            in_repo = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
-        except Exception:  # noqa: BLE001
-            in_repo = os.path.join(PKG_ROOT, "case01", "runs")
+    # 2026-10-08:仓内记录的家搬到仓根 `data/case01/runs/`。这里**不留 except 兜底** ——
+    # 兜底的老根已在当晚被删,静默用它会把"两边一致"报成"仓内一条都没有"(2026-10-08 实测:
+    # `-m` 形态 16/16、脚本形态 0/16)。解析不到就当场抛,让人看见是哪个根出问题。
+    in_repo = repo_runs or repo_runs_dir()
     pkg_runs = os.path.join(package, "runs")
     missing, diff, same = [], [], 0
     for run in RUNS:
@@ -161,6 +170,7 @@ def main(argv=None) -> int:
     missing, diff, same = compare(args.package)
     total = len(RUNS) * len(FILES)
     print("包根: {}".format(args.package))
+    print("仓内根: {}".format(repo_runs_dir()))
     print("一致 {}/{}".format(same, total))
     for run, name, why in missing:
         print("  [缺] {}/{}: {}".format(run, name, why))
