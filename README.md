@@ -213,8 +213,9 @@ uv pip install -r requirements.txt pytest
 > and were once submitted by accident), so the live UI at 5010 starts empty and a
 > handful of evidence-dependent tests **skip** rather than run — that is expected,
 > not a broken setup. To produce your own: `python -m case01.run --run-id <id>`
-> (~1-2 min/run), or a batch via `python -m case01.tools.batch_run --duration-min 180
-> --lanes 3 --model qwen3:8b`. Tests that need the missing data say which path they
+> (~2–6 min/run for qwen3:8b on a single lane; measured end-to-end ~3 min, the cold
+> first T0 turn is the slowest), or a batch via `python -m case01.tools.batch_run
+> --duration-min 180 --lanes 1 --model qwen3:8b`. Tests that need the missing data say which path they
 > want (e.g. `tests/test_metric_semantics.py` points at `data/case00/state`) —
 > feed it from your own runs, or drop the project-supplied demo package into
 > `data/case01/runs/` (see `provenance/docs/专家导览_怎么看provenance.md` — note it is

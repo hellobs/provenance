@@ -10,7 +10,8 @@ case00 = provenance 原有的 6 角色投资咨询场景(最一开始那套多 a
   `conversation.json`),不是 case01 那种单文件 `run.json`,没有 reflection/router;
 - case00 **已冻结、后续不维护**,所以这里只做"能看"的最小面,不承诺机器可读契约。
 
-存档不复制:2.2 GB 仍在 `results/checkpoints/`,本服务只读它并给索引与摘要。
+存档根由 `data_root("case00.state")` 解析(目标 `data/case00/state/`;`CASE00_CHECKPOINTS_ROOT`
+可显式覆盖,搬迁期老位置 `results/checkpoints/` 仍回落并出声),本服务只读它并给索引与摘要。
 """
 import argparse
 import json
@@ -135,11 +136,15 @@ def index():
  <div class="note">
   case00 = 仓库原有的 6 角色投资咨询场景，<b>已冻结、后续不维护</b>。
   实时可视化走 <code>live_switch.py --start case00</code>（<b>5010</b>，与 case01 互斥共用）；
-  本服务（5003）只读 <code>results/checkpoints/</code>，存档不复制。
+  本服务（5003）只读 <code>{root}</code>（由 case00.state 根解析，存档不复制）。
  </div>
  <h2 style="font-size:14px;color:#456;">可用存档（{count} 个）</h2>
  <ul>{rows}</ul>
-</main></body></html>""".format(count=len(rows), rows="".join(rows) or "<li>（空）</li>")
+</main></body></html>""".format(count=len(rows), rows="".join(rows) or "<li>（空）</li>",
+                           # 以真仓根(REPO_ROOT 的上一层,data/ 所在处)为基准显示,
+                           # 与 README/文档口径一致;env 覆盖到仓外时如实回退成 ../ 或绝对路径。
+                           root=os.path.relpath(
+                               CKPT_ROOT, os.path.dirname(REPO_ROOT)).replace(os.sep, "/"))
     return HTMLResponse(html)
 
 

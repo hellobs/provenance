@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """Case 01 Run 记录 → 学术排版 HTML(只读展示,纯文字)。
 
-把 case01/runs/<run_id>/ 的记录渲染成白底窄栏页面,便于评审阅读"过程与
+把成品记录目录(<run_id>/run.json,根由 data_root("case01.records") 解析,
+现行 data/case01/runs/)渲染成白底窄栏页面,便于评审阅读"过程与
 判断链"。零服务依赖:生成静态 HTML,浏览器直接打开。
-输出到 case01/runs_html/(index.html + 每 run 一页)。
+输出到 data_root("case01.html") 解析的目录(现行 data/case01/html/,
+即 5002 服务 /viewer 挂载的目录;index.html + 每 run 一页)。
 
 版式约定(按用户反馈):
 - 页头只放一行定位事实(谁咨询谁、标的、日期、分支),不加导读/摘要;
