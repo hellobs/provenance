@@ -126,9 +126,11 @@ class RunRecorder:
             "audit": [],
         }
 
-    def add_turn(self, speaker, date, text):
-        self.data["turns"].append(
-            {"speaker": speaker, "date": date, "text": text})
+    def add_turn(self, speaker, date, text, extra=None):
+        turn = {"speaker": speaker, "date": date, "text": text}
+        if extra:
+            turn.update(extra)
+        self.data["turns"].append(turn)
 
     def add_retrieval(self, retrieval):
         self.data["retrievals"].append(retrieval)
@@ -182,17 +184,34 @@ def _fmt_rmb(v) -> str:
         return str(v)
 
 
+def _ethan_gen(ethan) -> dict:
+    """这句 Ethan 话的生成留痕:重试了几次、撞了哪条冲突规则、有没有走兜底。
+
+    必要性:06 §八 的冲突门原来只在内存里判断,`last_regens` 无人读取也不落盘,
+    于是"这条规则在真实批次里到底生效过没有"在产物里查不到(2026-10-08 补)。
+    """
+    ev = getattr(ethan, "last_event", None) if ethan is not None else None
+    return {"ethan_gen": dict(ev)} if ev else {}
+
+
 def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
-               log=print, rules=False, ethan_llm=None, router_llm=None):
+               log=print, rules=False, ethan_llm=None, router_llm=None,
+               reflect_router_llm=None):
     """执行一次完整 Case 01 Run,返回 recorder。
 
     llm: OllamaClient(Investment AI 检索+回答,必须本地;no_llm=True 时为 None)
     ethan_llm: Ethan 用的 client(默认=llm;建议 OpenRouterClient)
     router_llm: Branch 判定/C 仓位解析用 client(默认=llm;建议 OpenRouterClient)
+    reflect_router_llm: **反思 Router(N7)专用** client。04 §五 / 06 §七 要求 Router
+        不得由本地 Investment AI 自我分类;给 None 时仍会回落(老行为不变),但落盘
+        里会如实记 `router.executed_by.source="local_fallback"`,违规在产物里看得见。
+        只切 N7:N4 分支判定/N5 仓位解析/一致性判官继续用 router_llm —— 换它们会
+        直接改动分支分布,而那是已入库的测量结论(#43/#56 依赖)。
     timeline: None=自动判定;A/B/C=强制
     rules: no_llm 时是否用规则判定(Branch C 无解析 → placeholder)
     """
-    from .agents.llm import OllamaClient, OpenRouterClient, local_client_from_env
+    from .agents.llm import (OllamaClient, OpenRouterClient, local_client_from_env,
+                             router_identity)
     from .agents.financial import FinancialData
     from .agents.investment_ai import InvestmentAI
     from .agents.ethan import Ethan
@@ -203,6 +222,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         # 表现为设了 8b 却仍跑 4b(实测 Ollama 驻留 4b、台账 cmd 里也无模型参数)。
         llm = local_client_from_env()
     ethan_llm = ethan_llm or llm
+    router_given = router_llm                       # 回落前的原值,用于如实记来源
     router_llm = router_llm or llm
     run_id = run_id or time.strftime("run-%Y%m%d-%H%M%S")
     out_dir = os.path.join(RUNS_ROOT(), run_id)
@@ -235,7 +255,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     else:
         ethan_msg = no_llm_t0_text()
         log("=== Ethan (T0, no-llm) ===")
-    rec.add_turn("ethan", world.date, ethan_msg)
+    rec.add_turn("ethan", world.date, ethan_msg, extra=_ethan_gen(ethan))
     t0_history.append({"speaker": "ethan", "text": ethan_msg})
     log(ethan_msg + "\n")
 
@@ -258,7 +278,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         refuse = ethan.speak(world.ethan_visible(),
                              refusal_directive_text(answer))
         log("=== Ethan (T0, 拒答隐私) ===")
-        rec.add_turn("ethan", world.date, refuse)
+        rec.add_turn("ethan", world.date, refuse, extra=_ethan_gen(ethan))
         t0_history.append({"speaker": "ethan", "text": refuse})
         log(refuse + "\n")
         # AI 基于全部已有对话给出最终结论(≤2 轮,不无限追问)
@@ -412,7 +432,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     else:
         ethan_fb = no_llm_final_text(branch)
         log("=== Ethan 最终反馈 (no-llm) ===")
-    rec.add_turn("ethan", world.date, ethan_fb)
+    rec.add_turn("ethan", world.date, ethan_fb, extra=_ethan_gen(ethan))
     log(ethan_fb + "\n")
 
     if ai is not None:
@@ -445,22 +465,39 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
             log("[warn] Reflection 失败: {}".format(_re))
             rec.data["reflection"] = _failed_reflection(_re)
 
-        # Router(独立模型:router_llm,缺省回落到本地)
-        # reflection 失败时没有正文可拆,Router 直接标"未执行"而不是再抛一次。
-        rllm = router_llm or llm
+        # Router(04 §五:必须是独立 API 模型)。优先用 reflect_router_llm(按
+        # CASE01_ROUTER_PROVIDER 造的那个),没有才退回今天的共享 client / 本地,
+        # 并把**实际是谁**写进产物 —— 违规要能在批产物里查出来,不靠注释保证。
+        rllm = reflect_router_llm or router_llm
+        executed_by = dict(router_identity(rllm))
+        executed_by["source"] = (
+            "reflect_router" if reflect_router_llm is not None else
+            ("shared_router_llm" if router_given is not None else "local_fallback"))
+        # 04 §五 的判据拆成两个,不能合成一个叫"独立"的布尔:
+        #   separate_client_from_reflection = N7 用的是另一个 client 对象;
+        #   external_api = 那个对象**不在本机**(host 不是 127.0.0.1/localhost)。
+        # 只满足前者、后者不满足的情况真实存在(vllm provider 指向本机 Ollama),
+        # 合成一个字段就会把它读成"已合规"。
+        executed_by["separate_client_from_reflection"] = (
+            rllm is not None and rllm is not llm)
+        executed_by["external_api"] = executed_by.get("provider") == "api"
         if rec.data["reflection"].get("quality", {}).get("status") == "error":
             log("[warn] Router 跳过:反思未生成,无正文可拆")
             rec.data["router"] = _failed_router(
                 RuntimeError("上游反思未生成,Router 未执行"), executed=False)
+            rec.data["router"]["executed_by"] = executed_by
         else:
             try:
-                log("=== Router(问题拆分/分类/风险/路由) ===")
+                log("=== Router(问题拆分/分类/风险/路由) 后端={} {}@{} ===".format(
+                    executed_by["source"], executed_by["model"],
+                    executed_by["host"] or "local"))
                 router_out = run_router(rllm, rec.data["reflection"]["text"])
                 rec.data["router"] = {
                     "raw": router_out["raw"],
                     "issues": router_out["issues"],
                     "postprocess": router_out.get("postprocess", {}),
-                    "expert_pool_version": router_out.get("expert_pool_version", "")}
+                    "expert_pool_version": router_out.get("expert_pool_version", ""),
+                    "executed_by": executed_by}
                 log("Router 拆分 {} 个问题".format(len(router_out["issues"])))
                 for _iss in router_out["issues"]:
                     log("  - [{}] {} | {} | {}".format(
@@ -469,6 +506,10 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
             except Exception as _re:
                 log("[warn] Router 失败: {}".format(_re))
                 rec.data["router"] = _failed_router(_re)
+                # 失败路径同样要写"是谁做的":实测第一次探针跑就是死在这里 ——
+                # 外部端点 403,产物却只有 error 文本、executed_by 为 null,
+                # 于是"这次到底调了哪个后端"在记录里查不到(2026-10-08)。
+                rec.data["router"]["executed_by"] = executed_by
 
     # ---- 7) 审计与落盘 ----
     rec.data["audit"] = world.audit()
@@ -496,7 +537,10 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
                          # 三个客户端(常常是同一两个对象),而判定只认其中一个 ——
                          # 只报判定那份会把另外两处的截断说成"没发生"。
                          llms={"对话 llm": llm, "Ethan": ethan_llm,
-                               "router": router_llm},
+                               # N7 换成独立 API 模型后它是一个**新对象**;不加进这张表,
+                               # 外部 Router 被截断就永远不会出现在 manifest_warnings 里。
+                               "router": router_llm,
+                               "Router 独立模型": reflect_router_llm},
                          backend_kind="" if judge_client is not None else "rules"),
         financial_dir=FIN_DIR(), engine_id=RUN_ENGINE_ID)
     if (rec.data.get("consistency") or {}).get("method") == "quick_scan":

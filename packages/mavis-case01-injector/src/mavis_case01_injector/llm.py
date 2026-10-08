@@ -550,3 +550,136 @@ class OpenRouterClient(_ChatMixin):
             "Content-Type": "application/json",
             "Authorization": "Bearer " + self._api_key,
         }
+
+
+# ---------------------------------------------------------------------------
+# Router(N7)专用:把"反思的问题拆分"交给一个**不是本地 Investment AI 自己**的模型
+# ---------------------------------------------------------------------------
+# 出处:0904doc 04 §五"由一个独立 API 大语言模型承担 Router 功能。Router 不使用本地
+# Investment AI 本身进行自我分类";06 §七、03 §十四同。2026-10-07 逐条对照查出批路径
+# 一直在违反:`router_llm` 缺省回落到本地同一个模型,于是"反思自己拆问题给自己审"。
+# 这里只切 N7 一处 —— N4 分支判定/N5 仓位解析/一致性判官仍用原来的 `router_llm`,
+# 因为换它们会直接改变分支分布(那是已入库的测量结论,#43/#56 依赖它)。
+
+BIGMODEL_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+BIGMODEL_ROUTER_MODEL = "glm-4.7-flash"
+OPENROUTER_ROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+
+
+def _host_of(base: str) -> str:
+    return str(base or "").split("//")[-1].split("/")[0]
+
+
+def _secrets_files() -> List[str]:
+    """按引擎同一顺序找 .secrets.json:case01 包根、其上一层(应用根)、git 根。"""
+    out = []
+    try:
+        import case01
+        app = os.path.dirname(os.path.dirname(os.path.abspath(case01.__file__)))
+    except ImportError:
+        app = ""
+    for base in (app, os.path.dirname(app) if app else ""):
+        if base:
+            out.append(os.path.join(base, ".secrets.json"))
+            out.append(os.path.join(base, "case01", ".secrets.json"))
+    out.append(os.path.join(os.path.abspath(__file__), "..", "..", "..", "..",
+                            ".secrets.json"))
+    seen, res = set(), []
+    for p in out:
+        p = os.path.normpath(p)
+        if p not in seen and os.path.exists(p):
+            seen.add(p)
+            res.append(p)
+    return res
+
+
+def _secret_value(env_name: str, json_name: str) -> str:
+    """env 优先,再逐个 secrets 文件取 json_name(只取值,绝不打印)。"""
+    k = os.environ.get(env_name, "").strip()
+    if k:
+        return k
+    for p in _secrets_files():
+        try:
+            with open(p, encoding="utf-8") as f:
+                v = str(json.load(f).get(json_name, "")).strip()
+        except (OSError, ValueError):
+            continue
+        if v:
+            return v
+    return ""
+
+
+def router_identity(client) -> dict:
+    """这台机器**实际**是谁:从对象属性读,不读配置字符串。
+
+    必要性:04 §五 要的是"独立模型"这件事**可查**。若只写一句"已用外部 API",
+    批产物里就没有判据 —— 与 #13 那条陷阱同族(结论依赖的变量没落进产物)。
+    合规相关的两个布尔(`separate_client_from_reflection` / `external_api`)由调用方
+    比对象、看 host 之后填 —— 它们不等价:把 vllm provider 指向本机 Ollama 时,
+    前一个是真、后一个是假。
+    """
+    if client is None:
+        return {"provider": "none", "model": "", "host": ""}
+    host = _host_of(getattr(client, "base_url", ""))
+    provider = "local" if host.startswith(("127.0.0.1", "localhost", "::1")) else "api"
+    return {"provider": provider, "model": str(getattr(client, "chat_model", "")),
+            "host": host}
+
+
+def router_client_from_env():
+    """按 `CASE01_ROUTER_PROVIDER` 造 N7 的客户端,返回 (client, identity)。
+
+    没配 provider ⇒ 返回 (None, {}),调用方照实回落本地并在产物里记
+    `source="local_fallback"`(违规要看得见,不给静默兜底)。
+    provider 取值:`bigmodel`(默认 `glm-4.7-flash`,key 走 `BIGMODEL_API_KEY`
+    或 `.secrets.json` 的 `bigmodel_api_key`)/ `openrouter`(沿用既有 key 解析)/
+    `vllm`(自配 `CASE01_ROUTER_BASE_URL`,兼容任何 OpenAI 兼容端点)。
+    可选覆盖:`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、`CASE01_ROUTER_TIMEOUT`。
+    """
+    provider = os.environ.get("CASE01_ROUTER_PROVIDER", "").strip().lower()
+    if not provider:
+        return None, {}
+    model = os.environ.get("CASE01_ROUTER_MODEL", "").strip()
+    base = os.environ.get("CASE01_ROUTER_BASE_URL", "").strip()
+    try:
+        timeout = float(os.environ.get("CASE01_ROUTER_TIMEOUT", "") or 180.0)
+    except ValueError:
+        raise ValueError("CASE01_ROUTER_TIMEOUT 要是一个数,收到:{!r}".format(
+            os.environ.get("CASE01_ROUTER_TIMEOUT")))
+    if provider == "bigmodel":
+        key = _secret_value("BIGMODEL_API_KEY", "bigmodel_api_key")
+        if not key:
+            raise RuntimeError(
+                "CASE01_ROUTER_PROVIDER=bigmodel 但取不到 key:设环境变量 "
+                "BIGMODEL_API_KEY,或写 .secrets.json 的 bigmodel_api_key(不入 git)")
+        client = OpenRouterClient(
+            model=model or BIGMODEL_ROUTER_MODEL, base_url=base or BIGMODEL_BASE_URL,
+            api_key=key, timeout=timeout,
+            # 拆问题是短 JSON 任务:开着 reasoning 会把正文挤出 max_tokens
+            # (与 branch_judge_eval 对 BigModel 的同一处置,2026-09-27 实测)
+            extra_body={"thinking": {"type": "disabled"}})
+    elif provider == "openrouter":
+        key = _openrouter_key()
+        if not key:
+            raise RuntimeError(
+                "CASE01_ROUTER_PROVIDER=openrouter 但取不到 OPENROUTER_API_KEY")
+        client = OpenRouterClient(model=model or OPENROUTER_ROUTER_MODEL,
+                                  base_url=base or "https://openrouter.ai/api/v1",
+                                  api_key=key, timeout=timeout)
+    elif provider == "vllm":
+        if not base:
+            raise ValueError("CASE01_ROUTER_PROVIDER=vllm 需要 CASE01_ROUTER_BASE_URL")
+        if not model:
+            raise ValueError("CASE01_ROUTER_PROVIDER=vllm 需要 CASE01_ROUTER_MODEL"
+                            "(这个后端没有有意义的默认模型名)")
+        client = VLLMClient(base_url=base, chat_model=model,
+                            embed_model=model,
+                            api_key=_secret_value("CASE01_ROUTER_API_KEY",
+                                                  "router_api_key"),
+                            timeout=timeout)
+    else:
+        raise ValueError("CASE01_ROUTER_PROVIDER 只认 bigmodel/openrouter/vllm,"
+                         "收到:{}".format(provider))
+    ident = router_identity(client)
+    ident["provider"] = provider
+    return client, ident

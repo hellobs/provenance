@@ -131,6 +131,8 @@ def _row(run_id: str, d: Dict, source: str = "ledger") -> Dict:
         # 失败/未执行的显式标记(2026-10-03):统计要能把它们摘出去,
         # 否则"没跑成"会被当成"跑出来但很差"混进均值。
         "router_status": router.get("status") or "",
+        # Router 实际由谁做的(04 §五 要求独立 API 模型;2026-10-08 起记录里才有这个字段)
+        "router_backend": router.get("executed_by") or {},
         # 口径与 full_context._reflection_failed 保持一致:error 状态,或旧版
         # (2026-10-03 前)无 quality 块只剩占位文本,都算"没跑成";
         # status=fail 不算(那是质量门判真反思差)。
@@ -416,6 +418,16 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
             "n_scored": len(issues),
             "n_excluded_not_scored": len(rows) - len(issues),
             "router_status_dist": _dist([r.get("router_status") or "ok" for r in rows]),
+            # 04 §五 判据:Router 必须是独立 API 模型。历史批没有这个字段 ⇒ 一律读成
+            # "未知(该批跑在字段落地之前)",不要读成"违规已修"。
+            "router_backend_dist": _dist([
+                "{}|{}|api={}".format(
+                    (r.get("router_backend") or {}).get("source", "(字段未记录)"),
+                    (r.get("router_backend") or {}).get("model", ""),
+                    (r.get("router_backend") or {}).get("external_api"))
+                for r in rows if (r.get("router_backend"))]),
+            "n_rows_without_backend_field": sum(
+                1 for r in rows if not r.get("router_backend")),
             # 兼容旧键:留 `n` 但语义写进注释,免得老脚本 KeyError。
             # 新读者请用 `n_scored`。
             "n": len(issues),
@@ -549,6 +561,11 @@ def _md(a: Dict) -> str:
         "- 每条记录 issue 数分布:{}".format(
             ", ".join("{}条→{}次".format(k, v)
                       for k, v in sorted(r["issues_dist"].items()))),
+        # 04 §五:Router 必须是独立 API 模型 —— 这批到底是谁做的,当场可读
+        "- Router 后端(04 §五 要独立 API 模型):{}".format(
+            ", ".join("{}→{}次".format(k, v)
+                      for k, v in sorted(r.get("router_backend_dist", {}).items()))
+            or "(这一批跑在 `router.executed_by` 字段落地之前,后端无从可查)"),
         "",
         "## 4. 一致性",
         "",

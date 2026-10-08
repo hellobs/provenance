@@ -80,25 +80,37 @@ def main():
             print("run not found:", run_id)
             sys.exit(1)
         rec_data = _json.load(open(p, encoding="utf-8"))
-        from case01.agents.llm import OpenRouterClient
+        from case01.agents.llm import (OpenRouterClient, local_client_from_env,
+                                       router_client_from_env, router_identity)
         from case01.reflection import run_reflection, run_router
         # 与主路径同源:走 local_client_from_env() 而不是 OllamaClient(seed=seed)。
         # 后者在 seed 为 None(未显式传)时会**丢掉** CASE01_LLM_SEED,
         # 于是"同一批带 seed 的记录补跑反思"反而不可复现(2026-10-05 修)。
-        from case01.agents.llm import local_client_from_env
         local = _local_hf_client() if args.local_hf else local_client_from_env()
-        router = OpenRouterClient() if args.external_ethan else local
+        # Router 后端优先级(04 §五 要独立模型):CASE01_ROUTER_PROVIDER > --external-ethan
+        # 的共享外部 client > 本地。实际是谁一律写进 router.executed_by。
+        api_router, _ = router_client_from_env()
+        if api_router is None and args.external_ethan:
+            api_router = OpenRouterClient()
+        router = api_router or local
+        _id = router_identity(router)
+        _id["source"] = ("reflect_router" if api_router is not None else
+                         "local_fallback")
+        _id["separate_client_from_reflection"] = router is not local
+        _id["external_api"] = _id.get("provider") == "api"
         print("=== Reflection ===")
         ref = run_reflection(local, rec_data)
         rec_data["reflection"] = {"material": ref["material"],
                                   "text": ref["text"],
                                   "quality": ref.get("quality", {})}
         print(ref["text"][:500])
-        print("\n=== Router ===")
+        print("\n=== Router(后端={} {}@{}) ===".format(
+            _id["source"], _id["model"], _id["host"] or "local"))
         rout = run_router(router, ref["text"])
         rec_data["router"] = {"raw": rout["raw"], "issues": rout["issues"],
                               "postprocess": rout.get("postprocess", {}),
-                              "expert_pool_version": rout.get("expert_pool_version", "")}
+                              "expert_pool_version": rout.get("expert_pool_version", ""),
+                              "executed_by": _id}
         print("issues:", len(rout["issues"]))
         for i in rout["issues"]:
             print(" -", i)
@@ -114,6 +126,13 @@ def main():
         from case01.agents.llm import OpenRouterClient
         ethan_llm = OpenRouterClient()
         router_llm = OpenRouterClient()
+    # Router(N7)专用独立模型:CASE01_ROUTER_PROVIDER=bigmodel|openrouter|vllm。
+    # 批子进程继承环境变量,所以 batch_run 不用改;没配就是 None(照今天行为回落,
+    # 但落盘的 router.executed_by 会记 source="local_fallback")。
+    reflect_router_llm = None
+    if not args.no_llm:
+        from case01.agents.llm import router_client_from_env
+        reflect_router_llm, _ = router_client_from_env()
 
     # 种子链:把"人敲的那一个数"摊到两条流 —— 模型侧仍走 CASE01_LLM_SEED(原值,
     # 所以 manifest.seed 记的还是它),世界动力学侧按 master+run_id 派生后播种。
@@ -128,7 +147,7 @@ def main():
 
     run_case01(llm=local_llm, timeline=args.timeline, run_id=args.run_id,
                no_llm=args.no_llm, ethan_llm=ethan_llm,
-               router_llm=router_llm)
+               router_llm=router_llm, reflect_router_llm=reflect_router_llm)
 
     if rng_info:
         from .orchestrator import RUNS_ROOT

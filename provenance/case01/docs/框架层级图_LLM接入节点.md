@@ -39,10 +39,11 @@
 | N4 | **Branch Judge**（`world/branch.py`） | T0 回答 → A/B/C | 默认本地；**可切换** OpenRouter（用 `router_llm`） | 本地 | 0.1 | Investment AI 的 T0 回答 | `{branch, reason}` |
 | N5 | **ConditionPlanParser**（`world/branch.py`） | C 建议 → 可执行仓位 | 默认本地；可切换 OpenRouter（用 `router_llm`） | 本地 | 0.1 | 条件化建议文本 | `{action, fraction, trigger, ...}` |
 | N6 | **Reflection（8 维反思）**（`reflection.py`） | Run 后的经历回顾 | **本地 Ollama，与 Investment AI 同源**（0904 硬性：本地、同源，不走外部） | 本地 | 0.4 | Investment AI 有权知道的完整经历 | 8 维中文反思文本 |
-| N7 | **Router（问题拆分 / 路由）**（`reflection.py`） | Reflection → 若干待审问题 | **推荐外部 OpenRouter**（独立模型，与反思同模型无意义）；默认可回退本地 | 本地（默认）/ 外部（推荐） | — | Reflection 文本 | `issues[]: {摘要, 专业类别, 风险等级, 路由理由}` |
+| N7 | **Router（问题拆分 / 路由）**（`reflection.py`） | Reflection → 若干待审问题 | **04 §五 要求独立 API 模型，不得由 N6 那个本地模型自我分类**。按 `CASE01_ROUTER_PROVIDER`=`bigmodel`/`openrouter`/`vllm` 单独造一个 client（`reflect_router_llm`）；没配则回落本地并在产物里记 `router.executed_by.source="local_fallback"` | 本地（默认，= 违规可见）/ 外部（按 env） | — | Reflection 文本 | `issues[]: {摘要, 专业类别, 风险等级, 路由理由}` + `executed_by` |
 | N8 | **（规划中）浩泽大模型 API** | 会议：AI 助手将接入浩泽大模型 | 外部 API | — | — | 同 N1/N3/N7 按需替换 | — |
 
 > 说明：`orchestrator.run_case01` 里 `ethan_llm` / `router_llm` 缺省都指向本地 `llm`（Ollama）；`run.py --external-ethan` 可将 N3 / N4 / N5 / N7 切到 OpenRouter。Reflection（N6）始终本地、同源。
+> **N7 从 2026-10-08 起有独立开关**：`CASE01_ROUTER_PROVIDER` 只切 N7（BigModel 默认 `glm-4.7-flash`，key 走 `BIGMODEL_API_KEY` 或 `.secrets.json` 的 `bigmodel_api_key`；OpenRouter 沿用既有 key 解析；任何 OpenAI 兼容端点用 `vllm` + `CASE01_ROUTER_BASE_URL`/`CASE01_ROUTER_MODEL`）。**刻意不动 N4/N5/一致性判官** —— 换它们会直接改动分支分布，而分支分布是已入库的测量结论（#43/#56 依赖）。批子进程继承环境变量，所以 `batch_run` 不用改；每条记录的 N7 后端落在 `run.json` 的 `router.executed_by`，`batch_analyze` 的 §3 会打印"Router 后端"。
 
 ## 2.1 mavis 路径的 LLM 接入节点（2026-09-17 起当前运行架构）
 
