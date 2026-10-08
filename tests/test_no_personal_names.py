@@ -12,6 +12,8 @@ import io
 import os
 import re
 
+import pytest
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 _PKG = os.path.join(_REPO, "provenance")
@@ -105,10 +107,20 @@ def test_guard_itself_catches_case_variants():
 
 
 def test_commit_msg_hook_exists_in_both_repos():
-    """提交信息守卫要真的在(否则"提交信息也不许带名字"只是口头约定)。"""
-    for root in (_REPO, _MAVIS):
+    """提交信息守卫要真的在(否则"提交信息也不许带名字"只是口头约定)。
+
+    引擎仓那一半**按它在不在默认同级位置决定跑不跑**:`tools/setup_all.py` 明确允许
+    `--engine-dir` 指到任意路径,把"恰好并列在同级"当成断言前提,会让换了目录布局的人
+    撞一条与命名规范无关的红测,而报的内容还是"缺提交信息钩子"—— 把人往错方向带
+    (2026-10-08 晚实测:同级没有引擎仓时这条就是 FAILED,而不是 skip)。
+    本仓那一半照常硬校验,顺序在前,不会被跳过掩盖。
+    """
+    for root, why in ((_REPO, "本仓"), (_MAVIS, "引擎仓")):
+        if why == "引擎仓" and not os.path.isdir(root):
+            pytest.skip("引擎仓不在默认同级位置 {};它由 setup_all --engine-dir 决定,"
+                        "本仓钩子已在上面校验过".format(root))
         hook = os.path.join(root, ".githooks", "commit-msg")
-        assert os.path.isfile(hook), "缺提交信息钩子: {}".format(hook)
+        assert os.path.isfile(hook), "缺{}提交信息钩子: {}".format(why, hook)
         txt = io.open(hook, encoding="utf-8", errors="replace").read()
         for w in FORBIDDEN:
-            assert w in txt, "钩子里没有禁用词 {}".format(w)
+            assert w in txt, "{}钩子里没有禁用词 {}".format(why, w)
