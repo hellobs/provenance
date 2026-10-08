@@ -11,7 +11,7 @@
 用法(在 provenance/provenance 下):
 
     python -m case01.tools.reflection_audit                    # 只体检(不写)
-    python -m case01.tools.reflection_audit --runs-dir case01/runs
+    python -m case01.tools.reflection_audit --runs-dir <记录根,默认 data/case01/runs>
     python -m case01.tools.reflection_audit --clean --write    # 剥掉客套开场白并写盘
 
 退出码:0 = 没有"疑似截断"也没有读不了的文件;1 = 二者至少有一种(**与 --clean 无关**,
@@ -22,6 +22,8 @@ import glob
 import io
 import json
 import os
+
+from case_engine.paths import data_root
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -76,7 +78,9 @@ def audit_one(rec):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="反思文本体检 / 清理客套开场白")
-    ap.add_argument("--runs-dir", default="case01/runs")
+    # 2026-10-08:默认值改走 data_root(成品记录已搬到 data/case01/runs)
+    ap.add_argument("--runs-dir", default=data_root("case01.records",
+                                                    env_var="CASE01_RUNS_ROOT"))
     ap.add_argument("--clean", action="store_true", help="剥掉开头的客套话")
     ap.add_argument("--write", action="store_true", help="配合 --clean 真写盘")
     args = ap.parse_args(argv)

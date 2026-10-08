@@ -32,7 +32,7 @@ case01 不写平台,平台不写 case01;两边通过只读 HTTP 接口单向取�
 | 服务 | `provenance/case01/serve.py`(FastAPI,只读) |
 | 地址 | `http://127.0.0.1:5002` |
 | 启动 | `uvicorn case01.serve:app --host 127.0.0.1 --port 5002`(在 `D:\zzr\provenance\provenance` 下) |
-| 数据根 | 默认 `case01/runs/`;可用环境变量 `CASE01_RUNS_ROOT` 覆盖 |
+| 数据根 | 默认 `data/case01/runs/`(仓根 data/ 下);可用环境变量 `CASE01_RUNS_ROOT` 覆盖 |
 | OpenAPI | `GET /openapi.json`(交互文档在 `GET /docs`) |
 | CORS | 开发期全放开(GET only),平台接入后建议收紧域名 |
 | 鉴权 | 本阶段无;服务仅监听 127.0.0.1,不做写操作 |

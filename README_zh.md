@@ -182,14 +182,14 @@ uv pip install -r requirements.txt pytest
 > pytest provenance/case_engine/tests provenance/case01/tests
 > ```
 >
-> **新克隆的仓库里没有运行数据。** `provenance/case01/runs/` 与
-> `provenance/results/checkpoints/` 是有意不入库的(体量大,且曾被误提交过),
+> **新克隆的仓库里没有运行数据。** `data/case01/runs/` 与
+> `data/case00/state/` 是有意不入库的(体量大,且曾被误提交过),
 > 所以 5010 实时面启动时是空的,少数依赖证据的测试会 **skip 而不是跑** ——
 > 这是预期行为,不是环境没配好。自己产出数据:`python -m case01.run --run-id <id>`
 > (每条约 1-2 分钟),或批量 `python -m case01.tools.batch_run --duration-min 180
 > --lanes 3 --model qwen3:8b`。缺数据时测试会说明它要哪个路径
-> (例如 `tests/test_metric_semantics.py` 指向 `results/checkpoints`)——
-> 用你自己跑出来的数据喂它,或把项目提供的 demo 包解压进 `provenance/case01/runs/`
+> (例如 `tests/test_metric_semantics.py` 指向 `data/case00/state`)——
+> 用你自己跑出来的数据喂它,或把项目提供的 demo 包解压进 `data/case01/runs/`
 > (见 `docs/专家导览_怎么看provenance.md`)。
 
 ## 3. 配置大模型(二选一)
@@ -248,8 +248,8 @@ python app.py
 - `/agents` — 已配置角色列表
 
 字段清单见 `provenance/config_tool/角色字段清单.md`。config_tool 产物默认写入本平台的
-`provenance/frontend/static/assets/village/agents/` 与 `provenance/scenarios/`
-(可通过环境变量 `MAVIS_ASSETS_ROOT` / `MAVIS_SCENARIOS_DIR` 覆盖)。
+`provenance/frontend/static/assets/village/agents/` 与 **case 自己的 `scenario/`**
+(可通过环境变量 `MAVIS_ASSETS_ROOT` 覆盖;`MAVIS_SCENARIOS_DIR` **已废弃且被忽略**)。
 新增角色后,重启仿真服务器(5010)即可让新角色进入模拟。
 
 ## 6. 运行参数
@@ -413,7 +413,7 @@ python provenance/tools/verify_demo_sync.py --require-zip   # ③ 交付件一�
 重打是一条命令(`python tools/make_demo_zip.py`,先加 `--dry-run` 可以只看条目);
 按顺序的交付清单在 `provenance/docs/冻结流程_打包装箱一页纸.md`。
 
-**克隆下来没有的东西**:`provenance/case01/runs/` 与 `provenance/results/checkpoints/`
+**克隆下来没有的东西**:`data/case01/runs/` 与 `data/case00/state/`
 是**故意 gitignore 的**(体积大,且曾经误提交过),所以本仓带的是**派生分析**
 (`provenance/results/analysis/`,已入库),**不含其背后的原始记录**。
 因此依赖原始记录的主张**无法只靠一次克隆复算** —— 这条边界连同"复现三档口径"写在

@@ -21,7 +21,7 @@ case00 是 provenance 平台**最一开始那套多 agent 设定**：6 个角色
   `config.json`（mavis 的 agent/LLM 基础配置）。
   这是**建容器当时的拷贝**，用于冻结留档；实时运行读的仍是平台本体
   （`frontend/static/assets/village/agents/` 与 `case00/scenario/`）。
-- `runs/` —— 运行存档**索引说明**。2.2 GB 的存档留在 `results/checkpoints/`，不复制，见 `runs/README.md`。
+- `runs/` —— 运行存档**索引说明**。2.2 GB 的存档留在 `data/case00/state/`，不复制，见 `runs/README.md`。
 - `serve.py` —— **只读**服务（端口 **5003**）：`/`（存档列表）、`/api/runs`、`/api/runs/{run_id}`、`/health`。
 
 ## 怎么跑

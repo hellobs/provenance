@@ -3,8 +3,8 @@
 
 用法(在 provenance/provenance 下):
 
-    python -m case01.tools.consistency_report                    # case01/runs
-    python -m case01.tools.consistency_report --runs-dir case01/runs_archive_20260919
+    python -m case01.tools.consistency_report                    # 默认记录根
+    python -m case01.tools.consistency_report --runs-dir <记录根>
     python -m case01.tools.consistency_report --only-bad         # 只列不一致/判不了的
 
 退出码:0=全部一致;1=存在不一致或判不了的记录(方便放进流程里当门禁)。
@@ -22,6 +22,8 @@ import glob
 import io
 import json
 import os
+
+from case_engine.paths import data_root
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -84,7 +86,9 @@ def collect(runs_dir):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="打印 Branch 与 AI T0 立场的一致性矩阵")
-    ap.add_argument("--runs-dir", default="case01/runs")
+    # 2026-10-08:默认值改走 data_root(成品记录已搬到 data/case01/runs)
+    ap.add_argument("--runs-dir", default=data_root("case01.records",
+                                                    env_var="CASE01_RUNS_ROOT"))
     ap.add_argument("--only-bad", action="store_true", help="只列不一致/判不了的")
     args = ap.parse_args(argv)
 

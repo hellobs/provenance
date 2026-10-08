@@ -14,11 +14,13 @@
 才站得住。
 
 用法(在 provenance/provenance 下):
-    python -m case01.tools.isolation_probe --branch B --out case01/runs_injector/isolation/probe-B.json
+    python -m case01.tools.isolation_probe --branch B --out <原始记录根>/isolation/probe-B.json(原 case01/runs_injector/ 已搬到 data/case01/raw)
 """
 import argparse
 import json
 import os
+
+from case_engine.paths import data_root
 import sys
 import time
 

@@ -203,16 +203,16 @@ uv pip install -r requirements.txt pytest
 > pytest provenance/case_engine/tests provenance/case01/tests
 > ```
 >
-> **A fresh clone has no run data.** `provenance/case01/runs/` and
-> `provenance/results/checkpoints/` are deliberately gitignored (they are large,
+> **A fresh clone has no run data.** `data/case01/runs/` and
+> `data/case00/state/` are deliberately gitignored (they are large,
 > and were once submitted by accident), so the live UI at 5010 starts empty and a
 > handful of evidence-dependent tests **skip** rather than run — that is expected,
 > not a broken setup. To produce your own: `python -m case01.run --run-id <id>`
 > (~1-2 min/run), or a batch via `python -m case01.tools.batch_run --duration-min 180
 > --lanes 3 --model qwen3:8b`. Tests that need the missing data say which path they
-> want (e.g. `tests/test_metric_semantics.py` points at `results/checkpoints`) —
+> want (e.g. `tests/test_metric_semantics.py` points at `data/case00/state`) —
 > feed it from your own runs, or drop the project-supplied demo package into
-> `provenance/case01/runs/` (see `docs/专家导览_怎么看provenance.md`).
+> `data/case01/runs/` (see `docs/专家导览_怎么看provenance.md`).
 
 ## 3. Configure the LLM (choose one)
 
@@ -292,8 +292,8 @@ Open http://127.0.0.1:8060/
 
 See `provenance/config_tool/角色字段清单.md` for the field list. config_tool
 writes into this platform's `provenance/frontend/static/assets/village/agents/`
-and `provenance/scenarios/` by default (override with `MAVIS_ASSETS_ROOT` /
-`MAVIS_SCENARIOS_DIR`). Restart the simulation server (5010) after adding roles.
+and the case's own `scenario/` by default (override with `MAVIS_ASSETS_ROOT`).
+`MAVIS_SCENARIOS_DIR` is **deprecated and ignored**. Restart the simulation server (5010) after adding roles.
 
 ## 6. Run Options
 
@@ -532,8 +532,8 @@ deleting the zip would look like a pass. Repacking is one command
 (`python tools/make_demo_zip.py`, add `--dry-run` to just list the entries first); the ordered
 delivery checklist is `provenance/docs/冻结流程_打包装箱一页纸.md`.
 
-**What a clone does not contain.** `provenance/case01/runs/` and
-`provenance/results/checkpoints/` are deliberately gitignored (large, and once committed by
+**What a clone does not contain.** `data/case01/runs/` and
+`data/case00/state/` are deliberately gitignored (large, and once committed by
 accident), so this repository ships the **derived analysis**
 (`provenance/results/analysis/`, tracked) but **not the raw run records behind it**. Claims
 that need those records therefore cannot be recomputed from a fresh clone alone — that

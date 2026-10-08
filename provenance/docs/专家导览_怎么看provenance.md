@@ -113,7 +113,7 @@ python live_switch.py --start case01 --review-only
 人机协同闭环的专家动作是**标记一条反思**:`verdict` 取 `correct`(核心成立)、
 `incorrect`(核心逻辑不成立)、`partial`(有遗漏或表述问题),后两者附一段纠正文本。
 入口是 `POST /api/reflections/mark`(统一口为 `POST /api/intervention/mark`);
-落盘在 `results/checkpoints/reflection_marks.json`(加锁 + 原子写),
+落盘在 `data/ledgers/reflection_marks.json`(加锁 + 原子写),
 并同步导出 `.jsonl`,每行含一条原始记录与一个 LoRA 训练样本(SFT 指令样本 + DPO 偏好对)。
 
 需要留意当前的实现边界:现成的**标记面板页 `/embed/reflections` 与反思列表口

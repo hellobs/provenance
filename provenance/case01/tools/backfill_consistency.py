@@ -9,7 +9,7 @@
 
     python -m case01.tools.backfill_consistency            # 只看会怎么改(不写盘)
     python -m case01.tools.backfill_consistency --write    # 真写
-    python -m case01.tools.backfill_consistency --write --runs-dir case01/runs
+    python -m case01.tools.backfill_consistency --write --runs-dir <记录根,默认 data/case01/runs>
 
 **边界**:本工具只会算 `quick_scan`(关键词快筛)。记录上已有 `llm_stance`(立场判官,
 主判据)的戳时**不覆盖它** —— 用弱判据盖掉强判据是口径倒退;source 该补的照补。
@@ -19,6 +19,8 @@ import glob
 import io
 import json
 import os
+
+from case_engine.paths import data_root
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -103,7 +105,10 @@ def backfill(path, write=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="给已有记录回填一致性戳(纯计算)")
-    ap.add_argument("--runs-dir", default="case01/runs")
+    # 2026-10-08:默认值原为相对路径 "case01/runs"(成品记录已搬到 data/case01/runs,
+    # 老默认会直接报"没找到记录");改走 data_root,与环境变量同一口径。
+    ap.add_argument("--runs-dir", default=data_root("case01.records",
+                                                    env_var="CASE01_RUNS_ROOT"))
     ap.add_argument("--write", action="store_true", help="真写盘(默认只看)")
     args = ap.parse_args(argv)
 

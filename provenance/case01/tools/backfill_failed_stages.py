@@ -26,6 +26,8 @@ import argparse
 import io
 import json
 import os
+
+from case_engine.paths import data_root
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))          # .../case01/tools
@@ -34,7 +36,8 @@ _PKG = os.path.dirname(CASE01_DIR)                           # .../provenance
 if _PKG not in sys.path:
     sys.path.insert(0, _PKG)
 
-RUNS_DIR = os.path.join(CASE01_DIR, "runs")
+# 2026-10-08:成品记录已搬到仓根 data/case01/runs(老路径会扫不到任何记录)
+RUNS_DIR = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 
 # 旧实现留下的失败指纹
 _LEGACY_FAIL_TEXT = "(失败)"
@@ -148,7 +151,7 @@ def main(argv=None):
         if patches is None:
             continue
         p = os.path.join(RUNS_DIR, name, "run.json")
-        # 先留一份原件:`case01/runs/` 按约定不入库,没有版本控制兜底,
+        # 先留一份原件:成品记录按约定不入库,没有版本控制兜底,
         # 写错了不可恢复(备份落在被 ignore 的 runs/ 内部,不会污染仓库)。
         bak = p + ".pre-backfill.bak"
         if not os.path.exists(bak):

@@ -1,10 +1,10 @@
 # case00 的运行存档（不复制，仅索引）
 
-case00 的运行存档体积很大——`results/checkpoints/` 下 **38 个 run、合计约 2.2 GB**
+case00 的运行存档体积很大——`data/case00/state/` 下 **38 个 run、合计约 2.2 GB**
 （`stock-en8` 单个就 1849 MB）。**所以这里不放副本**，只放这份说明；真身在原处：
 
 ```
-provenance/provenance/results/checkpoints/<run-name>/
+data/case00/state/<run-name>/(相对仓根)
 ```
 
 一个 run 目录里通常是：

@@ -695,7 +695,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="批次数据分析 + 基线对比")
     ap.add_argument("--batch", default="", help="批次号(读其 ledger.jsonl)")
     ap.add_argument("--scan-runs", action="store_true",
-                    help="直接扫 case01/runs 下所有 run.json")
+                    help="直接扫记录根下所有 run.json")
     ap.add_argument("--prefix", default="", help="配合 --scan-runs 按 run_id 前缀过滤")
     ap.add_argument("--out", default="", help="输出目录(默认写批次目录)")
     ap.add_argument("--fill-from-primary", action="store_true",

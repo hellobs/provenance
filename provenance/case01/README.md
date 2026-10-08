@@ -53,7 +53,7 @@ case01/
 ├─ reflection.py      # Reflection(本地同源)+ Router(问题拆分/路由)+ 容错解析
 ├─ full_context.py    # 专家"查看完整记录"自然语言全文(04 六.3)
 ├─ serve.py           # 只读数据 API(FastAPI,供 Governance Platform)
-├─ render.py          # run → 学术排版 HTML(折叠式演示页,输出 runs_html/)
+├─ render.py          # run → 学术排版 HTML(折叠式演示页,输出 data/case01/html/)
 ├─ run.py             # CLI: python -m case01.run
 ├─ docs/              # 对接契约与说明(OpenAPI / 对接说明 / 启动包)
 ├─ runs/<run_id>/     # 每次 Run 的完整记录(gitignored)
@@ -86,7 +86,7 @@ python -m case01.run --reflect-only --run-id <run_id> --external-ethan
 # 只读数据 API(供 Governance Platform)
 python -m uvicorn case01.serve:app --port 5002   # 需在 provenance 包根目录
 
-# 渲染演示页(case01/runs_html/)
+# 渲染演示页(data/case01/html/)
 python -m case01.render
 ```
 
@@ -211,7 +211,7 @@ Ollama configuration is used.
 5. **Router 输出格式约束**:字段内容内不得出现英文双引号、不得使用
    Markdown 代码围栏包裹 JSON(见 `reflection.ROUTER_JSON_HINT`);解析器
    对历史畸形输出做围栏剥离 + 顶层对象容错恢复。
-6. **演示 run(不入库)**:`runs/` 与 `runs_html/` 为 gitignored 生成物;
+6. **演示 run(不入库)**:`data/case01/runs/` 与 `data/case01/html/` 为 gitignored 生成物;
    2026-09-05 真机三线 demo-1(B,自动判定)/ demo-2(A,强制)/
    demo-3(C,强制;条件监测全程未触发、未买入,个人后果按方案 A 派生)
    齐备 Reflection + Router 分流。

@@ -33,7 +33,7 @@ first-class 容器 `case00/`（见下一小节），但容器只是**冻结留�
 - 前端（权威实现）：`frontend/templates/main_script.html`（Phaser：消息解析、移动队列、倾向曲线、治理面板）
 - 服务：`live_fastapi.py` + `live/`，端口 **5010**；对外面为 `/`（小镇实时）、`/embed/scene`、
   `/embed/goals`、`/embed/explain`、`/api/goals`、`/api/export-chart`
-- 运行存档：`results/checkpoints/<run-name>/`（已有 `gtc-demo`、`gtc-demo10`、`gtc-demo14` 等）、`results/compressed/`
+- 运行存档：`data/case00/state/<run-name>/`（已有 `gtc-demo`、`gtc-demo10`、`gtc-demo14` 等）、`results/compressed/`
 
 六个角色（`governance.json` 与贴图目录一致）：
 `AI Advisor`（`ai_tool`，制度内建）、`Daniel Shen`、`Kevin Su`、`Michael Chen`、`Wendy Lin`、`Mr. Zhou`。
@@ -53,7 +53,7 @@ cd D:\zzr\provenance\provenance
   `maze.json`、`relationships.json`、`story.json`、`config.json`。这是建容器当时的**拷贝**，
   用于冻结留档；实时运行读的仍是平台本体（`frontend/static/assets/village/`、`case00/scenario/`）。
 - `case00/runs/`——只有说明：2.2 GB 存档（38 个 run，`stock-en8` 单个 1849 MB）留在
-  `results/checkpoints/`，**不复制**，并写明不要删。
+  `data/case00/state/`，**不复制**，并写明不要删。
 - `case00/serve.py`——**只读**服务，端口 **5003**：`/`（存档列表）、`/api/runs`、
   `/api/runs/{run_id}`（快照步数 + 最后一步的角色坐标与 value_tendency）、`/health`。
 - `case00/README.md`——冻结声明与两条硬约定。
@@ -94,7 +94,7 @@ case01 是"作用于 mavis 的一套事件参数约束"：2 个角色（`Investm
   `runs/260905-demo-case01-old-{A,B,C}/`（`run.json` + `turns.jsonl` + `retrievals.jsonl` + `branch.json`）
 - **注入器原始与映射**：`runs_injector/`——`def-B/{raw.json,mapped.json}`（默认剧本）、
   `live-B-<日期>/raw.json`（真实跑一次的原始记录）、`smoke/`、`isolation/probe-B.json`
-- **静态审查页**：`runs_html/`（index + 6 个 demo 页 + viz 子目录）
+- **静态审查页**：`data/case01/html/`（index + 6 个 demo 页 + viz 子目录）
 
 **记录命名（2026-09-19 定稿）**：`<YYMMDD>-<kind>-<case>-<engine>-<branch>[-HHMM]`。
 样本如 `260905-demo-case01-old-B`（旧运行方式）与 `260917-demo-case01-mavis-A`（mavis），
