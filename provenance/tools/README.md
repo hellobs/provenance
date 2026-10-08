@@ -15,6 +15,16 @@
 
 ## 本目录有什么
 
+> ⚠ **`hc_*` 这一批是作者机的一次性取证脚本,包根写死在本机绝对路径上**
+> (`hc_data_integrity.py:5`、`hc_frontend_endpoints.py:6-8`、`hc_maze_usage.py:5`、
+> `hc_panel_ctx.py:2`、`hc_panel_refs.py:3`、`hc_static_quality.py:6`、`hc_template_render.py:4,7`、
+> `hc_tile.py:5`、`embed_probe.py:22` —— 9 个文件 12 处 `D:\zzr\provenance\provenance` 字面量,
+> 2026-10-08 路径写死体检量的)。它们**不在任何自动化链上**:没有测试、CI 或 `deep_check.py` 调用它们,
+> 引用面只有下面这张表和 `tests/test_scene_connectivity.py:153` 的文件名白名单。
+> 换一台机器跑会得到两种都难读的坏结果 —— 文件根本不存在被 `load()` 报成"解析失败"(假故障),
+> 而 glob 得到空列表被报成 0(#40 那一类假绿)。
+> **要跨机的检查走 `deep_check.py`**(它自己从 `__file__` 算包根,并有 `sys.path` 自救)。
+
 **一次跑完的总检**
 
 | 文件 | 干什么 |
@@ -52,7 +62,7 @@
 ## 常敲的命令
 
 ```powershell
-cd D:\zzr\provenance\provenance
+cd <仓根>\provenance        # 仓根就是你 clone 到的那一层(本机原写死为 D:\zzr\provenance)
 .venv-live\Scripts\python.exe tools\deep_check.py                  # 深度体检
 .venv-live\Scripts\python.exe tools\doc_audit.py --banner --check   # 文档状态块守卫(应为 0)
 .venv-live\Scripts\python.exe tools\verify_demo_sync.py --require-zip   # 交付件四者一致
