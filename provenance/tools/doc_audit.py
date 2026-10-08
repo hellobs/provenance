@@ -97,6 +97,10 @@ STATUS = {
     "case01/docs/转接_给下一棒_20260926.md": ("现行", "**当前权威交接**:基线 + 四个方向(行为层证据/GTC 演示/工程收尾/LoRA)+ 坑清单"),
     "case01/docs/LoRA预准备_20260924.md": ("现行", "LoRA 线预准备:标记→训练 JSONL 管道+校验门已就绪(0 标记,闸门在专家数据侧);环境体检与 Runbook"),
     "case01/docs/内化与敏感性_定量分析_20260924.md": ("现行", "IVD 定量证据第一批:内化位移 11/12 为正、双模型 Router 敏感性、人工校验框架;工具在 case01/tools/"),
+    # 2026-10-08:这条必须与 `case01/docs/金融背景资料库.md` 文首的状态行**逐字一致**——
+    # needs_banner 只比 状态/说明 两个值,表里没有这份文件就按兜底 ("待核对","尚未人工核对状态")
+    # 判,于是作者写的"现行"永远对不上,doc_audit --check 直接 rc=1(实测合并 origin/main 后红的那条)。
+    "case01/docs/金融背景资料库.md": ("现行", "100 条外部公司资料的导入、可选检索、分段和审计方式。"),
     "case01/docs/问题清单_20260925.md": ("部分过时", "**现行但部分过时**:六条待修问题清单;问题 2/3/4/6 已修、问题 1 已缓解(待 Branch C 重录)、问题 5 待外部数据(状态见文首)"),
     "case01/docs/转接_给下一棒_20260924.md": ("已被取代(由 `转接_给下一棒_20260926.md` 接替;本文的方向/任务清单中的阶段 3 与 LoRA 预准备均已完成,以新版为准)", "由 `转接_给下一棒_20260926.md` 接替(其中阶段 3/LoRA 预准备已完成);写于 2026-09-24 十三轮深度自检收尾,上一份权威交接是"),
     "docs/0923_体检报告.md": ("现行", "对接前体检:逐项实测的问题、工具数字口径、遗留项与归属"),
@@ -293,13 +297,20 @@ def git_last_dates(here):
     `-c core.quotepath=false` 必须加(2026-10-05 修 N6 深层根因):默认 quotepath=true 时
     git 会把非 ASCII 路径转义成八进制并加**外层双引号**(`"provenance/docs/GTC\\347\\240..."`),
     于是**所有中文文档都匹配不上**、只能回退 mtime —— 索引上"今天核对过"其实是 mtime 假象。
+
+    **不要加 `"--", "."` 路径限制**(2026-10-08 修):`cwd=here` 是内层包根 `<仓>/provenance`,
+    `.` 只覆盖这一棵子树,而 `git log --name-only` 输出的是**仓库根相对**路径,于是仓库根那半边
+    (`README*.md`、`tools/`、`packages/`、`handbook/`)一个键都进不来 —— 实测 950 个键**全部**以
+    `provenance/` 开头。后果不是"少个日期"而是**系统性撒谎**:索引表头写明"本仓全仓都在这里管",
+    而 `cdate()` 查不到就标 `未提交`,读者据此以为这 10 份根级文档没入库,实际 git 都答得上日期。
+    不加路径限制即覆盖全仓;键本来就是仓库根相对,`cdate()` 的 `rel_to_root` 直接对上。
     """
     import subprocess
     out = {}
     try:
         p = subprocess.run(["git", "-c", "core.quotepath=false",
                             "log", "--date=short", "--pretty=format:%ad",
-                            "--name-only", "--", "."],
+                            "--name-only"],
                            cwd=here, capture_output=True, text=True, encoding="utf-8",
                            errors="replace")
         cur = ""
