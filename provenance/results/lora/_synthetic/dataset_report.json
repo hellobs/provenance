@@ -9,23 +9,54 @@
     "sft": 3,
     "dpo": 2,
     "rejected": 0,
-    "reject_reasons": {}
+    "reject_reasons": {},
+    "char_len": {
+      "input_min": 115,
+      "input_median": 116,
+      "input_max": 120,
+      "output_min": 44,
+      "output_median": 51,
+      "output_max": 60,
+      "note": "input 含整篇反思;seq 上限须覆盖它,否则截断落在反思尾部"
+    }
   },
   "rows": [
     {
+      "run_id": "",
+      "issue_id": "",
+      "expert_category_id": "",
       "verdict": "incorrect",
-      "ok": true,
+      "origin": "expert",
+      "operator": "",
+      "marked_at": "",
+      "sft_in": true,
+      "dpo_in": true,
       "errors": []
     },
     {
+      "run_id": "",
+      "issue_id": "",
+      "expert_category_id": "",
       "verdict": "partial",
-      "ok": true,
+      "origin": "expert",
+      "operator": "",
+      "marked_at": "",
+      "sft_in": true,
+      "dpo_in": true,
       "errors": []
     },
     {
+      "run_id": "",
+      "issue_id": "",
+      "expert_category_id": "",
       "verdict": "correct",
-      "ok": true,
+      "origin": "expert",
+      "operator": "",
+      "marked_at": "",
+      "sft_in": true,
+      "dpo_in": false,
       "errors": []
     }
-  ]
+  ],
+  "generated_at": "2026-10-07T23:05:06+08:00"
 }
