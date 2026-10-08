@@ -85,3 +85,16 @@ def default_financial_data_dir() -> str:
         return os.path.join(os.path.dirname(case01.__file__), "data", "financial")
     except ImportError:
         return ""
+
+
+def background_retrieval_provider(embed_fn=None, use_default_embed=False):
+    """Optional case-side library adapter; no package dependency when disabled."""
+    if os.environ.get("CASE01_FINANCIAL_BACKGROUND", "0").strip().lower() in (
+            "0", "false", "off", "no"):
+        return None
+    from case01.agents.financial import FinancialData
+    from case01.agents.investment_ai import InvestmentAI
+    if embed_fn is None and use_default_embed:
+        from .llm import OllamaClient
+        embed_fn = OllamaClient().embed
+    return InvestmentAI(None, FinancialData(default_financial_data_dir(), embed_fn=embed_fn))

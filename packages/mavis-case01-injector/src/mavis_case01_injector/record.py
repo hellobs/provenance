@@ -69,7 +69,7 @@ def _events(nodes: List[dict]) -> List[dict]:
 
 
 def _retrievals(nodes: List[dict]) -> List[dict]:
-    """mavis 路径下"检索"= 该节点注入的材料清单（injector 侧记录,不伪造检索结果）。"""
+    """Preserve event injection and optional background retrieval as separate rows."""
     out: List[dict] = []
     for node in nodes:
         docs = [{
@@ -83,6 +83,8 @@ def _retrievals(nodes: List[dict]) -> List[dict]:
             "injected": docs,
             "mode": "injection",   # 与 case01 的向量检索区分
         })
+        out.extend(dict(r, date=node.get("date", ""))
+                   for r in node.get("background_retrievals") or [])
     return out
 
 

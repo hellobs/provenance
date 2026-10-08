@@ -1,0 +1,242 @@
+[
+  {
+    "id": "bg-552cb790703d8192a130",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "company_profile",
+    "source": "阿里巴巴集团；美国SEC披露附件",
+    "time": "2026-08-20",
+    "title": "Alibaba Group Announces June Quarter 2026 Results（ABOUT ALIBABA GROUP）",
+    "content": "阿里巴巴集团是一家聚焦人工智能、云计算与消费领域的全球科技公司。集团为商家、品牌、零售商及其他企业提供技术基础设施和营销渠道，帮助其与用户和客户建立联系并开展业务。\n\n集团向消费者和企业提供全栈人工智能能力，通义千问系列大语言模型及多模态模型服务于企业、电商与互联网应用。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-08-20",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 31,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "552cb790703d8192a1308897c3f25153567089288b9ac247ad8f2949086e9eba",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-8b8a650c04a95e045b72",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "financial",
+    "source": "阿里巴巴集团；美国SEC披露附件",
+    "time": "2026-08-20",
+    "title": "Alibaba Group Announces June Quarter 2026 Results",
+    "content": "截至2026年6月30日的季度，收入2689.53亿元，同比增长9%；经营利润151.61亿元，同比下降57%；归属普通股股东净利润105.37亿元。经调整EBITA为273.29亿元，同比下降30%，属于非GAAP指标。经营现金流净额229.45亿元，同比增长11%；自由现金流净流出446.70亿元。季度资本开支676.78亿元，同比增长75%。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2026-08-20",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 32,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "8b8a650c04a95e045b72173ac1449b99039e19422defa05537f2ea76f37f7c52",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-50ff8d6d0e8007ae3080",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "disclosure",
+    "source": "阿里巴巴集团；美国SEC披露附件",
+    "time": "2025-02-24",
+    "title": "Alibaba to Invest RMB380 billion in AI and Cloud Infrastructure Over Next Three Years",
+    "content": "Alibaba Group Holding Limited (NYSE: BABA and HKEX: 9988 (HKD Counter) and 89988 (RMB Counter), “Alibaba” or “Alibaba Group”) announced plans to invest at least RMB380 billion (US$53 billion) over the next three years to advance its cloud computing and AI infrastructure, reinforcing its commitment to long-term technological innovation and underscoring the company’s focus on AI-driven growth and its role as a leading global cloud provider.\n\nFebruary 24, 2025\n\nSafe Harbor Statements\n\nThis announcement contains forward-looking statements. These statements are made under the “safe harbor” provisions of the U.S. Private Securities Litigation Reform Act of 1995. These forward-looking statements can be identified by terminology such as “may,” “will,” “expect,” “anticipate,” “future,” “aim,” “estimate,” “intend,” “seek,” “plan,” “believe,” “potential,” “continue,” “ongoing,” “target,” “guidance,” “is/are likely to” and similar statements. Statements that are not historical facts, including statements about Alibaba’s strategies and investment plans, and Alibaba’s beliefs, expectations and guidance regarding the growth of its business and the market it operates in, are or contain forward-looking statements. Alibaba Group may also make forward-looking statements in its periodic reports to the U.S. Securities and Exchange Commission, in announcements made on the website of the Hong Kong Stock Exchange Limited, in press releases and other written materials and in oral statements made by its officers, directors or employees to third parties. Forward-looking statements involve inherent risks and uncertainties. A number of factors could cause actual results to differ materially from those contained in any forward-looking statement. In particular, Alibaba’s ability to compete, innovate and maintain or grow its business, risks associated with sustained investments in Alibaba’s businesses, fluctuations in general economic and business conditions in China and globally, uncertainties arising from competition among countries and geopolitical tensions and assumptions underlying or related to any of the foregoing, are subject to uncertainties. All information provided in this announcement is as of the date of this announcement and are based on assumptions that Alibaba Group believes to be reasonable as of this date, and Alibaba Group does not undertake any obligation to update any forward-looking statement, except as required under applicable law.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 33,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "50ff8d6d0e8007ae3080ba261a3ffb21555769bb0624bc7cf74b80c1c8638b7e",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-ad2e9484bec4dd99d0b5",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "disclosure",
+    "source": "阿里巴巴集团官网；吴泳铭业绩电话会发言整理",
+    "time": "2025-02-20",
+    "title": "Alibaba: Scale Up AI Investments in Three Areas Over the Next Three Years",
+    "content": "February 20, 2025 Alibaba Group reported earnings for the quarter ending December 31 on Thursday. Shortly afterward, Alibaba Group’s CEO, Eddie Wu, addressed investors and analysts on an earnings call. He mentioned “AI” more than 20 times and also revealed Alibaba will soon release a deep reasoning model built on Qwen2.5-Max.\n\nOver the past year, we have pursued our “user-first, AI-driven” strategy and focused on our two core businesses of e-commerce and AI + Cloud. After a year of transformation, our core businesses have demonstrated accelerating growth momentum. We have also largely completed the divestments of our offline assets. Across Alibaba Group, our businesses now possess strong business fundamentals and profit-generating capabilities.\n\nThis quarter, we continued to pursue our integrated “AI + Cloud” strategy in our cloud business. Leveraging our industry-leading AI product portfolio, overall revenue excluding Alibaba-consolidated subsidiaries grew 11% year-over-year this quarter, with AI-related product revenue maintaining triple-digit year-over-year growth for the sixth consecutive quarter. With the rapid adoption of AI technology across industries, customer demand for Alibaba Cloud products has surged. Looking ahead, revenue growth of Cloud Intelligence Group will continue to accelerate.\n\nWe recently launched Qwen2.5-Max, our flagship AI foundation model, which has achieved industry-leading performance across multiple recognized benchmarks. As of the end of January, over 90,000 Qwen-based derivative models have been developed globally, making Qwen the most popular among developers across the major model families. Over 290,000 companies and developers have accessed Qwen APIs through Alibaba Cloud’s Bailian platform. We will soon release a deep reasoning model built on Qwen2.5-Max.\n\nIn e-commerce, Taobao and Tmall continued to invest in new user growth and comprehensive user experience enhancements. We saw strong growth in both new consumers and orders during the quarter. 88VIP members, our core consumer group, maintained double-digit growth, reaching 49 million by the end of the quarter. Taobao and Tmall also made solid progress in monetization as planned, with CMR growing 9% year-over-year. At the same time, Taobao and Tmall continued to strengthen merchant-friendly measures that improve our platform’s business operating environment, fostering higher-quality and more sustainable development.\n\nOur international e-commerce business maintained strong growth this quarter, driven by cross-border businesses, with continued improvement in operating efficiency. During the quarter, we increased investment in key markets while focusing on operating efficiency, with Choice’s unit economics improving on a sequential basis. We expect AIDC to achieve its first quarter of profitability in the next fiscal year.\n\nOur other internet platform businesses continued to improve operating efficiency. Amap achieved profitability this quarter.\n\nLooking ahead, Alibaba’s strategic direction and roadmap are clearer than ever. We will continue to focus on three business categories: domestic and international e-commerce, AI + cloud computing, and internet platform businesses. We are confident that our focused strategy will drive sustained solid growth for Alibaba Group.\n\nToday, AI technology advancements are driving profound industry transformation. In alignment with Alibaba Group’s business landscape, we will scale up investments in the following three areas as part of our broader AI strategy over the next three years:\n\nInfrastructure for AI and cloud computing:The AI era presents a clear and massive demand for infrastructure. We will aggressively invest in AI infrastructure. Our planned investment in cloud and AI infrastructure over the next three years is set to exceed what we have spent over the past decade.\n\nAI foundation models and AI-native applications:AI foundation models are pivotal to transforming industry productivity. We will substantially increase R&D investment in AI foundation models to maintain our technological leadership and drive the development of AI-native applications.\n\nTransforming our existing businesseswith AI: AI technology presents powerful opportunities to enhance user value across our e-commerce and other internet platform businesses. We will increase investment in AI application R&D and computing power, and deeply integrate AI across our businesses, capturing new growth opportunities in the AI era.\n\nLooking ahead, we are confident in our focused strategy on e-commerce and “AI + Cloud” and excited by the business opportunities being unlocked by this new technology cycle.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-20",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 34,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "ad2e9484bec4dd99d0b5d18c7abf5abb900925e2d54c72a7909b2b2705755e7e",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-cd1f0509a69c7ac2e3ca",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "industry_media",
+    "source": "财新网；刘沛林，责任编辑屈运栩",
+    "time": "2025-02-24",
+    "title": "阿里宣布三年内投3800亿建云和AI基础设施 过去十年总资本开支为3760亿元",
+    "content": "【财新网】阿里押注AI和云计算发展。2月24日阿里巴巴（NYSE：BABA/ 09988.HK ）在发给财新的一份声明中称，未来三年，将投入超过3800亿元用于建设云和AI硬件基础设施，总额超过过去十年总和。阿里称，这笔投资也创下了中国民营企业在云和AI硬件最大规模投资纪录。\n\n根据财新以自然年统计，自2014年上市以来，2015-2024年阿里总资本开支分别为113亿、151亿、261亿、409亿、294亿、434亿、495亿、424亿、244亿和934亿元，过去十年总体资本开支约为3760亿元。这也意味着，未来三年阿里仅在云和AI上的投资，就将超过2015年以来阿里总体投资开支。\n\n阿里集团CEO兼云智能集团CEO吴泳铭在2月21日晚间的财报会上就曾提出“未来三年AI和云投资超过过去十年”这一说法（详见财新网报道《阿里吴泳铭：基座大模型商业模式尚不清晰 卖云价值明确》）市场关心在美国对华芯片出口管制趋紧下，这一开支目标是否能完成。吴泳铭对此回应称，阿里云已经做好了多种芯片的适配，不论政策如何变化，均能够实现AI战略。\n\n吴泳铭在财报会上称，阿里集团未来三年将围绕AI这个战略核心，在三个方向加大投资：一是AI和云计算的基础设施建设；二是AI基础模型平台和AI应用；三是现有业务的AI转型升级。\n\n吴泳铭指出，AI技术发展还处在早期阶段、技术快速发展，基座大模型的商业模式仍看不清，未来随着大模型智力的提升新的商业模式会出现。但云计算网络就像电力时代的电网，是AI时代的基础设施，商业回报确定，“未来90%的token（字符）将在云计算网络上生成和输出，”他说。\n\n吴泳铭进一步指出，基座模型目前通过API调用推理收费的模式未来还将存在，“推理需求在春节后爆发，阿里云新增需求中60%-70%来源于大模型推理”。此外，基于阿里基座模型的开发者天然会使用阿里云，企业使用阿里基座模型API带动云上其他产品销售，这两点也是基座模型带来的价值。“通义模型不见得直接带来收入，但它是云收入的一个重要组成部分，”他说。\n\n财报显示，2024年四季度，阿里云实现营收317.42亿元，同比增长13%，重回两位数增长。阿里云称，该增长得益于AI相关产品推动的公共云收入增长，AI收入已连续六个季度同比增幅超过100%。\n\n根据财报计算，2024年四季度，阿里云的经调整EBITA（税息折旧及摊销前利润）利润率为9.89%，上年同期为8.42%。尽管利润率提升，但由于国内公有云占比较低、规模相对小，阿里云的利润水平和美国头部云厂商还有显著差距，美国头部云厂商运营利润率可达30%以上。\n\n谈及云业务未来利润率，吴泳铭称，一方面客户基数和使用场景的扩大，整体AI基础设施利用率会提升，但另一方面随着未来三年资本开支达峰，未来折旧也会增加从而影响利润率。此外，中国云计算市场环境也决定了其利润率和全球水平存在差距。\n\n受2月21日晚间公布的财报超预期影响（详见财新网报道《阿里2024年四季度收入超预期 菜鸟收入下滑、云重回两位数增长》），2月21日阿里港股涨14.56%，年初以来涨幅已近70%。截至2月24日中午休市，阿里巴巴港股跌2.45%，至135.1港元/股。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24 12:25:52",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 35,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "cd1f0509a69c7ac2e3cab6bbf948228f04e57feedf0d6a7defc31085f4bf5fc8",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-18225ad205800c2a5f63",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "industry_media",
+    "source": "第一财经；陈杨园，责编李娜",
+    "time": "2025-02-24",
+    "title": "3800亿！ “瘦身”后阿里出狠拳，重押云和AI基础设施",
+    "content": "2月24日，阿里巴巴集团CEO吴泳铭宣布，未来三年，阿里将投入超过3800亿元，用于建设云和AI硬件基础设施，总额超过去十年总和。\n\n作为参考，阿里巴巴最新发布的第三财季财报显示，阿里巴巴该季度总营收为2801.5亿元，阿里云该季度营收317亿。这项投入金额达到了阿里云季度营收的近12倍。\n\n尽管阿里巴巴在2023年确定电商和云计算为核心业务，定下“用户为先，AI驱动”的发展战略，但进入2025年，阿里巴巴对AI与云计算的投入正变得“激进”得多，未来三年，阿里巴巴集团在云和AI的基础设施投入，预期将超越过去十年的总和。\n\n此外，吴泳铭表示，未来三年，阿里将加大投入三大AI领域：AI和云计算的基础设施建设、AI基础模型平台以及AI原生应用、现有业务的AI转型升级。3800亿的投入计划并不包括后两个领域的开支。\n\n一个值得关注的现象是，AI浪潮下，阿里巴巴正在全面重构投资版图，集中力量加速AI部署。\n\n从2023年9月起，阿里开始对既有业务进行战略优先级梳理，明确对核心业务保持长期专注和高强度投入，淡化非核心业务。一年多的时间里，阿里巴巴相继减持快狗打车、B站、陌陌、网易云音乐等，转让上海丽人丽妆化妆品股份、出售银泰百货、大润发母公司高鑫零售等，对阿里巴巴在实体零售以及非核心业务上的投资进行了大量出清。\n\n外部投资版图的调整中，阿里巴巴的大多数钱也都流向了AI。天翼智库数据显示，2023年前，人工智能领域在阿里投资领域金额占比为4%，2023年后，这个数字跃升至50%。目前，阿里参与投资的国内人工智能独角兽已包括智谱AI、零一万物、百川智能、MiniMax和月之暗面等，全面覆盖国内“大模型五虎”。无论是对云和AI硬件基础设施的持续投入，还是对AI大模型初创公司的投资，部分投资以算力的形式支付，要求被投企业使用阿里云的算力，阿里巴巴实际上都在进行对AI技术领先的“重押”以及力求成为AI算力基础设施的关键角色。\n\n随着3800亿投入计划的公布，阿里巴巴集团历史上云建设周期最大、最集中的周期正到来，吴泳铭表示，“这个集中的建设周期的资本支出会对硬件摊销等方面产生一定影响，但鉴于当前用户需求的强劲以及对行业未来的预判，集团相信这些投入的基础设施将很快被内外部客户的所需求消化。”阿里巴巴的未来正押注于这个关键判断。\n\n2月24日，阿里巴巴港股早盘短线拉涨，最高报140.90港元/股，随后股价回落，截至发稿，阿里港股报135.5港元/股，下跌2.17%。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24 16:00:17",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 36,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "18225ad205800c2a5f63482afeeadd8913847d7c65557a9195be46331f69fcdf",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-27527fbbef80f5bbd92f",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "self_media",
+    "source": "雪球专栏“零零之间”",
+    "time": "2025-02-24",
+    "title": "AIDC低位机会",
+    "content": "阿里今天官方披露未来三年投入3800亿用于云和AI基础建设，基本符合前期市场疯传的25年资本开支提升到1200亿，后续腾讯、字节、百度、快手、拼多多、美团一众互联网大厂都会下场的，整个AIDC的逻辑就不再赘述了，全景图也分享给大家了。（需要的还可以后台私我）今天聊一下低位的新方向：铅酸电池\n\n1、不管是UPS还是HVDC，上游都是储能；\n\n2、储能的趋势是以锂换铅，但是铅酸的稳定性高、寿命长、维修成本低依然不少数据中心再用；\n\n3、数据中心用铅酸电池不同于两轮车，数据中心铅酸电池对容量要求（后者的10倍）、充放次数、使用寿命等要求高；因此产线要求也非常高，后者无法制造数据中心铅酸电池。AIDC加速建设造成短期产能紧张，有涨价预期\n\n4、核心标的：南都电源、圣阳股份、昆工科技、雄韬股份南都电源：开年中了两个大单\n\n【中泰电新：关注数据中心铅酸电池行业机会】\n\n1. 数据中心用铅酸电池较两轮车铅酸电池区别较大 放电特性：数据中心需要具备高倍率放电，能在短时间提供大电流；而两轮车为稳定功率放电。 充电特性：数据中心充电电流较小，充电倍率低；两轮车充电倍率高。 寿命：数据中心需要较长使用寿命，两轮车相对要求较低。 产品类型：数据中心铅酸电池多为阀控式铅酸电池（VRLA），包括 AGM 和凝胶电池，免维护且可任意方向安装。两轮车铅酸多为富液式铅酸电池。\n\n2. 数据中心投资高增，拉动铅酸供需拐点出现 需求端：全球数据中心的高速增长，对铅酸电池的需求量带来显著提升。 供给端：数据中心用铅酸电池过去多年未有显著的扩产，产能有限。而且，两轮车用铅酸电池由于与数据中心铅酸产品区别较大，若要转产需重新开发验证，周期较长。从而使得该行业供需拐点呈现。\n\n关注： 南都电源：产能 4Gwh，深耕数据中心铅酸电池领域。 圣阳股份：数据中心领域铅酸头部企业。\n\n备注：敬请关注周一南都调研，周一晚上铅酸专家交流会以及后续圣阳调研。\n\n$南都电源(SZ300068)$ $圣阳股份(SZ002580)$",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24 20:27",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 37,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "27527fbbef80f5bbd92f899e730cb2dad0d0acad243757b4619cfe7893f185fb",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-047491018fdcb7d29d7a",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "self_media",
+    "source": "雪球账号“基实录”",
+    "time": "2025-02-24",
+    "title": "阿里拟三年投入超3800亿，AIDC产业链迎来黄金发展期",
+    "content": "阿里巴巴集团CEO吴泳铭宣布，未来三年将投入超过3800亿元用于建设云和AI硬件基础设施，这一投资规模创下中国民营企业在云和AI硬件基础设施建设领域的最高纪录。这一重磅消息不仅彰显了阿里在AI和云计算领域的雄心，也为AIDC（AI数据中心）产业链带来了前所未有的发展机遇。\n\n阿里3800亿投资的三大方向\n\n根据吴泳铭的披露，阿里的3800亿投资将聚焦三大领域：\n\n1.AI基础设施：包括服务器、交换机、光模块等硬件设备的采购与部署，预计2025年全年资本开支将达1200亿元，其中服务器采购金额接近500亿元。\n\n2.AI基础模型平台及原生应用：阿里将继续推进通义千问大模型的迭代升级，并推出更多AI原生应用，如Qwen2.5-Max等旗舰模型。\n\n3.现有业务的AI转型：通过AI技术赋能电商、云计算和互联网平台产品，提升业务效率和用户体验。\n\n这一投资计划不仅是对阿里自身业务的战略升级，更是对国内AI产业链的强力拉动。\n\nAIDC产业链的受益环节\n\n阿里的巨额投资将直接带动AIDC产业链的全面繁荣：\n\n1.服务器与芯片：阿里计划在未来三年年均投入超1100亿元用于设备采购，国产服务器代工商将迎来订单爆发。\n\n2.光模块与交换机：光模块和交换机的资本开支预计分别达到36亿元和80亿元，相关供应商将迎来业绩增长。\n\n3.数据中心基础设施：包括IDC机房、服务器电源、精密空调及液冷系统等，阿里与台达合作开发的IDC供电方案已开始大规模部署。\n\n4.AI模型与应用开发：通义千问大模型的成功商业化，为AI应用开发者提供了广阔的市场空间。\n\n对资本市场的深远影响\n\n阿里的投资计划不仅提振了AIDC产业链的信心，也为资本市场注入了新的活力。摩根士丹利和高盛近期大幅上调阿里目标价，分别至180美元和160美元，认为阿里云的EBITDA利润率有望从2025财年的20%提升至2028财年的35%。\n\n此外，阿里的投资还将带动腾讯、字节跳动等科技巨头加大资本开支，进一步推动国产算力需求的增长。开源证券指出，国产AIDC产业链的全面受益将带来行业估值重估。\n\nAIDC产业链的黄金时代\n\n阿里的3800亿投资不仅是其自身发展的里程碑，更是中国AI和云计算产业迈向全球领先的重要一步。随着AI技术的快速迭代和算力需求的持续增长，AIDC产业链将迎来黄金发展期。",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24 14:26",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 38,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "047491018fdcb7d29d7a60c52db7a4e027ed04a6a7fe96a074eae6901e3f3f78",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-9a0acca07b5a13e21c40",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "research",
+    "source": "招银国际环球市场；Lily YANG、Kevin ZHANG",
+    "time": "2025-02-24",
+    "title": "Semiconductors — Thematic investing and megatrends: Alibaba’s bold capex hike a boost to domestic AI infrastructure suppliers",
+    "content": "Alibaba released its 3QFY25 earnings (see our internet team report) with a significant step-up in capex plan for the next three years, the total of which is expected to surpass the company’s cumulative capex of the past decade, permgmt., reaching as high as ~RMB120bn per year during CY2026-28E, according to our calculation. We believe cloud service providers (CSPs) in China are trying to pick up the pace in capex in compute infrastructure to keep up with the relentless investment strides of overseas CSPs (Amazon, Meta, Microsoft, and Google). We believe the ripple effects of Alibaba’s increased capex plan will benefit domestic AI infrastructure supply chain names, such as Innolight (300308 CH, BUY, TP: RMB186) and Shengyi Tech (600183 CH, BUY, TP: RMB34.5), which supply critical components (e.g., high-speed optical transceivers, ultra-low-loss CCL) for datacenter buildout.\n\nOverseas CSPs collectively spent over US$228bn (54.2% YoY) on capex in 2024 and the investments are expected to grow another 30% in 2025. According to Bloomberg, Amazon, Google, Microsoft, and Meta’s capex grew by 57.4%/62.9%/57.8%/33.6% in 2024, and their capex is expected by BBG consensus to further increase by 30% YoY in 2025E(revised up from 18% YoY previously). Notably, their capex-to-rev. ratio increased to 16.6% in 2024 (vs. 11.9% in 2023) and is expected to reach 19.5% in 2025, per Bloomberg consensus. Among those four CSPs, Google has set the most ambitious capex plan at US$75bn for its AI investment in FY25 (vs. US$53bn in FY24), beating consensus estimate by 27%. Its cloud segment sales grew by 30.6% in 2024. Amazon and Microsoft each saw their cloud segment sales grow by 18.5% and 22% YoY in 2024.\n\nAlibaba and ByteDance to lead domestic capex spending. We believe the total compute power needed domestically is bound to surge on adoption of AI models which are transforming industry productivity across the board, driving domestic demand for compute power. Alibaba would spend a total of ~RMB360bn during FY2016-25E. Based on its latest capex plan and assuming 50% of the capex is cloud-related, Alibaba should invest over RMB60bn in cloud and AI infrastructure per year during FY26- 28E, far exceeding consensus estimate of RMB47bn in total capex for FY26E. ByteDance has also recently announced a bold capex plan of over RMB150bn for 2025E aimed at boosting compute hardware.\n\nWe believe domestic AI infrastructure suppliers are set to ride a second tide following the overseas AI infrastructure investment cycle, benefitting from the DeepSeek-driven AI investment cycle. We think the key beneficiaries include Innolight (300308 CH, BUY), Shengyi Tech(600183 CH, BUY), ZTE (000063 CH/763 HK, BUY), Eoptolink (300502 CH, NR), Cambricon (688256 CH, NR), TFC (300394 CH, NR), etc.",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 39,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "9a0acca07b5a13e21c400a5530b7558befe0ff5f368cffddf1b7af72b0db2288",
+      "verification": "source_not_independently_verified"
+    }
+  },
+  {
+    "id": "bg-7436ff43dc897b25dee0",
+    "company": "09988_hk",
+    "company_name": "阿里巴巴集团控股有限公司（Alibaba Group Holding Limited）；09988.HK；NYSE:BABA",
+    "tickers": [
+      "09988.HK",
+      "NYSE:BABA"
+    ],
+    "type": "social",
+    "source": "雪球账号“守风待兔”",
+    "time": "2025-02-24",
+    "title": "无独立标题",
+    "content": "存储风起，阿里等云厂商增加CAPEX，带动企业级存储需求：\n\n江波龙（存储模组）\n\n企业级存储业务2024年营收约9亿元，2025年预计翻倍，通过互联网、金融等领域客户认证，订单放量，未来存储模组在数据中心BOM中占比提升至40%-50%，江波龙直接受益于阿里等厂商采购需求。\n\n兆易创新（存储技术）\n\n涵盖NOR Flash、DRAM及HBM技术，切入算力芯片供应链，受益于端侧AI设备存储容量升级（如AI手机、耳机）。AI端侧设备存储需求翻倍（如AI耳机从64Mb→128Mb），利基存储芯片量价齐升。\n\n香农芯创（企业级DRAM）\n\n国内企业级DRAM核心厂商，前三大客户为阿里、字节、腾讯，合计收入占比35%-40%，直接受益于云厂商资本开支扩张。阿里未来三年云和AI投入超3800亿元，存储采购规模或达百亿级。\n\n$香农芯创(SZ300475)$\n\n评论与回复：\n\n深深52802025-02-25 14:33 · 广东\n\n大佬，看下老北京/君正，怎么样",
+    "meta": {
+      "corpus": "market_background_100_v1",
+      "publication_time_raw": "2025-02-24 23:09",
+      "date_policy": "latest_explicit_date_day_precision",
+      "source_file": "模型版_100条.jsonl",
+      "source_line": 40,
+      "source_sha256": "78af5db21c88097471b78da42fc3227531ad2a3d83edc7b85055079891c78f49",
+      "document_sha256": "7436ff43dc897b25dee0bea9bc458c81497cfa8ef95a2e65eb1a355d69ae8eb7",
+      "verification": "source_not_independently_verified"
+    }
+  }
+]

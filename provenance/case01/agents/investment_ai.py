@@ -63,17 +63,31 @@ class InvestmentAI:
         self.last_retrieval: Optional[dict] = None  # 审计:最近一次检索
 
     # ------------------------------------------------------------------
-    def retrieve(self, query: str, current_date: str, top_k: int = 8) -> List[dict]:
+    def retrieve(self, query: str, current_date: str, top_k: int = 8,
+                 background_only: bool = False) -> List[dict]:
         """检索 + 附加来源独立性统计(记录供审计)"""
-        results = self.financial.search(query, top_k=top_k, since=current_date)
+        results = self.financial.search_context(query, current_date, top_k, background_only)
         stats = self.financial.source_stats(results)
         self.last_retrieval = {
             "query": query, "current_date": current_date,
             "hits": [{"id": r["id"], "score": r["score"], "source": r.get("source"),
                       "type": r.get("type"), "time": r.get("time"),
-                      "title": (r.get("title") or "")[:60]}
+                      "title": r.get("title") or "",
+                      "document_id": r.get("document_id", r["id"]),
+                      "chunk_id": r.get("chunk_id"),
+                      "char_start": r.get("char_start", 0),
+                      "char_end": r.get("char_end", min(600, len(r.get("content") or ""))),
+                      "company": r.get("company"),
+                      "company_name": r.get("company_name"),
+                      "evidence_scope": r.get("evidence_scope"),
+                      "content": (r.get("content") or "")[:600],
+                      "meta": r.get("meta") or {}}
                      for r in results],
             "source_stats": stats,
+            "library": dict(self.financial.configuration(),
+                            primary_top_k=0 if background_only else top_k,
+                            background_only=background_only),
+            "context": self._format_context(results),
         }
         return results
 
@@ -96,6 +110,11 @@ class InvestmentAI:
             if meta.get("optimistic_bias") or meta.get("emotional"):
                 flags.append("语气偏乐观/情绪化")
             flag_txt = (" [" + ", ".join(flags) + "]") if flags else ""
+            if r.get("chunk_id"):
+                scope = "市场背景资料" if r.get("evidence_scope") == "market_background" else "目标公司资料"
+                flag_txt += " | {} | {} | {} | {}".format(
+                    scope, r.get("company_name") or r.get("company"),
+                    r.get("title", ""), r["chunk_id"])
             lines.append(
                 "[{}] {} | {} | {}{}\n{}".format(
                     i, r.get("type"), r.get("source"), r.get("time"),

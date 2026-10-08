@@ -148,6 +148,9 @@ class MavisBridge:
         self._current_node: Optional[NodeSpec] = None
         self._current_context: Dict[str, dict] = {}
         self._current_requests: List[dict] = []
+        self._background_provider = None
+        self._background_provider_loaded = False
+        self._current_retrievals: List[dict] = []
 
         # 记录
         self.records: List[dict] = []
@@ -173,6 +176,7 @@ class MavisBridge:
         self._current_node = node
         self._current_context = {r: dict(node.context.get(r, {})) for r in self.roles}
         self._current_requests = [dict(r) for r in node.interactions]
+        self._current_retrievals = []
         # 交互主题同时写入双方步级状态,确保话题进入 LLM 上下文
         for req in self._current_requests:
             src = req.get("from")
@@ -184,6 +188,32 @@ class MavisBridge:
                 self._current_context[src].setdefault("current task", focus)
             if dst in self._current_context:
                 self._current_context[dst].setdefault("user request", focus)
+        self._retrieve_background(node)
+
+    def _retrieve_background(self, node: NodeSpec) -> None:
+        """Retrieve at consultation nodes; only the assistant sees the passages."""
+        if not self._background_provider_loaded:
+            from ._providers import background_retrieval_provider
+            self._background_provider = background_retrieval_provider(
+                embed_fn=None if self.dry_run else getattr(self.judge_llm, "embed", None),
+                use_default_embed=not self.dry_run)
+            self._background_provider_loaded = True
+        provider = self._background_provider
+        if provider is None:
+            return
+        assistant = self.roles[0]
+        for request in self._current_requests:
+            query = str(request.get("focus") or "").strip()
+            if request.get("to") != assistant or not query:
+                continue
+            provider.retrieve(query, node.date, background_only=True)
+            audit = dict(provider.last_retrieval, mode="background_retrieval",
+                         query_source="node_focus", recipient=assistant)
+            self._current_retrievals.append(audit)
+            context = self._current_context[assistant]
+            text = audit["context"]
+            context["Financial Data background"] = (
+                context.get("Financial Data background", "") + "\n" + text).strip()
 
     def run(self) -> dict:
         """按节点推进,返回本次运行的记录。
@@ -229,6 +259,7 @@ class MavisBridge:
                 "dialogue": self._dialogue_tail(dialogue_before),
                 "agents": dict(self._agent_trace.get(step_index + 1, {})),
                 "elapsed_s": round(time.time() - node_t0, 1),
+                "background_retrievals": list(self._current_retrievals),
             })
 
             # judge 模式:第一个节点(T0)落地后立刻判定分支,然后换成该分支的后续节点重排。
