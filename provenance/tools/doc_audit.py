@@ -29,7 +29,9 @@ ROOTS = (
     # tools/tilemap_to_maze_README.md 与两个仓库 README,此前都不在状态块守卫与索引内,
     # 而索引的维护约定写的是"本仓每份 .md"。这里直接 walk 上一级(realpath 去重会跳过
     # 上面三个已覆盖的根)。
-    ("..", "仓库根(docs/ packages/ tools/ README)"),
+    # 2026-10-08:仓库根那份 `docs/` 改名 `handbook/`(消掉"两个 docs/"的同名歧义:
+    # 内层 docs/ 是应用文档,根 handbook/ 是框架/对接手册 + 四张录入模板)。
+    ("..", "仓库根(handbook/ packages/ tools/ README)"),
 )
 # 说明:mavis 仓的 md **不在这里管** —— 那是另一个仓(有自己的 README/教程节奏),
 # 本轮只给本仓的文档打状态,避免把自动状态块写进别人的仓库。
@@ -81,6 +83,8 @@ STATUS = {
     "../packages/mavis-vizkit/README.md": ("现行", "可视化插件包说明(挂 mavis 插件面,与案例解耦)"),
     "../packages/mavis-case01-injector/README.md": ("现行", "case01 注入器包说明"),
     "../tools/tilemap_to_maze_README.md": ("现行", "Tiled 地图转 maze.json 的 CLI 工具说明"),
+    "../tools/README.md": ("现行", "仓根 tools/ 与内层 provenance/tools/ 的分工(装新机/起面/打包/搬迁 vs 体检/探针/审计)"),
+    "tools/README.md": ("现行", "内层 tools/ 的体检与探针工具清单(含与仓根 tools/ 的边界)"),
     # —— 已被取代 ——
     "case01/docs/架构总览_嵌入case01_20260919.md": ("已被取代", "被 `docs/架构总览与对接指南.md` 取代(那时还没有 case_engine 与多场景)"),
     "case01/docs/Governance平台对接说明.md": ("参考(5002 面)", "5002 历史参考；对接使用 5010 契约，审核执行规则以《专家审核流程补充规范》为准"),
