@@ -1,0 +1,152 @@
+{
+  "summary": {
+    "judge_model": "qwen3:8b",
+    "model_env_requested": "qwen3:8b",
+    "channel": "ollama",
+    "temperature": 0.1,
+    "max_tokens": 2048,
+    "n": 8,
+    "n_moved": 2,
+    "old_prompt_sha8": "2caf63f9",
+    "new_prompt_sha8": "aad4dbe1",
+    "old_prompt_is_shipped_default": false
+  },
+  "rows": [
+    {
+      "case": "A_size_small_now",
+      "t0": "建议现在买入,仓位两成,不需要等任何消息。",
+      "old": {
+        "branch": "C",
+        "reason": "建议现在买入,仓位两成",
+        "attempts": 1,
+        "secs": 5.5
+      },
+      "new": {
+        "branch": "A",
+        "reason": "建议现在买入，不需要等任何消息",
+        "attempts": 1,
+        "secs": 4.6
+      },
+      "moved": true
+    },
+    {
+      "case": "A_size_full_now",
+      "t0": "我判断现在就该全仓买入。",
+      "old": {
+        "branch": "A",
+        "reason": "我判断现在就该全仓买入。",
+        "attempts": 1,
+        "secs": 6.9
+      },
+      "new": {
+        "branch": "A",
+        "reason": "我判断现在就该全仓买入。",
+        "attempts": 1,
+        "secs": 4.6
+      },
+      "moved": false
+    },
+    {
+      "case": "B_evidence_gate_only",
+      "t0": "等正式公告出来再说,现在仓位不动。",
+      "old": {
+        "branch": "B",
+        "reason": "现在仓位不动",
+        "attempts": 1,
+        "secs": 4.7
+      },
+      "new": {
+        "branch": "B",
+        "reason": "等正式公告出来再说,现在仓位不动。",
+        "attempts": 1,
+        "secs": 6.0
+      },
+      "moved": false
+    },
+    {
+      "case": "B_wait_and_avoid",
+      "t0": "公司前景正面,但目前信息不足,建议先观望。",
+      "old": {
+        "branch": "B",
+        "reason": "公司前景正面,但目前信息不足,建议先观望。",
+        "attempts": 1,
+        "secs": 4.4
+      },
+      "new": {
+        "branch": "B",
+        "reason": "公司前景正面,但目前信息不足,建议先观望。",
+        "attempts": 1,
+        "secs": 6.0
+      },
+      "moved": false
+    },
+    {
+      "case": "B_exit",
+      "t0": "建议清仓离场,不参与这只票。",
+      "old": {
+        "branch": "B",
+        "reason": "建议清仓离场,不参与这只票。",
+        "attempts": 1,
+        "secs": 5.8
+      },
+      "new": {
+        "branch": "B",
+        "reason": "建议清仓离场,不参与这只票",
+        "attempts": 1,
+        "secs": 4.8
+      },
+      "moved": false
+    },
+    {
+      "case": "C_trigger_plus_commit",
+      "t0": "如果公告确认营收同比增长超过20%,就买入两成仓位。",
+      "old": {
+        "branch": "C",
+        "reason": "如果公告确认营收同比增长超过20%,就买入两成仓位",
+        "attempts": 1,
+        "secs": 6.0
+      },
+      "new": {
+        "branch": "C",
+        "reason": "如果公告确认营收同比增长超过20%,就买入两成仓位",
+        "attempts": 1,
+        "secs": 5.3
+      },
+      "moved": false
+    },
+    {
+      "case": "C_trigger_price_level",
+      "t0": "若股价回落到80元以下,我将买入三成仓位。",
+      "old": {
+        "branch": "C",
+        "reason": "若股价回落到80元以下,我将买入三成仓位",
+        "attempts": 1,
+        "secs": 4.5
+      },
+      "new": {
+        "branch": "C",
+        "reason": "若股价回落到80元以下,我将买入三成仓位",
+        "attempts": 1,
+        "secs": 6.0
+      },
+      "moved": false
+    },
+    {
+      "case": "C_vague_condition",
+      "t0": "如果市场情绪好转,可以考虑适当参与一些。",
+      "old": {
+        "branch": "C",
+        "reason": "如果市场情绪好转,可以考虑适当参与一些",
+        "attempts": 1,
+        "secs": 5.9
+      },
+      "new": {
+        "branch": "undetermined",
+        "reason": "如果市场情绪好转,可以考虑适当参与一些。",
+        "attempts": 1,
+        "secs": 6.3
+      },
+      "moved": true
+    }
+  ]
+}
