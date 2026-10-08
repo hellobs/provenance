@@ -511,7 +511,12 @@ class TestProbeArtifactsAreNotResearchSamples(unittest.TestCase):
 
     def setUp(self):
         if not os.path.isfile(INTERVENTIONS):
-            self.skipTest("results/checkpoints/ 未入库(gitignore):本检出无现场数据")
+            # 文案里的路径必须等于本条实际测的那个文件(2026-10-08 改口):此前写的是
+            # `results/checkpoints/` —— 那是 10-08 搬迁**前**的老位置,而这里读的是
+            # `data_root("ledgers")/interventions.json`。写错路径会让读者去翻一个空目录,
+            # 并把"台账根没数据"误读成"老根残留"。
+            self.skipTest("登记簿不存在,本检出无干预数据:{}(现场数据不入库)".format(
+                INTERVENTIONS))
         with open(INTERVENTIONS, encoding="utf-8") as f:
             self.iv = json.load(f)
 
@@ -529,7 +534,8 @@ class TestProbeArtifactsAreNotResearchSamples(unittest.TestCase):
         """`_load_corpus_rows()` 的结果里**一条探测残留都不能有**。"""
         rows = _load_corpus_rows()
         if rows is None:
-            self.skipTest("results/checkpoints/ 未入库(gitignore)")
+            # 唯一返回 None 的分支就是"登记簿文件不存在"(见 _load_corpus_rows 首行)
+            self.skipTest("登记簿不存在,拿不到样本行:{}".format(INTERVENTIONS))
         sims = {sim for sim, _ in rows}
         probe_sims = {x.get("simulation") for x in self.iv
                       if x.get("agent") == "../../etc/passwd"}
@@ -591,9 +597,12 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
     def setUpClass(cls):
         cls.samples = []
         if not os.path.isdir(CK_DIR):
+            # 点名**实际测量根**而不是搬迁前的老位置:本条读的是 `data_root("case00.state")`,
+            # 文案写 `results/checkpoints/` 会把读者支去翻一个 10-08 已搬空的目录。
             cls._skipped_real = (
-                "results/checkpoints/ 未入库(gitignore):原始 Σ=1 样本级验证在本检出上"
-                "不执行 —— 入库产物侧的可执行守卫见 TestSimplexInvariantOnShippedProducts")
+                "现场存档根不存在,原始 Σ=1 样本级验证在本检出不执行:{}"
+                "(现场数据不入库)。入库产物侧的可执行守卫见 "
+                "TestSimplexInvariantOnShippedProducts".format(CK_DIR))
             return
         files = sorted(glob.glob(os.path.join(CK_DIR, "*", "simulate-*.json")))
         for path in files[:400]:      # 抽样上限,避免测试过慢
@@ -608,7 +617,9 @@ class TestValueTendencySimplexInvariant(unittest.TestCase):
                 if vals:
                     cls.samples.append((path, agent, vals))
         if not cls.samples:
-            cls._skipped_real = "checkpoints 目录在但无 value_tendency 样本"
+            cls._skipped_real = ("存档根在({})但 {} 个 simulate-*.json 里一条 "
+                                 "value_tendency 都没有(本测试最多扫 400 个)"
+                                 ).format(CK_DIR, len(files))
 
     # --- 纯计算不变量:构造单纯形点,不依赖产物,CI 上也跑 -------------
 
