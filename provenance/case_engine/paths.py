@@ -31,8 +31,66 @@
 都要用,各自实现一份必然漂移。
 """
 import os
+import sys
 
-__all__ = ["AmbiguousPathError", "require_abs_path", "resolve_root"]
+# 仓根 / 包根:本文件在 <仓根>/provenance/case_engine/paths.py
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(PKG_ROOT)
+
+__all__ = ["AmbiguousPathError", "require_abs_path", "resolve_root", "data_root", "DATA_KINDS"]
+
+
+# ---------------------------------------------------------------------------
+# 数据根(2026-10-08 归类搬迁):所有"跑出来的存档"统一搬到仓根 `data/`。
+#
+# 为什么需要这一层:此前**同一个概念有三个落点** ——
+#   `results/checkpoints/`(case00 沙盒存档 + 跨局登记簿)、
+#   `case01/injector/scenario/checkpoints/`(case01 引擎状态)、
+#   `case01/results/checkpoints/`(空壳,历史路径痕迹);
+# 而 case01 还把成品/原始记录放在自己目录下。见 `provenance/docs/仓库布局说明.md`。
+#
+# 搬迁期策略(**不用目录联接**):新位置优先;新位置不在而老位置在 → 用老位置并**打一行提示**;
+# 两个都不在 → 返回新位置(调用方负责创建)。这样"边搬边跑"安全,且**漏改的读取方会出声**。
+# ---------------------------------------------------------------------------
+DATA_KINDS = {
+    # kind                    新位置(相对仓根)                 老位置(相对包根)
+    "case01.records": ("data/case01/runs", "case01/runs"),
+    "case01.raw": ("data/case01/raw", "case01/runs_injector"),
+    "case01.runtime": ("data/case01/runtime", "case01/runs_injector"),
+    "case01.state": ("data/case01/state", "case01/injector/scenario/checkpoints"),
+    "case01.html": ("data/case01/html", "case01/runs_html"),
+    "case01.archive": ("data/case01/archive", "case01/runs_archive_20260919"),
+    "case00.state": ("data/case00/state", "results/checkpoints"),
+    "ledgers": ("data/ledgers", "results/checkpoints"),
+}
+
+_warned = set()
+
+
+def data_root(kind: str, *, env_var: str = "", what: str = "") -> str:
+    """解析某类数据根:环境变量(须绝对) > 新位置 > 老位置 > 新位置(待创建)。
+
+    环境变量仍然最高优先 —— 它是对接/演示的显式覆盖口(如 `CASE01_RUNS_ROOT`)。
+    """
+    if env_var:
+        raw = os.environ.get(env_var)
+        if raw:
+            return require_abs_path(raw, what=what or env_var)
+    if kind not in DATA_KINDS:
+        raise KeyError("未知数据根 {!r};可用:{}".format(kind, sorted(DATA_KINDS)))
+    new_rel, old_rel = DATA_KINDS[kind]
+    new = os.path.join(REPO_ROOT, *new_rel.split("/"))
+    old = os.path.join(PKG_ROOT, *old_rel.split("/"))
+    if os.path.isdir(new):
+        return new
+    if os.path.isdir(old):
+        if kind not in _warned:
+            _warned.add(kind)
+            sys.stderr.write(
+                "[data_root] {} 还在老位置 {} —— 请按 docs/仓库布局说明.md 迁移到 {}。"
+                "本次已用老位置继续。\n".format(kind, old, new))
+        return old
+    return new
 
 
 class AmbiguousPathError(ValueError):

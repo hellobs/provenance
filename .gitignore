@@ -172,6 +172,12 @@ cython_debug/
 .claude/
 checkpoints/
 
+# 数据归类搬迁(2026-10-08):所有"跑出来的存档"统一放仓根 `data/`。
+# 见 `provenance/docs/仓库布局说明.md`;搬迁期新旧位置并存,读侧由
+# `case_engine.paths.data_root()` 决定(新位置优先、老位置回落并出声)。
+# 整棵不入库:里面有 311+ 条成品记录、case00 的 2.4 GB 沙盒存档与跨局登记簿。
+data/
+
 # 临时测试脚本与工具
 _tmp_test/
 

@@ -43,7 +43,21 @@ def _data_root(env_var: str, *parts: str) -> str:
     if raw:
         from case_engine.paths import require_abs_path
         return require_abs_path(raw, what=env_var)
+    # 2026-10-08:已知的"数据根"改走 `case_engine.paths.data_root()` —— 它们的家搬到仓根 `data/` 下,
+    # 搬迁期新位置优先、老位置回落并出声。**保留 (_data_root) 这个入口形态**:
+    # 多个读取方与 `tests/test_runs_root_env_parity.py` 都按它断言,换签名等于白改一遍。
+    kind = _KIND_BY_PARTS.get((env_var,) + tuple(parts))
+    if kind:
+        from case_engine.paths import data_root
+        return data_root(kind, env_var=env_var)
     return os.path.join(BASE_DIR, *parts)
+
+
+# (环境变量, 老位置各部分) → data_root 的 kind。未列的继续走 BASE_DIR 拼接(如 results/compressed)。
+_KIND_BY_PARTS = {
+    ("CASE01_RUNS_ROOT", "case01", "runs"): "case01.records",
+    ("CASE00_CHECKPOINTS_ROOT", "results", "checkpoints"): "case00.state",
+}
 
 
 def _data_root_soft(env_var: str, *parts: str):

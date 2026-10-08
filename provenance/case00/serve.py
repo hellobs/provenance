@@ -21,7 +21,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(BASE_DIR)
-CKPT_ROOT = os.path.join(REPO_ROOT, "results", "checkpoints")
+# 2026-10-08:case00 存档的家由 `data_root()` 解析(目标 `data/case00/state`,搬迁期回落老位置
+# `results/checkpoints` 并出声)。环境变量 `CASE00_CHECKPOINTS_ROOT` 仍可显式覆盖。
+from case_engine.paths import data_root  # noqa: E402
+
+CKPT_ROOT = data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
 SCENARIO_DIR = os.path.join(BASE_DIR, "scenario")
 
 app = FastAPI(title="GTC Case 00 · 存档只读浏览")

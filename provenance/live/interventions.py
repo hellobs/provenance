@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi.responses import JSONResponse
 
+from live import state
 from live.state import write_json_atomic
 
 
@@ -103,6 +104,21 @@ def _governance_unsupported(ctx: InterventionContext):
 
 
 def _audit_path(ctx: InterventionContext) -> str:
+    """干预台账(跨局登记簿)的绝对路径。
+
+    2026-10-08:台账的家从 `results/checkpoints/` 挪到 `data/ledgers/`。
+    但 `ctx.base_dir` 是**测试与外部调用可以覆盖的根**(多处测试把 ctx 指到 tmp),
+    所以只在"ctx 指着真仓"时才走新解析器。
+
+    ⚠ 判据必须拿**物理常量**(`case_engine.paths.PKG_ROOT/REPO_ROOT`)比,
+    **不能拿 `state.BASE_DIR`** —— 那个变量本身就会被测试 patch 到 tmp,用它比等于
+    "测试里也判成真仓",于是台账被写到真仓老位置、测试看不到自己 seed 的数据
+    (2026-10-08 实测:test_live_api 的 undo/timeline 一整套因此红)。
+    """
+    from case_engine.paths import PKG_ROOT, REPO_ROOT, data_root
+    real = os.path.realpath(ctx.base_dir)
+    if real in (os.path.realpath(PKG_ROOT), os.path.realpath(REPO_ROOT)):
+        return os.path.join(data_root("ledgers"), "interventions.json")
     return os.path.join(ctx.base_dir, "results", "checkpoints", "interventions.json")
 
 

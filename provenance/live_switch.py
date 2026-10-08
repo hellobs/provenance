@@ -310,7 +310,9 @@ def start(case, args):
             # judge 模式下分支要等 T0 跑完才定,名字里就不该写一个假的分支字母(用 auto);
             # 重开一局时循环里现铸的名字也走同一套口径(见 live_run.py)。
             run_id = args.run_id or live_run_id("auto" if args.branch_mode == "judge" else args.branch)
-            out = args.out or os.path.join("case01", "runs_injector", run_id, "raw.json")
+            # 2026-10-08:原始记录的家挪到仓根 `data/case01/raw/`(搬迁期新优先、老回落并出声)。
+            from case_engine.paths import data_root
+            out = args.out or os.path.join(data_root("case01.raw"), run_id, "raw.json")
             _warn_overwrite(args.run_id, run_id, out)
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                    "--branch-mode", args.branch_mode,

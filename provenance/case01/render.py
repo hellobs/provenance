@@ -20,9 +20,12 @@ import re
 import sys
 import time
 
+from case_engine.paths import data_root
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-RUNS_DIR = os.path.join(HERE, "runs")
-OUT_DIR = os.path.join(HERE, "runs_html")
+# 2026-10-08:记录与渲染产物的家挪到仓根 `data/case01/`(搬迁期新优先、老回落并出声)。
+RUNS_DIR = data_root("case01.records")
+OUT_DIR = data_root("case01.html")
 
 # 长于该字符数的内容块默认折叠
 FOLD_LEN = 240

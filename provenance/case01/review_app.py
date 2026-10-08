@@ -58,9 +58,9 @@ def _resolve_runs_dir() -> str:
     与 `case01/orchestrator.RUNS_ROOT()`、`live/history._data_root` 同语义。
     仍保留模块级 `RUNS_DIR` 名字,因为多处测试 monkeypatch 它(见 `_runs_dir`)。
     """
-    from case_engine.paths import resolve_root
-    return resolve_root("CASE01_REVIEW_RUNS_DIR", os.path.join(BASE_DIR, "runs"),
-                        what="CASE01_REVIEW_RUNS_DIR")
+    from case_engine.paths import data_root
+    # 2026-10-08:改走 `data_root()`(成品记录的家挪到仓根 `data/case01/runs`)。
+    return data_root("case01.records", env_var="CASE01_REVIEW_RUNS_DIR")
 
 
 RUNS_DIR = _resolve_runs_dir()

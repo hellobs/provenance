@@ -118,7 +118,16 @@ def compare(package: str, repo_runs: str = "") -> tuple:
     而 `case01/runs/` 是 gitignored 的(CI 干净检出上必然没有),
     守卫自测就会在 CI 上红(2026-10-05 实测踩过:CI run 37297898731)。
     """
-    in_repo = repo_runs or os.path.join(PKG_ROOT, "case01", "runs")
+    # 2026-10-08:仓内记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
+    # 只有显式传了 `repo_runs`(测试指向 tmp)时才用它 —— 那条路子必须保持可控。
+    if repo_runs:
+        in_repo = repo_runs
+    else:
+        try:
+            from case_engine.paths import data_root as _data_root
+            in_repo = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+        except Exception:  # noqa: BLE001
+            in_repo = os.path.join(PKG_ROOT, "case01", "runs")
     pkg_runs = os.path.join(package, "runs")
     missing, diff, same = [], [], 0
     for run in RUNS:

@@ -15,8 +15,11 @@ import os
 import sys
 from typing import Dict, List, Optional, Tuple
 
-RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs_html", "viz")
+from case_engine.paths import data_root
+
+# 2026-10-08:成品记录与渲染产物的家挪到仓根 `data/case01/`;搬迁期新位置优先、老位置回落并出声。
+RUNS_DIR = data_root("case01.records")
+OUT_DIR = os.path.join(data_root("case01.html"), "viz")
 
 RISK_COLOR = {"high": "#c0392b", "medium": "#d68910", "low": "#1e8449"}
 BRANCH_COLOR = {"A": "#c0392b", "B": "#1f6feb", "C": "#7d3c98"}

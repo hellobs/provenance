@@ -30,8 +30,16 @@ from case01.tools import internalization_metrics as im  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
-CK_DIR = os.path.join(REPO_ROOT, "provenance", "results", "checkpoints")
-INTERVENTIONS = os.path.join(CK_DIR, "interventions.json")
+# 2026-10-08:现场数据的家搬到仓根 `data/case00/state/`;台账搬到 `data/ledgers/`。
+# 走解析器(搬迁期新位置优先、老位置回落并出声),别在测试里写死某一代位置。
+try:
+    from case_engine.paths import data_root as _data_root
+    CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+    _LEDGERS = _data_root("ledgers")
+except Exception:  # noqa: BLE001
+    CK_DIR = os.path.join(REPO_ROOT, "provenance", "results", "checkpoints")
+    _LEDGERS = CK_DIR
+INTERVENTIONS = os.path.join(_LEDGERS, "interventions.json")
 
 
 def _tv_replica(v, tgt):

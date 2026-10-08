@@ -38,21 +38,13 @@ except ImportError:  # 直接脚本运行(在 case01 目录)
     from case01.reflection import evaluate_reflection_quality
 
 from live.netguard import resolve_embed_origins
-from case_engine.paths import resolve_root
+from case_engine.paths import data_root
 
-# 2026-10-05:从裸读改为走 resolve_root(相对值当场报错,与写侧同语义)。
-# 此前相对值时这里按 cwd 解释 —— 与 `orchestrator.RUNS_ROOT()` 的读写不对称
-# 属同一类漏点(GTC 体检 N5/N8)。
-RUNS_ROOT = resolve_root(
-    "CASE01_RUNS_ROOT",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
-    what="CASE01_RUNS_ROOT",
-)
-RUNS_HTML_ROOT = resolve_root(
-    "CASE01_RUNS_HTML_ROOT",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs_html"),
-    what="CASE01_RUNS_HTML_ROOT",
-)
+# 2026-10-05:从裸读改为走绝对路径守卫(相对值当场报错,与写侧同语义)。
+# 2026-10-08:改走 `data_root()` —— 成品/渲染产物的家从 `case01/` 挪到仓根 `data/case01/`;
+# 搬迁期新位置优先、老位置回落并出声。两个环境变量仍是最高优先的显式覆盖口。
+RUNS_ROOT = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+RUNS_HTML_ROOT = data_root("case01.html", env_var="CASE01_RUNS_HTML_ROOT")
 
 app = FastAPI(
     title="GTC Case 01 · Run 只读数据服务",

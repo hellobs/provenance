@@ -25,6 +25,13 @@ from typing import Dict, List, Optional, Tuple
 
 CK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "..", "..", "results", "checkpoints")
+# 2026-10-08:CK_DIR 是**老位置**;现场数据将搬到 `data/case00/state/`。
+# 这里在 import 期解析一次(工具类脚本,进程寿命短),搬迁期新位置优先、老位置回落。
+try:
+    from case_engine.paths import data_root as _data_root
+    CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+except Exception:  # noqa: BLE001 —— 独立运行时不该因为 import 失败就打不开工具
+    pass
 
 DEFAULT_WINDOW_MIN = 60.0
 

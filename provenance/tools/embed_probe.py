@@ -54,6 +54,12 @@ def blocking(h):
 # 2026-10-04 实测:字典序会把历史里的 `probe-1003-1217` 当成"最新一条",
 # 而真正的最新是当天那条 live 记录;探针报的记录和跑批的产出对不上就是在骗人。
 _RUNS_DIR = os.path.join(PKG, "case01", "runs")
+# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
+try:
+    from case_engine.paths import data_root as _data_root
+    _RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 runs = sorted([d for d in os.listdir(_RUNS_DIR)
                if os.path.isfile(os.path.join(_RUNS_DIR, d, "run.json"))],
               key=lambda d: os.path.getmtime(os.path.join(_RUNS_DIR, d, "run.json")))

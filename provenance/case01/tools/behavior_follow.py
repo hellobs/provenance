@@ -34,6 +34,12 @@ from typing import Dict, List, Optional, Tuple
 
 CK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 CHECKPOINTS = os.path.join(CK, "results", "checkpoints")
+# 2026-10-08:现场数据的家要搬到 `data/case00/state/`(搬迁期新位置优先、老位置回落)。
+try:
+    from case_engine.paths import data_root as _data_root
+    CHECKPOINTS = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 
 DEFAULT_WINDOW_MIN = 120.0
 DEFAULT_SAMPLE = 30          # 离线补算时每侧最多抽多少条行动文本

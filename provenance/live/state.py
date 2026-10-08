@@ -225,9 +225,59 @@ def current_sim_time(fmt: str = "%Y%m%d-%H:%M", engine=None) -> str:
     return ""
 
 
+def _base_is_real() -> bool:
+    """`BASE_DIR` 是否还指着**真仓**(而不是被测试 patch 到 tmp)。
+
+    ⚠ 为什么必须判这个:多处测试用 `monkeypatch.setattr(state, "BASE_DIR", tmp)` 把
+    整套存储重定向到临时目录。若 `sim_dir()`/`ledger_file()` 无条件走新解析器,
+    就会绕过那个重定向、去读**真仓**的老位置 —— 测试看不到自己刚塞的数据
+    (2026-10-08 实测:test_live_api 的 timeline/undo 一整套因此红)。
+    """
+    try:
+        from case_engine.paths import PKG_ROOT
+    except Exception:  # noqa: BLE001
+        return False
+    return os.path.realpath(BASE_DIR) == os.path.realpath(PKG_ROOT)
+
+
+def sim_dir(name: str) -> str:
+    """某个模拟的现场存档目录(每步快照/决策/对话)。
+
+    2026-10-08:走 `data_root()` —— 家从 `results/checkpoints/<模拟名>` 挪到
+    `data/case00/state/<模拟名>`(搬迁期新位置优先、老位置回落并出声)。
+    但 `BASE_DIR` 被重定向(测试)时保持老语义:在 `<BASE_DIR>/results/checkpoints/<名>`。
+    """
+    if _base_is_real():
+        from case_engine.paths import data_root
+        return os.path.join(data_root("case00.state"), name)
+    return os.path.join(BASE_DIR, "results", "checkpoints", name)
+
+
+def ledger_file(name: str) -> str:
+    """跨局登记簿文件(`interventions.json` 干预台账 / `reflection_marks.json` 专家标记)。
+
+    为什么和 `sim_dir` 分开:登记簿**不属于任何一局**,所以它的家是 `data/ledgers/`,
+    而模拟存档是 `data/case00/state/<模拟名>/` —— 混在一个函数里正是当初"三个同名 checkpoints"
+    的来源之一。同样尊重 `BASE_DIR` 被重定向的情形。
+    """
+    if _base_is_real():
+        from case_engine.paths import data_root
+        return os.path.join(data_root("ledgers"), name)
+    return os.path.join(BASE_DIR, "results", "checkpoints", name)
+
+
 def checkpoint_file(*parts) -> str:
-    """BASE_DIR/results/checkpoints/<parts...> 绝对路径"""
-    return os.path.join(BASE_DIR, "results/checkpoints", *parts)
+    """【已弃用,仅为兼容外部脚本】新代码请用 `sim_dir()` / `ledger_file()`。
+
+    旧语义:`BASE_DIR/results/checkpoints/<parts...>`。当年它同时被用来指"模拟目录"和
+    "登记簿文件"两样东西,于是这两样东西的家再也分不开。现在按调用形态转发:
+    `checkpoint_file("x.json")` → 登记簿;`checkpoint_file("<模拟名>")` → 模拟目录。
+    """
+    if len(parts) == 1:
+        one = str(parts[0])
+        return ledger_file(one) if one.endswith(".json") else sim_dir(one)
+    from case_engine.paths import data_root
+    return os.path.join(data_root("case00.state"), *parts)
 
 
 def intervention_sort_key(iv: dict):

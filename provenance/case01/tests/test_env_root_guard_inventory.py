@@ -91,11 +91,17 @@ def _env_path_vars_in(path):
 
 
 def _guard_refs_in(path):
-    """该文件是否引用了任一守卫入口(用于"裸读"判定)。"""
+    """该文件是否引用了任一守卫入口(用于"裸读"判定)。
+
+    2026-10-08 加 `data_root`:它是 `case_engine.paths` 里新的"数据根解析器"
+    (新位置优先、老位置回落并出声),环境变量那一支内部走的仍是 `require_abs_path`,
+    所以它同样算"走了守卫"。不加这一项,把调用点从 `resolve_root` 换成 `data_root`
+    的改动会被误判成裸读。
+    """
     with open(path, encoding="utf-8", errors="replace") as fh:
         src = fh.read()
     return any(k in src for k in (
-        "resolve_root", "require_abs_path", "env_abs_path",
+        "resolve_root", "require_abs_path", "env_abs_path", "data_root",
     ))
 
 
@@ -116,14 +122,14 @@ def test_every_root_env_is_read_through_the_guard():
     """任何路径型环境变量都不得**裸读**(全仓 os.walk 扫描)。
 
     判据:该文件里若出现 `os.environ.get("XXX_ROOT")`(或 `_PATH`/`_DIR`/`_FILE`),
-    同一文件必须同时引用了 `resolve_root` / `require_abs_path` / `env_abs_path`。
+    同一文件必须同时引用了 `resolve_root` / `require_abs_path` / `env_abs_path` / `data_root`。
     裸读(既 get 又不走守卫)= 漏点。
     """
     offenders = _offenders()
     assert not offenders, (
         "路径守卫按调用点铺开、有根漏网(GTC 体检 N5 / 第六轮 P2-1):\n  " +
         "\n  ".join(offenders) +
-        "\n改法:case01/live 走 case_engine.paths.resolve_root(env, default, what=...),"
+        "\n改法:case01/live 走 case_engine.paths.resolve_root 或 data_root(env_var=..., what=...),"
         "config_tool 走 engine_bridge.env_abs_path(...)")
 
 

@@ -67,6 +67,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))          # .../case01/tools
 CASE01_DIR = os.path.dirname(HERE)                        # .../case01
 PROV_DIR = os.path.dirname(CASE01_DIR)                    # .../provenance
 RUNS_DIR = os.path.join(CASE01_DIR, "runs")
+# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
+try:
+    from case_engine.paths import data_root as _data_root
+    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 ANALYSIS_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 _SEQ_RE = re.compile(r"-(\d{3,})$")            # run_id 末尾的 -001…-NNN(--seed-base 用)
 

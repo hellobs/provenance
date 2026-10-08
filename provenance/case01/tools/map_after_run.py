@@ -43,6 +43,12 @@ from case01.safestream import run_text, tolerant_stdout, utf8_env
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.dirname(os.path.dirname(HERE))          # provenance/provenance
 RUNS_DIR = os.path.join(PKG_ROOT, "case01", "runs")
+# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
+try:
+    from case_engine.paths import data_root as _data_root
+    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 
 # 看护进程的输出被重定向到日志文件,此时 stdout 用的是**本地编码**(中文 Windows 是 GBK);
 # 打不出对勾/叉号那类符号时会直接抛 UnicodeEncodeError —— 而它发生在映射**成功之后**,

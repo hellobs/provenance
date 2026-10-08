@@ -53,6 +53,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CASE01_DIR = os.path.dirname(HERE)
 PROV_DIR = os.path.dirname(CASE01_DIR)
 RUNS_DIR = os.path.join(CASE01_DIR, "runs")
+# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
+try:
+    from case_engine.paths import data_root as _data_root
+    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 BATCH_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 
 # 答辩基线(25 条小镇面记录;记录内无模型字段,身份只能推断)——只作量级参照

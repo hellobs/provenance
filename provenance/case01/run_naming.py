@@ -49,7 +49,7 @@ def sample_run_id(case: str, engine: str, branch: str, date: str) -> str:
     return "{}-demo-{}-{}-{}".format(date, case, engine, branch)
 
 
-def unique_run_id(base: str, roots=("case01/runs", "case01/runs_injector")) -> str:
+def unique_run_id(base: str, roots=None) -> str:
     """给 `base` 找一个**还没被占用**的 run_id(占用了就加 `-2`、`-3`…)。
 
     为什么需要(2026-09-19 用户反馈"重开一局这个功能有问题"时查出来的):
@@ -59,8 +59,16 @@ def unique_run_id(base: str, roots=("case01/runs", "case01/runs_injector")) -> s
     这属于"静默处理",必须拦住。
 
     返回可用的名字;调用方负责把它落到盘上。roots 里任一目录存在同名子目录即视为占用。
+
+    2026-10-08:两个根由 `data_root()` 解析(成品与原始记录的家挪到仓根 `data/case01/`),
+    搬迁期新位置优先、老位置回落并出声 —— 撞名检查因此对**两个位置都生效**。
     """
     import os
+
+    from case_engine.paths import data_root
+
+    if roots is None:
+        roots = (data_root("case01.records"), data_root("case01.raw"))
 
     def taken(rid: str) -> bool:
         return any(os.path.isdir(os.path.join(r, rid)) for r in roots)

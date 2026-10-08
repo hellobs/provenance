@@ -55,6 +55,12 @@ if not (fe_w & tm_w):
 
 # 4) checkpoints run 记录可读(取**按 mtime 最新的几个目录**,读其最后一个 simulate-* 快照)
 ck = os.path.join(BASE, "results", "checkpoints")
+# 2026-10-08:现场数据的家搬到仓根 `data/case00/state/`(搬迁期新位置优先、老位置回落并出声)。
+try:
+    from case_engine.paths import data_root as _data_root
+    ck = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+except Exception:  # noqa: BLE001
+    pass
 if os.path.isdir(ck):
     # 只数目录:`reflection_marks.json` / `reflection_marks.jsonl` / `interventions.json` 是散文件,
     # 不是 run。而且原先按 `sorted(os.listdir)` 取**名字尾巴**当"最新",尾巴落到的往往是

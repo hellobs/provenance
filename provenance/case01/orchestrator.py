@@ -633,11 +633,11 @@ def RUNS_ROOT():  # noqa: N802 —— 函数形态不能改:run.py 与多处测�
     —— 读写不对称。改为走 `resolve_root`,与 `live/history._data_root`、
     `case_engine/scenarios` 同语义:环境变量须绝对,空值按未设置回默认根。
     """
-    from case_engine.paths import resolve_root
-    return resolve_root(
-        "CASE01_RUNS_ROOT",
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs"),
-        what="CASE01_RUNS_ROOT")
+    from case_engine.paths import data_root
+    # 2026-10-08 归类搬迁:成品记录的家从 `case01/runs` 挪到仓根 `data/case01/runs`。
+    # `data_root()` 负责"新位置优先、老位置回落并出声",所以搬迁期新旧并存都能跑;
+    # 环境变量 `CASE01_RUNS_ROOT` 仍然是最高优先的显式覆盖口(演示时用它指交付包)。
+    return data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 FIN_DIR = lambda: os.path.join(os.path.dirname(os.path.abspath(__file__)),  # noqa: E731
                                "data", "financial")
 

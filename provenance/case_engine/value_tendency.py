@@ -73,8 +73,16 @@ def _load_interventions(base: str, path: str = "") -> list:
 
     读不到就回空 —— 但不能因此假装"没有干预":调用方据"文件是否存在"来区分
     "没有干预" 与 "查不到审计",见 explain_divergence() 的 note 字段。
+
+    2026-10-08:台账的家挪到仓根 `data/ledgers/`。只在 `base` 就是本仓(包根或仓根)时走新解析器;
+    `base` 是测试/外部给的其它根时仍按老位置读(否则测试的临时根会被绕过去)。
     """
-    p = path or os.path.join(base, "results", "checkpoints", "interventions.json")
+    from case_engine.paths import PKG_ROOT, REPO_ROOT, data_root
+    real = os.path.realpath(base)
+    if not path and real in (os.path.realpath(PKG_ROOT), os.path.realpath(REPO_ROOT)):
+        p = os.path.join(data_root("ledgers"), "interventions.json")
+    else:
+        p = path or os.path.join(base, "results", "checkpoints", "interventions.json")
     data = _load_json(p)
     return [x for x in (data or []) if isinstance(x, dict)]
 

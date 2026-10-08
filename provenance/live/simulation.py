@@ -96,7 +96,9 @@ def run_simulation(name, sim_config, start_step, step, stride):
 
         fw_agent.chat_callback = on_chat_line
         # 绝对路径,避免 cwd 依赖导致检查点写到错误目录
-        checkpoints_folder = os.path.join(state.BASE_DIR, "results/checkpoints", name)
+        # 2026-10-08:改走 `state.sim_dir()`(家从 `results/checkpoints/<名>` 挪到 `data/case00/state/<名>`;
+        # 搬迁期新位置优先、老位置回落并出声)。
+        checkpoints_folder = state.sim_dir(name)
 
         # 用存档里的时间建时钟(存档 time 已是下一步时间)
         timer = Timer(start=sim_config["time"]["start"])
