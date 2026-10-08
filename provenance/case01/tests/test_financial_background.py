@@ -1,4 +1,3 @@
-import hashlib
 import json
 from pathlib import Path
 
@@ -7,7 +6,7 @@ import pytest
 from case01.agents.financial import FinancialData
 from case01.agents.investment_ai import InvestmentAI
 from case01.agents.passages import passages
-from case01.tools.import_financial_background import convert
+from case01.tools.import_financial_background import convert, source_fingerprint
 from mavis_case01_injector.bridge import MavisBridge
 from mavis_case01_injector.nodes import NodeSpec
 from mavis_case01_injector.record import _retrievals
@@ -43,10 +42,13 @@ def test_real_import_retains_original_and_dates():
     assert max(d["time"] for d in docs) == "2026-08-24"
     rows = [json.loads(line) for line in raw.decode().splitlines()]
     for company, group in groups.items():
-        assert json.loads((DATA / "financial" / "background" / company / "docs.json").read_text()) == group
+        # read_text() 不给 encoding 在 Windows 上走 cp936,中文 docs.json 第 104 字节即崩
+        # (写侧 line 33 是 utf-8);本机实测 UnicodeDecodeError,CI(Linux)看不出。
+        assert json.loads((DATA / "financial" / "background" / company / "docs.json")
+                          .read_text(encoding="utf-8")) == group
     for doc in docs:
         assert doc["content"] == rows[doc["meta"]["source_line"] - 1]["正文"]
-        assert doc["meta"]["source_sha256"] == hashlib.sha256(raw).hexdigest()
+        assert doc["meta"]["source_sha256"] == source_fingerprint(raw)
         chunks = list(passages(doc["content"]))
         assert "".join(text for _, _, text in chunks) == doc["content"]
         assert all(doc["content"][start:end] == text and len(text) <= 600

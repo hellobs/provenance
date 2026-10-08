@@ -19,9 +19,24 @@ TYPES = {"公司资料": "company_profile", "财务数据": "financial", "公告
 CORPUS = "market_background_100_v1"
 
 
+def source_fingerprint(raw: bytes) -> str:
+    """语料指纹 = **换行归一后**的 sha256 —— 不是文件字节本身的 sha256。
+
+    为什么要归一(2026-10-08 实测):仓里没有 `.gitattributes`,git 在提交时把 CRLF 清成
+    LF(blob 384 918 字节),检出时又按本机 `core.autocrlf` 还原成 CRLF(工作副本 385 018
+    字节,100 行各多一个 `\\r`)。同一份语料因此有两个字节形态 ——
+    LF `78af5db2…`、CRLF `bc2992a6…`。产物是在 LF 那台机器上生成的,记录的正是 `78af5db2`;
+    在 Windows 上重跑 `sha256(read_bytes())` 必然对不上,100 条文档里唯一飘出来的差异字段
+    就是 `meta.source_sha256`。**指纹依赖检出机器的换行配置 = 依赖的不是语料本身**,
+    而这条指纹是用来对外声明"这 100 条来自同一份语料"的证据。
+    归一后哈希对 LF 侧逐字不变(不必重生成任何已入库产物),Windows 侧落回同一个值。
+    """
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+
+
 def convert(source: Path):
     raw = source.read_bytes()
-    source_hash = hashlib.sha256(raw).hexdigest()
+    source_hash = source_fingerprint(raw)
     groups = defaultdict(list)
     for line_no, line in enumerate(raw.decode("utf-8-sig").splitlines(), 1):
         if not line.strip():
