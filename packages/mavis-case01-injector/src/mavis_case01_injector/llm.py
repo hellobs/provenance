@@ -78,6 +78,34 @@ class _ChatMixin:
             type(self).__name__, max_tokens, self.truncations), flush=True)
         return True
 
+    # HTTP 404 与"网络不通"在这条链上长得一模一样(`HTTP Error 404: Not Found`),
+    # 但只有一种是改模型名能救的。2026-10-08 实测:本机没有 `qwen3:4b` 这个 tag
+    # (只有 `qwen3:8b` / `qwen3:4b-instruct-2507-q4_K_M` / embedding),按简写敲 ⇒
+    # 整批两条全打死,台账里的形态和 #45 那次超时无法区分,而重试三次只是把同一句
+    # 404 读三遍。⇒ 404 当场定性并停止重试,把"请求的 model"和"服务端现有 tag"一起打出来。
+    def _is_missing_model(self, err) -> bool:
+        return isinstance(err, urllib.error.HTTPError) and err.code == 404
+
+    def _model_tags(self):
+        """能列服务端模型 tag 的客户端才实现(Ollama);列不出返回 None。"""
+        return None
+
+    def _fail(self, kind: str, attempts: int, err) -> None:
+        model = getattr(self, "chat_model", None)
+        if kind == "embed":
+            model = getattr(self, "embed_model", model)
+        msg = "{} {} failed after {} attempts: {}".format(
+            type(self).__name__, kind, attempts, err)
+        if self._is_missing_model(err):
+            tags = self._model_tags()
+            msg += "\n  ⚠ 404 一般是**模型名不存在**,不是网络故障(重试不会恢复)。"
+            msg += " 请求的 model={!r}".format(model)
+            if tags:
+                msg += "；该服务端现有 model tag: {}".format(tags)
+            else:
+                msg += "；该端点没有 /api/tags,列不出可用模型。"
+        raise RuntimeError(msg)
+
     def chat(self, messages: List[dict], temperature: float = 0.7,
              max_tokens: int = 1024, num_ctx: Optional[int] = None,
              extra_body: Optional[dict] = None) -> Optional[str]:
@@ -123,11 +151,12 @@ class _ChatMixin:
                 # socket.timeout(=TimeoutError),它**不是** URLError 的子类,
                 # 原先漏掉 → 8b 单次生成超 120s 时不重试、直接冒泡把整条 run 打死
                 # (批次 261003-165042 的 014 就是这样,run.json 全丢)。
+                if self._is_missing_model(e):
+                    self._fail("chat", attempt + 1, e)
                 last_err = e
                 if attempt + 1 < self.retries:   # 末轮不白睡
                     time.sleep(2 * (attempt + 1))
-        raise RuntimeError("{} chat failed after {} retries: {}".format(
-            type(self).__name__, self.retries, last_err))
+        self._fail("chat", self.retries, last_err)
 
 
 class OllamaClient(_ChatMixin):
@@ -177,11 +206,12 @@ class OllamaClient(_ChatMixin):
                 return None
             except (urllib.error.URLError, KeyError, json.JSONDecodeError,
                     TimeoutError) as e:
+                if self._is_missing_model(e):
+                    self._fail("embed", attempt + 1, e)
                 last_err = e
                 if attempt + 1 < self.retries:   # 末轮不白睡
                     time.sleep(2 * (attempt + 1))
-        raise RuntimeError("Ollama embed failed after {} retries: {}".format(
-            self.retries, last_err))
+        self._fail("embed", self.retries, last_err)
 
     def is_available(self) -> bool:
         try:
@@ -242,11 +272,23 @@ class OllamaClient(_ChatMixin):
                 return obj["message"]["content"]
             except (urllib.error.URLError, KeyError, json.JSONDecodeError,
                     TimeoutError) as e:
+                if self._is_missing_model(e):
+                    self._fail("native_chat", attempt + 1, e)
                 last_err = e
                 if attempt + 1 < self.retries:   # 末轮不白睡
                     time.sleep(2 * (attempt + 1))
-        raise RuntimeError("Ollama native_chat failed after {} retries: {}".format(
-            self.retries, last_err))
+        self._fail("native_chat", self.retries, last_err)
+
+    def _model_tags(self):
+        """Ollama 有 `/api/tags`:404 时把服务端现有模型名一起打出来,省得把
+        "tag 敲错"读成"服务没起"。列不出(服务真没起/超时)返回 None。"""
+        try:
+            req = urllib.request.Request(self.base_url + "/api/tags")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                obj = json.loads(resp.read().decode("utf-8"))
+            return [m.get("name") for m in (obj.get("models") or []) if m.get("name")]
+        except Exception:  # noqa: BLE001 - 这里只是给错误信息补一行,不掩盖原错
+            return None
 
 
 class VLLMClient(_ChatMixin):
