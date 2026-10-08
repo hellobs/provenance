@@ -1,3 +1,10 @@
 .secrets.json
 runs/
 runs_html/
+
+# 过渡期安全网(2026-10-08 数据归类搬迁):下面两个老位置已被搬进仓根 `data/case01/`,
+# 但旧脚本 / 文档示例可能把它们重建 —— 一旦重建就是"未跟踪且未忽略",
+# 有再次误提交的风险(2026-09-19 吃过一次:11 条记录进了公开仓库)。
+# 映射见 `docs/仓库布局说明.md`;新位置:data/case01/raw、data/case01/state。
+runs_injector/
+injector/scenario/checkpoints/
