@@ -15,7 +15,11 @@
 路由清单(挂在 case01 实时面 5010 上,由 `review_app.attach_to` 一并 include):
 
 - `/review/expert`  面板页(带大标题)
-- `/embed/expert`   嵌入面:同一页,压缩版式,给平台 iframe
+- `/embed/expert`   **同一页的别名,目前没有嵌入版式**:`review_app` 那边有"前端按 `/embed/` 路径切
+                    `body.embed` 压缩版式"的机制(见 `review_app.py` 里的 `EMBED` 判定与 CSS),
+                    **本面板没有接**,所以引这个地址拿到的与 `/review/expert` 完全一样
+                    (含大标题与"← 回到只读面")。要给平台做嵌入版式,照 `review_app` 那套补,
+                    别把这两个地址对外说成两种版式。
 - `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开)
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
 - `/api/expert/decision` 提交一份意见(approve/edit/reject + 自由文本)
@@ -697,5 +701,6 @@ def expert_index():
 
 @router.get("/embed/expert", response_class=HTMLResponse)
 def expert_embed():
-    """嵌入面:同一页。平台 iframe 引这个地址就能拿到一份可跑的字段样例。"""
+    """`/review/expert` 的别名,**不是**嵌入版式(本文件没有 `body.embed` 那套前端判定)。
+    留着是为了与 `review_app` 的路由形状对齐;要做真压缩版式请照 `review_app.py:463` 补。"""
     return HTMLResponse(_EXPERT_PAGE)
