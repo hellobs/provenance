@@ -165,6 +165,12 @@ def run_simulation(name, sim_config, start_step, step, stride):
         consequence = ConsequenceEngine()
 
         _static_root = os.path.join(state.BASE_DIR, "frontend/static")
+        # 引擎 Game 构造时**无条件**按 `MAVIS_CHECKPOINTS_ROOT` 建 `<模拟名>/storage`,
+        # 而它的默认值是 cwd 相对的 `results/checkpoints` —— 不设就每起一次 case00 面在
+        # 2026-10-08 已搬空的老位置留一个空壳(真实快照走 `state.sim_dir()`,已在新根)。
+        # 取 `state.checkpoints_root()` 而不是自己拼:它与 `sim_dir()` 同口径,测试重定向
+        # BASE_DIR 时两个跟着一起走。`setdefault` 不覆盖调用方显式设的根。
+        os.environ.setdefault("MAVIS_CHECKPOINTS_ROOT", state.checkpoints_root())
         game = Game(name, _static_root, sim_config, conversation, timer=timer,
                     governance=governance, consequence_fn=consequence.feedback)
         # 供 /api/goals 暴露 embedding 稳定性健康度(降级监控)

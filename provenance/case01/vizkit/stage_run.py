@@ -69,6 +69,13 @@ class _Maze:
 
     def __init__(self, scenario_dir):
         self.maze = None
+        # 引擎 Game 构造时**无条件**按 `MAVIS_CHECKPOINTS_ROOT`(默认值是 **cwd 相对**的
+        # `results/checkpoints`)建 `<name>/storage`。布景播放器不起推演,但 Game 一构造
+        # 就在 2026-10-08 刚搬空的老位置留一个空壳 —— 每起一次 5020 污染一次。
+        # 指到 case01 的状态根,与 `live_run.py` 起桥前那句同一个 kind。这里不学那句包
+        # try/except:吞掉解析失败就等于回到"污染老位置"那个 bug 本身。
+        from case_engine.paths import data_root
+        os.environ.setdefault("MAVIS_CHECKPOINTS_ROOT", data_root("case01.state"))
         try:
             from mavisframework.config.loader import load_config
             from mavisframework.runtime.game import Game

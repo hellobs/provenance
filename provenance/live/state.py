@@ -240,6 +240,20 @@ def _base_is_real() -> bool:
     return os.path.realpath(BASE_DIR) == os.path.realpath(PKG_ROOT)
 
 
+def checkpoints_root() -> str:
+    """引擎 `Game` 的存档根(它会按 `<根>/<模拟名>/storage` 建目录)。
+
+    和 `sim_dir()` 必须给出同一个根 —— 各写一份正是当初"三个同名 checkpoints"的来源:
+    此前两处 `Game(...)` 构造点都没设 `MAVIS_CHECKPOINTS_ROOT`,于是引擎按它默认的
+    **cwd 相对** `results/checkpoints` 建壳,每起一次服务就在 2026-10-08 刚搬空的老位置
+    污染一次,而真实快照早已落在 `data/case00/state/`。
+    """
+    if _base_is_real():
+        from case_engine.paths import data_root
+        return data_root("case00.state")
+    return os.path.join(BASE_DIR, "results", "checkpoints")
+
+
 def sim_dir(name: str) -> str:
     """某个模拟的现场存档目录(每步快照/决策/对话)。
 
@@ -247,10 +261,7 @@ def sim_dir(name: str) -> str:
     `data/case00/state/<模拟名>`(搬迁期新位置优先、老位置回落并出声)。
     但 `BASE_DIR` 被重定向(测试)时保持老语义:在 `<BASE_DIR>/results/checkpoints/<名>`。
     """
-    if _base_is_real():
-        from case_engine.paths import data_root
-        return os.path.join(data_root("case00.state"), name)
-    return os.path.join(BASE_DIR, "results", "checkpoints", name)
+    return os.path.join(checkpoints_root(), name)
 
 
 def ledger_file(name: str) -> str:
