@@ -30,15 +30,13 @@ from case01.tools import internalization_metrics as im  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
-# 2026-10-08:现场数据的家搬到仓根 `data/case00/state/`;台账搬到 `data/ledgers/`。
-# 走解析器(搬迁期新位置优先、老位置回落并出声),别在测试里写死某一代位置。
-try:
-    from case_engine.paths import data_root as _data_root
-    CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
-    _LEDGERS = _data_root("ledgers")
-except Exception:  # noqa: BLE001
-    CK_DIR = os.path.join(REPO_ROOT, "provenance", "results", "checkpoints")
-    _LEDGERS = CK_DIR
+# 现场数据根/台账根一律走解析器 `case_engine.paths.data_root`,测试里不写死某一代位置。
+# **不留 except 兜底**:本文件上面那句 `from case01.tools import ...` 既然成功了,
+# 包根就必然在 sys.path 上,解析器不可能导不到 —— 那条 except 只会把"读 2026-10-08 搬空后的
+# 老壳(`results/checkpoints` 现在只剩 stage/,0 文件)"伪装成一次正常读数。
+from case_engine.paths import data_root as _data_root   # noqa: E402
+CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+_LEDGERS = _data_root("ledgers")
 INTERVENTIONS = os.path.join(_LEDGERS, "interventions.json")
 # 分析产物根(报表,入库):`provenance/results/analysis` —— 与存档不在同一层了,不能靠 `..` 拼。
 ANALYSIS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(

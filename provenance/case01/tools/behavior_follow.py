@@ -32,15 +32,17 @@ import os
 import sys
 from typing import Dict, List, Optional, Tuple
 
-CK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-CHECKPOINTS = os.path.join(CK, "results", "checkpoints")
-# 2026-10-08:现场数据的家要搬到 `data/case00/state/`(搬迁期新位置优先、老位置回落)。
-try:
-    from case_engine.paths import data_root as _data_root
-    CHECKPOINTS = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
-    TABLEDGER = _data_root("ledgers")      # 跨局登记簿现在单独一层
-except Exception:  # noqa: BLE001
-    TABLEDGER = CHECKPOINTS
+CK = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+# 与 tools/deep_check.py:113 同一自救写法:脚本形态(`python case01/tools/behavior_follow.py`)
+# 的 sys.path[0] 是脚本自己那层,而 case_engine 没装进任何 venv ⇒ 不补这句就 import 不到解析口。
+# 此前这里用 try/except 兜老根,于是换个敲法就换一套数:老 `results/checkpoints` 现在只剩
+# 一个空壳 `stage/`(0 文件),真存档在 `data/case00/state`(41 条)与 `data/ledgers`(4 条),
+# 脚本形态会安静地出一份"0 条样本"的报表(2026-10-08 晚实测)。解析不到就当场抛。
+if CK not in sys.path:
+    sys.path.insert(0, CK)
+from case_engine.paths import data_root as _data_root   # noqa: E402
+CHECKPOINTS = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+TABLEDGER = _data_root("ledgers")                        # 跨局登记簿单独一层
 # 分析产物根(报表,入库):与存档不在同一层,用包根显式拼,不要 `..`。
 ANALYSIS_ROOT = os.path.join(CK, "results", "analysis")
 

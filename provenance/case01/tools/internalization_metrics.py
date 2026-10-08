@@ -23,20 +23,19 @@ import os
 import sys
 from typing import Dict, List, Optional, Tuple
 
-CK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                      "..", "..", "results", "checkpoints")
-# 2026-10-08:CK_DIR 是**老位置**;现场数据将搬到 `data/case00/state/`。
-# 这里在 import 期解析一次(工具类脚本,进程寿命短),搬迁期新位置优先、老位置回落。
-try:
-    from case_engine.paths import data_root as _data_root
-    CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
-    TABLEDGER = _data_root("ledgers")          # 跨局登记簿(干预台账/专家标记)现在单独一层
-except Exception:  # noqa: BLE001 —— 独立运行时不该因为 import 失败就打不开工具
-    TABLEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "..", "..", "results", "checkpoints")
+PROV = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "..", ".."))                # .../provenance(包目录)
+# 与 tools/deep_check.py:113 同一自救写法。此前"独立运行时不该因为 import 失败就打不开工具"
+# 是靠 except 兜老根实现的,而老根 `results/checkpoints` 在 2026-10-08 已搬空(只剩空壳 stage/,
+# 0 文件)——于是脚本形态出一份"0 条样本"的报表而不是报错,`-m` 形态却读到 41 条(当晚实测)。
+# 补上路径让**两种敲法都打得开**,且只有一个根解析口、不留兜底。
+if PROV not in sys.path:
+    sys.path.insert(0, PROV)
+from case_engine.paths import data_root as _data_root            # noqa: E402
+CK_DIR = _data_root("case00.state", env_var="CASE00_CHECKPOINTS_ROOT")
+TABLEDGER = _data_root("ledgers")                                # 跨局登记簿(干预台账/专家标记)
 # 分析产物根(报表,入库):`<包根>/results/analysis`;与存档层无关,所以用包根显式拼。
-ANALYSIS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "..", "..", "results", "analysis")
+ANALYSIS_ROOT = os.path.join(PROV, "results", "analysis")
 
 DEFAULT_WINDOW_MIN = 60.0
 

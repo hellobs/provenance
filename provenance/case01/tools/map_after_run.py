@@ -16,7 +16,7 @@
 
 1. 轮询等 `raw.json` 出现(推演跑完 bridge.save 才会写);
 2. 等文件大小连续若干次不变(防读到写了一半的 JSON);
-3. 跑 pipeline 映射成 `case01/runs/<run_id>/run.json`;
+3. 跑 pipeline 映射成 `data/case01/runs/<run_id>/run.json`(仓根 `data/` 下,2026-10-08 起);
 4. 校验成品文件真的存在,成功/失败都打日志、都留痕。
 
 它**不改**任何已有记录,也可以随时手工重复执行(幂等:重跑覆盖同一路径)。
@@ -28,7 +28,7 @@
 用法(在 `provenance/provenance` 下)
 ------------------------------------
     python -m case01.tools.map_after_run --run-id <run_id> --branch B \
-        --raw case01/runs_injector/<run_id>/raw.json --port 5010
+        --raw data/case01/raw/<run_id>/raw.json --port 5010
 """
 import argparse
 import json
@@ -42,13 +42,11 @@ from case01.safestream import run_text, tolerant_stdout, utf8_env
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG_ROOT = os.path.dirname(os.path.dirname(HERE))          # provenance/provenance
-RUNS_DIR = os.path.join(PKG_ROOT, "case01", "runs")
-# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
-try:
-    from case_engine.paths import data_root as _data_root
-    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
-except Exception:  # noqa: BLE001
-    pass
+# 成品记录根只有一个解析口。与 batch_run 同:**不留 except 兜底、不留老根字面量** ——
+# 老位置 `provenance/case01/runs` 在 2026-10-08 已删,而本文件在脚本形态下早在文件头
+# `from case01.safestream` 那行就起不来(实测 ModuleNotFoundError、rc=1),那段兜底从来不可达。
+from case_engine.paths import data_root as _data_root      # noqa: E402
+RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 
 # 看护进程的输出被重定向到日志文件,此时 stdout 用的是**本地编码**(中文 Windows 是 GBK);
 # 打不出对勾/叉号那类符号时会直接抛 UnicodeEncodeError —— 而它发生在映射**成功之后**,
@@ -160,7 +158,7 @@ def main(argv=None) -> int:
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
     ap.add_argument("--raw", required=True, help="实时面写出的原始记录路径")
-    ap.add_argument("--out", default="", help="成品记录路径(默认 case01/runs/<run_id>/run.json)")
+    ap.add_argument("--out", default="", help="成品记录路径(默认仓根 data/case01/runs/<run_id>/run.json)")
     ap.add_argument("--port", type=int, default=5010, help="实时面端口(用于判断它是否还在)")
     ap.add_argument("--poll", type=float, default=10.0, help="轮询间隔秒")
     ap.add_argument("--stable", type=int, default=3,

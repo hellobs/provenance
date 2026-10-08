@@ -66,13 +66,13 @@ from case01.safestream import tolerant_stdout, utf8_env
 HERE = os.path.dirname(os.path.abspath(__file__))          # .../case01/tools
 CASE01_DIR = os.path.dirname(HERE)                        # .../case01
 PROV_DIR = os.path.dirname(CASE01_DIR)                    # .../provenance
-RUNS_DIR = os.path.join(CASE01_DIR, "runs")
-# 2026-10-08:成品记录的家搬到仓根 `data/case01/runs/`(搬迁期新位置优先、老位置回落并出声)。
-try:
-    from case_engine.paths import data_root as _data_root
-    RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
-except Exception:  # noqa: BLE001
-    pass
+# 成品记录根只有一个解析口(下面两行)。这里**不留 except 兜底、也不留老根字面量**:
+# 老位置当晚已被删,兜到它等于安静地读一个空目录;而本文件在脚本形态下早在文件头
+# `from case01.safestream` 那行就起不来(2026-10-08 实测 ModuleNotFoundError、rc=1),
+# 所以原先那段 `except Exception: pass` 从来不可达 —— 留着只会被下一个人当成"老位置还在"的证据。
+# 要独立跑就用 `-m case01.tools.batch_run`。
+from case_engine.paths import data_root as _data_root    # noqa: E402 —— 与文件头 case01.* 同一可导前提
+RUNS_DIR = _data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 ANALYSIS_ROOT = os.path.join(PROV_DIR, "results", "analysis", "batch_runs")
 _SEQ_RE = re.compile(r"-(\d{3,})$")            # run_id 末尾的 -001…-NNN(--seed-base 用)
 
