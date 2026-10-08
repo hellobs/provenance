@@ -95,6 +95,9 @@ def background_retrieval_provider(embed_fn=None, use_default_embed=False):
     from case01.agents.financial import FinancialData
     from case01.agents.investment_ai import InvestmentAI
     if embed_fn is None and use_default_embed:
-        from .llm import OllamaClient
-        embed_fn = OllamaClient().embed
+        # 必须走 local_client_from_env():裸 OllamaClient() 会吞掉 CASE01_EMBED_MODEL /
+        # CASE01_LLM_BASE_URL / CASE01_LLM_SEED,于是台账记的模型与实际检索用的不是
+        # 一个(外层守卫 test_no_bare_ollama_client_construction_in_production_paths 点名这条)。
+        from .llm import local_client_from_env
+        embed_fn = local_client_from_env().embed
     return InvestmentAI(None, FinancialData(default_financial_data_dir(), embed_fn=embed_fn))
