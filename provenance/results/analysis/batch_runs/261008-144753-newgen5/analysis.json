@@ -1,0 +1,259 @@
+{
+  "title": "261008-144753-newgen5",
+  "runs_root": "D:\\zzr\\provenance\\data\\case01\\runs",
+  "n_runs": 5,
+  "n_unreadable": 0,
+  "ledger_gap": 0,
+  "ledger_gap_resolved": false,
+  "ledger_missing": false,
+  "ledger_gap_detail": null,
+  "llm": {
+    "model_actual": [
+      "qwen3:8b"
+    ],
+    "model_requested": [
+      "qwen3:8b"
+    ],
+    "n_rows_with_model_actual": 5,
+    "prompt_flags_variants": {
+      "{\"ai_reasoning_hint\": false, \"ai_system_prompt_sha8\": \"3b3b1a01e630\"}": 5
+    },
+    "prompt_flags_keys": [
+      "ai_reasoning_hint",
+      "ai_system_prompt_sha8"
+    ],
+    "n_rows_without_prompt_flags": 0
+  },
+  "branches": {
+    "B": 1,
+    "C": 3,
+    "undetermined": 1
+  },
+  "branch_top": {
+    "branch": "C",
+    "count": 3,
+    "share": 0.6,
+    "collapse_warning": false
+  },
+  "excluded_failed": {
+    "n": 0,
+    "n_scored": 5,
+    "note": "反思或 Router 未跑成的记录已排除在质量/产出统计之外(其 0 分与 0 issue 不代表质量)",
+    "records": []
+  },
+  "reflection": {
+    "chars_mean": 1776.4,
+    "chars_median": 1849,
+    "chars_min": 1251,
+    "chars_max": 2238,
+    "score_mean": 95.6,
+    "score_median": 95,
+    "score_n": 5,
+    "status_dist": {
+      "pass": 4,
+      "review": 1
+    },
+    "fail_reason_top": {
+      "未提出可执行的后续改进动作": 1
+    }
+  },
+  "router": {
+    "issues_total": 25,
+    "issues_mean": 5.0,
+    "issues_median": 5,
+    "zero_issue_runs": 0,
+    "issues_dist": {
+      "5": 5
+    },
+    "n_scored": 5,
+    "n_excluded_not_scored": 0,
+    "router_status_dist": {
+      "ok": 5
+    },
+    "router_backend_dist": {
+      "local_by_config|qwen3:8b|api=False": 5
+    },
+    "n_rows_without_backend_field": 0,
+    "n": 5,
+    "issues_mean_over": "n_scored",
+    "issues_mean_formula": "issues_total / n_scored"
+  },
+  "consistency": {
+    "consistent": 3,
+    "inconsistent": 2
+  },
+  "per_run": [
+    {
+      "run_id": "batch-261008-144753-newgen5-001",
+      "source": "ledger",
+      "branch": "B",
+      "consistency": "consistent",
+      "refl_chars": 1584,
+      "refl_score": 93,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "router_backend": {
+        "provider": "local",
+        "model": "qwen3:8b",
+        "host": "127.0.0.1:11434",
+        "source": "local_by_config",
+        "separate_client_from_reflection": false,
+        "external_api": false
+      },
+      "prompt_flags": {
+        "ai_reasoning_hint": false,
+        "ai_system_prompt_sha8": "3b3b1a01e630"
+      },
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 185.1,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261009
+    },
+    {
+      "run_id": "batch-261008-144753-newgen5-002",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1960,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "router_backend": {
+        "provider": "local",
+        "model": "qwen3:8b",
+        "host": "127.0.0.1:11434",
+        "source": "local_by_config",
+        "separate_client_from_reflection": false,
+        "external_api": false
+      },
+      "prompt_flags": {
+        "ai_reasoning_hint": false,
+        "ai_system_prompt_sha8": "3b3b1a01e630"
+      },
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 250.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261010
+    },
+    {
+      "run_id": "batch-261008-144753-newgen5-003",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "consistent",
+      "refl_chars": 1849,
+      "refl_score": 90,
+      "refl_status": "review",
+      "refl_fail_reasons": [
+        "未提出可执行的后续改进动作"
+      ],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "router_backend": {
+        "provider": "local",
+        "model": "qwen3:8b",
+        "host": "127.0.0.1:11434",
+        "source": "local_by_config",
+        "separate_client_from_reflection": false,
+        "external_api": false
+      },
+      "prompt_flags": {
+        "ai_reasoning_hint": false,
+        "ai_system_prompt_sha8": "3b3b1a01e630"
+      },
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 195.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261011
+    },
+    {
+      "run_id": "batch-261008-144753-newgen5-004",
+      "source": "ledger",
+      "branch": "C",
+      "consistency": "inconsistent",
+      "refl_chars": 1251,
+      "refl_score": 95,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "router_backend": {
+        "provider": "local",
+        "model": "qwen3:8b",
+        "host": "127.0.0.1:11434",
+        "source": "local_by_config",
+        "separate_client_from_reflection": false,
+        "external_api": false
+      },
+      "prompt_flags": {
+        "ai_reasoning_hint": false,
+        "ai_system_prompt_sha8": "3b3b1a01e630"
+      },
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 180.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261012
+    },
+    {
+      "run_id": "batch-261008-144753-newgen5-005",
+      "source": "ledger",
+      "branch": "undetermined",
+      "consistency": "inconsistent",
+      "refl_chars": 2238,
+      "refl_score": 100,
+      "refl_status": "pass",
+      "refl_fail_reasons": [],
+      "issues": 5,
+      "issues_final": 5,
+      "turns": 4,
+      "events": 13,
+      "router_status": "",
+      "router_backend": {
+        "provider": "local",
+        "model": "qwen3:8b",
+        "host": "127.0.0.1:11434",
+        "source": "local_by_config",
+        "separate_client_from_reflection": false,
+        "external_api": false
+      },
+      "prompt_flags": {
+        "ai_reasoning_hint": false,
+        "ai_system_prompt_sha8": "3b3b1a01e630"
+      },
+      "refl_error": "",
+      "router_error": "",
+      "seconds": 215.0,
+      "attempt": 1,
+      "model_actual": "qwen3:8b",
+      "model_requested": "qwen3:8b",
+      "seed": 20261013
+    }
+  ]
+}
