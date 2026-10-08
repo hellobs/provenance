@@ -133,6 +133,8 @@ def _row(run_id: str, d: Dict, source: str = "ledger") -> Dict:
         "router_status": router.get("status") or "",
         # Router 实际由谁做的(04 §五 要求独立 API 模型;2026-10-08 起记录里才有这个字段)
         "router_backend": router.get("executed_by") or {},
+        # Investment AI 的 system prompt 形态(#55:来源清单默认关,带上就是另一条件)
+        "prompt_flags": d.get("prompt_flags") or {},
         # 口径与 full_context._reflection_failed 保持一致:error 状态,或旧版
         # (2026-10-03 前)无 quality 块只剩占位文本,都算"没跑成";
         # status=fail 不算(那是质量门判真反思差)。
@@ -382,6 +384,15 @@ def analyze(rows: List[Dict], bad: int, title: str, gap: Optional[Dict] = None) 
                                         and r["model_requested"] != "(默认)"}),
             "n_rows_with_model_actual": sum(1 for r in rows if r.get("model_actual")
                                             and r["model_actual"] != "(未检出)"),
+            # 发给 Investment AI 的 system prompt 是哪一形态。#55 之后"带不带来源可信度
+            # 清单"是一个**实验条件**,不是实现细节:两条批的措辞/分支分布对不上时,
+            # 先看这两个字段,别再去猜。2026-10-08 之前的记录没有 prompt_flags ⇒ 读成
+            # "该批跑在字段落地之前",不能读成"当时没带 hint"。
+            "ai_system_prompt_sha8": sorted({
+                (r.get("prompt_flags") or {}).get("ai_system_prompt_sha8", "")
+                for r in rows} - {""}),
+            "n_rows_without_prompt_flags": sum(
+                1 for r in rows if not r.get("prompt_flags")),
         },
         "branches": br,
         "branch_top": {"branch": top_branch, "count": top_n,

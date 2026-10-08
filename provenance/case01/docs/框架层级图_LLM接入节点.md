@@ -33,7 +33,7 @@
 
 | # | 节点（调用方） | 用途 | 模型 / Provider | 默认 | 温度 | 输入 | 输出 |
 |---|---|---|---|---|---|---|---|
-| N1 | **Investment AI 回答**（`agents/investment_ai.py`） | T0 咨询 + 最终反馈回应 | 本地 Ollama `qwen3:4b-instruct-2507-q4_K_M` | **硬性本地，不可切外部** | 0.5 | 检索到的 Financial Data + 对话历史 | 投资建议文本 |
+| N1 | **Investment AI 回答**（`agents/investment_ai.py`） | T0 咨询 + 最终反馈回应 | 本地 Ollama `qwen3:4b-instruct-2507-q4_K_M` | **硬性本地，不可切外部** | 0.5 | 检索到的 Financial Data + 对话历史（system prompt = 06 §二 原文；**来源可信度清单默认不带**，`CASE01_AI_REASONING_HINT=1` 才带） | 投资建议文本 |
 | N2 | **Financial Data 检索（embedding）**（`agents/financial.py`） | 向量检索 + 防未来信息泄露 | 本地 Ollama `qwen3-embedding:0.6b-q8_0` | 本地 | — | query + 截止当前日期 | 命中文档 + 来源独立性统计 |
 | N3 | **Ethan**（`agents/ethan.py`） | 扮演普通投资者 | 本地 Ollama；**可切换** OpenRouter | 本地 | 0.8 | 可见状态 + 公开事件 | 自然语言表达（含冲突重生成 ≤3 次） |
 | N4 | **Branch Judge**（`world/branch.py`） | T0 回答 → A/B/C | 默认本地；**可切换** OpenRouter（用 `router_llm`） | 本地 | 0.1 | Investment AI 的 T0 回答 | `{branch, reason}` |

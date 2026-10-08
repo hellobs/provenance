@@ -81,7 +81,8 @@ def main():
             sys.exit(1)
         rec_data = _json.load(open(p, encoding="utf-8"))
         from case01.agents.llm import (OpenRouterClient, local_client_from_env,
-                                       router_client_from_env, router_identity)
+                                       router_client_from_env, router_identity,
+                                       router_provider_name, LOCAL_ROUTER_PROVIDERS)
         from case01.reflection import run_reflection, run_router
         # 与主路径同源:走 local_client_from_env() 而不是 OllamaClient(seed=seed)。
         # 后者在 seed 为 None(未显式传)时会**丢掉** CASE01_LLM_SEED,
@@ -94,8 +95,10 @@ def main():
             api_router = OpenRouterClient()
         router = api_router or local
         _id = router_identity(router)
+        _prov = router_provider_name()
         _id["source"] = ("reflect_router" if api_router is not None else
-                         "local_fallback")
+                         ("local_by_config" if _prov and _prov in LOCAL_ROUTER_PROVIDERS
+                          else "local_fallback"))
         _id["separate_client_from_reflection"] = router is not local
         _id["external_api"] = _id.get("provider") == "api"
         print("=== Reflection ===")

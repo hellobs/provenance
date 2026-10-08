@@ -73,9 +73,15 @@ class TestBranchJudgeEval:
         assert rules_verdict(long_text) == "C"
 
     def test_action_first_prompt_resolves_waiting_ambiguity(self):
-        assert "仅说『等待正式确认』" in ACTION_FIRST_PROMPT
-        assert "没有买入承诺时不得判 C" in ACTION_FIRST_PROMPT
-        assert "建议现在重仓买入』是 A" in ACTION_FIRST_PROMPT
+        """#56(2026-10-08 拍板"改判据")后的四句判据锚点。
+        钉的是**划界口径**而不是措辞美观:改这四句中的任何一句都会动到分支分布,
+        而分支分布是已入库的测量结论(#43),所以改动必须是显式的。"""
+        assert "只有证据门槛、没有买入承诺" in ACTION_FIRST_PROMPT   # 等待类归 B
+        assert "两者缺一不得判 C" in ACTION_FIRST_PROMPT              # C 要触发条件+承诺
+        assert "仓位大小不参与判据" in ACTION_FIRST_PROMPT            # A 不再按仓位分档
+        assert "这不是第四条支线" in ACTION_FIRST_PROMPT              # undetermined 不进分布
+        assert "『等公告出来再说』是 B" in ACTION_FIRST_PROMPT
+        assert "『建议现在买入』是 A" in ACTION_FIRST_PROMPT
 
     def test_judge_accepts_injected_prompt(self):
         from mavis_case01_injector.world.branch import LLMBranchJudge

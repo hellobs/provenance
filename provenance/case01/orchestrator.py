@@ -18,6 +18,7 @@
 输出:runs/<run_id>/ 完整记录(对话/事件/状态/判定)。
 """
 import json
+import hashlib
 import os
 import re
 import time
@@ -227,6 +228,18 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     run_id = run_id or time.strftime("run-%Y%m%d-%H%M%S")
     out_dir = os.path.join(RUNS_ROOT(), run_id)
     rec = RunRecorder(run_id, out_dir)
+
+    # 发给 Investment AI 的 system prompt 到底是哪一形态(#55)。
+    # hint 从"常驻"改成"显式开关"之后,带没带就是这一批的条件之一;不落到产物里,
+    # 以后两条批的措辞/分支分布对不上时又只能靠猜(= #13 那条陷阱)。
+    from .agents.investment_ai import REASONING_HINT, SYSTEM_PROMPT, reasoning_hint_on
+    _hint = reasoning_hint_on()
+    rec.data["prompt_flags"] = {
+        "ai_reasoning_hint": _hint,
+        "ai_system_prompt_sha8": hashlib.sha256(
+            (SYSTEM_PROMPT + (REASONING_HINT if _hint else "")).encode("utf-8")
+        ).hexdigest()[:12],
+    }
 
     fin = FinancialData(FIN_DIR(), embed_fn=(llm.embed if llm else None))
     ai = InvestmentAI(llm, fin) if llm else None
@@ -470,9 +483,18 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         # 并把**实际是谁**写进产物 —— 违规要能在批产物里查出来,不靠注释保证。
         rllm = reflect_router_llm or router_llm
         executed_by = dict(router_identity(rllm))
-        executed_by["source"] = (
-            "reflect_router" if reflect_router_llm is not None else
-            ("shared_router_llm" if router_given is not None else "local_fallback"))
+        if reflect_router_llm is not None:
+            _src = "reflect_router"
+        elif router_given is not None:
+            _src = "shared_router_llm"
+        else:
+            # 区分"故意配成本地"(现场演示无网/无 key)与"配漏了":两者都违 04 §五,
+            # 但只有后者是需要修的故障。
+            from .agents.llm import router_provider_name, LOCAL_ROUTER_PROVIDERS
+            _prov = router_provider_name()
+            _src = ("local_by_config" if _prov in LOCAL_ROUTER_PROVIDERS and _prov
+                    else "local_fallback")
+        executed_by["source"] = _src
         # 04 §五 的判据拆成两个,不能合成一个叫"独立"的布尔:
         #   separate_client_from_reflection = N7 用的是另一个 client 对象;
         #   external_api = 那个对象**不在本机**(host 不是 127.0.0.1/localhost)。

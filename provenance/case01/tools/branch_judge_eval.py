@@ -263,7 +263,7 @@ def _md(rows: List[dict], s: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> int:
+def main(argv=None) -> int:
     import argparse
     ap = argparse.ArgumentParser(description="分支判定对照:规则表 vs LLM")
     ap.add_argument("--llm", default="glm", choices=["glm", "ollama", "vllm"])
@@ -275,8 +275,12 @@ def main() -> int:
     ap.add_argument("--tune-prompt", action="store_true",
                     help="用 ACTION_FIRST_PROMPT 复跑;2026-10-07 实测它和出厂 JUDGE_PROMPT "
                          "是同一个字符串,所以现在加了也是 no-op(会出声),等真有候选 prompt 再用")
+    ap.add_argument("--prompt-file", default="",
+                    help="用文件里的文本当判定 prompt 复跑(换 prompt 版本的对照必须能在这里做:"
+                         "此前只有 --tune-prompt 一个入口,而它是 no-op。产物里的 prompt_sha8 "
+                         "记的就是这份文本)")
     ap.add_argument("--out-root", default=OUT_ROOT)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     cases = load_cases_from_report(args.cases_json) if args.cases_json else load_cases()
     if args.limit:
@@ -285,13 +289,17 @@ def main() -> int:
         print("没有可评估的记录")
         return 2
     llm = make_llm(args.llm, args.max_tokens)
-    prompt = ACTION_FIRST_PROMPT if args.tune_prompt else ""
+    if args.prompt_file:
+        with open(args.prompt_file, encoding="utf-8") as f:
+            prompt = f.read()
+    else:
+        prompt = ACTION_FIRST_PROMPT if args.tune_prompt else ""
     rows = evaluate(cases, llm, args.max_tokens, prompt=prompt)
     s = summarize(rows)
     s.update(_judge_identity(llm, args.llm, prompt))
-    if args.tune_prompt and s["prompt_is_shipped_default"]:
-        print("[!] --tune-prompt 传进去的文本和出厂 JUDGE_PROMPT 逐字相同"
-              "(sha8={}),这一跑和默认跑没有区别。".format(s["prompt_sha8"]), flush=True)
+    if (args.tune_prompt or args.prompt_file) and s["prompt_is_shipped_default"]:
+        print("[!] 传进去的 prompt 文本和出厂 JUDGE_PROMPT 逐字相同(sha8={}),"
+              "这一跑和默认跑没有区别。".format(s["prompt_sha8"]), flush=True)
     os.makedirs(args.out_root, exist_ok=True)
     with open(os.path.join(args.out_root, "branch_judge_eval.json"), "w",
               encoding="utf-8") as f:

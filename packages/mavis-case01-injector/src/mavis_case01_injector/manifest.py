@@ -577,12 +577,20 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     # --- 提示词版本 ---
     prompts, prompt_warnings = _prompt_versions()
     warnings.extend(prompt_warnings)
-    # 判定提示词的权威来源是 scenario 的 branch.judge_prompt
+    # ⚠ 命名订正(2026-10-08,查 #56 时撞上):这里的键原先叫 `scenario_branch_judge`,
+    # 读起来像"分支判定提示词的权威来源"。实测**不是**:`cases/case01_stock/scenario.yaml`
+    # 的 `branch.judge_prompt` 段装的是 **Reflection Router** 的提示词(与
+    # `case01/reflection.py:ROUTER_PROMPT_CN` 同一段话),运行时**没有任何代码读它**
+    # (`LLMBranchJudge` 用 `world/branch.py` 的模块常量 `JUDGE_PROMPT`),只有这段清单
+    # 在给它算哈希。所以按现在的键名,审计里会出现"分支判定提示词 = 某个哈希",而那个哈希
+    # 其实是 Router 提示词 —— 与"警告文案里的标签≠测量点"同一族错。
+    # 改法:键名如实叫 scenario 的**字段**哈希(它就是一个场景文件里的字段),
+    # 判定提示词的真实版本继续由 `prompts["branch_judge"]`(模块常量)提供。
     judge_prompt, jp_err = _scenario_judge_prompt(sp)
     if judge_prompt:
-        prompts["scenario_branch_judge"] = sha256_12(text_sha256(judge_prompt))
+        prompts["scenario_branch_judge_field"] = sha256_12(text_sha256(judge_prompt))
     else:
-        warnings.append("scenario_branch_judge=null:" +
+        warnings.append("scenario_branch_judge_field=null:" +
                         _REASON_NO_JUDGE_PROMPT.format(jp_err))
     judge_prompt_version = prompts.get("branch_judge") or None
     if not judge_prompt_version:

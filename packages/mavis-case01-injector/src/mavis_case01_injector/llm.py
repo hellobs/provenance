@@ -609,6 +609,25 @@ def _secret_value(env_name: str, json_name: str) -> str:
     return ""
 
 
+LOCAL_ROUTER_PROVIDERS = ("local", "none", "off")
+
+
+def router_provider_name() -> str:
+    """这次要用哪个 Router 后端:**env 优先,其次 `.secrets.json`,都没有=没配**。
+
+    做成两级是因为"配外部 API"这件事必须对第一次接触项目的人足够简单(实测新人卡在
+    key 这一步):`tools/setup_api.py --router bigmodel --key …` 一条命令把 provider 和
+    key 一起写进 `.secrets.json`(已 gitignore),之后跑批/起面**不用再记环境变量名**。
+    env 仍保持最高优先级,因为它是一次性对照与排障用的。
+    显式写 `local` 与"没配"要区分:前者是"这次故意用本地"(现场演示无网/无 key),
+    后者是配置缺失 —— 产物里分别记 `local_by_config` / `local_fallback`。
+    """
+    p = os.environ.get("CASE01_ROUTER_PROVIDER", "").strip().lower()
+    if p:
+        return p
+    return _secret_value("", "router_provider").strip().lower()
+
+
 def router_identity(client) -> dict:
     """这台机器**实际**是谁:从对象属性读,不读配置字符串。
 
@@ -630,17 +649,21 @@ def router_client_from_env():
     """按 `CASE01_ROUTER_PROVIDER` 造 N7 的客户端,返回 (client, identity)。
 
     没配 provider ⇒ 返回 (None, {}),调用方照实回落本地并在产物里记
-    `source="local_fallback"`(违规要看得见,不给静默兜底)。
+    `source="local_fallback"`(违规要看得见,不给静默兜底);显式配 `local` 记
+    `local_by_config`。
     provider 取值:`bigmodel`(默认 `glm-4.7-flash`,key 走 `BIGMODEL_API_KEY`
     或 `.secrets.json` 的 `bigmodel_api_key`)/ `openrouter`(沿用既有 key 解析)/
-    `vllm`(自配 `CASE01_ROUTER_BASE_URL`,兼容任何 OpenAI 兼容端点)。
-    可选覆盖:`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、`CASE01_ROUTER_TIMEOUT`。
+    `vllm`(任何 OpenAI 兼容端点;`router_base_url`/`router_model` 也能写在
+    `.secrets.json`,所以一条 setup 命令就配得完自托管模型)。
+    覆盖项:`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、`CASE01_ROUTER_TIMEOUT`。
     """
-    provider = os.environ.get("CASE01_ROUTER_PROVIDER", "").strip().lower()
-    if not provider:
+    provider = router_provider_name()
+    if provider in LOCAL_ROUTER_PROVIDERS or not provider:
         return None, {}
-    model = os.environ.get("CASE01_ROUTER_MODEL", "").strip()
-    base = os.environ.get("CASE01_ROUTER_BASE_URL", "").strip()
+    model = os.environ.get("CASE01_ROUTER_MODEL", "").strip() \
+        or _secret_value("", "router_model")
+    base = os.environ.get("CASE01_ROUTER_BASE_URL", "").strip() \
+        or _secret_value("", "router_base_url")
     try:
         timeout = float(os.environ.get("CASE01_ROUTER_TIMEOUT", "") or 180.0)
     except ValueError:
@@ -650,8 +673,9 @@ def router_client_from_env():
         key = _secret_value("BIGMODEL_API_KEY", "bigmodel_api_key")
         if not key:
             raise RuntimeError(
-                "CASE01_ROUTER_PROVIDER=bigmodel 但取不到 key:设环境变量 "
-                "BIGMODEL_API_KEY,或写 .secrets.json 的 bigmodel_api_key(不入 git)")
+                "Router provider=bigmodel 但取不到 key。一条命令配好:"
+                "`python provenance/tools/setup_api.py --router bigmodel --key <GLM key>`"
+                "(写进 .secrets.json,已 gitignore;不打印 key)")
         client = OpenRouterClient(
             model=model or BIGMODEL_ROUTER_MODEL, base_url=base or BIGMODEL_BASE_URL,
             api_key=key, timeout=timeout,
@@ -662,13 +686,18 @@ def router_client_from_env():
         key = _openrouter_key()
         if not key:
             raise RuntimeError(
-                "CASE01_ROUTER_PROVIDER=openrouter 但取不到 OPENROUTER_API_KEY")
+                "Router provider=openrouter 但取不到 OPENROUTER_API_KEY。一条命令配好:"
+                "`python provenance/tools/setup_api.py --router openrouter --key sk-…`")
         client = OpenRouterClient(model=model or OPENROUTER_ROUTER_MODEL,
                                   base_url=base or "https://openrouter.ai/api/v1",
                                   api_key=key, timeout=timeout)
     elif provider == "vllm":
         if not base:
-            raise ValueError("CASE01_ROUTER_PROVIDER=vllm 需要 CASE01_ROUTER_BASE_URL")
+            raise ValueError(
+                "Router provider=vllm 需要端点。一条命令配好:"
+                "`python provenance/tools/setup_api.py --router vllm "
+                "--base-url http://…/v1 --model <名字> --key …`"
+                "(或设 CASE01_ROUTER_BASE_URL)")
         if not model:
             raise ValueError("CASE01_ROUTER_PROVIDER=vllm 需要 CASE01_ROUTER_MODEL"
                             "(这个后端没有有意义的默认模型名)")

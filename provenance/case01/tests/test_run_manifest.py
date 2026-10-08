@@ -267,7 +267,9 @@ def test_branch_mode_and_judge_prompt_version_recorded(tmp_path):
     # 反思/路由提示词版本也记了
     pv = rec["manifest"]["prompt_versions"]
     assert len(pv.get("reflection", "")) == 12 and len(pv.get("router", "")) == 12
-    assert pv.get("scenario_branch_judge"), "scenario 的判定提示词也要留版本"
+    # scenario 文件里那个字段也留哈希 —— 但它叫 `judge_prompt` 装的却是 Router 提示词,
+    # 且运行时无人读它(判定用的是上面的模块常量),所以键名如实写成 *_field(2026-10-08)
+    assert pv.get("scenario_branch_judge_field"), "scenario 的该字段要留版本指纹"
 
 
 def test_prompt_hash_is_content_bound():

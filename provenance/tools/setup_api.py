@@ -1,17 +1,31 @@
 # -*- coding: utf-8 -*-
-"""一条命令配好外部 API key(OpenRouter 等),并**联网自检**。
+"""一条命令配好外部 API key(含 Router 用的独立模型),并**联网自检**。
 
 为什么有它:密钥原本要么设环境变量、要么手写 .secrets.json —— 对第一次接触项目的人
-都不直观(实测:新人卡在这一步)。这里把"写 key + 验证 key 真能用"合成一条命令。
+都不直观(实测:新人卡在这一步)。这里把"写 key + 选定后端 + 验证真能用"合成一条命令。
+配好之后**跑批/起面不用再设任何环境变量**:`case01` 的 Router 会从 `.secrets.json`
+读 `router_provider`(env 仍可临时覆盖,用于对照与排障)。
 
 用法::
 
-    python provenance/tools/setup_api.py --key sk-xxxx     # 写入仓库根 .secrets.json + 自检
-    python provenance/tools/setup_api.py                   # 交互式输入(不回显)
-    python provenance/tools/setup_api.py --check           # 只自检(用已配好的 key)
-    python provenance/tools/setup_api.py --show            # 只看 key 从哪来(不打印 key)
+    # Router 换成 BigModel 的独立模型(04 §五 / 06 §七 要求它不是本地 Investment AI 自己)
+    python provenance/tools/setup_api.py --router bigmodel --key <GLM key>
+    python provenance/tools/setup_api.py --router bigmodel --check    # 只自检,不写文件
+
+    # 现场演示/无网:显式声明"这次故意用本地"(产物里记 local_by_config,不冒充外部)
+    python provenance/tools/setup_api.py --router local
+
+    # 兼容旧用法:只配 OpenRouter 的 key(不动 router_provider)
+    python provenance/tools/setup_api.py --key sk-xxxx
+    python provenance/tools/setup_api.py                # 交互式输入(不回显)
+    python provenance/tools/setup_api.py --show         # 看现在配的是谁(不打印 key)
+
+    # 自托管 OpenAI 兼容端点(vLLM 等)
+    python provenance/tools/setup_api.py --router vllm --base-url http://127.0.0.1:8101/v1 \
+        --model qwen3-8b --key 随便填
 
 安全:key 只写本地(仓库根 .secrets.json,已 gitignore),权限 0600;**绝不打印** key。
+写文件是**合并**而不是覆盖 —— 早先这里是整文件重写,配 BigModel 会把 OpenRouter 的 key 抹掉。
 """
 import argparse
 import getpass
@@ -28,14 +42,48 @@ if PKG not in sys.path:
 
 DEFAULT_BASE = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+BIGMODEL_BASE = "https://open.bigmodel.cn/api/paas/v4"
+BIGMODEL_MODEL = "glm-4.7-flash"
+
+# 每个 provider 存哪几个字段(key 的 json 名 / env 名 / 默认 base+model)
+PROVIDERS = {
+    "bigmodel": {"key_json": "bigmodel_api_key", "key_env": "BIGMODEL_API_KEY",
+                 "base": BIGMODEL_BASE, "model": BIGMODEL_MODEL},
+    "openrouter": {"key_json": "openrouter_api_key", "key_env": "OPENROUTER_API_KEY",
+                   "base": DEFAULT_BASE, "model": DEFAULT_MODEL},
+    "vllm": {"key_json": "router_api_key", "key_env": "CASE01_ROUTER_API_KEY",
+             "base": "", "model": ""},
+    "local": {"key_json": "", "key_env": "", "base": "", "model": ""},
+}
 
 
-def _write_repo_secrets(key: str, base_url: str) -> str:
-    """写入仓库根 .secrets.json(与 case_engine.llm 的解析口径一致)。"""
-    p = os.path.join(REPO, ".secrets.json")
+def _repo_secrets_path() -> str:
+    return os.path.join(REPO, ".secrets.json")
+
+
+def _read_repo_secrets() -> dict:
+    p = _repo_secrets_path()
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _merge_repo_secrets(patch: dict) -> str:
+    """**合并**写入仓库根 .secrets.json(不是整文件覆盖)。"""
+    p = _repo_secrets_path()
+    cur = _read_repo_secrets()
+    for k, v in patch.items():
+        if v is None or v == "":
+            cur.pop(k, None)
+        else:
+            cur[k] = v
     with open(p, "w", encoding="utf-8") as f:
-        json.dump({"openrouter_api_key": key, "openrouter_base_url": base_url},
-                  f, indent=2)
+        json.dump(cur, f, indent=2, ensure_ascii=False)
     try:
         os.chmod(p, 0o600)
     except OSError:
@@ -43,14 +91,16 @@ def _write_repo_secrets(key: str, base_url: str) -> str:
     return p
 
 
-def _check(key: str, base_url: str, model: str):
+def _check(key: str, base_url: str, model: str, extra_body: dict = None):
     """一次最小真实调用,验证 key 可用(只回状态/错误,不打印 key)。"""
-    body = json.dumps({
+    body = {
         "model": model, "max_tokens": 1,
         "messages": [{"role": "user", "content": "ping"}],
-    }).encode("utf-8")
+    }
+    body.update(extra_body or {})
     req = urllib.request.Request(
-        base_url.rstrip("/") + "/chat/completions", data=body,
+        base_url.rstrip("/") + "/chat/completions",
+        data=json.dumps(body).encode("utf-8"),
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + key})
     try:
@@ -63,31 +113,78 @@ def _check(key: str, base_url: str, model: str):
         return False, "{}: {}".format(type(e).__name__, e)
 
 
+def _configured_provider() -> str:
+    from case01.agents.llm import router_provider_name
+    return router_provider_name()
+
+
+def _show() -> int:
+    from case_engine.llm import openrouter_key, openrouter_source
+    prov = _configured_provider() or "(未配 ⇒ Router 回落本地,记录里是 local_fallback)"
+    sec = _read_repo_secrets()
+    print("Router 后端(router_provider):{}".format(prov))
+    print("OpenRouter key:{}".format(openrouter_source() or "(未配置)"))
+    for name in ("bigmodel_api_key", "router_api_key"):
+        print("{}:{}(只看有没有值,不打印)".format(
+            name, "已配" if str(sec.get(name, "")).strip() else "未配"))
+    print("一条命令配好 → python provenance/tools/setup_api.py --router bigmodel --key <key>")
+    return 0
+
+
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="配置/自检外部 API key(OpenRouter 等)")
+    ap = argparse.ArgumentParser(
+        description="配置/自检外部 API key 与 Router 后端(OpenRouter / BigModel / vLLM)")
     ap.add_argument("--key", default="", help="API key(不填则交互输入;不回显)")
-    ap.add_argument("--base-url", default=os.environ.get("OPENROUTER_BASE_URL", DEFAULT_BASE))
-    ap.add_argument("--model", default=os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL))
+    ap.add_argument("--router", default="", choices=sorted(PROVIDERS),
+                    help="把 N7(Router)配成哪个后端;配成 local 表示故意用本地")
+    ap.add_argument("--base-url", default="", help="端点(不填按 provider 的默认值)")
+    ap.add_argument("--model", default="", help="模型名(不填按 provider 的默认值)")
     ap.add_argument("--check", action="store_true", help="只自检(用已配置的 key),不写文件")
-    ap.add_argument("--show", action="store_true", help="只看 key 来源,不做别的")
+    ap.add_argument("--show", action="store_true", help="只看现在配的是谁(不打印 key)")
     args = ap.parse_args(argv)
 
-    from case_engine.llm import openrouter_key, openrouter_source
-
     if args.show:
-        print("key 来源:" + (openrouter_source() or "(未配置)"))
-        print("一条命令配好 → python provenance/tools/setup_api.py --key sk-xxxx")
-        return 0
+        return _show()
+
+    # 没给 --router 时按老用法走 OpenRouter(向后兼容:--key sk-… 单独用仍然配 OpenRouter)
+    provider = args.router or "openrouter"
+    spec = PROVIDERS[provider]
+    base = args.base_url or os.environ.get("CASE01_ROUTER_BASE_URL", "") or spec["base"]
+    model = args.model or os.environ.get("CASE01_ROUTER_MODEL", "") or spec["model"]
 
     if args.check:
-        key = openrouter_key()
+        # 自检用**当前生效**的配置(env → .secrets.json),不写文件
+        if provider == "local":
+            print("router_provider=local:这次不测外部端点(现场演示用本地)。")
+            return 0
+        from case01.agents.llm import _secret_value, _openrouter_key
+        key = (_openrouter_key() if provider == "openrouter"
+               else _secret_value(spec["key_env"], spec["key_json"]))
+        if not key:
+            print("取不到 key。配一条:python provenance/tools/setup_api.py "
+                  "--router {} --key <key>".format(provider))
+            return 1
     else:
-        key = args.key.strip() or getpass.getpass("粘贴 API key(不回显): ").strip()
+        key = args.key.strip()
+        if provider != "local" and not key:
+            key = getpass.getpass("粘贴 API key(不回显): ").strip()
+        if provider == "local":
+            p = _merge_repo_secrets({"router_provider": "local"})
+            print("已写入:{}  router_provider=local(Router 故意用本地)".format(p))
+            print("要换成外部独立模型:python provenance/tools/setup_api.py "
+                  "--router bigmodel --key <key>")
+            return 0
         if not key:
             print("没给 key(--key)也没交互输入,什么也没做。")
             return 2
-        p = _write_repo_secrets(key, args.base_url)
-        print("已写入:{}  (已 gitignore,不会入库)".format(p))
+        patch = {"router_provider": provider, spec["key_json"]: key}
+        if provider == "vllm":
+            patch.update({"router_base_url": base, "router_model": model})
+            if spec.get("key_json"):
+                patch["router_api_key"] = key
+        p = _merge_repo_secrets(patch)
+        print("已写入:{}  (已 gitignore,不会入库;合并写,其他 provider 的 key 不动)")
+        print("生效后端:router_provider={}  model={}  base={}".format(provider, model, base))
 
     if not key:
         print("未找到可用的 key。先配: python provenance/tools/setup_api.py --key sk-xxxx")
@@ -95,10 +192,12 @@ def main(argv=None) -> int:
         return 1
 
     print("自检中(一次最小真实调用)…")
-    ok, info = _check(key, args.base_url, args.model)
+    extra = {"thinking": {"type": "disabled"}} if provider == "bigmodel" else None
+    ok, info = _check(key, base, model, extra)
     print("自检结果:" + ("可用 ✓ " if ok else "失败 ✗ ") + info)
     if ok and not args.check:
         print("\n下一步:python provenance/live_switch.py --start case01   (或 --start case00)")
+        print("跑批不用再设环境变量;要临时换后端:CASE01_ROUTER_PROVIDER=vllm/env 优先。")
     return 0 if ok else 1
 
 
