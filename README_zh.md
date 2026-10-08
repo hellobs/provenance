@@ -101,13 +101,18 @@ Provenance(平台,本仓库)
 │   ├── live_fastapi.py  # 实时模拟 + 可视化(FastAPI + WebSocket,唯一入口)
 │   ├── case_engine/     # 引擎层:场景声明 → 可注册可替换的运行方式
 │   ├── cases/           # 场景声明(数据):case00_village / case01_stock / case02_minimal
+│   │                    #   运行素材随各 case 自带(`case00/scenario/`、
+│   │                    #   `case01/injector/scenario/`);旧的 `scenarios/` 一层已归并掉
 │   ├── case01/          # 案例:投资咨询(二级市场)基线
 │   ├── case00/          # 案例:村庄(已冻结,作对照与展示)
 │   ├── live/            # 实时面:干预策略/网络守卫等
 │   ├── frontend/        # 可视化前端(Phaser + 贴图池 agents_pool/)
-│   ├── scenarios/       # 旧业务层场景配置(investment: 角色/关系/剧情)
 │   ├── data/            # 配置与提示词
-│   └── results/         # 存档与决策留痕(decisions.json)
+│   └── results/         # 分析报表与决策留痕(decisions.json)
+├── data/                # 跑出来的数据在**仓根**这一层:case01/runs(成品记录)、case01/raw、
+│                        #   case00/state、ledgers。**不入库**——新克隆这里什么都没有;
+│                        #   5010 / 5002 读的是 `data/case01/runs/<run_id>/run.json`
+├── handbook/            # 框架接入/配置指南(仓根 `docs/` 已于 2026-10-08 改名 handbook/)
 ├── packages/            # 本地包: mavis-vizkit(呈现) / mavis-case01-injector(注入器)
 └── 依赖 mavisframework  # 框架(独立仓库 hellobs/mavis,以 wheel 安装)
 ```
@@ -190,7 +195,18 @@ uv pip install -r requirements.txt pytest
 > --lanes 3 --model qwen3:8b`。缺数据时测试会说明它要哪个路径
 > (例如 `tests/test_metric_semantics.py` 指向 `data/case00/state`)——
 > 用你自己跑出来的数据喂它,或把项目提供的 demo 包解压进 `data/case01/runs/`
-> (见 `docs/专家导览_怎么看provenance.md`)。
+> (见 `provenance/docs/专家导览_怎么看provenance.md` —— 它在**包内** `provenance/docs/`,
+> 不是仓根的 `handbook/`)。
+>
+> **一条命令都还没跑就想看到记录**:本仓入库了两条 fixture 记录,把读侧指过去即可
+> (环境变量必须是**绝对路径**):
+> `CASE01_RUNS_ROOT=<仓根>/provenance/case01/tests/fixtures/records`。
+> 干净检出上实测:`/api/runs` 报 `count=2`,两条的详情与 full-context 都能出。
+> 不设它也**不是故障**——面板照样 200、只是列表为空(无 traceback)。
+>
+> **提交信息守卫**:`.githooks/commit-msg` 入库了但**默认不生效**,每个克隆要开一次:
+> `git config core.hooksPath .githooks`。(本仓口径:文档与提交信息只写角色词
+> —— 平台侧/需求方/实现侧/研究侧 —— 不写真实人名。)
 
 ## 3. 配置大模型(二选一)
 
@@ -362,7 +378,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
 - **测试**:`tests/test_live_api.py`(pytest,假 server 注入,无需真实模拟/LLM)覆盖 goals 读写、干预跨模拟隔离、explain 三层、export 错误处理;运行方式测试在 mavis 仓库 `tests/`
 - 前端 Phaser 脚本:服务端优先使用本地 `frontend/static/vendor/phaser.min.js`(离线可用),不存在时回退 CDN。离线环境建议首次运行前下载 `https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js`(约 1.3MB)放入该目录
 - 界面/提示词本地化:修改框架的 `mavisframework/prompt/scratch.py` 与前端文案即可,逻辑无需改动
-- **角色/场景配置工具**:角色、关系、剧情事件通过本仓 `provenance/config_tool/` 的表单式工具生成(独立进程,端口 **8060**);产物直接写入本平台的 `agents/`、`scenarios/` 与 `cases/` 目录
+- **角色/场景配置工具**:角色、关系、剧情事件通过本仓 `provenance/config_tool/` 的表单式工具生成(独立进程,端口 **8060**)。产物落三处(仓里**没有** `scenarios/` 这一层,它已于 2026-10-08 归并):角色 → `provenance/frontend/static/assets/village/agents/<角色>/agent.json`;关系/剧情/制度层权重 → 各 case 自己的运行期素材目录(`provenance/case00/scenario/` 或 `provenance/case01/injector/scenario/`);场景声明 → `provenance/cases/<case_id>/scenario.yaml`
 
 ## 10. 修改地图
 
