@@ -477,6 +477,29 @@ def setup_api_key(key: str) -> None:
     ok("key 已写入(该文件被 .gitignore 忽略;脚本不会打印 key 本身)")
 
 
+def data_records_root() -> str:
+    """成品记录根:走仓内那一个解析口 `case_engine.paths.data_root()`。
+
+    为什么必须有这个函数(2026-10-08 晚实测):此前 self_check 数的是
+    `provenance/case01/runs/` —— 那一层当晚归类搬迁时已被删,数它永远得 0,
+    于是这台**已经有 583 条**的机器也被报成"还没有成品记录 —— 新克隆的正常状态"。
+    `case_engine.paths` 只用标准库,所以引导解释器(3.8+,没装任何依赖)也能 import 它。
+    """
+    pkg = os.path.join(REPO_ROOT, "provenance")
+    if pkg not in sys.path:
+        sys.path.insert(0, pkg)
+    from case_engine.paths import data_root
+    return data_root("case01.records", env_var="CASE01_RUNS_ROOT")
+
+
+def count_records(root: str) -> int:
+    """数"带 run.json 的目录" —— 别拿目录数当记录数(失败批会留空目录)。"""
+    if not os.path.isdir(root):
+        return 0
+    return len([d for d in os.listdir(root)
+                if os.path.isfile(os.path.join(root, d, "run.json"))])
+
+
 def self_check(py: str, engine_dir: str) -> int:
     step("自检(同样的检查也可以单独跑:--check)")
     problems = []
@@ -509,27 +532,35 @@ def self_check(py: str, engine_dir: str) -> int:
     (ok if service_ok else warn)("Ollama 服务{}".format("可达" if service_ok else "不可达(只影响跑推演)"))
     if names:
         say("        已有模型:{}".format(", ".join(sorted(names)[:8])))
-    runs = os.path.join(REPO_ROOT, "provenance", "case01", "runs")
-    nruns = len([d for d in os.listdir(runs) if os.path.isfile(os.path.join(runs, d, "run.json"))]) \
-        if os.path.isdir(runs) else 0
+    runs = data_records_root()
+    nruns = count_records(runs)
     if nruns:
-        ok("已有成品记录 {} 条(界面开箱有内容)".format(nruns))
+        ok("已有成品记录 {} 条(界面开箱有内容)—— 根:{}".format(nruns, runs))
     else:
-        info("还没有成品记录 —— 新克隆的正常状态;界面上会/embed/explore 为空。"
-             "要造一条:python -m case01.run --run-id my-001(约 1-2 分钟)")
+        info("还没有成品记录(看的根:{})—— 新克隆的正常状态;界面上会/embed/explore 为空。"
+             "要造一条:python -m case01.run --run-id my-001(约 1-2 分钟);"
+             "想看现成的:把交付包 runs/ 拷进上面那个根,或把 CASE01_RUNS_ROOT 指到 "
+             "provenance/case01/tests/fixtures/records(仓内入库了两条)".format(runs))
 
     say("")
     if problems:
         bad("自检未通过:{}".format(", ".join(problems)))
         say("   下一步:重跑 `python tools/setup_all.py`(它会补装),或看上面的 [失败] 行。")
         return 1
-    ok("自检通过。接下来:")
-    say("       起实时面(只读,不需要 GPU):{}".format(
-        "cd provenance\\provenance && .venv-live\\Scripts\\python.exe live_switch.py --start case01 --review-only"
-        if IS_WIN else
-        "cd provenance/provenance && ../.venv-live/bin/python live_switch.py --start case01 --review-only"))
-    say("       跑测试:{}".format(".venv-live\\Scripts\\python.exe -m pytest tests"
-                              if IS_WIN else ".venv-live/bin/python -m pytest tests"))
+    ok("自检通过。接下来(面与解释器都在包目录 `provenance/` 那层;下面按绝对路径给,免得再猜 cwd):")
+    pkg = os.path.join(REPO_ROOT, "provenance")
+    venv_py = (os.path.join(".venv-live", "Scripts", "python.exe") if IS_WIN
+               else os.path.join(".venv-live", "bin", "python"))
+    say("       起实时面(只读,不需要 GPU):cd \"{}\" && {} live_switch.py --start case01 --review-only"
+        .format(pkg, venv_py))
+    # 这两条此前是坏的:它们按"仓根的上一级"起步写(`cd provenance\provenance`),
+    # 而 README/setup 让人在仓根跑 —— 那个相对路径在这里指向不存在的第三层。
+    # 跑测试的目录口径也写反过:外层 `tests/` 在仓根,`case01/tests`/`case_engine/tests`
+    # 必须在包目录跑(在仓根跑会 "no tests ran" 而 exit 0,是假绿)。
+    say("       跑测试(外层):cd \"{}\" && {} -m pytest tests"
+        .format(REPO_ROOT, os.path.join("provenance", venv_py)))
+    say("       跑测试(内层两套,必须 cd 包目录):cd \"{}\" && {} -m pytest case01/tests case_engine/tests"
+        .format(pkg, venv_py))
     return 0
 
 
