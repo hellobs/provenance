@@ -4,7 +4,16 @@ r"""数据归类搬迁:把"跑出来的存档"从代码目录挪到仓根 `data/
 
     python tools/migrate_data_layout.py                # 只看(dry-run,默认)
     python tools/migrate_data_layout.py --apply        # 真搬
+    python tools/migrate_data_layout.py --only state,injector --apply   # 只搬这几组(分步搬/续搬)
     python tools/migrate_data_layout.py --undo <台账>  # 按台账搬回去
+
+分组名(`--only` 用):
+    runs      case01/runs(成品记录;**正在被 5010 读时别搬**)
+    injector  case01/runs_injector(拆成 raw/ 与 runtime/)
+    state     case01/injector/scenario/checkpoints(引擎现场存档)
+    archive   case01/runs_archive_20260919
+    html      case01/runs_html
+    shells    两个空目录(case01/results、仓根 results)
 
 为什么要有它(2026-10-08):仓里同一个概念有过**三个落点** ——
 `results/checkpoints/`(case00 沙盒存档 + 跨局登记簿)、
@@ -75,19 +84,36 @@ def walk_files(base: str):
             yield os.path.join(dp, f)
 
 
-def build_plan():
-    """返回 (moves, drops, problems)。moves 每项 (old_abs, new_abs)。"""
+def build_plan(groups=None):
+    """返回 (moves, drops, problems)。moves 每项 (old_abs, new_abs)。
+
+    `groups` 为 None 表示全搬;否则只搬选中的组(`--only`)。
+    """
+    want = None if not groups else {g.strip() for g in groups if g.strip()}
     moves, drops, problems = [], [], []
-    for old_rel, new_rel in WHOLE:
+
+    def on(name):
+        return want is None or name in want
+
+    for name, (old_rel, new_rel) in (("runs", WHOLE[0]), ("state", WHOLE[1]),
+                                     ("archive", WHOLE[2]), ("html", WHOLE[3])):
+        if not on(name):
+            continue
         old, new = os.path.join(REPO, *old_rel.split("/")), os.path.join(REPO, *new_rel.split("/"))
         if not os.path.isdir(old):
             continue
+        files = list(walk_files(old))
+        if not files:
+            continue                      # 空壳:没什么可搬(搬完的收尾由 prune_empty 负责)
         if os.path.exists(new):
-            problems.append("目标已存在,需人工确认:{}".format(new_rel))
+            problems.append("目标已存在且老位置**还有 {} 个文件**,需人工确认:{}".format(
+                len(files), new_rel))
             continue
-        for f in walk_files(old):
+        for f in files:
             moves.append((f, os.path.join(new, os.path.relpath(f, old))))
     for old_root_rel, rec_rel, rest_rel in SPLIT:
+        if not on("injector"):
+            continue
         old_root = os.path.join(REPO, *old_root_rel.split("/"))
         if not os.path.isdir(old_root):
             continue
@@ -97,8 +123,24 @@ def build_plan():
             rid = parts[0] if len(parts) > 1 else "_loose"
             tail = os.path.join(*parts[1:]) if len(parts) > 1 else parts[0]
             dest_root_rel = rec_rel if os.path.basename(f) in RECORD_NAMES else rest_rel
-            moves.append((f, os.path.join(REPO, *dest_root_rel.split("/"), rid, tail)))
+            new = os.path.join(REPO, *dest_root_rel.split("/"), rid, tail)
+            # 拆分组也要做"拒绝覆盖":这里最容易出现"搬过一次、之后又新写了同一条"的情形
+            # (runs_injector 是活的写入目标),静默覆盖会吃掉新记录。
+            if os.path.exists(new):
+                try:
+                    same = (os.path.getsize(f) == os.path.getsize(new)
+                            and sha256(f) == sha256(new))
+                except OSError:
+                    same = False
+                if same:
+                    continue              # 已经搬过且内容一致:跳过(可重复跑)
+                problems.append("目标已存在且内容不同,拒绝覆盖:{}".format(
+                    os.path.relpath(new, REPO).replace("\\", "/")))
+                continue
+            moves.append((f, new))
     for rel in DROP_IF_EMPTY:
+        if not on("shells"):
+            continue
         p = os.path.join(REPO, *rel.split("/"))
         if not os.path.isdir(p):
             continue
@@ -124,7 +166,34 @@ def check_targets(moves, apply_: bool):
     return clash
 
 
-def do_move(moves, drops, apply_: bool):
+def prune_empty(root: str):
+    """把 root 下变空的目录自底向上删掉(只删**空**的),返回被删的相对路径列表。
+
+    为什么需要:整棵搬走文件后,老位置会留下一串空目录。留着它们有两个坏处 ——
+    ① "哪个才是真的"又变模糊;② `data_root()` 的存在性判据会被空壳满足。
+    """
+    gone = []
+    if not os.path.isdir(root):
+        return gone
+    for dp, dn, fn in os.walk(root, topdown=False):
+        if dp == root:
+            continue
+        if not os.listdir(dp):
+            try:
+                os.rmdir(dp)
+                gone.append(dp)
+            except OSError:
+                pass
+    if os.path.isdir(root) and not os.listdir(root):
+        try:
+            os.rmdir(root)
+            gone.append(root)
+        except OSError:
+            pass
+    return gone
+
+
+def do_move(moves, drops, apply_: bool, prune_roots=()):
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     ledger_path = os.path.join(DATA, "MIGRATION_{}.json".format(stamp))
     entries, failed = [], []
@@ -153,6 +222,9 @@ def do_move(moves, drops, apply_: bool):
         if apply_:
             shutil.rmtree(p, ignore_errors=True)
     if apply_:
+        for root in prune_roots:
+            for gone in prune_empty(root):
+                dropped.append(os.path.relpath(gone, REPO).replace("\\", "/") + "  (搬空的壳)")
         os.makedirs(DATA, exist_ok=True)
         with open(ledger_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump({"stamp": stamp, "moves": entries, "dropped": dropped,
@@ -186,6 +258,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="数据归类搬迁(case01 存档 → 仓根 data/)")
     ap.add_argument("--apply", action="store_true", help="真搬(默认只 dry-run)")
     ap.add_argument("--undo", default="", help="按台账搬回去")
+    ap.add_argument("--only", default="",
+                    help="只搬这几组(逗号分隔):runs,injector,state,archive,html,shells")
     args = ap.parse_args(argv)
 
     if args.undo:
@@ -195,8 +269,11 @@ def main(argv=None) -> int:
             print("  [!] " + b)
         return 1 if bad else 0
 
-    moves, drops, problems = build_plan()
+    groups = [g for g in args.only.replace(",", " ").split() if g]
+    moves, drops, problems = build_plan(groups)
     print("仓根:{}".format(REPO))
+    if groups:
+        print("只搬这几组:{}".format(", ".join(groups)))
     print("计划:搬 {} 个文件,删 {} 个空目录".format(len(moves), len(drops)))
     total = sum(os.path.getsize(o) for o, _ in moves if os.path.isfile(o))
     print("合计 {:.1f} MB".format(total / 1e6))
@@ -226,7 +303,9 @@ def main(argv=None) -> int:
     if not args.apply:
         print("\n--dry-run:未写盘。加 --apply 执行。")
         return 0
-    entries, dropped, failed, ledger = do_move(moves, drops, True)
+    entries, dropped, failed, ledger = do_move(moves, drops, True, prune_roots=[
+        os.path.join(REPO, *r.split("/")) for r in
+        [w[0] for w in WHOLE] + [s[0] for s in SPLIT]])
     print("\n已搬 {} 个文件;台账:{}".format(len(entries), ledger))
     for rel, why in failed:
         print("  [!] {} {}".format(rel, why))
