@@ -19,6 +19,7 @@
   不是"对齐方向"(对齐方向在 DPO 对里)—— 训练配比要清楚这一点。
 """
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -74,8 +75,11 @@ def validate_dpo(dpo: dict) -> List[str]:
     if c.strip() and r.strip():
         ratio = min(len(c), len(r)) / max(len(c), len(r))
         if ratio < 0.5:
-            errs.append("chosen/rejected 量纲不对等(片段 vs 全文,ratio={:.2f});"
-                        "需要 anchor 定位或改为整篇重写".format(ratio))
+            errs.append("chosen/rejected 量纲不对等(ratio={:.2f})".format(ratio) +
+                        ":专家给的是**片段**(《HCI 增量需求》§二要求 Edit 不重写整篇,"
+                        "所以这是正确形态,不是专家写错了)。当前导出不会按 anchor 把片段"
+                        "合回整篇 ⇒ 这条只进审核材料、不进偏好对;要让它进偏好对是"
+                        "**导出侧**按 anchor 重建,而不是回头要求专家改成整篇")
     return errs
 
 
@@ -84,6 +88,23 @@ def _dedup_key(sample: dict) -> str:
         (str(sample.get("instruction", "")) + "|" +
          str(sample.get("input", "")) + "|" +
          str(sample.get("output", ""))).encode("utf-8")).hexdigest()[:16]
+
+
+def _row_identity(mark: dict) -> dict:
+    """这条标记落在报告里的"我是谁"。
+
+    必要性(2026-10-07 对 0904doc 05 §六):平台要能显示"该问题当前是否已进入训练
+    材料池",而原先 rows 只有 verdict/ok/errors —— 一个任务对不上号,池状态就只能靠
+    猜总数。身份从意见的 review 子对象取(面板写的),没有就是实时面手工标记(无任务粒度)。
+    """
+    rv = mark.get("review") if isinstance(mark.get("review"), dict) else {}
+    return {"run_id": rv.get("run_id") or "",
+            "issue_id": rv.get("issue_id") or "",
+            "expert_category_id": rv.get("expert_category_id") or "",
+            "verdict": str(mark.get("verdict", "")),
+            "origin": str(mark.get("origin", "expert") or "expert"),
+            "operator": str(mark.get("operator", "") or ""),
+            "marked_at": str(mark.get("marked_at", "") or "")}
 
 
 # ---------------------------------------------------------------------------
@@ -120,23 +141,30 @@ def export(marks: List[dict], out_root: str = OUT_ROOT) -> dict:
             stats["rejected"] += 1
             for e in errs:
                 stats["reject_reasons"][e] = stats["reject_reasons"].get(e, 0) + 1
-            report_rows.append({"verdict": v, "ok": False, "errors": errs})
+            row = _row_identity(m)
+            row.update({"sft_in": False, "dpo_in": False, "errors": errs})
+            report_rows.append(row)
             continue
         seen.add(key)
         sft.append(s)
         stats["sft"] += 1
+        dpo_ok = False
         if d:
             derrs = validate_dpo(d)
             if not derrs:
                 dpo.append(d)
                 stats["dpo"] += 1
+                dpo_ok = True
             else:
                 # DPO 对不合格不牵连 SFT 那条(同一条意见可以只进 SFT)
                 stats["dpo_rejected"] = stats.get("dpo_rejected", 0) + 1
                 for e in derrs:
                     stats["reject_reasons"]["DPO:" + e] = \
                         stats["reject_reasons"].get("DPO:" + e, 0) + 1
-        report_rows.append({"verdict": v, "ok": True, "errors": []})
+        row = _row_identity(m)
+        row.update({"sft_in": True, "dpo_in": dpo_ok,
+                    "errors": derrs if (d and not dpo_ok) else []})
+        report_rows.append(row)
 
     # 序列长度实测(2026-10-07):训练起点配置写的是 seq<=1024,而 input 里装着整篇反思
     # —— 真实标记一到位就会撞上限。不写进产物,配置就只能靠猜,而截断恰好切掉反思尾部
@@ -153,7 +181,11 @@ def export(marks: List[dict], out_root: str = OUT_ROOT) -> dict:
     os.makedirs(out_root, exist_ok=True)
     sft_text = "".join(json.dumps(s, ensure_ascii=False) + "\n" for s in sft)
     dpo_text = "".join(json.dumps(d, ensure_ascii=False) + "\n" for d in dpo)
-    report = {"stats": stats, "rows": report_rows}
+    report = {"stats": stats, "rows": report_rows,
+              # 池状态是给平台显示的,不是实时真值:没有这个戳,读的人无法知道它落后
+              # 磁盘多久(导出只在有人跑 --export 时重写)。
+              "generated_at": datetime.datetime.now().astimezone().isoformat(
+                  timespec="seconds")}
     _write_atomic(os.path.join(out_root, "sft.jsonl"), sft_text)
     _write_atomic(os.path.join(out_root, "dpo.jsonl"), dpo_text)
     _write_atomic(os.path.join(out_root, "dataset_report.json"),
