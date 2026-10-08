@@ -47,7 +47,9 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -254,6 +256,34 @@ def do_undo(ledger_path: str, apply_: bool):
     return back, bad
 
 
+def who_may_be_reading() -> list:
+    """尽力找出"可能正在读记录根"的进程(只报名字,不动手)。
+
+    为什么只警告不阻断:搬运是用户显式要求的动作;**但要出声** ——
+    5010 的审查面在启动时就把记录根记在内存里,搬走会让**已在跑的进程**读不到记录
+    (重启即恢复)。2026-10-08 实测:另一个会话的两个 `live_run --review-only` 就是这样。
+    """
+    try:
+        if os.name == "nt":
+            out = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
+                 "ForEach-Object { $_.ProcessId.ToString() + ' ' + $_.CommandLine }"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=30).stdout or ""
+        else:
+            out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True,
+                                 timeout=30).stdout or ""
+    except (OSError, subprocess.SubprocessError):
+        return []
+    hits = []
+    for line in out.splitlines():
+        if re.search(r"live_run|live_fastapi|case01\.serve|case00\.serve|review_app|"
+                     r"serve_all|stage_run", line):
+            hits.append(line.strip()[:120])
+    return hits
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="数据归类搬迁(case01 存档 → 仓根 data/)")
     ap.add_argument("--apply", action="store_true", help="真搬(默认只 dry-run)")
@@ -270,6 +300,7 @@ def main(argv=None) -> int:
         return 1 if bad else 0
 
     groups = [g for g in args.only.replace(",", " ").split() if g]
+    want_runs = (not groups) or ("runs" in groups)      # 搬 runs 才需要"没人在读"的窗口
     moves, drops, problems = build_plan(groups)
     print("仓根:{}".format(REPO))
     if groups:
@@ -295,6 +326,14 @@ def main(argv=None) -> int:
         for c in clash[:10]:
             print("   " + os.path.relpath(c, REPO).replace("\\", "/"))
         return 2
+    if want_runs:
+        busy = who_may_be_reading()
+        if busy:
+            print("⚠ 检测到 {} 个可能正在读记录/服务的进程(搬 runs 会让它们读不到记录,重启即恢复):"
+                  .format(len(busy)))
+            for b in busy[:5]:
+                print("   " + b)
+            print("   建议:先按各自的停法停掉,搬完再起。")
     long_ones = [n for _, n in moves if len(n) > LONG_PATH]
     if long_ones:
         print("⚠ 搬家后路径超过 {} 字符的 {} 个(Windows 上可能打不开):".format(LONG_PATH, len(long_ones)))
