@@ -142,22 +142,27 @@ def test_module_aliases_are_startup_snapshots(tmp_path, monkeypatch):
     保留别名是为了兼容既有模板引用(以及若干测试 monkeypatch);真正要用"实时值"
     的地方一律调函数。这条把两种语义的差别钉下来,免得后人以为别名会跟着变。
 
-    2026-10-08:素材目录不再是模块别名 —— `SCENARIOS_DIR` 已删(关系/剧情归并进
-    `cases/<case_id>/assets/`,由 `case_assets_dir()` 按 case 实时解析)。这条同时钉住
-    "函数必须实时"与"旧别名不许回来"。
+    2026-10-08:素材目录不再是模块别名 —— `SCENARIOS_DIR` 已删。素材由
+    `case_scenario_dir(case_id)` 定位:**已登记的 case 按表**(它把素材放在自己代码旁边的
+    `scenario/`),**未登记的 case 跟随 `CASE_ENGINE_CASES_ROOT`**(实时)。这条同时钉住
+    "别名=快照 / 函数=实时"与"旧别名不许回来"。
     """
     app_mod = _tool_module()
     before_village = app_mod.VILLAGE_ROOT
-    before_assets = app_mod.case_assets_dir("case00_village")
     monkeypatch.setenv("MAVIS_ASSETS_ROOT", str(tmp_path / "late"))
     monkeypatch.setenv("CASE_ENGINE_CASES_ROOT", str(tmp_path / "late_cases"))
     assert app_mod.VILLAGE_ROOT == before_village, "别名不该随环境变量变"
     assert app_mod.village_root() == os.path.normpath(str(tmp_path / "late")), \
         "函数必须实时读"
-    assert app_mod.case_assets_dir("case00_village") != before_assets, \
-        "素材目录必须实时解析(它按 CASE_ENGINE_CASES_ROOT 走)"
+    # 已登记的 case:按表定位,与"场景声明根"无关(素材就在 case 自己的 scenario/ 旁边)
+    assert app_mod.case_scenario_dir("case00_village") == os.path.join(
+        app_mod._PLATFORM_DIR, "case00", "scenario"), "已登记 case 应按表定位"
+    # 未登记的 case:跟随 CASE_ENGINE_CASES_ROOT(实时解析)
+    fresh = app_mod.case_scenario_dir("some_new_case")
+    assert os.path.normcase(fresh).startswith(
+        os.path.normcase(os.path.normpath(str(tmp_path / "late_cases")))), fresh
     assert not hasattr(app_mod, "SCENARIOS_DIR"), \
-        "旧别名已删:素材在 cases/<case_id>/assets/,别再引入一个固定的场景根"
+        "旧别名已删:素材按 case 定位,别再引入一个固定的场景根"
 
 
 def test_relative_env_is_rejected_by_the_functions(monkeypatch):

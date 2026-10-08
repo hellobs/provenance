@@ -123,9 +123,12 @@ def run_simulation(name, sim_config, start_step, step, stride):
         # 全球时区场景:所有角色(含 user)全天在线不睡觉
         sim_config.setdefault("agent_base", {})["no_sleep"] = True
         relationships, story = [], []
-        # 2026-10-08:运行期素材(关系/剧情)从 `scenarios/investment/` 归并到
-        # `cases/case00_village/assets/` —— 与声明式 scenario.yaml 同一棵树,一处装场景。
-        scenario_dir = os.path.join(state.BASE_DIR, "cases", "case00_village", "assets")
+        # 2026-10-08:**运行期素材的家 = 该 case 自己的 `scenario/`**(case00 → `case00/scenario/`)。
+        # 中途曾把素材搬到 `cases/<case_id>/assets/`,但 `case00/scenario/` 里本来就有一份
+        # **逐字节相同**的 story/relationships(还有 maze/config/agents),于是成了两份 ——
+        # 已撤销那个约定,只保留每 case 一处。声明(`cases/<case_id>/scenario.yaml`)与素材
+        # (`<case>/scenario/`)分工见 `docs/仓库布局说明.md`。
+        scenario_dir = os.path.join(state.BASE_DIR, "case00", "scenario")
         rel_path = os.path.join(scenario_dir, "relationships.json")
         if os.path.exists(rel_path):
             with open(rel_path, "r", encoding="utf-8") as f:
