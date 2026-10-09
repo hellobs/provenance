@@ -91,8 +91,14 @@ def test_register_adds_engine_zero_rework():
 
 
 def test_experiment_eval_run_produces_result(tmp_path):
-    """experiment-eval.run 真跑:分支路由 + 状态 + 一致性,并落盘 JSON(免 LLM 最小线)。"""
+    """experiment-eval.run 真跑:分支路由 + 状态 + 一致性,并落盘 JSON(免 LLM 最小线)。
+
+    2026-10-09:case01_stock 不再声明 branch/consistency ⇒ 用局部夹具补上,
+    保证"分支落 A/B/C 之一 + 一致性有判定"这条链仍被覆盖。
+    """
     s = _load("case01_stock")
+    s.branch = {"default_branch": "C", "conditional": ["轻仓", "分批", "等待确认"]}
+    s.consistency = {"cond_words": ["partial position"]}
     res = ExperimentEval().run(s, input_text="轻仓分批等待确认", out_dir=str(tmp_path))
     assert res["engine"] == "experiment-eval"
     assert res["run_type"] == "rule-dryrun"
@@ -109,15 +115,26 @@ def test_experiment_eval_run_produces_result(tmp_path):
     assert "artifact" in res and res["artifact"].endswith("case01_stock_exp.json")
 
 
+def test_experiment_eval_run_without_branch_still_runs():
+    """无 branch 段的场景(2026-10-09 后的 case01_stock)仍能跑:
+    无词表 ⇒ 规则路由落空 default_branch(空串),不抛错、不伪造分支。"""
+    s = _load("case01_stock")
+    assert not s.branch          # 夹具前置:确认真没有 branch 段
+    res = ExperimentEval().run(s, input_text="轻仓分批等待确认")
+    assert res["run_type"] == "rule-dryrun"
+    assert res["branch"] == ""   # 无词表/无默认分支 → 空,而非硬塞 A/B/C
+
+
 def test_experiment_eval_run_falls_back_to_scenario_inputs():
     """场景已声明 inputs.sample_answers 时,空输入自动取缺省样本自检,不再抛错。
 
-    空输入能跑通本身就证明兜底生效(无其他输入来源),分支落在三者之一即可。
+    空输入能跑通本身就证明兜底生效(无其他输入来源)。2026-10-09 后 case01_stock
+    无 branch 段 ⇒ 分支为空串,这里只断言"能跑通 + 分支取自声明式时间线前端"。
     """
     s = _load("case01_stock")
     res = ExperimentEval().run(s, input_text="   ")
     assert res["run_type"] == "rule-dryrun"
-    assert res["branch"] in {"A", "B", "C"}
+    assert res["branch"] == ""
 
 
 def test_experiment_eval_run_requires_input_without_samples():

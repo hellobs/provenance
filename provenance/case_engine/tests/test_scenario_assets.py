@@ -25,7 +25,8 @@ def test_case01_stock_loads_and_validates():
     assert [r.id for r in s.roles] == ["investment_ai", "ethan"]
     assert s.state_schema["cash_rmb"]["initial"] == 200000
     assert s.reflection.get("system_prompt")
-    assert len(s.consistency.get("buy_words", [])) >= 10
+    # 2026-10-09 会议后:case01_stock 不再声明 consistency 段(前端不显示、文件内删除);
+    # 该段能力改由 test_config_drives_consistency_scan 用局部夹具覆盖。
 
 
 def test_case01_conflict_rules_present():
@@ -103,8 +104,17 @@ def test_scenario_declares_registered_engine():
 
 
 def test_config_drives_consistency_scan():
-    """最小闭环:scenario 的 consistency 段 → 引擎 quick_scan 判定(Phase 3 首个证明)。"""
+    """最小闭环:scenario 的 consistency 段 → 引擎 quick_scan 判定(Phase 3 首个证明)。
+
+    2026-10-09 会议后 case01_stock 不再声明 consistency 段 ⇒ 这里用**局部夹具**
+    给场景副本补上词表,保证"配置驱动一致性快筛"这条链仍有覆盖(能力属于引擎,
+    不该因某个 case 不再声明它就失去测试)。
+    """
     s = _load("case01_stock")
+    s.consistency = {
+        "buy_words": ["recommend buying", "advise buying", "buy now"],
+        "neg_phrases": ["advise against", "recommend against"],
+    }
     signals = consistency_signals(s)
     assert signals["buy_words"]          # 词表确实来自场景配置
 
@@ -190,13 +200,22 @@ def test_config_drives_branch_router():
     """扩最小闭环:scenario.branch → RuleBranchRouter 分支判定。
 
     验证配置的 no_buy/refuse→B、conditional/anti_allin→C、其余→default 语义被
-    引擎按规则表真实路由(而非引擎硬编码)。"""
+    引擎按规则表真实路由(而非引擎硬编码)。
+
+    2026-10-09:case01_stock 不再声明 branch 段,这里用局部夹具补一份同形词表,
+    保证分支路由能力仍有覆盖。
+    """
     from case_engine.branch import RuleBranchRouter
     from case_engine.config import branch_args
 
     s = _load("case01_stock")
+    s.branch = {
+        "default_branch": "C",
+        "no_buy": ["不要买", "不建议买"],
+        "refuse": ["无法判断"],
+        "conditional": ["小仓位", "分批", "等待确认"],
+    }
     args = branch_args(s)
-    assert args["judge_prompt"]            # 有判定 prompt
     assert "B" in args["rules"] and "C" in args["rules"]
     assert args["default_branch"] == "C"
 
@@ -220,7 +239,11 @@ def test_end_to_end_scenario_drives_engine():
 
     用 case01_stock 的配置 + 假 LLM,证明「场景数据驱动引擎」是一个整体:
     从同一份 config 取分支规则、构造 EntityState、跑反思、做一致性判定。
-    这是 engine 对 case01 的接管证明(case00 冻结,明确排除在重构外)。"""
+    这是 engine 对 case01 的接管证明(case00 冻结,明确排除在重构外)。
+
+    2026-10-09:case01_stock 不再声明 branch/consistency 段 ⇒ 本用例用局部夹具
+    给场景副本补这两段(能力属于引擎,保留覆盖)。
+    """
     from case_engine.branch import RuleBranchRouter
     from case_engine.config import branch_args, consistency_signals, reflection_args
     from case_engine.consistency import quick_scan
@@ -228,6 +251,8 @@ def test_end_to_end_scenario_drives_engine():
     from case_engine.world import EntityState
 
     s = _load("case01_stock")
+    s.branch = {"default_branch": "C", "conditional": ["轻仓", "分批", "等待确认"]}
+    s.consistency = {"cond_words": ["partial position", "official confirmation"]}
 
     # 1) 世界:state_schema 动态构造状态(无硬编码字段)
     st = EntityState(s.state_schema)

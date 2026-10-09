@@ -214,9 +214,19 @@ def test_run_assembles_timeline_nodes():
     """ExperimentEval 真跑后产出按日期装配的节点序列,首末含对角交互 + 价格 world。
 
     确定性、不调 LLM:节点来自声明式 timeline,而非模型。
+
+    2026-10-09:case01_stock 不再声明 branch 段(会议决定删除)。无词表时规则路由
+    落到 default_branch(空)→ branch 为空串,时间线仍按 timeline.branch_map 缺省
+    取第一条线装配。故这里改为**显式注入 input_text 并以 branch 段做局部夹具**,
+    保证还能覆盖"分支→选线"这条链,而不是依赖 case01_stock 的 branch 段。
     """
+    from case_engine.config import load_yaml
     from case_engine.engines import build_for
-    s = _case01()
+    path = os.path.join(CASES_ROOT, "case01_stock", "scenario.yaml")
+    s = load_yaml(path)
+    # 用一份"仍带分支词表"的场景副本做此用例(分支是引擎能力,不该因某个 case
+    # 不再声明它而失去覆盖)。
+    s.branch = {"default_branch": "C", "conditional": ["小规模", "分批", "轻仓"]}
     res = build_for(s).run(s, input_text="我建议分阶段先小规模试点")  # → C → Timeline A
     assert res["branch"] == "C"
     nodes = res.get("timeline") or []

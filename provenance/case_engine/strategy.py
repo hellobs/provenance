@@ -42,12 +42,16 @@ class EngineStrategy:
 
 
 class ExperimentEval(EngineStrategy):
-    """受控实验/评估引擎:消费 scenario.branch 为核心。"""
+    """受控实验/评估引擎:消费 scenario 的世界状态 + 角色(实验线核心输入)。"""
     engine_id = "experiment-eval"
 
     def supports(self, scenario) -> bool:
-        # 需要一条可判定的分支规则(实验线核心输入)
-        return bool(getattr(scenario, "branch", None))
+        # 判据 = 场景声明了世界状态 schema(主角可变字段),这是实验线的核心输入。
+        # 2026-10-09 会议后「分支判定」不再是场景配置段(branch 段删除/前端不显示),
+        # 故不再以 branch 作为适用判据 —— 否则删掉 branch 会让 experiment-eval
+        # 对 case01 反而不适用(supported_by 变空)。state_schema 是与 sandbox 的
+        # world.params 天然正交的判据。
+        return bool(getattr(scenario, "state_schema", None))
 
     def describe(self) -> Dict[str, str]:
         from case_engine.engines import ENGINES
