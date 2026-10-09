@@ -493,7 +493,14 @@ const TABS = [
   ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的带风险的行为/判断（含风险等级）"],
   ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
                                                                           "注入器的节点、释放了哪些事件、事件怎么定义"],
-  ["audit",      "审计",     d => (d.audit || []).length,                 "每一步操作的可审计留痕"],
+  // 审计徽标只数**引擎侧**的交互留痕(release_events / interaction);
+  // 不数事实层记账(随 T0 一次算出的那几条流水)——后者在进度还是 0/7 时就已存在,
+  // 显示成徽标会让人误以为"没开始就出了审计"(2026-10-09 用户两次追问)。
+  // 事实层的条目在审计页签里照常列出。
+  ["audit",      "审计",     d => (d.audit || []).filter(
+                                x => x.action === "release_events" || x.action === "interaction"
+                              ).length,
+                                                                          "引擎侧交互留痕(释放事件/交互);事实层的事件记账见本页签内条目"],
 ];
 let DATA = null, TAB = "overview";
 // 记录 → 引擎归属:靠近端拿到的清单里每条都带 engine(索引字段)。
