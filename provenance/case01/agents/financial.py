@@ -48,6 +48,10 @@ class FinancialData:
         self.include_background = (background_enabled() if include_background is None
                                    else bool(include_background))
         self.docs: List[dict] = []
+        # 资料目录里每一个 .json 都按"一份资料数组"读;读不出/不是数组的都留名字在这里,
+        # 由 configuration() 带进每条检索记录 —— 静默跳过会让"少了一批资料"和
+        # "目录里塞了个别的 .json"在产物里长得一模一样(2026-10-08 补)。
+        self.load_skipped: List[str] = []
         self._vec_cache: Dict[str, List[float]] = {}
         self.last_ranking = "not_queried"
         self._load()
@@ -67,7 +71,27 @@ class FinancialData:
 
     @staticmethod
     def _background(doc):
-        return bool((doc.get("meta") or {}).get("corpus", "").startswith("market_background_"))
+        # `or ""` 而不是 `.get("corpus","")`:手写/半截的 meta 里 `"corpus": null` 会让
+        # `.startswith` 当场 AttributeError,把整个资料库的加载打断在半路。
+        return bool(str((doc.get("meta") or {}).get("corpus") or "")
+                    .startswith("market_background_"))
+
+    def _embed_backend(self):
+        """embed 是谁给的 —— 判官客户端 / 环境变量新建的本地客户端 / 没有。
+
+        要进产物是因为这条会**静默换后端**:`bridge._retrieve_background` 先取
+        `getattr(judge_llm, "embed", None)`,取不到才回落到 `local_client_from_env()`
+        (= 打本机 11434)。只看代码看不出一局用的是哪个;落到记录里才追得回。
+        """
+        fn = self.embed_fn
+        if fn is None:
+            return "none(keyword 降级)"
+        owner = getattr(fn, "__self__", None)
+        if owner is None:
+            return "callable(未绑定客户端)"
+        model = getattr(owner, "embed_model", "") or "?"
+        base = getattr(owner, "base_url", "") or getattr(owner, "api_base", "")
+        return "{} model={} base={}".format(type(owner).__name__, model, base or "-")
 
     def configuration(self):
         return {"background_enabled": self.include_background,
@@ -77,6 +101,8 @@ class FinancialData:
                 "chunking": PASSAGE_VERSION if self.include_background else "legacy-first-600",
                 "ranking_requested": "embedding" if self.embed_fn else "keyword",
                 "ranking": self.last_ranking,
+                "embed_backend": self._embed_backend(),
+                "skipped_json": list(self.load_skipped),
                 "primary_top_k": 8,
                 "background_top_k": 2 if self.include_background else 0}
 
@@ -91,14 +117,21 @@ class FinancialData:
                     try:
                         with open(p, encoding="utf-8") as f:
                             arr = json.load(f)
-                        if isinstance(arr, list):
-                            for d in arr:
-                                if self._background(d) and not self.include_background:
-                                    continue
-                                d.setdefault("company", os.path.basename(root))
-                                self.docs.append(d)
                     except Exception as e:
+                        self.load_skipped.append("{}(读不出:{})".format(p, e))
                         print("[financial] skip {}: {}".format(p, e))
+                        continue
+                    if not isinstance(arr, list):
+                        # 此前这条**连一声都不出**(只是 not isinstance 就什么也不做):
+                        # 目录里放一个 dict 形的 manifest.json,资料数就静默少一批。
+                        self.load_skipped.append("{}(不是资料数组)".format(p))
+                        print("[financial] skip {}: JSON 不是资料数组".format(p))
+                        continue
+                    for d in arr:
+                        if self._background(d) and not self.include_background:
+                            continue
+                        d.setdefault("company", os.path.basename(root))
+                        self.docs.append(d)
 
     # ------------------------------------------------------------------
     def _vec(self, text: str) -> Optional[List[float]]:
@@ -172,8 +205,11 @@ class FinancialData:
     def search_context(self, query, current_date, top_k=8, background_only=False):
         if not self.include_background:
             return self.search(query, top_k=top_k, since=current_date)
+        # 主料名额**不写死公司**:`background=False` 已经把这批"非背景库资料"整份隔开了,
+        # 再接第二家目标公司时不必改这里;此前写 `company="hcm"` 会让新公司的资料
+        # 静默拿不到主料名额(实测当前语料只有 hcm,所以今天不咬人)。
         primary = [] if background_only else self.search(
-            query, top_k=top_k, since=current_date, company="hcm", background=False,
+            query, top_k=top_k, since=current_date, background=False,
             distinct_documents=True)
         background = self.search(query, top_k=2, since=current_date, background=True,
                                  distinct_documents=True)
