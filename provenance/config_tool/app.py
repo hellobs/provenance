@@ -279,8 +279,9 @@ def _launch_live(case_id: str) -> dict:
     err = out + ".err"
     try:
         with open(out, "ab") as fo, open(err, "ab") as fe:
+            cmd = [_LIVE_PY, switch, "--start", live_case]
             subprocess.Popen(
-                [_LIVE_PY, switch, "--start", live_case],
+                cmd,
                 cwd=_PLATFORM_DIR, stdout=fo, stderr=fe,
                 creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     except Exception as exc:  # noqa: BLE001 —— 起切换失败只提示,不阻断本次运行

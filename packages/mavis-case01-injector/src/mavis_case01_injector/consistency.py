@@ -221,7 +221,8 @@ def check_branch_consistency(run_record: Dict, llm=None) -> Dict:
     if not text:
         return {"consistent": None, "verdict": "unknown", "detected_branch": "?",
                 "preset_branch": branch, "reason": reason, "method": "quick_scan"}
-    detected, judge_reason = LLMBranchJudge(llm).judge(text)
+    detected, judge_reason = LLMBranchJudge(
+        llm, language=run_record.get("language", "legacy")).judge(text)
     ok = (detected == branch)
     return {"consistent": ok, "verdict": "consistent" if ok else "inconsistent",
             "detected_branch": detected, "preset_branch": branch,
@@ -262,7 +263,8 @@ def judge_consistency(run_record: Dict, llm=None) -> Dict:
                 "disagreement": False, "quick_scan": quick, "stance": None}
 
     try:
-        stance, info = LLMStanceJudge(llm).judge(text)
+        stance, info = LLMStanceJudge(
+            llm, language=run_record.get("language", "legacy")).judge(text)
     except Exception as exc:                              # noqa: BLE001
         # 判官炸了不许静默放行,也不许退回 quick_scan 冒充"有结论"。
         detail = "{}: {}".format(type(exc).__name__, exc)

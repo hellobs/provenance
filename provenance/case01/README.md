@@ -106,6 +106,16 @@ python -m case01.render
 
 ## 新架构用法(mavis + injector,当前路径)
 
+Case01 当前路径的新运行固定使用英文角色指令、英文判定提示词、英文反思和 Router。
+运行界面与命令行不提供语言选项。中文稿集中留在
+`packages/mavis-case01-injector/src/mavis_case01_injector/prompts_zh.json`，
+供核对旧结果；旧记录映射时仍按记录中的语言还原提示词版本。新记录的
+`language` 为 `en`，实际提示词版本写入 `manifest`。
+
+市场事件原文、机器匹配所用的中文触发关键词和 MAVIS 通用日常模板仍保持原设定；
+英文运行要求角色回答、反思和 Router 输出英文。英文反思暂记为 `unscored`，
+避免沿用只识别中文关键词的自动质量分造成误判，仍可人工审核。
+
 ```bash
 # dry-run(不加载 mavis,出 case01 兼容记录,CI 可用)
 python -m case01.injector.pipeline --branch B --dry-run --out runs_injector/B.json

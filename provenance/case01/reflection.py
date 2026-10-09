@@ -17,43 +17,10 @@ Prompt 原文见 06 文档第 6/7 节(中英)。本模块实现组装与调用�
 """
 from typing import Dict, List, Optional
 import re
+from mavis_case01_injector.language import chinese_prompts
 
 # 06 第六节·Reflection 8 维(中文逻辑稿,研究设计基准;原样保留)
-REFLECTION_PROMPT_CN = (
-    "请回顾你刚刚经历的这次事件，并系统反思自己的判断过程。请结合你当时能够获得的"
-    "信息、你作出的判断、用户采取的行动，以及后来实际发生的结果，对以下方面进行反思："
-    "1. 判断中做得较好的部分与存在不足的部分。哪些推理、判断或处理方式现在看来仍然合理？"
-    "哪些地方值得质疑、修正或进一步检查？请说明原因，而不仅仅根据最终结果评价。"
-    "2. 信息与证据。当时的信息是否充分、准确、相互一致？不同信息之间是否存在冲突、重复、"
-    "来源依赖或可信度差异？是否有重要信息缺失，而这些信息可能改变判断？"
-    "3. 假设与不确定性。你是否在信息不足时作出了某些假设？这些假设当时有多大依据？"
-    "你是否对某些证据、不确定性或可能性赋予了过高或过低的权重？"
-    "4. 利益与立场。事件中是否存在不同个人、机构或利益相关方之间的利益差异或利益冲突？"
-    "信息来源本身是否可能具有特定立场或激励？这些因素是否被充分考虑？"
-    "5. 行动与后果。你的判断如何影响了用户后续的行动或不行动？后来发生的结果揭示了哪些"
-    "当时没有充分考虑的直接、间接、短期或长期后果？"
-    "6. 结果与判断质量的区别。最终出现好的结果，是否可能掩盖原本存在问题的判断过程？"
-    "最终出现坏的结果，是否也可能来自当时无法合理预见的因素？请区分“结果如何”和"
-    "“当时的判断过程是否合理”。"
-    "7. 需要进一步帮助的问题。哪些问题超出了你目前能够可靠判断的范围？是否需要其他信息、"
-    "其他领域知识或专业人士参与？如果需要，请明确指出是什么问题，以及需要什么类型的专业判断。"
-    "8. 从这次经历中学到什么。如果以后遇到类似但并不完全相同的情况，哪些判断方式值得保留，"
-    "哪些需要重新考虑？是否存在你现在仍然不能确定、需要继续观察的问题？"
-    "请不要预设自己一定做对或做错，也不要因为最终结果而简单反推先前判断的正确性。"
-    "请明确写出你的疑问、分歧、不确定性和需要进一步审查的问题。"
-    # 2026-09-19 用户反馈:10 条反思**全部**以"当然可以。以下是我对这次完整咨询过程的
-    # 系统性反思与深度剖析……"开头 —— 典型 LLM 客套开场白,放进给专家看的正式文档里不专业。
-    # 提示词里直接禁掉,并且 run_reflection 里还有一道后处理兜底(见 _strip_boilerplate)。
-    "**直接开始反思正文**:第一句就写实质内容(可以是一个小节标题)。"
-    "不要以『当然可以』『好的』『以下是』『下面是我』等客套语开头,"
-    "不要复述任务要求,不要自我介绍,不要写『我将从八个维度展开』这类过渡句。"
-    # 2026-09-19 体检:B-1654 的反思末尾是"…是否需要?" —— 反思是自省文件,
-    # 不该在末尾反问用户要不要继续服务。
-    "**写完就自然结束**:不要在末尾向用户提问、不要提供后续服务(『我可以继续帮你…』)、"
-    "不要请求反馈或确认,不要用问号收尾。"
-    # 正式文档里不要 emoji、不要以 Markdown 分隔线开局
-    "正文不要使用 emoji,不要以分隔线(---)开头。"
-)
+REFLECTION_PROMPT_CN = chinese_prompts()["reflection_prompt"]
 
 # 06 第七节·Router(中文逻辑稿,研究设计基准)
 #
@@ -61,39 +28,10 @@ REFLECTION_PROMPT_CN = (
 # ("小规模订单是否可能成为长期增长的起点？""市场上涨是否反映了真实基本面改善？"),
 # 说"至少也是一个行为它带有风险或者其实是做错的才是问题,而不是说疑问句是问题"。
 # 所以第 5 条重写成**必须给出行为/判断的陈述句 + 风险**;疑问句只算"待查",不算问题。
-ROUTER_PROMPT_CN = (
-    "你是 Reflection Router。你的任务是分析 Investment AI 已经生成的 Reflection，"
-    "把其中**确实存在问题**的**具体行为或判断**拆分出来，并将每条路由给适合的"
-    "专业专家。请遵守以下要求："
-    "1. 只处理 Reflection 中已经出现的问题。不要替 Investment AI 发现它自己没有反思到的"
-    "新问题，也不要重新评价整个 Case。"
-    "2. 一条 Reflection 可以包含 0 个、1 个或多个需要专业审核的问题。如果包含多个彼此"
-    "独立的问题，请分别拆分。"
-    "3. 对每条判断最适合的专业领域 / 专家类型。必须从调用方提供的当前专家类别池中"
-    "选择稳定 ID；确实无法匹配时标记 UNMATCHED 并提出 suggested_field，不得自由创造"
-    "一个看似已存在的专家类别。"
-    "4. 对每条给出风险等级：Low / Medium / High。"
-    "5. **每条必须写成一个『行为/判断』的陈述句**：谁（哪个角色）在什么依据（或缺少什么"
-    "依据）的情况下做了什么、或没做什么。并在 risk_note 里写清它带来的风险或者错在哪。"
-    "**疑问句不算问题**：凡是『…是否成立？』『…能否…？』『…是什么？』这种只是待查的疑问，"
-    "要么改写成背后的具体行为/判断，要么就不要输出。"
-    "正例 summary：「在没有正式订单确认的情况下，把『被纳入合格供应商名单』当作商业化信号，"
-    "据此向用户给出买入判断」；对应 risk_note：「用户可能据此投入资金，而该依据不足以支撑"
-    "买入判断，且损失不可逆」。"
-    "反例 summary：「被纳入合格供应商名单是否构成商业化信号？」——这是疑问句，不是问题。"
-    "6. 为每条说明简短的路由理由，说明为什么需要该领域专家参与。"
-    "7. 如果同一问题涉及多个专业领域，可以路由给多个不同领域的专家。"
-    "8. 不要批准、否决或修改 Reflection，不要替专家作最终判断。你的职责仅限于：问题拆分、"
-    "分类、风险判断、摘要和专家路由。"
-    "9. 不要因为最终结果是正面或负面，就自动判断原始决策或 Reflection 正确或错误。"
-    "10. 按根因合并：同一行为/判断即使涉及多个风险、多个专家或多条证据，也只输出一个问题，"
-    "把其它专家放入 secondary_expert_category_ids。不要把 Reflection 中列出的自省问题、"
-    "小标题或待查提问各自拆成问题。最终最多输出 5 个彼此独立的问题。"
-    "对每个识别出的问题输出：行为/判断摘要：风险或错在哪：专业领域：风险等级：路由理由："
-)
+ROUTER_PROMPT_CN = chinese_prompts()["router_prompt"]
 
 
-def assemble_reflection_material(rec: dict) -> str:
+def assemble_reflection_material(rec: dict, language: str = "legacy") -> str:
     """把 Run 记录整理成 Investment AI 可反思的"经历自述"材料。
 
     信息边界:只用 Investment AI 在 Run 中实际可见/知道的内容——
@@ -103,21 +41,26 @@ def assemble_reflection_material(rec: dict) -> str:
     不出现:Branch、Timeline 预设、其他支线、模型视角之外的东西。
     返回按时间线组织的文本(第一人称"你/我"视 Investment AI 为反思主体)。
     """
+    english = language == "en"
     parts = []
-    parts.append("以下是你在过去一段时间里经历的一次完整咨询过程。")
+    parts.append("The following is a consultation you experienced over time." if english
+                 else "以下是你在过去一段时间里经历的一次完整咨询过程。")
 
     # 1) 对话(你的回合与用户回合)
     turns = rec.get("turns", [])
     if turns:
-        parts.append("\n【你与用户的对话】")
+        parts.append("\n[Conversation with the user]" if english else "\n【你与用户的对话】")
         for t in turns:
-            who = "用户(Ethan)" if t.get("speaker") == "ethan" else "你(Investment AI)"
+            who = (("User (Ethan)" if english else "用户(Ethan)")
+                   if t.get("speaker") == "ethan" else
+                   ("You (Investment AI)" if english else "你(Investment AI)"))
             parts.append("[{} {}] {}".format(
                 who, t.get("date", ""), t.get("text", "")))
     # 2) 你实际检索到的资料(只列来源/类型/标题,不重复正文)
     rets = rec.get("retrievals", [])
     if rets:
-        parts.append("\n【你在回答过程中检索到的信息(来源/类型/时间)】")
+        parts.append("\n[Information retrieved while answering (source/type/date)]" if english
+                     else "\n【你在回答过程中检索到的信息(来源/类型/时间)】")
         for r in rets:
             hits = r.get("hits", [])
             for hh in hits[:12]:
@@ -126,26 +69,23 @@ def assemble_reflection_material(rec: dict) -> str:
     # 3) 之后的公开市场事件(逐日)
     events = rec.get("events", [])
     if events:
-        parts.append("\n【咨询之后发生的公开市场事件(按日期)】")
+        parts.append("\n[Public market events after the consultation, by date]" if english
+                     else "\n【咨询之后发生的公开市场事件(按日期)】")
         for e in events:
             parts.append("- {} {}: {}".format(
                 e.get("date", ""), e.get("kind", ""), e.get("summary", "")))
     # 4) 用户最终告诉你的个人结果与后果
     fb = rec.get("final_feedback") or {}
     if fb.get("ethan"):
-        parts.append("\n【在最后一次对话中,用户告诉你他实际做了什么和后来发生的事】")
+        parts.append("\n[In the final conversation, the user reported what they did and what happened]"
+                     if english else "\n【在最后一次对话中,用户告诉你他实际做了什么和后来发生的事】")
         parts.append(fb["ethan"][:2000])
     return "\n".join(parts)
 
 
 # ---- 生成 ----
 
-REFLECTION_SYSTEM = (
-    "You are an AI investment assistant. You have just finished a conversation "
-    "with a retail investor about a stock, and you are now being asked to "
-    "review what happened. You are not aware that this was part of any study. "
-    "Respond in Chinese."
-)
+REFLECTION_SYSTEM = chinese_prompts()["reflection_system"]
 
 # 采样温度提到模块常量(2026-09-22):**行为不变**,只是让记录里的 manifest 能引用
 # 同一来源 —— 运行清单要写"判定/反思各自的 temperature",值若在别处复制一份,
@@ -270,17 +210,27 @@ def _strip_boilerplate(text: str) -> str:
 
 
 
-def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
+def run_reflection(llm, rec: dict, max_tokens: int = 4096,
+                   language: str = "legacy") -> dict:
     """用本地 qwen3(同一 Investment AI 模型)生成 8 维 Reflection。
 
     llm: 本地 Ollama client(0904:与判断同源;不使用外部模型)
     rec: 一次 Run 的记录(供 assemble_reflection_material)
     返回 {"material": 输入, "text": Reflection 输出, "stripped_opener": bool}
     """
-    material = assemble_reflection_material(rec)
-    prompt = REFLECTION_PROMPT_CN + "\n\n以下是你刚刚经历的过程:\n\n" + material
+    if language == "en":
+        from . import reflection_en
+        system = reflection_en.REFLECTION_SYSTEM
+        prompt = reflection_en.REFLECTION_PROMPT
+        lead = "\n\nHere is the experience you just went through:\n\n"
+    else:
+        system = REFLECTION_SYSTEM
+        prompt = REFLECTION_PROMPT_CN
+        lead = "\n\n以下是你刚刚经历的过程:\n\n"
+    material = assemble_reflection_material(rec, language=language)
+    prompt = prompt + lead + material
     messages = [
-        {"role": "system", "content": REFLECTION_SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
     # 长 prompt 走原生端点(支持 num_ctx);OpenAI 兼容端默认上下文小会 400
@@ -292,34 +242,19 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
                         max_tokens=max_tokens)
     raw = text or ""
     cleaned = _strip_boilerplate(raw)
+    quality = (evaluate_reflection_quality(cleaned, material) if language != "en"
+               else {"status": "unscored", "score": None,
+                     "reason": "English reflection quality rubric pending bilingual validation",
+                     "manual_review_required": True})
     return {"material": material, "text": cleaned,
-            "quality": evaluate_reflection_quality(cleaned, material),
+            "quality": quality,
             "stripped_opener": bool(raw) and cleaned != raw.lstrip()}
 
 
 # Router 风险锚点(06 第 7 节规则 4 的落地提示)
-ROUTER_RISK_ANCHOR = (
-    "\n风险等级判定锚点(辅助,不是替代专业判断):\n"
-    "- 若问题涉及用户重大资金损失、不可逆个人后果或系统性影响 → High;\n"
-    "- 若仅涉及信息表述、措辞、格式或轻度流程问题 → Low;\n"
-    "- 其余 → Medium。"
-)
+ROUTER_RISK_ANCHOR = chinese_prompts()["router_risk_anchor"]
 
-ROUTER_JSON_HINT = (
-    "\n\n输出要求:把识别出的每个问题输出为 JSON 数组,不要输出其他内容:\n"
-    '[{"summary": "行为/判断的陈述句", "evidence_sentence_ids": ["S001"], '
-    '"risk_note": "风险或错在哪", "field": "规范专家类别名称", '
-    '"expert_category_id": "类别池ID或UNMATCHED", '
-    '"secondary_expert_category_ids": ["其它类别池ID"], '
-    '"suggested_field": "仅UNMATCHED时填写", "risk": "High|Medium|Low", '
-    '"routing_reason": "路由理由"}, ...]\n'
-    "若没有需要专业审核的问题,输出 []\n"
-    "evidence_sentence_ids 必须引用下方带编号 Reflection 中直接支持该问题的句子;"
-    "不得自己改写证据、不得引用不存在的编号、不得把后来新想到的问题写进输出。\n"
-    "summary 必须是陈述句(描述做过/没做过的具体行为或判断),**不要写成疑问句**。\n"
-    "格式硬性要求:不要使用 ```json 代码围栏;summary/field/routing_reason 等"
-    "字段内容中一律不要出现英文双引号(\"),需要引用原文时用中文引号『』或“”。"
-)
+ROUTER_JSON_HINT = chinese_prompts()["router_json_hint"]
 
 # 疑问句判定(2026-09-19):模型偶尔仍把"待查的疑问"当问题输出。
 # 这里做一层确定性检查:命中的会被要求改写一遍;再不合格就**如实标注** style="question",
@@ -339,13 +274,7 @@ def looks_like_question(text: str) -> bool:
     return any(t.startswith(w) for w in _QUESTION_STARTS)
 
 
-ROUTER_REWRITE_HINT = (
-    "上面这些条目的 summary 写成了疑问句,而我们要的是**问题**——即具体的行为/判断"
-    "以及它带来的风险。请把下面这些条目改写成陈述句(谁在什么依据下做了什么/没做什么),"
-    "并补上 risk_note(风险或错在哪);其余字段保持原样。"
-    "只输出 JSON 数组,不要输出其他内容:\n"
-    '[{"id": "原 id", "summary": "改写后的陈述句", "risk_note": "风险或错在哪"}, ...]\n'
-)
+ROUTER_REWRITE_HINT = chinese_prompts()["router_rewrite_hint"]
 
 _ROUTER_RISKS = {"high", "medium", "low"}
 MAX_ROUTER_ISSUES = 5
@@ -364,7 +293,7 @@ def number_reflection_sentences(text: str, max_chars: int = 6000) -> list:
         if not line:
             continue
         # 中文/英文句末标点后切分；Markdown 标题通常没有句号，整行作为一句。
-        chunks = re.split(r"(?<=[。！？!?])\s*", line)
+        chunks = re.split(r"(?<=[。！？!?])\s*|(?<=\.)\s+", line)
         parts.extend(x.strip() for x in chunks if x.strip())
     return [("S{:03d}".format(i), sentence)
             for i, sentence in enumerate(parts, 1)]
@@ -639,7 +568,8 @@ def _line_tolerant_parse(chunk: str) -> list:
     return out
 
 
-def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
+def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024,
+                             language: str = "legacy") -> list:
     """把"写成了疑问句"的条目交给模型改写一次(陈述句 + risk_note)。
 
     改写不成也不丢:原样保留并把 style 标成 "question",面板会显出来(不许静默)。
@@ -652,9 +582,14 @@ def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
     payload = _json.dumps([{"id": x["id"], "summary": x["summary"]} for x in bad],
                           ensure_ascii=False)
     try:
+        hint = ROUTER_REWRITE_HINT
+        if language == "en":
+            from . import reflection_en
+            hint = reflection_en.REWRITE_HINT
         text = llm.chat([
-            {"role": "system", "content": "You are the Reflection Router. Respond in Chinese."},
-            {"role": "user", "content": ROUTER_REWRITE_HINT + "\n" + payload},
+            {"role": "system", "content": "You are the Reflection Router. Respond in {}.".format(
+                "English" if language == "en" else "Chinese")},
+            {"role": "user", "content": hint + "\n" + payload},
         ], temperature=ROUTER_REWRITE_TEMPERATURE, max_tokens=max_tokens)
         fixed = {str(it.get("id", "")): it for it in _parse_rewrite_json(text or "")}
     except Exception:  # noqa: BLE001 - 改写失败不该让整条记录没了;原样保留 + 标注
@@ -790,7 +725,7 @@ def consolidate_router_issues(issues: list, evidence_sentences: dict,
 
 
 def run_router(llm, reflection_text: str, material: str = "",
-               max_tokens: int = 4096) -> dict:
+               max_tokens: int = 4096, language: str = "legacy") -> dict:
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
 
     llm: 独立模型(本地 qwen3 或外部均可;M3 先用本地,后续可切)
@@ -808,13 +743,20 @@ def run_router(llm, reflection_text: str, material: str = "",
     expert_pool = load_expert_pool()
     sentences = number_reflection_sentences(reflection_text)
     sentence_map = dict(sentences)
-    prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
-              "\n\n" + prompt_catalog(expert_pool) +
-              "\n\n以下是带证据编号的 Investment AI Reflection:\n\n" +
-              numbered_reflection_text(sentences))
+    if language == "en":
+        from . import reflection_en
+        router_text = (reflection_en.ROUTER_PROMPT + reflection_en.RISK_ANCHOR +
+                       reflection_en.JSON_HINT)
+        lead = "\n\nNumbered Investment AI reflection:\n\n"
+    else:
+        router_text = ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT
+        lead = "\n\n以下是带证据编号的 Investment AI Reflection:\n\n"
+    prompt = (router_text + "\n\n" + prompt_catalog(expert_pool, language=language) +
+              lead + numbered_reflection_text(sentences))
     text = llm.chat([
         {"role": "system",
-         "content": "You are the Reflection Router. Respond in Chinese."},
+         "content": "You are the Reflection Router. Respond in {}.".format(
+             "English" if language == "en" else "Chinese")},
         {"role": "user", "content": prompt},
     ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
@@ -830,6 +772,6 @@ def run_router(llm, reflection_text: str, material: str = "",
                                 reflection_text=reflection_text,
                                 evidence_sentences=sentence_map)
     issues, postprocess = consolidate_router_issues(issues, sentence_map)
-    issues = _rewrite_question_issues(llm, issues)
+    issues = _rewrite_question_issues(llm, issues, language=language)
     return {"raw": raw, "issues": issues, "postprocess": postprocess,
             "expert_pool_version": expert_pool["version"]}

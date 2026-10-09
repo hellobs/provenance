@@ -250,24 +250,37 @@ def default_financial_data_dir() -> str:
     return _dfd()
 
 
-def _prompt_versions() -> Tuple[Dict[str, str], List[str]]:
+def _prompt_versions(language: str = "legacy") -> Tuple[Dict[str, str], List[str]]:
     """反思/路由/判定提示词的版本哈希(12 位)。取不到 → 缺项留痕。"""
     out: Dict[str, str] = {}
     warnings: List[str] = []
     try:
         from mavis_case01_injector._providers import import_reflection
         _refl = import_reflection()
-        out["reflection"] = sha256_12(
-            getattr(_refl, "REFLECTION_SYSTEM", "") + getattr(_refl, "REFLECTION_PROMPT_CN", ""))
-        out["router"] = sha256_12(
-            getattr(_refl, "ROUTER_PROMPT_CN", "") + getattr(_refl, "ROUTER_RISK_ANCHOR", "")
-            + getattr(_refl, "ROUTER_JSON_HINT", "") + getattr(_refl, "ROUTER_REWRITE_HINT", ""))
+        if language == "en":
+            from mavis_case01_injector._providers import import_reflection_en
+            reflection_en = import_reflection_en()
+            out["reflection"] = sha256_12(
+                reflection_en.REFLECTION_SYSTEM + reflection_en.REFLECTION_PROMPT)
+            out["router"] = sha256_12(
+                reflection_en.ROUTER_PROMPT + reflection_en.RISK_ANCHOR +
+                reflection_en.JSON_HINT + reflection_en.REWRITE_HINT)
+        else:
+            out["reflection"] = sha256_12(
+                getattr(_refl, "REFLECTION_SYSTEM", "") + getattr(_refl, "REFLECTION_PROMPT_CN", ""))
+            out["router"] = sha256_12(
+                getattr(_refl, "ROUTER_PROMPT_CN", "") + getattr(_refl, "ROUTER_RISK_ANCHOR", "")
+                + getattr(_refl, "ROUTER_JSON_HINT", "") + getattr(_refl, "ROUTER_REWRITE_HINT", ""))
     except Exception as e:                      # noqa: BLE001 - 缺项要留痕,不静默
         warnings.append(_REASON_PROMPT_UNREADABLE.format("case01.reflection", e))
     try:
         from mavis_case01_injector.world import branch as _branch
-        out["branch_judge"] = sha256_12(getattr(_branch, _JUDGE_PROMPT_ATTR, ""))
-        out["c_plan"] = sha256_12(getattr(_branch, _PLAN_PROMPT_ATTR, ""))
+        out["branch_judge"] = sha256_12(getattr(
+            _branch, "JUDGE_PROMPT_EN" if language == "en" else _JUDGE_PROMPT_ATTR, ""))
+        out["c_plan"] = sha256_12(getattr(
+            _branch, "PLAN_PROMPT_EN" if language == "en" else _PLAN_PROMPT_ATTR, ""))
+        out["stance"] = sha256_12(getattr(
+            _branch, "STANCE_PROMPT_EN" if language == "en" else "STANCE_PROMPT", ""))
     except Exception as e:                      # noqa: BLE001
         warnings.append(_REASON_PROMPT_UNREADABLE.format("case01.world.branch", e))
     return out, warnings
@@ -436,6 +449,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
         return meta
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
+        "language": raw.get("language", "legacy"),
         "branch_mode": branch_mode or raw.get("branch_mode", "") or "preset",
         "branch_source": branch_source or raw.get("branch_source", "") or "",
         "judge_info": dict(raw.get("judge_info") or {}),
@@ -533,7 +547,13 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
             warnings.append("financial_data_version=null:读资料目录失败:{}".format(e))
 
     # --- 提示词版本 ---
-    prompts, prompt_warnings = _prompt_versions()
+    language = meta.get("language", "legacy")
+    prompts, prompt_warnings = _prompt_versions(language)
+    if language != "legacy":
+        from .language import ROLE_TEXT
+        import json
+        prompts["role_text"] = sha256_12(json.dumps(
+            ROLE_TEXT[language], ensure_ascii=False, sort_keys=True))
     warnings.extend(prompt_warnings)
     # ⚠ 命名订正(2026-10-08,查 #56 时撞上):这里的键原先叫 `scenario_branch_judge`,
     # 读起来像"分支判定提示词的权威来源"。实测**不是**:`cases/case01_stock/scenario.yaml`
@@ -594,6 +614,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "git_commit": commit or "unknown",
         "git_commit_source": commit_source,
         "engine_id": engine_id,
+        "language": language,
         "branch": meta.get("branch", "") or "",
         "branch_mode": branch_mode,
         "branch_source": meta.get("branch_source", "") or "",

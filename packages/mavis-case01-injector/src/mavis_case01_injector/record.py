@@ -205,6 +205,7 @@ def to_case01_record(record: dict, branch: str = "",
         # 新增段：injector 的原始节点记录（平台按需读取,不影响既有解析）
         "injector": {
             "schema_version": record.get("schema_version", ""),
+            "language": record.get("language", "legacy"),
             "mode": record.get("mode", ""),
             "roles": record.get("roles", []),
             "scenario_dir": record.get("scenario_dir", ""),

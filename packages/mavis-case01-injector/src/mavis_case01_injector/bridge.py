@@ -70,6 +70,7 @@ class MavisBridge:
         judge_llm: Optional[object] = None,
         backend_kind: str = "",
         think_workers: int = 0,
+        language: str = "en",
     ):
         self.nodes = list(nodes or [])
         # 调用方给的序列长度就是它要的步数(冒烟/收时间窗用的截断也在这里)。
@@ -83,6 +84,8 @@ class MavisBridge:
         # 设成 1 才让"同一个种子"落到同一个角色的同一次抽样上。
         self.think_workers = max(0, int(think_workers or 0))
         self.scenario_dir = scenario_dir
+        from .language import check_language
+        self.language = check_language(language)
         self.run_id = run_id
         self.max_retries = int(max_retries)
         self.dry_run = bool(dry_run)
@@ -319,7 +322,7 @@ class MavisBridge:
 
         llm = self._judge_client()
         try:
-            detected, info = LLMBranchJudge(llm).judge(answer)
+            detected, info = LLMBranchJudge(llm, language=self.language).judge(answer)
         except Exception as e:  # noqa: BLE001 - 判定失败也要留痕,不静默
             detected = "undetermined"
             info = {"branch": detected, "reason": "judge failed: {}".format(e),
@@ -388,12 +391,13 @@ class MavisBridge:
         """
         from .manifest import collect_run_meta
 
-        key = (self.branch, self.branch_mode, self.branch_source,
+        key = (self.branch, self.branch_mode, self.branch_source, self.language,
                repr(self.judge_info))
         cached = self._manifest_meta_cache
         if cached and cached[0] == key:
             return dict(cached[1])
         raw = {"branch": self.branch, "branch_mode": self.branch_mode,
+               "language": self.language,
                "branch_source": self.branch_source, "judge_info": dict(self.judge_info),
                "mode": "dry-run" if self.dry_run else "mavis"}
         # 小镇这一局的对话/反思走的是挂在各 agent 上的 `Case01SafeProvider`,把它们
@@ -421,6 +425,7 @@ class MavisBridge:
         """本次运行的记录（schema 版本化,便于与 case01 run.json 对齐）。"""
         return {
             "schema_version": "injector-0.1",
+            "language": self.language,
             "run_id": self.run_id,
             "mode": "dry-run" if self.dry_run else "mavis",
             "branch": self.branch,
@@ -497,6 +502,8 @@ class MavisBridge:
             start_time=self._start_time(), stride=0, agents=list(self.roles),
             config_path=config_path, assets_root="",
         )
+        from .language import apply_role_text
+        apply_role_text(config, self.roles, self.language)
         self._apply_local_provider(config)
         self._apply_ethan_provider(config)
         # 存档目录默认落在场景内,避免污染仓库根目录
@@ -853,7 +860,7 @@ class MavisBridge:
 
                 llm = local_client_from_env()
             try:
-                plan = ConditionPlanParser(llm).parse(ai_answer)
+                plan = ConditionPlanParser(llm, language=self.language).parse(ai_answer)
                 plan.setdefault("source", "T0")
             except Exception as e:
                 if self.game is not None:
