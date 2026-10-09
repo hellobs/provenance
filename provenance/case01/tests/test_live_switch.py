@@ -160,8 +160,20 @@ def test_procs_by_cmdline_folds_trampoline_on_both_platforms(monkeypatch):
 
 def test_real_netstat_parsing_does_not_raise():
     """真调本平台的端口工具:在中文 Windows 上是 netstat(那条崩溃点本身),在 Linux/macOS
-    上是 ss/lsof/netstat。断言只到"拿到集合"为止 —— 真机上有没有人监听不该由测试决定。"""
+    上是 ss/lsof/netstat。断言只到"拿到集合"为止 —— 真机上有没有人监听不该由测试决定。
+
+    但**必须先确认本平台真有工具可调**:三个都没有时 `_pids_by_port` 只会返回空集,这条
+    测试就什么都没测到(CI 跑 ubuntu,这正是 POSIX 分支唯一的真机覆盖点,不能是假绿)。
+    """
+    import shutil
+
+    import live_switch
     from live_switch import _pids_by_port
+
+    if not live_switch.IS_WIN:
+        have = [t for t in ("ss", "lsof", "netstat") if shutil.which(t)]
+        assert have, ("POSIX 上 ss/lsof/netstat 一个都没有 ⇒ 下面两条断言只证明了"
+                      "'空集不崩',端口链什么都没测;补一句 skip 或装 iproute2/lsof/net-tools")
 
     assert isinstance(_pids_by_port(5010), set)
     assert isinstance(_pids_by_port(1), set)
