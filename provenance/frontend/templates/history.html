@@ -119,6 +119,12 @@
     return d.innerHTML;
   }
 
+  /* briefCard 里那句占位符的**唯一**写法。详情读失败时要把它换成红字,
+     两边必须是同一个串 —— 此前失败路径抄了一份 `margin-top:12px`(没有 class="hint"),
+     与真实占位符不相等 ⇒ replace 永远不命中,读失败就**一直显示"加载详情中…"**,
+     错误消息算出来了却扔掉。 */
+  var LOADING = '<div class="hint" style="margin-top:14px;">加载详情中…</div>';
+
   function labelTxt(source) {
     return source === "review" ? "成品 run" : source === "checkpoint" ? "运行时痕迹" : "压缩成品";
   }
@@ -160,6 +166,14 @@
     }
     var extra = "";
     if (r.error) extra = '<div class="hint" style="color:#9b2c2c;">' + esc(r.error) + '</div>';
+    // 质检三行取的是**列表面**的字段(下面 briefCard 的入参 r 就是 /api/runs 的一条行)。
+    // 详情面 /api/run-detail 默认专家安全白名单,branch/quality 一律没有 ——
+    // 所以这些只能从行里拿,拿不到要说"本行不带这个键",不许显示成空白
+    // (空白读起来像"这条没有分支",而真相是"这一类行压根不给这个字段")。
+    var hasManifest = Object.prototype.hasOwnProperty.call(r, "manifest_status");
+    var manifestTxt = hasManifest
+      ? esc(r.manifest_status) + " (警告 " + esc(r.manifest_warning_count) + " 条)"
+      : "本行不带该键(case00 痕迹/压缩成品/读不出的行)";
     var h = '<div class="card-pad">' +
       '<span class="tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
       '<span class="tag">' + esc(r.case_name || r.case_id || "—") + '</span>' +
@@ -167,12 +181,17 @@
       row("场景", esc(r.case_name || r.case_id || "—")) +
       row("运行方式", esc(r.engine_name || r.engine_id || "—")) +
       row("分支", esc(r.branch || "—")) +
+      row("质检标记", esc(r.quality || "—") +
+          (r.quality && r.reason ? ' <span class="hint">' + esc(r.reason) + '</span>' : "")) +
+      row("一致性", esc(r.consistency || "—") +
+          (r.branch_source ? ' <span class="hint">分支来源 ' + esc(r.branch_source) + '</span>' : "")) +
+      row("复现指纹", manifestTxt) +
       row("开始时间", esc(r.start_date || "—")) +
       row("结束时间", esc(r.end_date || "—")) +
       row("对话轮次", esc(r.n_turns != null ? r.n_turns : "—")) +
       row("反思条数", esc(r.n_reflections != null ? r.n_reflections : "—")) +
       row("数据完整性", r.has_graph ? "完整" : "—") +
-      '<div class="hint" style="margin-top:14px;">加载详情中…</div>' +
+      LOADING +
       '</div>';
     return h;
   }
@@ -191,9 +210,8 @@
       .then(function (res) {
         if (!res.ok || !res.j.ok) {
           var msg = (res.j && res.j.errors && res.j.errors[0]) ? res.j.errors[0] : "读详情失败";
-          document.querySelector("#explore-detail .alert-warning, #explore-detail div:last-of-type");
           detail.innerHTML = briefCard(r).replace(
-            '<div style=\"margin-top:12px;\">加载详情中…</div>',
+            LOADING,
             '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">' + esc(msg) + '</div>');
           return;
         }
@@ -204,7 +222,7 @@
       })
       .catch(function (err) {
         detail.innerHTML = briefCard(r).replace(
-          '<div style=\"margin-top:12px;\">加载详情中…</div>',
+          LOADING,
           '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">详情请求失败: ' +
           esc(String(err && err.message || err)) + '</div>');
       });
@@ -230,7 +248,7 @@
     var inner = "";
     var t = body.turns || [], rt = body.router || {}, rf = body.reflection || {};
     inner += sec("概览", kvRows({
-      "run_id": body.run_id, "branch": body.branch,
+      "run_id": body.run_id, "branch": r.branch,
       "start_date": body.start_date, "end_date": body.end_date,
       "n_turns": t.length, "n_retrievals": (body.retrievals || []).length,
       "n_events": (body.events || []).length,
@@ -264,7 +282,7 @@
       inner += sec("问题分流(" + (rt.issues || []).length + ")", issues);
     }
     detail.innerHTML = briefCard(r).replace(
-      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      LOADING,
       '<div style="margin-top:4px;">' + inner + '</div>');
   }
 
@@ -288,14 +306,14 @@
     }).join("");
     if (shots) inner += sec("倾向/轨迹快照", '<ul style="padding-left:18px; margin:0;">' + shots + '</ul>');
     detail.innerHTML = briefCard(r).replace(
-      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      LOADING,
       '<div style="margin-top:4px;">' + inner + '</div>');
   }
 
   function renderCompressed(body, r) {
     var files = (body.files || []).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join("");
     detail.innerHTML = briefCard(r).replace(
-      '<div class="hint" style="margin-top:14px;">加载详情中…</div>',
+      LOADING,
       '<div style="margin-top:4px;">' +
       '<div class="hint">压缩成品仅保留文件清单,原始运行见对应场景的痕迹/成品。</div>' +
       (files ? sec("内容文件", '<ul style="padding-left:18px; margin:0;">' + files + '</ul>') : '') +
