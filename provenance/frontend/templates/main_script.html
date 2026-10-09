@@ -15,7 +15,7 @@
 
 	// Live mode (direct-drive mode): move agent smoothly on each agent message
 	let live_mode = {{ live_mode|default(false)|tojson }};
-	let FRONTEND_VERSION = "v10-path";   // frontend version (cache-busting)
+	let FRONTEND_VERSION = "v11-idle";   // frontend version (cache-busting)
 	let move_speed = 1.0;             // pixels/frame (60fps) ≈ 1.9 tiles/s, walking feel
 	let movement_target = {};         // agent -> waypoint queue (pixels)
 
@@ -987,12 +987,23 @@
 				} else if (moved_axis === "y") {
 					dir = move_y > 0 ? "d" : "u";
 				} else {
-					// 本帧没推动(被墙卡住):沿用上一帧朝向,别乱翻
 					dir = pre_anims_direction_dict[curr_persona_name] || "d";
 				}
 				pre_anims_direction_dict[curr_persona_name] = dir;
 				let dir_word = dir == "d" ? "down" : dir == "u" ? "up" : dir == "l" ? "left" : "right";
-				curr_persona.anims.play(curr_persona_name + "-" + dir_word + "-walk", true);
+				if (moved_axis === "") {
+					// 本帧两轴都没推进(目标 waypoint 所在格不可通行):**不能播走路动画**。
+					// 原来这里无条件 anims.play,于是位置一动不动、腿却一直在走 ——
+					// 画面就是"一个人停在自己格子上原地踏步"(2026-10-09 用户反馈
+					// "一个人一直在自己格子上走")。改为停在当前朝向的静止帧,
+					// 且只在"从走到停"的那一帧切纹理(避免每帧重设纹理闪烁)。
+					if (curr_persona.anims.isPlaying) {
+						curr_persona.anims.stop();
+						curr_persona.setTexture(curr_persona_name, dir_word);
+					}
+				} else {
+					curr_persona.anims.play(curr_persona_name + "-" + dir_word + "-walk", true);
+				}
 			}
 		}
 
