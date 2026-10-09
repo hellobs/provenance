@@ -68,7 +68,14 @@ def unique_run_id(base: str, roots=None) -> str:
     from case_engine.paths import data_root
 
     if roots is None:
-        roots = (data_root("case01.records"), data_root("case01.raw"))
+        # 撞名检查必须**同时**覆盖"环境变量指的根"和"仓内默认根(含搬迁期老位置回落)":
+        # 只查其一,另一根里已有的同名就会漏判,而本函数存在的理由正是防静默覆盖。
+        # env 未设时前两项相同,由 dict.fromkeys 去掉。
+        roots = tuple(dict.fromkeys([
+            data_root("case01.records", env_var="CASE01_RUNS_ROOT"),
+            data_root("case01.records"),
+            data_root("case01.raw"),
+        ]))
 
     def taken(rid: str) -> bool:
         return any(os.path.isdir(os.path.join(r, rid)) for r in roots)

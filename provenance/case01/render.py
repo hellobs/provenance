@@ -26,7 +26,10 @@ from case_engine.paths import data_root
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 2026-10-08:记录与渲染产物的家挪到仓根 `data/case01/`(搬迁期新优先、老回落并出声)。
-RUNS_DIR = data_root("case01.records")
+# ⚠ `env_var` 不能省:写侧与其余 16 个读取方都认 `CASE01_RUNS_ROOT`,而这里漏传时
+# 本工具**永远只读仓内默认根** —— 交付包按 `run_demo.sh` 把根指到包内 runs/ 时,
+# 渲染出来的其实是仓内那份副本,包内原件根本读不到(2026-10-08 实测被忽略)。
+RUNS_DIR = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 OUT_DIR = data_root("case01.html")
 
 # 长于该字符数的内容块默认折叠

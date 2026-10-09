@@ -18,7 +18,8 @@ from typing import Dict, List, Optional, Tuple
 from case_engine.paths import data_root
 
 # 2026-10-08:成品记录与渲染产物的家挪到仓根 `data/case01/`;搬迁期新位置优先、老位置回落并出声。
-RUNS_DIR = data_root("case01.records")
+# `env_var` 与 `render.py` 同口径:漏传就不认 `CASE01_RUNS_ROOT`,只能读仓内默认根。
+RUNS_DIR = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
 OUT_DIR = os.path.join(data_root("case01.html"), "viz")
 
 RISK_COLOR = {"high": "#c0392b", "medium": "#d68910", "low": "#1e8449"}
