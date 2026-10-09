@@ -180,15 +180,21 @@ def health():
 
 
 @router.get("/api/review/runs")
-def list_runs(safe: int = 0):
+def list_runs(safe: int = 0, include_questionable: int = 0):
     """面板的 run 清单。
 
     `?safe=1`(嵌入面用):不给 branch/branch_summary,并且**默认滤掉质检不合格的记录**
     (questionable/debug/deprecated)——但**不静默**:响应里给 `hidden_count` 与被隐藏的 run_id。
+
+    `?include_questionable=1`:把那层过滤关掉,与 `/api/runs` 同一个参数名、同一套语义。
+    以前这个接口只认 `safe`,平台侧照页面自己那句提示("完整清单见 …include_questionable=1")
+    敲过来会被**静默忽略**:同样带 1,`/api/runs` 给 626 条而这里还是 514 条,于是"演一次
+    质检门在拦"在九块面上根本做不到。关掉过滤不等于漏实验字段 —— 每条仍走
+    `_brief(..., safe=True)` 那套剥离。
     """
     items = [_brief(r, safe=bool(safe)) for r in _discover_runs()]
     hidden = []
-    if safe:
+    if safe and not include_questionable:
         keep = []
         for it in items:
             if str(it.get("quality") or "unverified") in ("questionable", "debug", "deprecated"):
@@ -200,6 +206,8 @@ def list_runs(safe: int = 0):
             "current_run_id": _CURRENT["run_id"],
             "current_note": _CURRENT["note"],
             "runs": items}
+    if safe:
+        body["filter"] = {"include_questionable": bool(include_questionable)}
     if hidden:
         body["hidden_count"] = len(hidden)
         body["hidden"] = hidden
@@ -311,6 +319,14 @@ def get_run(run_id: str, safe: int = 0):
 #   同一个 router_identity() 落 executed_by,那之前映射的小镇记录"跑在字段之前"是真话。
 #   两条相关守卫:case01/tests/test_review_app.py 的棘轮(专家面源码里的机制名只许维持)
 #   与 test_review_panel_probe.py(用 node 探针真跑页面 JS 查深链行为)。
+#   2026-10-09(深链那一格的两种说法):`/embed/review?run=X` 找不到 X 时以前一律说
+#   "不存在",但**被质检门排除的记录是另一种情形**,而且同一份 `/api/review/runs?safe=1`
+#   响应里就带着 `hidden:[{run_id, quality}]` 可以判。实测:`run=demo1015-C`(questionable)
+#   页面说"不存在",而它确实存在于库里、只是默认视图不列 —— 对 10/15 现场这是句会被当场
+#   证伪的话(演示主局 A/C 就是这一类,见 #68)。现在按 hidden 命中与否给两句不同的话。
+#   同批:`/api/review/runs` 以前**只认 safe**,`include_questionable=1` 被 FastAPI 静默丢掉,
+#   于是页面自己那句提示("完整清单见 …include_questionable=1")在本接口上是假指针 ——
+#   敲了参数条数纹丝不动(514)。现在它真的关掉过滤(仍走 `_brief(safe=True)` 剥实验字段)。
 #   2026-10-09(paneAudit):审计页那一格写着"每一步操作的可审计留痕",但列只取 kind 与
 #   summary 两个键,而**不是每个动作都带它们**。实测 583 条记录共 8802 行留痕,其中
 #   **1310 行(15%)类型与摘要两格全空**:set_branch 583(带 branch)、condition_check 351
@@ -972,9 +988,14 @@ async function boot() {
     const hit = d.runs.find(x => x.run_id === WANT_RUN);
     if (hit) { sel.value = WANT_RUN; await pick(WANT_RUN); return; }
     if (live.live && live.run_id === WANT_RUN) { sel.value = LIVE_ID; await loadLive(true); return; }
-    // 深链指定的记录不存在:**页面上说出来**,不许静默回落到另一条
-    PARAM_NOTE = `<div class="note" style="color:#d93025;border-color:#fecaca">` +
-      `深链指定的 run 不存在:${esc(WANT_RUN)};下面是回落的记录。</div>`;
+    // 深链指定的记录不在这份清单里:分清是哪一种,不许静默回落到另一条。
+    const hid = (d.hidden || []).find(x => x.run_id === WANT_RUN);
+    PARAM_NOTE = hid
+      ? `<div class="note" style="color:#b45309;border-color:#fcd9a0">` +
+        `深链指定的 run 被质检门排除(quality=${esc(hid.quality)}),默认视图不列它;` +
+        `要看它请取 /api/runs?include_questionable=1 这条全量清单。下面是回落的记录。</div>`
+      : `<div class="note" style="color:#d93025;border-color:#fecaca">` +
+        `深链指定的 run 不存在:${esc(WANT_RUN)};下面是回落的记录。</div>`;
     LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
   }
   if (live.live) { sel.value = LIVE_ID; await loadLive(true); return; }

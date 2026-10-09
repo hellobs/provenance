@@ -21,7 +21,7 @@
                     (含大标题与"← 回到只读面")。要给平台做嵌入版式,照 `review_app` 那套补,
                     别把这两个地址对外说成两种版式。
 - `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开;除最近若干条外,
-                    「已有 1 份意见、在等第二份」的记录强制进队列并按状态排序,见 `_recent_runs`)
+                    「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)强制进队列并按状态排序,见 `_recent_runs`)
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
 - `/api/expert/decision` 提交一份意见(approve/edit/reject + 自由文本)
 - `/api/expert/marks`   已提交意见的**计数**,不回内容也不回结论(见下)。
@@ -59,10 +59,11 @@ MAX_TEXT_CHARS = 200_000     # 与标记端点同一条上限,超长一律拒
 def _recent_runs(limit: int, must_include=()):
     """取最近落地的若干条记录,**外加必须进队列的那几条**(不受 mtime 窗口影响)。
 
-    为什么要 `must_include`:这函数原本只按 mtime 取最近 N 条,于是"已经有 1 份意见、
-    在等第二份"的记录一变旧就**从队列里消失** —— 而 04 §八 首轮要两份独立意见,
-    第二位专家恰恰就该找这种记录。实测过这个死角:全库唯一一份带任务坐标的意见挂在
-    `batch-261007-212235-sample8b15-009`,它早不在最近 10 条里,面板上看不出任何欠账。
+    为什么要 `must_include`:这函数原本只按 mtime 取最近 N 条,于是**已经有人评过、但记录
+    变旧了的**那些会整条从队列里消失 —— 而 04 §八 要的恰恰是这些:等第二份的那条得有人
+    接着评,评满/评崩的那两条统筹要能回头核对。实测过两次:先是全库唯一一份带任务坐标的
+    意见挂在 `batch-261007-212235-sample8b15-009`(面板上看不出任何欠账),后来它攒够两份
+    之后又因为"只强制 n==1"而从视野里消失。所以强制进来的是**任何有意见的记录**。
 
     排序**按 run.json 的 mtime,不按 run_id 字典序**(实测错过一次):
     run_id 前缀不统一 —— `batch-261007-203649-arm8bC-001` 与 `probe-1003-1217`、
@@ -124,8 +125,10 @@ def expert_queue(limit: int = 10):
         k = (str(rid), str(iid), str(rv.get("expert_category_id") or ""))
         n_by_task[k] = n_by_task.get(k, 0) + 1
         verdicts_by_task.setdefault(k, set()).add(str(m.get("verdict", "")))
-    # 已有 1 份、在等第二份的那些记录必须进队列,哪怕已经不在"最近 N 条"里
-    pending_runs = sorted({k[0] for k, n in n_by_task.items() if n == 1})
+    # 已经有 1 份在等第二份、以及已经评满/评崩的那些记录都必须进队列,哪怕已经不在
+    # "最近 N 条"里:统筹要能回头核对"这个任务真的齐了没",只收 n==1 会让评完的任务
+    # 从视野里整条消失(实测:唯一一份攒够两条的 E4 任务就因为跌出窗口而看不见)。
+    pending_runs = sorted({k[0] for k, n in n_by_task.items() if n >= 1})
 
     pool_rows, pool_at = _pool_rows()
 
@@ -168,9 +171,9 @@ def expert_queue(limit: int = 10):
             "verdict_words": sorted(VERDICT_ALIAS),
             "pool_generated_at": pool_at,
             "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
-                    "除最近 limit 条外,凡「已有 1 份意见、在等第二份」的记录都强制进队列"
-                    "(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > 争议轮 > "
-                    "等第二份 > 待领取 > 首轮已齐 —— 已齐的仍列在队尾(面板不接单,"
+                    "除最近 limit 条外,凡「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)"
+                    "都强制进队列(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > "
+                    "争议轮 > 等第二份 > 待领取 > 首轮已齐 —— 已齐的列在队尾但不隐藏(面板不接单,"
                     "要不要过滤由平台按 state_rank 决定)。"
                     "review_state 是给统筹看的状态词,不含任何一份意见的结论或文本;"
                     "pool 来自上次 lora_prep --export 的产物(generated_at 标明新鲜度),不是实时真值"}
