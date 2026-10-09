@@ -117,12 +117,20 @@ def _probe_git(timeout=5.0):
     rel = os.path.basename(pkg) + "/"
     out = {"git_head": "", "worktree_dirty_paths": -1, "worktree_dirty_code_paths": -1}
     try:
+        # 显式给 encoding/errors(两条都给,同一族调用不留半套):父进程在中文 Windows 上的
+        # 默认解码器是 cp936,而 `git status --porcelain` 在 `core.quotepath=false` 下会把
+        # 中文路径按 UTF-8 原样写出(本仓 docs/ 全是中文名)。严格解码失败时**读线程直接死掉、
+        # stdout 变 None**,下面两条的 .strip()/.splitlines() 抛错又被 except 吞成
+        # `worktree_dirty_paths=-1` —— 跑批照样成功,但"这局用的是哪棵代码树/工作树脏不脏"
+        # 这条复现证据静默变成未知。(git_head 那条本身是纯 ASCII 的 sha,不会坏。)
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root,
-                              capture_output=True, text=True, timeout=timeout)
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout)
         if head.returncode == 0:
             out["git_head"] = head.stdout.strip()[:40]
         st = subprocess.run(["git", "status", "--porcelain"], cwd=root,
-                            capture_output=True, text=True, timeout=timeout)
+                            capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=timeout)
         if st.returncode == 0:
             paths = [line[3:].strip().strip('"') for line in st.stdout.splitlines()
                      if line.strip()]

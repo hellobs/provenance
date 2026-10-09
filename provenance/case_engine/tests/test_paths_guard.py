@@ -112,8 +112,12 @@ def _probe_from(cwd, plat, root):
     code = _CWD_PROBE.format(plat=plat, root=root)
     env = dict(os.environ)
     env.pop("CASE_ENGINE_CASES_ROOT", None)
-    out = subprocess.run([sys.executable, "-c", code], cwd=cwd, env=env,
-                         capture_output=True, text=True, timeout=60)
+    # `-X utf8` + 父进程 encoding="utf-8":两端各自钉死同一个编码。只给一端的写法在
+    # "pytest 被 `-X utf8`/PYTHONUTF8 启起来、而子进程只继承 locale(cp936)"这种组合下会把
+    # subprocess 的读线程打死 ⇒ stdout=None ⇒ 下面 .strip() 报 AttributeError,看不到真错因。
+    out = subprocess.run([sys.executable, "-X", "utf8", "-c", code], cwd=cwd, env=env,
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=60)
     assert out.returncode == 0, out.stderr
     return out.stdout.strip()
 

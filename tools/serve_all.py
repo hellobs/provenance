@@ -193,7 +193,8 @@ def port_owner(port: int) -> int:
             m = re.findall(r"^\s*TCP\s+\S+:%d\s+\S+\s+LISTENING\s+(\d+)\s*$" % port, out, re.M)
             return int(m[0]) if m else 0
         out = subprocess.run(["lsof", "-ti", "tcp:%d" % port, "-s", "TCP:LISTEN"],
-                             capture_output=True, text=True, timeout=25).stdout or ""
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=25).stdout or ""
         for tok in out.split():
             if tok.strip().isdigit():
                 return int(tok)
@@ -365,7 +366,8 @@ def cmdline_of(pid: int) -> str:
             with open(p, "rb") as f:
                 return f.read().decode("utf-8", "replace").replace("\x00", " ").strip()
         out = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True,
-                             text=True, timeout=15).stdout or ""
+                             text=True, encoding="utf-8", errors="replace",
+                             timeout=15).stdout or ""
         return out.strip()
     except (OSError, subprocess.SubprocessError):
         return ""

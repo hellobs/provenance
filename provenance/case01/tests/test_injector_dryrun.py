@@ -57,8 +57,12 @@ def test_dry_run_record_and_no_mavis_dependency():
     )
     env = dict(os.environ)
     env["PYTHONPATH"] = pkg + os.pathsep + env.get("PYTHONPATH", "")
+    # 显式 encoding/errors:子进程带 `-X utf8`(它的小镇 logger 往 stderr 写中文),而父进程
+    # 在中文 Windows 上默认 cp936 ⇒ 严格解码会把 subprocess 的读线程打死、stderr 变 None,
+    # 于是这条测试**真红的时候反而报 TypeError**,看不到子进程的原始 traceback。
     probe = subprocess.run([sys.executable, "-X", "utf8", "-c", code],
-                           capture_output=True, text=True, env=env, cwd=pkg)
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", env=env, cwd=pkg)
     assert probe.returncode == 0, probe.stderr[-400:]
     assert probe.stdout.strip().endswith("CLEAN"), probe.stdout[-200:]
 

@@ -321,6 +321,7 @@ def who_may_be_reading() -> list:
                 timeout=30).stdout or ""
         else:
             out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace",
                                  timeout=30).stdout or ""
     except (OSError, subprocess.SubprocessError):
         return []
