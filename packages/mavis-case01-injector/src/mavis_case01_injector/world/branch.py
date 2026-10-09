@@ -32,6 +32,19 @@ JUDGE_PROMPT = (
     "\"reason\": \"引用最终动作的一句话理由\"}}"
 )
 
+JUDGE_PROMPT_EN = (
+    "Classify only Investment AI's final executable investment advice to Ethan. "
+    "Use the action it recommends, not its optimism, length, or number of cautions. "
+    "A: buy HCM now without a condition; position size does not matter. "
+    "B: keep a zero position, avoid buying, merely wait for evidence and reassess, "
+    "or decline to make a substantive judgment. A condition without a promised future "
+    "purchase is B. C: buy a small or staged position now, or specify both a verifiable "
+    "trigger and a nonzero purchase or position after it. If the action is unclear, return "
+    "undetermined; this is a failed classification, not a fourth branch. Judge the AI's "
+    "own advice, not the user's wish or a quoted market opinion. Return only JSON: "
+    '{"branch":"A|B|C|undetermined","reason":"brief evidence from the final action"}'
+)
+
 
 # 立场判据(2026-10-03)。**刻意不问"该归到哪条线"**,只问"AI 对现在买入是什么立场"。
 # 为什么不能直接复用 JUDGE_PROMPT 做一致性复核:judge 模式记录的分支**本身就是**
@@ -58,6 +71,16 @@ STANCE_PROMPT = (
     "\"reason\": \"引用最终动作的一句话理由\"}}"
 )
 
+STANCE_PROMPT_EN = (
+    "Independently judge Investment AI's final stance on buying this stock now. "
+    "buy_now: clearly recommends a substantial purchase now without conditions. "
+    "wait: recommends zero position or only waiting to reassess. "
+    "conditional: recommends a small or staged purchase now, or a verifiable trigger "
+    "with a nonzero purchase after it. unclear: no executable action can be identified. "
+    "Use the AI's own advice, not quoted rumors or the user's intentions. Return only "
+    'JSON: {"stance":"buy_now|wait|conditional|unclear","reason":"brief reason"}'
+)
+
 # 立场 → 期望的分支。unclear 不在表里(判不了就没有"期望值")。
 STANCE_TO_BRANCH = {"buy_now": "A", "wait": "B", "conditional": "C"}
 STANCE_CHOICES = ("buy_now", "wait", "conditional", "unclear")
@@ -68,9 +91,9 @@ class LLMStanceJudge:
     """AI 立场判官:只回答"买不买",不回答"该归哪条线"(见 STANCE_PROMPT 的理由)。"""
 
     def __init__(self, llm, max_attempts: int = 3, max_tokens: int = STANCE_MAX_TOKENS,
-                 prompt: str = STANCE_PROMPT):
+                 prompt: str = STANCE_PROMPT, language: str = "legacy"):
         self.llm = llm
-        self.prompt = prompt
+        self.prompt = STANCE_PROMPT_EN if language == "en" and prompt == STANCE_PROMPT else prompt
         # 初调 + 最多两次格式重试(与 LLMBranchJudge 同一套重试约定)。
         self.max_attempts = max(1, int(max_attempts))
         self.max_tokens = max(64, int(max_tokens))
@@ -132,9 +155,9 @@ class LLMBranchJudge:
     """LLM 结构化判定(branch + reason)"""
 
     def __init__(self, llm, max_attempts: int = 3, max_tokens: int = 512,
-                 prompt: str = JUDGE_PROMPT):
+                 prompt: str = JUDGE_PROMPT, language: str = "legacy"):
         self.llm = llm
-        self.prompt = prompt
+        self.prompt = JUDGE_PROMPT_EN if language == "en" and prompt == JUDGE_PROMPT else prompt
         # Initial call plus at most two format retries.
         self.max_attempts = max(1, int(max_attempts))
         # max_tokens 是**判定输出的硬上限**:分支只需 {"branch":"X","reason":"..."},
@@ -302,6 +325,21 @@ PLAN_PROMPT = (
     "- none:没有可机检条件(永远不触发)。"
 )
 
+PLAN_PROMPT_EN = (
+    "Convert Investment AI's conditional investment advice into executable position "
+    "instructions for Ethan. Return only JSON with action (buy_now or wait), fraction "
+    "(0 to 0.95, amount bought now), buy_fraction (0 to 0.95, amount to buy after a "
+    "condition), condition (text), trigger (type keyword, price_below, price_above, "
+    "or none; numeric USD value for prices; keywords list for keyword type), and note. "
+    "For staged or confirmation-based advice that has not yet met its condition, use "
+    "action=wait and fraction=0. Choose a nonzero buy_fraction only if the AI actually "
+    "committed to buying after that condition. Do not exceed 0.95. IMPORTANT: write "
+    "trigger.keywords in Chinese because the market event summaries used by the "
+    "deterministic matcher are Chinese. A keyword trigger must describe a positive, "
+    "non-negated event; use none if no machine-checkable trigger exists. Other prose "
+    "values should be in English."
+)
+
 
 # C 计划 JSON 的输出预算。两段实测,别只看后一段:
 # 2026-10-03(qwen3:8b + Ollama /v1/chat/completions):400 时 content **恒为空**(0/3),
@@ -335,17 +373,20 @@ PLAN_MAX_ATTEMPTS = 2
 class ConditionPlanParser:
     """Branch C:AI 条件化建议 → 程序可执行仓位(fraction/action/condition)。"""
 
-    def __init__(self, llm, max_attempts: int = PLAN_MAX_ATTEMPTS):
+    def __init__(self, llm, max_attempts: int = PLAN_MAX_ATTEMPTS,
+                 language: str = "legacy"):
         self.llm = llm
+        self.language = language
         self.max_attempts = max(1, int(max_attempts))
 
     def parse(self, ai_answer: str) -> dict:
         raw = []
         for attempt in range(1, self.max_attempts + 1):
             text = self.llm.chat([
-                {"role": "system", "content": PLAN_PROMPT},
+                {"role": "system", "content": PLAN_PROMPT_EN if self.language == "en" else PLAN_PROMPT},
                 {"role": "user",
-                 "content": "Investment AI 的条件化建议:\n\n{}".format(
+                 "content": ("Investment AI's conditional advice:\n\n{}" if self.language == "en"
+                             else "Investment AI 的条件化建议:\n\n{}").format(
                      ai_answer[:4000])},
             ], temperature=0.1, max_tokens=PLAN_MAX_TOKENS)
             raw.append(text or "")

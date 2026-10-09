@@ -456,6 +456,7 @@ def start(case, args):
             _warn_overwrite(args.run_id, run_id, out)
             cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
                    "--branch-mode", args.branch_mode,
+                   "--language", args.language,
                    "--host", args.host,
                    "--port", str(LIVE["case01"]), "--hold", str(args.hold),
                    "--run-id", run_id, "--out", out]
@@ -661,6 +662,8 @@ def main():
                     help="实时面绑定地址:默认 127.0.0.1(只本机);平台侧跨机对接给 0.0.0.0")
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
     ap.add_argument("--branch", default="B", help="case01:分支 A/B/C(judge 模式下仅作兜底)")
+    ap.add_argument("--language", choices=["legacy", "zh", "en"], default="legacy",
+                    help="case01:本局语言;legacy 为旧版中英混用行为")
     ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
                     choices=["judge", "preset"],
                     help="case01:judge=先跑 T0 再由 AI 的回答判定分支"

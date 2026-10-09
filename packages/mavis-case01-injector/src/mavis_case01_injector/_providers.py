@@ -24,6 +24,15 @@ def import_reflection():
             "裸包用户请经 run_pipeline(reflection_mod=...) 注入等价实现") from e
 
 
+def import_reflection_en():
+    """English reflection prompt source for provenance-backed runs."""
+    try:
+        from case01 import reflection_en
+        return reflection_en
+    except ImportError as e:
+        raise ImportError("English reflection prompts unavailable") from e
+
+
 def import_orchestrator():
     """case01.orchestrator(事实层的价格常量 BUY_PRICE_A 等)。"""
     try:

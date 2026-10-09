@@ -63,7 +63,7 @@ def resolve_restart_choice(raw, current_branch="B"):
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
                   scenario_dir="", with_review=True, on_restart=None, branch="B",
-                  branch_mode="judge"):
+                  branch_mode="judge", language="legacy"):
     """建**一个**服务:实时小镇 + case01 结果面板(九块)。
 
     为什么要挂在一起(2026-09-19 用户拍板"只维护一个界面"):
@@ -91,7 +91,10 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         restart_choices=[{"id": "branch",
                           "label": "分支",
                           "options": ["auto", "A", "B", "C"],
-                          "value": "auto" if branch_mode == "judge" else branch}],
+                          "value": "auto" if branch_mode == "judge" else branch},
+                         {"id": "language", "label": "语言",
+                          "options": ["zh", "en"],
+                          "value": language if language != "legacy" else "zh"}],
         # 顶栏外部工具链接:mavis 的角色/场景配置工具是**独立进程**(默认 8060),
         # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)。
         # "专家审核"排在前面,且**只在挂了结果面板时给** —— 九块/专家队列都由
@@ -126,7 +129,7 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     return live
 
 
-def _map_run(run_id, branch, raw_out, rng_info=None):
+def _map_run(run_id, branch, raw_out, rng_info=None, language="legacy"):
     """把这一局的原始记录映射成成品记录(**在本进程里顺序做**,不另起看护进程)。
 
     为什么改成顺序做:重开一局时如果每局都起一个独立的映射看护进程,连点几次就会
@@ -147,7 +150,8 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
                        run_id, "run.json")
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
            "--branch", branch, "--run-id", run_id,
-           "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
+           "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect",
+           "--language", language]
     print("  正在映射成品记录(约 1-2 分钟)…")
     t0 = time.time()
     proc = run_text(cmd, cwd=PKG_ROOT, env=utf8_env())
@@ -176,6 +180,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="case01 单一界面:实时小镇 + 结果记录")
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"],
                     help="兜底分支:judge 模式下只有在判不出来时才用它")
+    ap.add_argument("--language", choices=["legacy", "zh", "en"], default="legacy",
+                    help="本次运行语言;legacy 保留旧版中英混用行为")
     ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
                     choices=["judge", "preset"],
                     help="judge=先跑 T0 再由 AI 的回答判定分支(0904doc 01 §六 的设计原意,默认);"
@@ -223,14 +229,16 @@ def main(argv=None):
     # 回调只做一件事:把重开请求(含页面上选的分支)记下来;真正的重开由下面的主循环执行
     # (不能在回调里直接跑推演,那是 HTTP 线程池的活)。
     restart_flag = threading.Event()
-    restart_req = {"branch": ""}
+    restart_req = {"branch": "", "language": ""}
     # 闭包里要读"当前分支":回调是 HTTP 线程池里跑的,不能直接用 args
     branch_now = [args.branch]
 
     def request_restart(payload=None):
+        from mavis_case01_injector.language import check_language
         try:
             branch, mode = resolve_restart_choice((payload or {}).get("branch"),
                                                   current_branch=branch_now[0])
+            chosen_language = check_language((payload or {}).get("language") or args.language)
         except ValueError as exc:
             # 不认识的取值**不再静默当成 judge**(2026-09-24 第十轮体检):以前 {"branch":"D"}
             # 会被当成 auto,回一句"已受理:下一局由 AI 的 T0 回答判定分支" —— 调用方以为
@@ -239,6 +247,7 @@ def main(argv=None):
             return {"ok": False, "error": str(exc)}
         restart_req["branch"] = branch
         restart_req["mode"] = mode
+        restart_req["language"] = chosen_language
         restart_flag.set()
         # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
         # pending 里那条上一局的 done,变成"重开后又突然说推演结束"(用户实测反馈)。
@@ -259,6 +268,7 @@ def main(argv=None):
     live = build_service(host=args.host, port=args.port, roles=roles,
                          run_id=args.run_id, scenario_dir=scenario,
                          branch=args.branch, branch_mode=args.branch_mode,
+                         language=args.language,
                          on_restart=None if args.no_restart else request_restart)
     # 页面上有没有「重开一局」按钮(没注册回调就没有)
     can_restart = not args.no_restart
@@ -284,6 +294,7 @@ def main(argv=None):
     ran_once = False
     branch = args.branch
     branch_mode = args.branch_mode
+    language = args.language
     try:
         while True:
             restart_flag.clear()
@@ -294,6 +305,8 @@ def main(argv=None):
                 branch_mode = restart_req.get("mode") or branch_mode
                 restart_req["branch"] = ""
                 restart_req["mode"] = ""
+                language = restart_req.get("language") or language
+                restart_req["language"] = ""
             branch_now[0] = branch        # 回调里读"当前分支"用
             nodes = default_nodes(branch, roles=list(roles))
             debug_note = ""
@@ -369,6 +382,7 @@ def main(argv=None):
                 run_id=run_id,
                 dry_run=False, max_retries=args.max_retries, branch=branch,
                 branch_mode=branch_mode,
+                language=language,
                 debug_note=debug_note,
                 visualizers=[live],
                 think_workers=workers,
@@ -410,7 +424,8 @@ def main(argv=None):
                               "Select a branch in the UI and restart.")
                     elif not args.no_map:
                         # 用**判定后的**真实分支做映射(judge 模式下 branch 参数只是兜底)
-                        _map_run(run_id, record.get("branch") or branch, out, rng_info)
+                        _map_run(run_id, record.get("branch") or branch, out, rng_info,
+                                 language=language)
                     else:
                         print("  (--no-map:跳过映射;手工命令见 docs)")
                 finally:

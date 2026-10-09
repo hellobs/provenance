@@ -106,11 +106,21 @@ python -m case01.render
 
 ## 新架构用法(mavis + injector,当前路径)
 
+Case01 当前路径支持运行时选择语言：`--language zh` 使用中文角色指令、中文反思和
+Router；`--language en` 使用英文版本。`legacy`（不传参数时的默认值）保留此前
+中英混用的行为，供历史记录复现。语言及实际提示词版本写入原始记录和成品记录的
+`language` / `manifest`。5010 页面的“重开一局”也可更换语言；从配置工具启动
+Case01 时可在“运行”区选择中文或 English。
+
+市场事件原文、机器匹配所用的中文触发关键词和 MAVIS 通用日常模板仍保持原设定；
+英文运行要求角色回答、反思和 Router 输出英文。英文反思暂记为 `unscored`，
+避免沿用只识别中文关键词的自动质量分造成误判，仍可人工审核。
+
 ```bash
 # dry-run(不加载 mavis,出 case01 兼容记录,CI 可用)
-python -m case01.injector.pipeline --branch B --dry-run --out runs_injector/B.json
+python -m case01.injector.pipeline --branch B --dry-run --language zh --out runs_injector/B.json
 # 真实运行 + 反思(Branch A/B/C;单次约 9–10 分钟,反思约 1.5 分钟)
-python -m case01.injector.pipeline --branch B --reflect --out runs_injector/B.json
+python -m case01.injector.pipeline --branch B --reflect --language en --out runs_injector/B.json
 # 后处理已有记录(补事实层/接反思/Router)
 python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
 ```

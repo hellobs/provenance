@@ -61,7 +61,7 @@ def _resolve_router(local, router_llm, external_router: bool):
 
 def _attach_reflection(record: dict, llm=None, router_llm=None,
                        external_router: bool = False,
-                       reflection_mod=None) -> dict:
+                       reflection_mod=None, language: str = "legacy") -> dict:
     """在映射后的记录上补 Reflection 与 Router（复用 case01 现有实现）。"""
     from mavis_case01_injector.llm import local_client_from_env
     from mavis_case01_injector._providers import import_reflection
@@ -69,10 +69,13 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     local = llm or local_client_from_env()
     router, source = _resolve_router(local, router_llm, external_router)
     _refl = reflection_mod or import_reflection()
-    ref = _refl.run_reflection(local, record)
+    ref = (_refl.run_reflection(local, record) if language == "legacy" else
+           _refl.run_reflection(local, record, language=language))
     record["reflection"] = {"material": ref["material"], "text": ref["text"],
-                            "stripped_opener": bool(ref.get("stripped_opener"))}
-    rout = _refl.run_router(router, ref["text"])
+                            "stripped_opener": bool(ref.get("stripped_opener")),
+                            "quality": ref.get("quality")}
+    rout = (_refl.run_router(router, ref["text"]) if language == "legacy" else
+            _refl.run_router(router, ref["text"], language=language))
     record["router"] = {"raw": rout["raw"], "issues": rout["issues"],
                         "expert_pool_version": rout.get("expert_pool_version", "")}
     # 04 §五 问的是"这条的 Router 由谁执行"。批路径 10-08 已经把答案落进产物
@@ -143,7 +146,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                  require_consistent: bool = False, branch_mode: str = "preset",
                  judge_llm=None, judge_backend_kind: str = "",
                  scenario_path: str = "", financial_dir: str = "",
-                 reflection_mod=None) -> dict:
+                 reflection_mod=None, language: str = "legacy") -> dict:
     """跑一条完整流水线,返回 case01 兼容记录。
 
     raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
@@ -155,6 +158,13 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
     scenario_path / financial_dir: 覆盖清单里两处内容哈希的来源(默认真实路径)。
     """
     scenario_dir = scenario_dir or default_scenario_dir()
+    from .language import check_language
+    language = check_language(language)
+    raw_language = (raw_record or {}).get("language") if isinstance(raw_record, dict) else None
+    if raw_language:
+        if language != "legacy" and language != raw_language:
+            raise ValueError("requested language conflicts with raw record language")
+        language = check_language(raw_language)
     branch = branch or (raw_record or {}).get("branch", "B")
     run_id = run_id or (raw_record or {}).get("run_id") or "injector-{}".format(branch)
 
@@ -170,7 +180,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
                              run_id=run_id, max_retries=max_retries, dry_run=dry_run,
                              branch=branch, branch_mode=branch_mode,
                              judge_llm=judge_llm,
-                             backend_kind=judge_backend_kind)
+                             backend_kind=judge_backend_kind, language=language)
         raw = bridge.run()
 
     # 原始记录里的分支才是**实际跑出来的**分支(judge 模式:跑完 T0 才判定;
@@ -190,6 +200,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
 
     record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
+    record["language"] = language
     record.setdefault("compat", {})["reflection_attached"] = False
 
     # 运行清单一律在**写盘之前**挂上(manifest 段本身就是这次运行的证据;
@@ -197,6 +208,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
     run_meta = collect_run_meta(raw, branch=branch, branch_mode=branch_mode,
                                 judge_llm=judge_llm,
                                 backend_kind=judge_backend_kind)
+    run_meta["language"] = language
     attach_manifest(record, run_meta, scenario_path=scenario_path,
                     financial_dir=financial_dir)
 
@@ -207,7 +219,7 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
         try:
             _attach_reflection(record, llm=llm, router_llm=router_llm,
                                external_router=external_router,
-                               reflection_mod=reflection_mod)
+                               reflection_mod=reflection_mod, language=language)
         except Exception as exc:  # noqa: BLE001 —— 留痕后继续写盘,不静默、不白跑
             msg = "{}: {}".format(type(exc).__name__, exc)
             print("[!] 反思/Router 挂了,记录照写但 reflection/router 留空:{}".format(msg))
@@ -284,7 +296,11 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     local = local_client_from_env()
     router, source = _resolve_router(local, router_llm, external_router)
     old = ((rec.get("router") or {}).get("issues")) or []
-    rout = run_router(router, text)
+    from mavis_case01_injector._providers import import_reflection
+    _refl = reflection_mod or import_reflection()
+    language = rec.get("language") or (rec.get("manifest") or {}).get("language") or "legacy"
+    rout = (_refl.run_router(router, text) if language == "legacy" else
+            _refl.run_router(router, text, language=language))
     rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or [],
                      "expert_pool_version": rout.get("expert_pool_version", "")}
     # 重跑会**整段替换** rec["router"],以前把上一次盖好的 `executed_by` 一起抹掉了 ——
@@ -321,6 +337,8 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
 def main():
     ap = argparse.ArgumentParser(description="case01 injector 完整流水线")
     ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
+    ap.add_argument("--language", choices=["legacy", "zh", "en"], default="legacy",
+                    help="本次运行语言;legacy 保留旧版中英混用行为")
     ap.add_argument("--roles", default="Investment AI,Ethan Lin")
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
@@ -373,6 +391,7 @@ def main():
         raw_record=raw, fill_facts=args.fill_facts,
         branch_source=args.branch_source, require_consistent=args.require_consistent,
         branch_mode=args.branch_mode,
+        language=args.language,
     )
     if args.out:
         print("saved ->", args.out)

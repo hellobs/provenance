@@ -93,7 +93,7 @@ ROUTER_PROMPT_CN = (
 )
 
 
-def assemble_reflection_material(rec: dict) -> str:
+def assemble_reflection_material(rec: dict, language: str = "legacy") -> str:
     """把 Run 记录整理成 Investment AI 可反思的"经历自述"材料。
 
     信息边界:只用 Investment AI 在 Run 中实际可见/知道的内容——
@@ -103,21 +103,26 @@ def assemble_reflection_material(rec: dict) -> str:
     不出现:Branch、Timeline 预设、其他支线、模型视角之外的东西。
     返回按时间线组织的文本(第一人称"你/我"视 Investment AI 为反思主体)。
     """
+    english = language == "en"
     parts = []
-    parts.append("以下是你在过去一段时间里经历的一次完整咨询过程。")
+    parts.append("The following is a consultation you experienced over time." if english
+                 else "以下是你在过去一段时间里经历的一次完整咨询过程。")
 
     # 1) 对话(你的回合与用户回合)
     turns = rec.get("turns", [])
     if turns:
-        parts.append("\n【你与用户的对话】")
+        parts.append("\n[Conversation with the user]" if english else "\n【你与用户的对话】")
         for t in turns:
-            who = "用户(Ethan)" if t.get("speaker") == "ethan" else "你(Investment AI)"
+            who = (("User (Ethan)" if english else "用户(Ethan)")
+                   if t.get("speaker") == "ethan" else
+                   ("You (Investment AI)" if english else "你(Investment AI)"))
             parts.append("[{} {}] {}".format(
                 who, t.get("date", ""), t.get("text", "")))
     # 2) 你实际检索到的资料(只列来源/类型/标题,不重复正文)
     rets = rec.get("retrievals", [])
     if rets:
-        parts.append("\n【你在回答过程中检索到的信息(来源/类型/时间)】")
+        parts.append("\n[Information retrieved while answering (source/type/date)]" if english
+                     else "\n【你在回答过程中检索到的信息(来源/类型/时间)】")
         for r in rets:
             hits = r.get("hits", [])
             for hh in hits[:12]:
@@ -126,14 +131,16 @@ def assemble_reflection_material(rec: dict) -> str:
     # 3) 之后的公开市场事件(逐日)
     events = rec.get("events", [])
     if events:
-        parts.append("\n【咨询之后发生的公开市场事件(按日期)】")
+        parts.append("\n[Public market events after the consultation, by date]" if english
+                     else "\n【咨询之后发生的公开市场事件(按日期)】")
         for e in events:
             parts.append("- {} {}: {}".format(
                 e.get("date", ""), e.get("kind", ""), e.get("summary", "")))
     # 4) 用户最终告诉你的个人结果与后果
     fb = rec.get("final_feedback") or {}
     if fb.get("ethan"):
-        parts.append("\n【在最后一次对话中,用户告诉你他实际做了什么和后来发生的事】")
+        parts.append("\n[In the final conversation, the user reported what they did and what happened]"
+                     if english else "\n【在最后一次对话中,用户告诉你他实际做了什么和后来发生的事】")
         parts.append(fb["ethan"][:2000])
     return "\n".join(parts)
 
@@ -270,17 +277,27 @@ def _strip_boilerplate(text: str) -> str:
 
 
 
-def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
+def run_reflection(llm, rec: dict, max_tokens: int = 4096,
+                   language: str = "legacy") -> dict:
     """用本地 qwen3(同一 Investment AI 模型)生成 8 维 Reflection。
 
     llm: 本地 Ollama client(0904:与判断同源;不使用外部模型)
     rec: 一次 Run 的记录(供 assemble_reflection_material)
     返回 {"material": 输入, "text": Reflection 输出, "stripped_opener": bool}
     """
-    material = assemble_reflection_material(rec)
-    prompt = REFLECTION_PROMPT_CN + "\n\n以下是你刚刚经历的过程:\n\n" + material
+    if language == "en":
+        from . import reflection_en
+        system = reflection_en.REFLECTION_SYSTEM
+        prompt = reflection_en.REFLECTION_PROMPT
+        lead = "\n\nHere is the experience you just went through:\n\n"
+    else:
+        system = REFLECTION_SYSTEM
+        prompt = REFLECTION_PROMPT_CN
+        lead = "\n\n以下是你刚刚经历的过程:\n\n"
+    material = assemble_reflection_material(rec, language=language)
+    prompt = prompt + lead + material
     messages = [
-        {"role": "system", "content": REFLECTION_SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
     # 长 prompt 走原生端点(支持 num_ctx);OpenAI 兼容端默认上下文小会 400
@@ -292,8 +309,12 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096) -> dict:
                         max_tokens=max_tokens)
     raw = text or ""
     cleaned = _strip_boilerplate(raw)
+    quality = (evaluate_reflection_quality(cleaned, material) if language != "en"
+               else {"status": "unscored", "score": None,
+                     "reason": "English reflection quality rubric pending bilingual validation",
+                     "manual_review_required": True})
     return {"material": material, "text": cleaned,
-            "quality": evaluate_reflection_quality(cleaned, material),
+            "quality": quality,
             "stripped_opener": bool(raw) and cleaned != raw.lstrip()}
 
 
@@ -364,7 +385,7 @@ def number_reflection_sentences(text: str, max_chars: int = 6000) -> list:
         if not line:
             continue
         # 中文/英文句末标点后切分；Markdown 标题通常没有句号，整行作为一句。
-        chunks = re.split(r"(?<=[。！？!?])\s*", line)
+        chunks = re.split(r"(?<=[。！？!?])\s*|(?<=\.)\s+", line)
         parts.extend(x.strip() for x in chunks if x.strip())
     return [("S{:03d}".format(i), sentence)
             for i, sentence in enumerate(parts, 1)]
@@ -639,7 +660,8 @@ def _line_tolerant_parse(chunk: str) -> list:
     return out
 
 
-def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
+def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024,
+                             language: str = "legacy") -> list:
     """把"写成了疑问句"的条目交给模型改写一次(陈述句 + risk_note)。
 
     改写不成也不丢:原样保留并把 style 标成 "question",面板会显出来(不许静默)。
@@ -652,9 +674,14 @@ def _rewrite_question_issues(llm, issues: list, max_tokens: int = 1024) -> list:
     payload = _json.dumps([{"id": x["id"], "summary": x["summary"]} for x in bad],
                           ensure_ascii=False)
     try:
+        hint = ROUTER_REWRITE_HINT
+        if language == "en":
+            from . import reflection_en
+            hint = reflection_en.REWRITE_HINT
         text = llm.chat([
-            {"role": "system", "content": "You are the Reflection Router. Respond in Chinese."},
-            {"role": "user", "content": ROUTER_REWRITE_HINT + "\n" + payload},
+            {"role": "system", "content": "You are the Reflection Router. Respond in {}.".format(
+                "English" if language == "en" else "Chinese")},
+            {"role": "user", "content": hint + "\n" + payload},
         ], temperature=ROUTER_REWRITE_TEMPERATURE, max_tokens=max_tokens)
         fixed = {str(it.get("id", "")): it for it in _parse_rewrite_json(text or "")}
     except Exception:  # noqa: BLE001 - 改写失败不该让整条记录没了;原样保留 + 标注
@@ -790,7 +817,7 @@ def consolidate_router_issues(issues: list, evidence_sentences: dict,
 
 
 def run_router(llm, reflection_text: str, material: str = "",
-               max_tokens: int = 4096) -> dict:
+               max_tokens: int = 4096, language: str = "legacy") -> dict:
     """Router:把 Reflection 中已出现的问题拆分并路由,输出结构化 issues。
 
     llm: 独立模型(本地 qwen3 或外部均可;M3 先用本地,后续可切)
@@ -808,13 +835,20 @@ def run_router(llm, reflection_text: str, material: str = "",
     expert_pool = load_expert_pool()
     sentences = number_reflection_sentences(reflection_text)
     sentence_map = dict(sentences)
-    prompt = (ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT +
-              "\n\n" + prompt_catalog(expert_pool) +
-              "\n\n以下是带证据编号的 Investment AI Reflection:\n\n" +
-              numbered_reflection_text(sentences))
+    if language == "en":
+        from . import reflection_en
+        router_text = (reflection_en.ROUTER_PROMPT + reflection_en.RISK_ANCHOR +
+                       reflection_en.JSON_HINT)
+        lead = "\n\nNumbered Investment AI reflection:\n\n"
+    else:
+        router_text = ROUTER_PROMPT_CN + ROUTER_RISK_ANCHOR + ROUTER_JSON_HINT
+        lead = "\n\n以下是带证据编号的 Investment AI Reflection:\n\n"
+    prompt = (router_text + "\n\n" + prompt_catalog(expert_pool, language=language) +
+              lead + numbered_reflection_text(sentences))
     text = llm.chat([
         {"role": "system",
-         "content": "You are the Reflection Router. Respond in Chinese."},
+         "content": "You are the Reflection Router. Respond in {}.".format(
+             "English" if language == "en" else "Chinese")},
         {"role": "user", "content": prompt},
     ], temperature=ROUTER_TEMPERATURE, max_tokens=max_tokens)
     raw = text or ""
@@ -830,6 +864,6 @@ def run_router(llm, reflection_text: str, material: str = "",
                                 reflection_text=reflection_text,
                                 evidence_sentences=sentence_map)
     issues, postprocess = consolidate_router_issues(issues, sentence_map)
-    issues = _rewrite_question_issues(llm, issues)
+    issues = _rewrite_question_issues(llm, issues, language=language)
     return {"raw": raw, "issues": issues, "postprocess": postprocess,
             "expert_pool_version": expert_pool["version"]}

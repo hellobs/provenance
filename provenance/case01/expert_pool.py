@@ -83,12 +83,30 @@ def resolve_category(category_id: str = "", field: str = "",
     return None
 
 
-def prompt_catalog(pool: Optional[dict] = None) -> str:
+_EN_CATEGORIES = {
+    "E1": "Information and evidence verification: disclosures, rumors, source independence and reliability",
+    "E2": "Finance and valuation: financial statements, order value, forecasts and valuation",
+    "E3": "Industry and business: supply chains, customers, procurement and competition",
+    "E4": "Market and trading risk: price, volatility, position sizing and execution",
+    "E5": "Legal and compliance: disclosure, contracts, securities and advisory duties",
+    "E6": "Client suitability and investment advice: resources, objectives and risk tolerance",
+    "E7": "Behavioral finance and conflicts of interest: bias, sentiment and incentives",
+    "E8": "AI models and governance: hallucination, reasoning, traceability and model risk",
+}
+
+
+def prompt_catalog(pool: Optional[dict] = None, language: str = "legacy") -> str:
     data = pool or load_expert_pool()
+    if language == "en":
+        lines = ["Available expert category IDs (version={}):".format(data["version"])]
+        for item in data["categories"]:
+            lines.append("- {} | {}".format(
+                item["id"], _EN_CATEGORIES.get(item["id"], item["name"])))
+        lines.append("Choose only an ID above. Use UNMATCHED and suggested_field if none fits.")
+        return "\n".join(lines)
     lines = ["当前可用专家类别池(version={}):".format(data["version"])]
     for item in data["categories"]:
         lines.append("- {} | {} | {}".format(
             item["id"], item["name"], item["description"]))
     lines.append("只能从以上 ID 中选择。确实无法匹配时使用 UNMATCHED，并填写 suggested_field。")
     return "\n".join(lines)
-

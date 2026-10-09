@@ -53,6 +53,8 @@
 
 <div class="section">
     <h2 style="margin-top:0;">运行</h2>
+    <label>Case01 实时推演语言 <span class="opt">选择组合后启动的 5010 推演；不改变下方装配预检</span></label>
+    <select id="run-language"><option value="zh">中文</option><option value="en">English</option></select>
     <label>受判对象回答 <span class="opt">experiment-eval 需要;留空时自动取场景 inputs 样本回答;sandbox-value 忽略</span></label>
     <textarea id="input_text" placeholder="选填 … 不填则自动用场景内置样本判定分支"></textarea>
 </div>
@@ -161,10 +163,12 @@ function runComp(compId){
     // experiment-eval 的"受判对象回答"默认取场景内置样本(inputs.sample_answers),
     // 文本框只作可选的显式覆盖;留空也能跑,不再强制人工填。
     var input_text = document.getElementById("input_text").value.trim();
+    var language = document.getElementById("run-language").value;
     fetch("/api/run/execute", {method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
             composition_id: compId,
-            input_text: input_text
+            input_text: input_text,
+            language: language
         })})
     .then(function(r){return r.json();})
     .then(render)
