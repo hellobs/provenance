@@ -752,7 +752,12 @@
 					backgroundColor: "#ffffcc",
 					padding: { x: 4, y: 4},
 					border:"solid",
-					borderRadius:"10px"
+					borderRadius:"10px",
+					// 头顶气泡要能换行(2026-10-09 用户反馈"聊天气泡要支持换行"):
+					// 原来这里没设 wordWrap,长句就横向铺成一行糊在头上。
+					// 限宽 200px(约 11 个中文字/行),超出自动折行。
+					align: "left",
+					wordWrap: { width: 200, useAdvancedWrap: true },
 				}
 			).setDepth(3);
 			pronunciatios[persona_name].alpha = 0.7;
