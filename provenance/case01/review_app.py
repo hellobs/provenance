@@ -311,6 +311,15 @@ def get_run(run_id: str, safe: int = 0):
 #   同一个 router_identity() 落 executed_by,那之前映射的小镇记录"跑在字段之前"是真话。
 #   两条相关守卫:case01/tests/test_review_app.py 的棘轮(专家面源码里的机制名只许维持)
 #   与 test_review_panel_probe.py(用 node 探针真跑页面 JS 查深链行为)。
+#   2026-10-09(paneAudit):审计页那一格写着"每一步操作的可审计留痕",但列只取 kind 与
+#   summary 两个键,而**不是每个动作都带它们**。实测 583 条记录共 8802 行留痕,其中
+#   **1310 行(15%)类型与摘要两格全空**:set_branch 583(带 branch)、condition_check 351
+#   (带 trigger_type/fired)、release_events 201(带 count/node_id)、interaction 59(带
+#   from/to/focus/started/retries)、mark_to_market 43、buy_position 11、exit_position 11
+#   (带 price/cash/fraction)。读的人看到空行会以为"这步没内容",而真相是内容在别的键上。
+#   现在没有 summary 就把该条自带的其余字段摊成 `键=值`(布尔翻成 是/否,null 翻成 空),
+#   一行都不留空。JS 里**不点名**任何动作或字段(那是实验词,会顶到上面那条棘轮),
+#   所以这段说明留在 Python 侧。
 _PAGE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -497,6 +506,9 @@ const WANT_TAB = Q.get("tab") || "";
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;");
+// 字段缺值时给一个看得见的破折号:空着渲染出来是"有标签、没内容",
+// 读的人分不清是"这条记录没这个值"还是"面板坏了"。
+const dashv = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
 // **本面实际可用的页签** = 导航渲染用的同一份口径。
 // 以前这里用未过滤的 TABS 判断,于是深链指到"本面不提供的页签"时,主区域会渲染出
 // 导航里根本没有的那一块(2026-09-25 第十五轮体检:那句守卫写在读 WANT_TAB 之前,是死代码)。
@@ -662,7 +674,7 @@ function paneTurns(d) {
   const who = s => /ai|invest/i.test(s) ? "AI" : "咨询者";
   return t.map(x => `<div class="card">
     <div class="m"><b>${esc(who(x.speaker || ""))}</b> · ${esc(x.speaker)} · ${esc(x.date)}</div>
-    <div class="t">${esc(x.text)}</div></div>`).join("");
+    <div class="t">${dashv(x.text)}</div></div>`).join("");
 }
 
 function paneRetrievals(d) {
@@ -694,7 +706,7 @@ function paneRetrievals(d) {
     }
     return `<div class="card">
       <div class="m">${head.join(" · ")}</div>
-      <div class="t"><b>查询：</b>${esc(x.query)}</div>
+      <div class="t"><b>查询：</b>${dashv(x.query)}</div>
       <div style="margin-top:8px">${body}</div></div>`;
   }).join("");
 }
@@ -753,7 +765,7 @@ function paneRouter(d) {
       <div class="m"><b>${esc(x.id)}</b> ${riskBadge(x.risk)} <span class="chip">${esc(x.field)}</span>${styleTag(x)}</div>
       <div class="t">${esc(x.summary)}</div>
       ${x.risk_note ? `<div class="m" style="margin-top:8px">风险 / 错在哪</div><div class="t">${esc(x.risk_note)}</div>` : ""}
-      <div class="m" style="margin-top:8px">分流理由</div><div class="t">${esc(x.routing_reason)}</div>
+      <div class="m" style="margin-top:8px">分流理由</div><div class="t">${dashv(x.routing_reason)}</div>
     </div>`).join("") : '<div class="card"><div class="empty">无分流问题</div></div>')
     + `<div class="card"><details><summary>展开模型原始输出（注意：这里 risk 是首字母大写，上面徽标用的是归一化后的小写）</summary>
        <pre>${esc(raw)}</pre></details></div>`;
@@ -774,12 +786,28 @@ function paneInjector(d) {
   </div>`).join("");
 }
 
+function auditExtra(x) {
+  // 动作自带的其余字段摊成一行(见 Python 侧 paneAudit 上方的维护说明)。
+  const skip = {t: 1, action: 1, kind: 1, summary: 1};
+  const parts = Object.keys(x).filter(k => !skip[k]).map(k => {
+    const v = x[k];
+    let txt;
+    if (v === true) txt = "是";
+    else if (v === false) txt = "否";
+    else if (v === null || v === undefined) txt = "空";
+    else if (typeof v === "object") txt = JSON.stringify(v);
+    else txt = String(v);
+    return k + "=" + txt;
+  });
+  return parts.length ? parts.join(" · ") : "(这条没有再带其他字段)";
+}
+
 function paneAudit(d) {
   const a = d.audit || [];
   if (!a.length) return '<div class="card"><div class="empty">无审计记录</div></div>';
   return `<div class="card"><table><thead><tr><th>时间</th><th>动作</th><th>类型</th><th>摘要</th></tr></thead>
     <tbody>${a.map(x => `<tr><td class="num">${esc(x.t)}</td><td>${esc(x.action)}</td>
-      <td>${esc(x.kind)}</td><td>${esc(x.summary)}</td></tr>`).join("")}</tbody></table></div>`;
+      <td>${esc(x.kind || "—")}</td><td>${esc(x.summary || auditExtra(x))}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
 const PANES = { overview: paneOverview, turns: paneTurns, retrievals: paneRetrievals,

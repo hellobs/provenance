@@ -649,8 +649,15 @@ function pick(t, node) {
   if (node) node.classList.add("on");
   renderForm();
   api("/api/expert/read?run_id=" + encodeURIComponent(t.run_id)).then(function (r) {
+    // 连点两条任务时,先那条的响应可能后到 —— 不丢弃就会出现"看的是 A 的正文、
+    // 提交的是 B"这种错位(A 的反思贴在 B 的任务上)。只认当前选中任务的那一次。
+    if (TASK !== t) return;
+    var chars = document.getElementById("chars"), anch = document.getElementById("anch");
     if (!r.ok) { document.getElementById("body").innerHTML =
-      "<span class='err'>" + esc((r.errors || []).join("; ")) + "</span>"; return; }
+      "<span class='err'>" + esc((r.errors || []).join("; ")) + "</span>";
+      // 这两个占位符不能停在"…":读不到正文是终态,不是还在加载
+      if (chars) chars.textContent = "—(没读到正文)";
+      if (anch) anch.textContent = "—"; return; }
     FULL = r.reflection_text;
     document.getElementById("chars").textContent = r.reflection_chars + " 字";
     // 默认不给整篇反思:《HCI 增量需求》§二"默认展示该专家需要审核的具体问题,
@@ -685,7 +692,7 @@ function renderForm() {
     "<div class='quote'>" + esc(t.evidence_quote) + "</div>" +
     "<div class='meta'>审核状态:" + esc(t.review_state || "?") +
       " · 训练材料池:" + esc(pl.state || "?") + POOL_AT + "</div>" +
-    "<div class='meta'>反思正文:<span id='chars'>…</span> 字 · 你负责的原文定位 <code id='anch'>…</code></div>" +
+    "<div class='meta'>反思正文:<span id='chars'>…</span> · 你负责的原文定位 <code id='anch'>…</code></div>" +
     "<div id='body'><div class='meta'>正文加载中…</div></div>" +
     "<h3>你的结论(必填)</h3>" +
     "<div>" +
