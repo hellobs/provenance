@@ -160,7 +160,7 @@ def run_detail(run_id: str) -> dict:
     reflection_quality = ref.get("quality")
     if (not isinstance(reflection_quality, dict) or not reflection_quality) and ref.get("text"):
         reflection_quality = evaluate_reflection_quality(
-            ref.get("text", ""), ref.get("material", ""))
+            ref.get("text", ""), ref.get("material", ""), language=rec.get("language", "legacy"))
     meta = {
         "run_id": rec.get("run_id") or run_id,
         "start_date": rec.get("start_date", ""),

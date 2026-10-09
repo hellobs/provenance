@@ -100,6 +100,7 @@ _BOILERPLATE_OPENERS = (
     "当然可以", "当然，可以", "当然,可以", "当然。", "当然，", "当然,",
     "好的，以下", "好的,以下", "好的。以下", "好的，", "好的,",
     "以下是", "下面是我", "下面是我对", "下面从", "接下来我",
+    "Certainly", "Of course", "Sure,", "Here is", "Here are", "Below is",
 )
 # 除"客套开场语"之外的**元话语**标记:实测还有"我将以中文回应,并严格遵循你提出的八个维度…"
 # 这类"交代自己怎么答"的开场,同样不该出现在给专家的正式文档里。
@@ -107,15 +108,19 @@ _META_MARKERS = (
     "当然", "以下是", "下面是我", "下面从", "我将以", "我将从", "我将严格", "我将按",
     "严格遵循", "遵循你", "按照你", "按你提出", "感谢你", "谢谢你", "作为AI", "作为 AI",
     "好的，", "明白，", "首先，我", "这段反思", "本反思将",
+    "I will reflect", "I will review", "I will address", "I will follow",
+    "This reflection will", "Thank you", "As an AI",
 )
-_BOILERPLATE_END = ("：", ":", "。", "！", "!", "\n")
-_META_END = re.compile(r"[。！？：\n]")
+_BOILERPLATE_END = ("：", ":", "。", "！", "!", ".", "\n")
+_META_END = re.compile(r"[。！？：.\n]")
 # 结尾的"服务兜售/反问"句(反思是自省文件,不该出现这些);按段/按句从尾部剥
 _TAIL_OFFER_MARKERS = (
     "如你愿意", "如您愿意", "如果你愿意", "如果您愿意", "是否需要", "需要我",
     "我可以继续", "我可以帮", "我可以为你", "我可以为您", "我可以进一步",
     "要不要我", "随时告诉我", "请告诉我", "欢迎告诉我", "如果你希望", "如果您希望",
     "如果还有其他", "还需要我", "我可以协助",
+    "If you would like", "If you want", "Would you like", "Let me know",
+    "I can also", "I can help", "feel free to ask",
 )
 _EMOJI = re.compile(
     "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF"
@@ -145,7 +150,7 @@ def _strip_tail_offer(text: str) -> str:
                 continue
         # 末段没标记但以问号结尾:只削掉最后那个问句
         if last.endswith(("？", "?")):
-            idx = max(last.rfind("。"), last.rfind("！"), last.rfind("!"))
+            idx = max(last.rfind("。"), last.rfind("！"), last.rfind("!"), last.rfind("."))
             if idx > 0:
                 t = (keep + "\n\n" + last[:idx + 1]).strip() if keep else last[:idx + 1].strip()
                 continue
@@ -242,10 +247,7 @@ def run_reflection(llm, rec: dict, max_tokens: int = 4096,
                         max_tokens=max_tokens)
     raw = text or ""
     cleaned = _strip_boilerplate(raw)
-    quality = (evaluate_reflection_quality(cleaned, material) if language != "en"
-               else {"status": "unscored", "score": None,
-                     "reason": "English reflection quality rubric pending bilingual validation",
-                     "manual_review_required": True})
+    quality = evaluate_reflection_quality(cleaned, material, language=language)
     return {"material": material, "text": cleaned,
             "quality": quality,
             "stripped_opener": bool(raw) and cleaned != raw.lstrip()}
@@ -335,26 +337,41 @@ def _case_anchors(material: str) -> list:
                               if x.strip() and x.strip() not in ignored))
 
 
-def evaluate_reflection_quality(text: str, material: str = "") -> dict:
+def evaluate_reflection_quality(text: str, material: str = "", language: str = "legacy") -> dict:
     """确定性反思质量门（自动筛查，不冒充人工语义裁决）。
 
     总分 100：八维覆盖 40、案例落地 15、结果/过程区分 10、具体自省 10、
     不确定性 5、可执行改进 10、样式 10。忠实度和深层切题度仍需专家复核。
     """
     source = (text or "").strip()
+    if language == "en":
+        from . import reflection_en
+        dimensions_config = reflection_en.QUALITY_DIMENSIONS
+        outcome_markers = reflection_en.OUTCOME_PROCESS_MARKERS
+        critique_markers = reflection_en.SELF_CRITIQUE_MARKERS
+        uncertainty_markers = reflection_en.UNCERTAINTY_MARKERS
+        actionable_markers = reflection_en.ACTIONABLE_MARKERS
+        inspected = source.casefold()
+    else:
+        dimensions_config = _QUALITY_DIMENSIONS
+        outcome_markers = _OUTCOME_PROCESS_MARKERS
+        critique_markers = _SELF_CRITIQUE_MARKERS
+        uncertainty_markers = _UNCERTAINTY_MARKERS
+        actionable_markers = _ACTIONABLE_MARKERS
+        inspected = source
     dimensions = []
-    for key, label, markers in _QUALITY_DIMENSIONS:
-        hits = [marker for marker in markers if marker in source]
+    for key, label, markers in dimensions_config:
+        hits = [marker for marker in markers if marker in inspected]
         dimensions.append({"id": key, "label": label, "score": 5 if hits else 0,
                            "max_score": 5, "evidence_markers": hits[:3]})
 
     anchors = _case_anchors(material)
     matched_anchors = [anchor for anchor in anchors if anchor in source]
     grounding_score = 15 if len(matched_anchors) >= 2 else (8 if matched_anchors else 0)
-    outcome_hits = [x for x in _OUTCOME_PROCESS_MARKERS if x in source]
-    critique_hits = [x for x in _SELF_CRITIQUE_MARKERS if x in source]
-    uncertainty_hits = [x for x in _UNCERTAINTY_MARKERS if x in source]
-    actionable_hits = [x for x in _ACTIONABLE_MARKERS if x in source]
+    outcome_hits = [x for x in outcome_markers if x in inspected]
+    critique_hits = [x for x in critique_markers if x in inspected]
+    uncertainty_hits = [x for x in uncertainty_markers if x in inspected]
+    actionable_hits = [x for x in actionable_markers if x in inspected]
     style_ok = bool(source) and (_strip_boilerplate(source) == source and
                                  _strip_tail_offer(source) == source and
                                  _strip_emoji(source) == source)
@@ -369,21 +386,24 @@ def evaluate_reflection_quality(text: str, material: str = "") -> dict:
     }
     score = sum(components.values())
     failures = []
+    def failure(zh: str, en: str) -> str:
+        return en if language == "en" else zh
     if len(source) < 300:
-        failures.append("反思过短，难以实质覆盖完整经历")
+        failures.append(failure("反思过短，难以实质覆盖完整经历", "Reflection is too short to cover the experience"))
     missing_dims = [x["label"] for x in dimensions if not x["score"]]
     if missing_dims:
-        failures.append("缺少实质维度：" + "、".join(missing_dims))
+        failures.append(failure("缺少实质维度：", "Missing substantive dimensions: ") +
+                        (", ".join(missing_dims) if language == "en" else "、".join(missing_dims)))
     if not matched_anchors:
-        failures.append("未引用可逐字核对的本案例数字、日期或专有名词")
+        failures.append(failure("未引用可逐字核对的本案例数字、日期或专有名词", "No verbatim case-specific number, date, or proper name"))
     if not outcome_hits:
-        failures.append("未明确区分最终结果与当时判断过程")
+        failures.append(failure("未明确区分最终结果与当时判断过程", "Does not distinguish the outcome from the judgment process"))
     if not critique_hits:
-        failures.append("未指出具体的自身判断或行为不足")
+        failures.append(failure("未指出具体的自身判断或行为不足", "No specific self-critique"))
     if not actionable_hits:
-        failures.append("未提出可执行的后续改进动作")
+        failures.append(failure("未提出可执行的后续改进动作", "No actionable improvement"))
     if not style_ok:
-        failures.append("存在客套开场、尾部追问或 emoji 等样式问题")
+        failures.append(failure("存在客套开场、尾部追问或 emoji 等样式问题", "Opening, closing question, or emoji style issue"))
     status = "pass" if score >= 70 and not failures else ("review" if score >= 50 else "fail")
     return {
         "version": "1.0", "score": score, "max_score": 100, "status": status,

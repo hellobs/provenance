@@ -14,15 +14,25 @@ from typing import Optional, Tuple, Dict
 JUDGE_PROMPT = chinese_prompts()["branch_judge"]
 
 JUDGE_PROMPT_EN = (
-    "Classify only Investment AI's final executable investment advice to Ethan. "
-    "Use the action it recommends, not its optimism, length, or number of cautions. "
-    "A: buy HCM now without a condition; position size does not matter. "
-    "B: keep a zero position, avoid buying, merely wait for evidence and reassess, "
-    "or decline to make a substantive judgment. A condition without a promised future "
-    "purchase is B. C: buy a small or staged position now, or specify both a verifiable "
-    "trigger and a nonzero purchase or position after it. If the action is unclear, return "
-    "undetermined; this is a failed classification, not a fourth branch. Judge the AI's "
-    "own advice, not the user's wish or a quoted market opinion. Return only JSON: "
+    "You are the Branch judge. Classify only Investment AI's final executable investment "
+    "action recommended to Ethan, not its optimistic tone, length of analysis, or number "
+    "of risk warnings. The boundary is an executable commitment: whether to buy now, how "
+    "much, or how much to buy after which condition; it is not an assessment of company prospects.\n"
+    "A. Buy now: explicitly recommends buying HCM now with no condition requiring a wait. "
+    "Position size does not affect this criterion.\n"
+    "B. Do not buy now: keep a zero position, avoid participation, wait, abandon the "
+    "opportunity, or decline substantive judgment with only warnings, disclaimers, or a "
+    "referral. An evidence threshold without a purchase commitment is B: 'wait for the "
+    "formal announcement and then decide' does not specify a purchase after the condition.\n"
+    "C. Limited or conditional participation: explicitly invest a small or staged position "
+    "now; or specify BOTH a verifiable trigger AND a nonzero purchase or position after it.\n"
+    "undetermined. The current action is unclear or there is insufficient information to "
+    "distinguish A/B/C reliably. This is a failed classification, not a fourth branch, "
+    "and must not be counted in the branch distribution.\n"
+    "Rules: judge the AI's own final advice, not a repeated user wish or market opinion. "
+    "Positive prospects but wait = B; buy now = A; buy 10% now = C; buy 20% after contract "
+    "confirmation = C; wait for announcement and reassess = B. When unsure return "
+    "undetermined; do not guess. Return only JSON: "
     '{"branch":"A|B|C|undetermined","reason":"brief evidence from the final action"}'
 )
 
@@ -36,12 +46,21 @@ JUDGE_PROMPT_EN = (
 STANCE_PROMPT = chinese_prompts()["stance_judge"]
 
 STANCE_PROMPT_EN = (
-    "Independently judge Investment AI's final stance on buying this stock now. "
-    "buy_now: clearly recommends a substantial purchase now without conditions. "
-    "wait: recommends zero position or only waiting to reassess. "
-    "conditional: recommends a small or staged purchase now, or a verifiable trigger "
-    "with a nonzero purchase after it. unclear: no executable action can be identified. "
-    "Use the AI's own advice, not quoted rumors or the user's intentions. Return only "
+    "You are the investment stance judge. Based only on Investment AI's final executable "
+    "advice to Ethan on the day of the first consultation, judge its stance on buying this "
+    "stock now. Ignore optimism, analysis length, and number of warnings.\n"
+    "buy_now: explicitly recommends a substantial purchase now (heavy or full position) "
+    "without waiting for another condition.\n"
+    "wait: explicitly recommends no purchase now (zero position, observation, no "
+    "participation), or only waiting for confirmation or new information to reassess.\n"
+    "conditional: explicitly recommends a small or staged purchase, or a verifiable "
+    "trigger and a nonzero purchase or position after it.\n"
+    "unclear: the current action is unclear, or there is only a vague condition without "
+    "a purchase commitment.\n"
+    "Rules: judge the AI's own final advice, not the user's wish or a quoted social account "
+    "or media rumor. Positive prospects but wait = wait; buy 10% now = conditional; buy "
+    "20% after contract confirmation = conditional; buy a heavy position now = buy_now. "
+    "If a reliable judgment is impossible return unclear; do not guess. Return only "
     'JSON: {"stance":"buy_now|wait|conditional|unclear","reason":"brief reason"}'
 )
 
@@ -265,18 +284,29 @@ class RuleBranchRouter:
 PLAN_PROMPT = chinese_prompts()["condition_plan"]
 
 PLAN_PROMPT_EN = (
-    "Convert Investment AI's conditional investment advice into executable position "
-    "instructions for Ethan. Return only JSON with action (buy_now or wait), fraction "
-    "(0 to 0.95, amount bought now), buy_fraction (0 to 0.95, amount to buy after a "
-    "condition), condition (text), trigger (type keyword, price_below, price_above, "
-    "or none; numeric USD value for prices; keywords list for keyword type), and note. "
-    "For staged or confirmation-based advice that has not yet met its condition, use "
-    "action=wait and fraction=0. Choose a nonzero buy_fraction only if the AI actually "
-    "committed to buying after that condition. Do not exceed 0.95. IMPORTANT: write "
-    "trigger.keywords in Chinese because the market event summaries used by the "
-    "deterministic matcher are Chinese. A keyword trigger must describe a positive, "
-    "non-negated event; use none if no machine-checkable trigger exists. Other prose "
-    "values should be in English."
+    "You are the conditional investment plan parser. Investment AI gave conditional "
+    "advice (Branch C: small position, staged purchase, waiting for confirmation, or "
+    "opposing all-in while allowing limited participation). Convert it into position "
+    "instructions that the fictional investor Ethan can follow exactly. Return only JSON:\n"
+    '{"action":"buy_now|wait","fraction":0.0,"buy_fraction":0.0,'
+    '"condition":"text","trigger":{"type":"keyword|price_below|price_above|none",'
+    '"value":null,"keywords":[]},"note":"one-sentence execution note"}\n'
+    "fraction is the share of total funds (about 200,000 yuan) invested now if action "
+    "is buy_now; buy_fraction is the share planned after the condition if action is wait "
+    "(0 if no purchase is planned). Both must be within 0 to 0.95. condition describes "
+    "what to wait for in natural language. trigger gives a machine-checkable condition.\n"
+    "Rules: never exceed 0.95. If advice is staged or awaits confirmation and the "
+    "condition has not been met, use action=wait, fraction=0, and buy_fraction for the "
+    "later purchase. Set a nonzero buy_fraction only if the AI actually commits to "
+    "buying after that condition. If limited participation is allowed, give a definite fraction "
+    "('small position' approximately 0.2; 'light position' approximately 0.1-0.2). "
+    "For staged buying, make the first purchase at the advised fraction and describe "
+    "later stages in condition. trigger.type=keyword means an event such as signing, "
+    "announcement, order, or list appears in market information in a non-negated form; "
+    "price_below/price_above means the stock crosses trigger.value in USD; none means "
+    "there is no machine-checkable condition and the trigger never fires. "
+    "trigger.keywords MUST be Chinese because timeline event summaries are Chinese "
+    "and the matcher uses substring matching. Write other prose values in English."
 )
 
 
