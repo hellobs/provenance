@@ -27,6 +27,9 @@
 - `/api/expert/marks`   已提交意见的**计数**,不回内容也不回结论(见下)。
                     "几份"按提交主体折、来源非专家的不算,不计数的行在 `excluded` 里
                     分类报数(口径见 `_opinion_tally` 与 `COUNTING_RULE`)
+- `/api/expert/audit-trail` 按 Run 回溯整条处理链(Reflection → Router → 分配 → 审核 →
+                    冲突 → 最终结果 → 进池),把三处产物按时间合并;平台侧负责的几步如实
+                    标 `platform_side`,取不到的标 `missing`,不编造(05 §五 / 01 §十三)
 
 三条设计口径(都不是审美选择,是规范里读出来的):
 1. **两套词汇在服务端桥接**。平台词 `approve/edit/reject`(《补充规范》§3)与本平台
@@ -482,6 +485,291 @@ def _pool_state(by_task: dict, run_id: str, issue_id: str, category: str) -> dic
     errs = sorted({e for r in rows for e in (r.get("errors") or [])})
     return {"state": "进 SFT {} 份 / 进偏好对 {} 份".format(sft, dpo),
             "n_rows": len(rows), "rejected_reasons": errs}
+
+
+# ---------------------------------------------------------------------------
+# Audit Trail:把一条 Run 的处理链按时间拼成一条可读的记录
+# ---------------------------------------------------------------------------
+# 为什么要有这个接口(05 §五 / 01 §十三 两处独立点名,此前全仓没实现):
+# 链上的数据本来就都在盘上,但散在**三个来源**里,谁想回答"这条反思是谁审的、
+# 审了几轮、最后进没进训练集"都得手工对三趟:
+#   1. 成品记录 `case01/runs/<run_id>/run.json` —— Reflection 生成、Router 分类;
+#   2. 标记台账 `data/ledgers/reflection_marks.json` —— 专家提交的每一份意见;
+#   3. 导出报告 `results/lora/dataset_report.json` —— 进没进训练材料池。
+# 本接口只做**合并与排序**,不做任何推断:取不到的节点如实标 missing 并给原因,
+# 不拿相近的东西冒充(本仓的判据纪律:缺证据 ≠ 有证据)。
+#
+# 两个边界(都要在返回里说清,不让读的人误以为这是"全部"):
+# - 链上"专家分配 / 冲突追加 / 多数裁决"三步按分工在**平台侧**(见队列接口的 note),
+#   本接口只能看到平台把结果写回标记之后的那一步,所以那三步的状态是**从产物推不出来的**,
+#   如实标 `platform_side` 而不是编一个时间;
+# - 5010 面无鉴权,`expert_ref` 同机部署下都是 `peer:127.0.0.1`,所以"谁审的"最多到
+#   连接方地址,不是真人身份(与 `_opinion_tally` 同一条现状说明)。
+AUDIT_CHAIN_STEPS = (
+    ("reflection", "Reflection 生成"),
+    ("router", "Router 分类与路由"),
+    ("assignment", "专家分配"),
+    ("expert_review", "专家审核 / 修改"),
+    ("conflict", "冲突追加审核"),
+    ("final_verdict", "最终审核结果"),
+    ("training_pool", "进入训练材料池"),
+)
+
+
+def _audit_reflection(data: dict, run_id: str) -> list:
+    """链的第一步:反思是什么时候、由谁生成的(时间取记录的 created_at)。"""
+    ref = data.get("reflection") or {}
+    text = str(ref.get("text") or "")
+    created = str((data.get("manifest") or {}).get("created_at") or "")
+    events = []
+    if text.strip():
+        events.append({
+            "step": "reflection", "at": created or None,
+            "who": str((data.get("manifest") or {}).get("judge_model") or "本地模型"),
+            "action": "生成 Reflection",
+            "result": "反思正文 {} 字".format(len(text)),
+            "detail": {"quality": (ref.get("quality") or {}).get("status"),
+                       "chars": len(text)},
+        })
+    else:
+        events.append({"step": "reflection", "at": None, "who": None,
+                       "action": "生成 Reflection", "result": "记录里没有反思正文",
+                       "missing": "记录缺 reflection.text", "has_data": False})
+    return events
+
+
+def _audit_router(data: dict) -> list:
+    """链的第二步:Router 拆出几条问题、分别归到哪个专业。"""
+    ro = data.get("router") or {}
+    issues = ro.get("issues") or []
+    if not issues and not ro.get("raw"):
+        return [{"step": "router", "at": None, "who": None,
+                 "action": "Router 分类与路由", "result": "记录里没有 Router 产物",
+                 "missing": "记录缺 router.issues", "has_data": False}]
+    eb = ro.get("executed_by") or {}
+    cats = {}
+    for i in issues:
+        c = str(i.get("expert_category_id") or "(未标)")
+        cats[c] = cats.get(c, 0) + 1
+    return [{
+        "step": "router", "at": None,
+        "who": "{} {}@{}".format(eb.get("source") or "?", eb.get("model") or "?",
+                                 eb.get("host") or "local") if eb else None,
+        "action": "Router 分类与路由",
+        "result": "拆出 {} 条问题:{}".format(
+            len(issues), "、".join("{}×{}".format(k, v) for k, v in sorted(cats.items())) or "无"),
+        "detail": {"n_issues": len(issues), "by_category": cats,
+                   "executed_by": eb or None,
+                   "expert_pool_version": ro.get("expert_pool_version") or None},
+    }]
+
+
+def _audit_platform_gap(step: str, label: str, why: str) -> dict:
+    """平台侧负责、产物推不出来的那几步:如实标 void,不编时间也不编人。
+
+    `has_data=False` 是给 `chain[].covered` 用的判据 —— 这条事件只是**占位说明**,
+    不代表这一节点在产物里有证据(第一版拿"step 出现过"当 covered,把平台侧三步
+    显示成了绿的,`sample8b15-009` 实测暴露)。
+    """
+    return {"step": step, "at": None, "who": None, "action": label,
+            "result": "由平台侧负责", "platform_side": True, "has_data": False, "note": why}
+
+
+def _audit_expert_events(marks: list, run_id: str) -> list:
+    """链的第三段:每条任务上专家提交的每一份意见(含被取代的旧版本 —— 不删)。
+
+    排序按 `marked_at`(带时区,跨机可比);缺它的老行按 `marked_time` 补,再缺就排最后。
+    """
+    rows = []
+    for m in marks:
+        rv = m.get("review") if isinstance(m.get("review"), dict) else {}
+        if str(rv.get("run_id") or "") != run_id:
+            continue
+        rows.append(m)
+
+    def _key(m):
+        rv = m.get("review") or {}
+        t = str(m.get("marked_at") or m.get("marked_time") or "")
+        return (t or "~", str(rv.get("issue_id") or ""), int(str(rv.get("version") or 1) or 1))
+
+    rows.sort(key=_key)
+    events = []
+    for m in rows:
+        rv = m.get("review") or {}
+        verdict = str(m.get("verdict") or "")
+        origin = str(m.get("origin") or "expert")
+        events.append({
+            "step": "expert_review",
+            "at": m.get("marked_at") or m.get("marked_time") or None,
+            "who": str(m.get("operator") or "unattributed"),
+            "action": "提交意见",
+            "has_data": True,
+            "result": "{}:{} {}".format(
+                rv.get("issue_id") or "(无坐标)",
+                rv.get("expert_category_id") or "(未标专业)",
+                VERDICT_REVERSE.get(verdict, verdict)),
+            "detail": {
+                "issue_id": rv.get("issue_id"),
+                "expert_category_id": rv.get("expert_category_id"),
+                "verdict_platform": rv.get("verdict_platform") or VERDICT_REVERSE.get(verdict),
+                "verdict_internal": verdict,
+                "version": rv.get("version"),
+                "supersedes": rv.get("supersedes") or None,
+                "formation": rv.get("formation"),
+                "expert_ref": rv.get("expert_ref"),
+                "reason": rv.get("reason") or None,
+                "has_correction": bool(str(m.get("correction") or "").strip()),
+                # origin != expert 的行不算"专家意见"(导出侧同样拒收),链上要显示出来
+                "origin": origin,
+                "counted": origin == "expert",
+            },
+        })
+    return events
+
+
+def _audit_pool_events(run_id: str) -> list:
+    """链的最后一步:这条 Run 的任务在最近一次导出里进没进池。
+
+    ⚠ 导出报告只在有人跑 `lora_prep --export` 时重写,所以它不是实时真值;
+    `generated_at` 必须一起给出去,读的人才知道它落后磁盘多久。
+    """
+    by_task, generated = _pool_rows()
+    rows = [r for k, rs in by_task.items() if k.split("|", 1)[0] == run_id for r in rs]
+    if not rows:
+        # 没进池 = 这条 Run 的池状态**未知**(报告可能是旧的、或这条 Run 从没导出过),
+        # 不是"没进池"这个结论 —— 所以 has_data=False,chain 上显示未覆盖。
+        return [{"step": "training_pool", "at": None, "who": None,
+                 "action": "进入训练材料池",
+                 "result": "最近一次导出里没有这条 Run 的任务",
+                 "detail": {"report_generated_at": generated}, "has_data": False,
+                 "note": "报告只在跑 lora_prep --export 时重写,可能是还没导出过"}]
+    sft = sum(1 for r in rows if r.get("sft_in"))
+    dpo = sum(1 for r in rows if r.get("dpo_in"))
+    ev = {
+        "step": "training_pool", "at": generated, "who": "lora_prep --export",
+        "action": "进入训练材料池",
+        "result": "{} 条任务:SFT {} 份 / 偏好对 {} 份".format(len(rows), sft, dpo),
+        "detail": {"report_generated_at": generated, "n_tasks": len(rows),
+                   "sft_in": sft, "dpo_in": dpo,
+                   "rejected_reasons": sorted({e for r in rows
+                                               for e in (r.get("rejected_reasons")
+                                                         or r.get("errors") or [])})},
+        # ⚠ at 是"报告生成时间",不是"进池时间" —— 它可能早于这条 Run 的最后一份
+        # 意见(10-07 的报告 vs 10-09 的审核)。`at_semantics` 让排序别拿它当
+        # 真实发生时间用,见 expert_audit_trail 里的 _sort_key。
+        "at_semantics": "report_generated_at",
+    }
+    if not sft and not dpo:
+        # 在报告里出现了、但一份都没进 SFT/偏好对 ⇒ 没真进池,链上不该显示成
+        # 已完成(排除原因就在 detail.rejected_reasons 里)。
+        ev["has_data"] = False
+    return [ev]
+
+@router.get("/api/expert/audit-trail")
+def expert_audit_trail(run_id: str = ""):
+    """按 Run 回溯整条处理链(05 §五 / 01 §十三)。
+
+    返回一条**按时间排好**的事件列表,覆盖七个节点;取不到的节点如实标 missing /
+    platform_side,不拿相近的东西冒充。平台侧只要按 `events` 顺序渲染即可。
+    """
+    from live.reflections import load_marks
+
+    run_id = str(run_id or "").strip()
+    if not run_id or "/" in run_id or ".." in run_id:
+        return JSONResponse({"ok": False, "errors": ["run_id 非法"]}, status_code=400)
+
+    from .review_app import _runs_dir
+    path = os.path.join(_runs_dir(), run_id, "run.json")
+    if not os.path.isfile(path):
+        return JSONResponse({"ok": False, "errors": ["记录不存在"]}, status_code=404)
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    events = []
+    events += _audit_reflection(data, run_id)
+    events += _audit_router(data)
+    events.append(_audit_platform_gap(
+        "assignment", "专家分配",
+        "分配由平台侧执行(本平台只到「建单候选」为止,见 /api/expert/queue 的 note);"
+        "平台写回标记之后才能看到结果"))
+    events += _audit_expert_events(load_marks(), run_id)
+
+    # 冲突:从产物只能看出"同任务多份结论不一致",看不出平台有没有真开争议轮
+    marks = [m for m in load_marks()
+             if str(((m.get("review") or {}).get("run_id")) or "") == run_id]
+    tally = _opinion_tally([m for m in marks])
+    disputed = [k for k, v in tally["verdicts_by_task"].items()
+                if len(v) > 1 and tally["by_task"].get(k, 0) >= 2]
+    if disputed:
+        events.append({
+            "step": "conflict", "at": None, "who": None,
+            "action": "冲突追加审核",
+            "result": "{} 条任务两份结论互斥 → 需追加未参与前一轮的专家".format(len(disputed)),
+            "detail": {"disputed_tasks": ["|".join(k) for k in disputed]},
+            "undecidable": "是否真的开了争议轮、追加了谁 —— 平台侧负责,产物里看不到",
+        })
+    else:
+        events.append({"step": "conflict", "at": None, "who": None,
+                       "action": "冲突追加审核",
+                       "result": "判定不了:当前不足两份互斥意见",
+                       "undecidable": "冲突要两份结论互斥才能判;不足两份时"
+                                      "「没有冲突」与「还没审」在产物里长得一样",
+                       "has_data": False})
+
+    n_tasks = len(set(
+        (str((m.get("review") or {}).get("issue_id")),
+         str((m.get("review") or {}).get("expert_category_id")))
+        for m in marks if (m.get("review") or {}).get("issue_id")))
+    decided = tally["opinions_counted"]
+    fv = {
+        "step": "final_verdict", "at": None, "who": None,
+        "action": "最终审核结果",
+        "result": "已收 {} 份计票意见,涉及 {} 条任务".format(decided, n_tasks),
+        "detail": {"opinions_counted": decided, "n_tasks_with_marks": n_tasks,
+                   "excluded": tally["excluded"]},
+        "note": "多数裁决与最终定稿由平台侧负责;这里只报**已写回的**意见数",
+    }
+    if decided == 0:
+        # 一份计票意见都没有时,"最终结果"是**推不出来**的,不能显示成"0 份"就算数
+        fv["result"] = "判定不了:还没有写回的计票意见"
+        fv["has_data"] = False
+        fv["undecidable"] = "产品里没有任何 origin=expert 的意见写回,谈不上最终结果"
+    events.append(fv)
+    events += _audit_pool_events(run_id)
+
+    order = {s: i for i, (s, _) in enumerate(AUDIT_CHAIN_STEPS)}
+
+    def _sort_key(e):
+        # 时间轴只用来排"真按时间发生"的事件。
+        # ⚠ `training_pool` 的 at 是**报告生成时间**,不是进池时间(报告可能早于这条
+        # Run 的最后一份意见)⇒ 它不参与时间排序,一律钉到链尾,否则会插在审核中间
+        # (`sample8b15-009` 实测:10-07 的池快照排到了 10-09 的审核之前)。
+        if e.get("at_semantics") == "report_generated_at":
+            return (2, "", order.get(e.get("step"), 99))
+        t = str(e.get("at") or "")
+        return (1 if not t else 0, t or "", order.get(e.get("step"), 99))
+
+    events.sort(key=_sort_key)
+    # covered 只算"产物里有真实证据"的节点:平台侧占位与 missing/undecidable 都不算,
+    # 否则链上会出现"绿的但其实什么都没有"(第一版就是这么错的)。
+    covered = {e["step"] for e in events if e.get("has_data", True) is not False
+               and not e.get("platform_side")}
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "chain": [{"step": s, "label": lb,
+                   "covered": s in covered} for s, lb in AUDIT_CHAIN_STEPS],
+        "events": events,
+        "n_events": len(events),
+        "boundaries": {
+            "what_this_shows": "本平台产物里**能看到的**那几段:Reflection 生成、Router 分类、"
+                              "专家提交的每一份意见、任务是否进训练材料池",
+            "what_this_cannot_show": "专家分配/争议轮/多数裁决在平台侧执行,产物里推不出来 —— "
+                                     "这几步如实标 platform_side,不编造时间与责任人",
+            "who_note": "5010 面无鉴权,operator 是服务端观测到的连接方地址(同机即 "
+                        "peer:127.0.0.1),不是真人身份",
+        },
+    }
 
 
 def _review_state(n: int, n_distinct_verdicts: int) -> str:
