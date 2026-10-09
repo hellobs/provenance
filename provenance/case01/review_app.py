@@ -368,6 +368,10 @@ _PAGE = r"""<!DOCTYPE html>
   .expertlink { margin-left:auto; font-size:13px; color:#0b5cad; text-decoration:none;
                 border:1px solid #a8cfe8; border-radius:8px; padding:5px 10px; background:#f0f7fd; }
   .expertlink:hover { background:#e1f0fb; }
+  /* 嵌入面里不给这条跨页链接:它在宿主 iframe 里整页跳走,宿主收不到任何消息就把
+     "结果记录"卡片换成专家面板,且没有回来的路(2026-10-09 实测)。平台要专家面
+     自己放进自己的导航;要看就给 /review 全页面的这条链接。 */
+  body.embed .expertlink { display:none; }
   header .meta { font-size:12px; color:var(--mut); margin-left:auto; min-width:0;
                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   header .meta a { color:var(--accent); text-decoration:none; }
@@ -877,7 +881,17 @@ async function pick(id) {
   if (id === LIVE_ID) { await loadLive(true); return; }
   const r = await fetch(`/api/review/run/${encodeURIComponent(id)}` + (SAFE ? "?safe=1" : ""));
   DATA = await r.json();
+  syncExpertLink(id);
   render();
+}
+
+// "去专家审核 →"要带上"我现在在看哪条",否则对面是个凭空的面板、返回时也回不到这条
+// (2026-10-09:返回链接原来写死 /review,记不住来源)。嵌入面下这条链接被 CSS 隐藏,
+// 因为整页跳转会换掉宿主 iframe 的内容且没有回来的路。
+function syncExpertLink(id) {
+  const a = document.querySelector(".expertlink");
+  if (!a) return;
+  a.href = "/review/expert?run=" + encodeURIComponent(id || "") + "&from=review";
 }
 
 // ---- 实时记录:小镇在动,这里每 2 秒跟着长 ----

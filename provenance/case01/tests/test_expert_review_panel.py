@@ -162,6 +162,47 @@ class ExpertPanelCase(unittest.TestCase):
         self.assertEqual(rep["stats"]["dpo"], 1, rep["stats"])
         self.assertEqual(rep["stats"]["rejected"], 0, rep["stats"])
 
+    # ---- 两个面之间的往返(2026-10-09 修:以前回不到原来那条记录) ----
+
+    def test_embed_expert_is_a_real_embedded_layout(self):
+        """`/embed/expert` 必须切到 `body.embed`:去掉大标题本页返回链接。
+
+        此前它只是 `/review/expert` 的别名 —— 嵌进宿主 iframe 后点"← 回到只读面"
+        会整页跳走,宿主收不到消息,于是"点开专家面板就回不去了"。
+        """
+        html = self.c.get("/embed/expert").text
+        self.assertIn("body.embed", html, "嵌入版式规则没了")
+        self.assertIn("body.embed header h1", html, "大标题在嵌入面里该隐藏")
+        self.assertIn("body.embed #backlink", html, "本页返回链接在嵌入面里该隐藏")
+        # 前端要有 embed 判定,否则上面三条 CSS 永远不会生效
+        self.assertIn("location.pathname.indexOf(\"/embed/\")", html)
+        self.assertIn("classList.add(\"embed\")", html)
+
+    def test_expert_page_backlink_keeps_run_and_source(self):
+        """返回链接要带回 `?run=`(全页面版式下可见)。
+
+        以前写死 `/review`,离开后就回不到刚才看的那条记录。
+        """
+        html = self.c.get("/review/expert").text
+        self.assertIn('id="backlink"', html, "返回链接要有 id 供前端改写")
+        self.assertIn("var WANT_RUN", html, "前端要读 ?run=")
+        self.assertIn("var FROM", html, "前端要读 ?from=")
+        self.assertIn('encodeURIComponent(WANT_RUN)', html, "返回时要把 run 拼回去")
+        # 前端不能只读参数不用:拼 target 的那几行必须在
+        self.assertIn('target = "/embed/review"', html, "来源是嵌入面时要指回嵌入面")
+
+    def test_readonly_face_hides_expert_link_when_embedded(self):
+        """结果记录嵌入面里不给跨页的"去专家审核"链接。
+
+        它在宿主 iframe 里整页跳走,宿主只看到"结果记录"卡片被换成专家面板,
+        且没有回来的路 —— 所以嵌入模式下隐藏,要跳就用 `/review` 全页面。
+        """
+        embed = self.c.get("/embed/review").text
+        self.assertIn("body.embed .expertlink", embed, "嵌入面缺少隐藏规则")
+        plain = self.c.get("/review").text
+        self.assertIn("syncExpertLink", plain, "全页面要能同步当前 run 到链接里")
+        self.assertIn("from=review", plain)
+
 
 if __name__ == "__main__":
     unittest.main()

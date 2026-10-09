@@ -14,12 +14,13 @@
 
 路由清单(挂在 case01 实时面 5010 上,由 `review_app.attach_to` 一并 include):
 
-- `/review/expert`  面板页(带大标题)
-- `/embed/expert`   **同一页的别名,目前没有嵌入版式**:`review_app` 那边有"前端按 `/embed/` 路径切
-                    `body.embed` 压缩版式"的机制(见 `review_app.py` 里的 `EMBED` 判定与 CSS),
-                    **本面板没有接**,所以引这个地址拿到的与 `/review/expert` 完全一样
-                    (含大标题与"← 回到只读面")。要给平台做嵌入版式,照 `review_app` 那套补,
-                    别把这两个地址对外说成两种版式。
+- `/review/expert`  面板页(全页版式,带大标题与"← 回到只读面")
+- `/embed/expert`   **嵌入版式**:同一份 HTML,前端按 `/embed/` 路径(或 `?embed=1`)切
+                    `body.embed` —— 去掉大标题与本页自己的返回链接(2026-10-09 补;
+                    此前它只是别名,嵌进宿主 iframe 后点"← 回到只读面"会整页跳走、
+                    回不到原记录,见 `review_app` 的 `body.embed .expertlink{display:none}`)。
+- 深链参数:`?run=<run_id>` 进来直接定位那条记录的第一条任务(只读面点过来时带上);
+                    `?from=review|embed` 决定"← 回到只读面"指回哪一面的原记录。
 - `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开;除最近若干条外,
                     「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)强制进队列并按状态排序,见 `_recent_runs`)
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
@@ -895,6 +896,14 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
   .rubric ol { margin: 6px 0 6px 18px; padding: 0; }
   .task .st { color: #57606a; }
   .task .st b { color: #cf222e; }
+  /* 嵌入版式:与 review_app 的 `body.embed` 同一套判定(`/embed/` 路径或 ?embed=1`)。
+     去掉大标题与本页自己的返回链接 —— 在宿主 iframe 里它们是多余的,而且那个
+     "← 回到只读面"会整页跳走(2026-10-09 修:以前嵌进去就没有回来的路)。 */
+  body.embed { background:#fff; }
+  body.embed header { padding:9px 12px; }
+  body.embed header h1 { display:none; }
+  body.embed #backlink { display:none; }
+  body.embed main { padding:8px 10px 12px; }
 </style>
 </head>
 <body>
@@ -902,7 +911,7 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
   <h1>专家审核面板 · 参照实现</h1>
   <p>一条「问题 + 专业类别」一份意见。界面由平台侧重写,这里是<b>字段与后果的样子</b>。
      <span class="meta" id="counts"></span>
-     <a href="/review" class="meta">← 回到只读面(看记录)</a></p>
+     <a href="/review" class="meta" id="backlink">← 回到只读面(看记录)</a></p>
   <p class="how">怎么做:<b>①</b> 左边选一条任务(可按风险高低筛) → <b>②</b> 右边<b>默认只给
      你要审的那条问题</b>和它在原文里的定位,想看整篇再点"读整篇反思原文" →
      <b>③</b> 选一个结论:认可 = 这段反思核心成立、无需实质修改;<b>建议修改</b> = 方向有价值但有
@@ -942,6 +951,21 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
 </main>
 <script>
 var TASK = null, FULL = "";
+var Q = new URLSearchParams(location.search);
+var EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") === 0;
+var FROM = Q.get("from") || "";       // "review" = 从只读面点进来的
+var WANT_RUN = Q.get("run") || "";    // 只读面正在看的那条,进来就直接定位
+if (EMBED) { document.body.classList.add("embed"); }
+// 返回链接要记住来源与那条记录 —— 以前写死 /review,离开后回不到原来那条(2026-10-09)。
+// 非嵌入时按 ?from= 拼;没给来源时用 referrer 兜底;都没有才给裸 /review。
+(function () {
+  var a = document.getElementById("backlink");
+  if (!a) return;
+  var target = "/review", label = "← 回到只读面(看记录)";
+  if (FROM === "embed") { target = "/embed/review"; }
+  if (WANT_RUN) { target += (target.indexOf("?") >= 0 ? "&" : "?") + "run=" + encodeURIComponent(WANT_RUN); }
+  a.href = target;
+})();
 function esc(s) { var d = document.createElement("div"); d.textContent = (s == null ? "" : String(s)); return d.innerHTML; }
 function api(u, o) { return fetch(u, o).then(function (r) { return r.json(); }); }
 // 两处刷新(进页面、提交完)用同一个式子,免得第二处把新增的那半句漏掉
@@ -981,6 +1005,23 @@ api("/api/expert/queue?limit=10").then(function (q) {
   }
   drawQueue();
   document.getElementById("risk").onchange = drawQueue;
+  // ?run=<id> 直接定位到那条记录的第一条任务(从只读面点进来时就带这个参数)。
+  // 该 run 不在窗口内(队列只扫最近 MAX_QUEUE_RUNS 条)时如实说,不静默什么都不做。
+  if (WANT_RUN) {
+    var hit = TASKS.filter(function (t) { return t.run_id === WANT_RUN; })[0];
+    if (hit) {
+      // 高亮要落在**这一条**的节点上:drawQueue 后节点顺序 = 过滤后的 TASKS 顺序,
+      // 直接取第一个会把高亮画到别的任务上(只读面点进来时最容易被看出来)。
+      var shown = TASKS.filter(function (t) {
+        var w = document.getElementById("risk").value; return !w || t.risk === w; });
+      pick(hit, document.querySelectorAll("#queue .task")[shown.indexOf(hit)]);
+    } else {
+      var box = document.getElementById("queue");
+      box.insertAdjacentHTML("afterbegin",
+        "<div class='task err'>指定记录 " + esc(WANT_RUN) +
+        " 不在本次扫描窗口内(队列按 mtime 只扫最近若干条),下面列出的是窗口内的任务。</div>");
+    }
+  }
   return api("/api/expert/marks");
 }).then(function (m) {
   document.getElementById("counts").textContent = countsLine(m);
@@ -1143,6 +1184,7 @@ def expert_index():
 
 @router.get("/embed/expert", response_class=HTMLResponse)
 def expert_embed():
-    """`/review/expert` 的别名,**不是**嵌入版式(本文件没有 `body.embed` 那套前端判定)。
-    留着是为了与 `review_app` 的路由形状对齐;要做真压缩版式请照 `review_app.py:463` 补。"""
+    """`/review/expert` 的嵌入版式:同一份 HTML,前端按 `/embed/` 路径(或 `?embed=1`)
+    切到 `body.embed` —— 去掉大标题与本页自己的"← 回到只读面"链接(2026-10-09 补;
+    以前这里只是别名,嵌进宿主 iframe 后那个返回链接会整页跳走、回不到原记录)。"""
     return HTMLResponse(_EXPERT_PAGE)
