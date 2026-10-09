@@ -100,7 +100,9 @@ def _recent_runs(limit: int, must_include=()):
         if fc.quality_of(data).get("quality") in _HIDDEN_QUALITY:
             continue
         picked.append((run_id, data))
-    return picked, scanned
+    # 第三个返回值是"这个库里一共有多少条成品记录" —— 队列只扫窗口内那些,
+    # 调用方要能算出"这次没读到多少条"(见 expert_queue 的 records_not_scanned)。
+    return picked, scanned, len(by_run)
 
 
 COUNTING_RULE = ("一份意见 = 一个 review.expert_ref 在该任务上的最新版本,且 origin 是 expert"
@@ -184,7 +186,7 @@ def expert_queue(limit: int = 10):
 
     pool_rows, pool_at = _pool_rows()
 
-    picked, scanned = _recent_runs(limit, must_include=pending_runs)
+    picked, scanned, total_runs = _recent_runs(limit, must_include=pending_runs)
     tasks, triage, blocked = [], [], []
     for run_id, data in picked:
         pkg = build_review_package(data, run_id)
@@ -218,6 +220,14 @@ def expert_queue(limit: int = 10):
     # 面板那边同款排序在 _EXPERT_PAGE 的 TASKS.sort 里。
     tasks.sort(key=lambda t: (t["state_rank"], _RISK_ORDER.get(t["risk"], 3), t["run_id"]))
     return {"n_runs_scanned": scanned, "n_tasks": len(tasks),
+            # 队列是**窗口**而不是全库(每条要读一次 run.json,所以 MAX_QUEUE_RUNS 封顶)。
+            # 第五轮体检实测:n_tasks 随 limit 漂移(1→20、10→63、50→155),而面板顶部把它当
+            # "可建单任务 N 条"直接显示 ⇒ 只给一个数就是谎。这里把窗口与欠扫的条数一起给出去。
+            "window": {"limit": limit, "max_runs": MAX_QUEUE_RUNS},
+            "total_review_records": total_runs,
+            "records_not_scanned": max(0, total_runs - scanned),
+            "n_tasks_scope": "n_tasks/n_manual_triage/n_blocked 都是本次扫描窗口内的数,"
+                             "不是全库待审总量;要总量看 total_review_records 与 records_not_scanned",
             "n_manual_triage": len(triage), "n_blocked": len(blocked),
             "tasks": tasks, "manual_triage": triage, "blocked": blocked,
             "verdict_words": sorted(VERDICT_ALIAS),
@@ -227,6 +237,9 @@ def expert_queue(limit: int = 10):
             "opinions_counted": tally["opinions_counted"], "excluded": tally["excluded"],
             "counting_rule": COUNTING_RULE,
             "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
+                    "⚠ **n_tasks 是窗口数不是总量**:本次只读 min(limit, MAX_QUEUE_RUNS) 条记录"
+                    "(外加凡有人评过的),没读到的条数写在 records_not_scanned 里 —— "
+                    "把 n_tasks 当「全库待审」显示会把一百多条说成几十条。"
                     "除最近 limit 条外,凡「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)"
                     "都强制进队列(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > "
                     "争议轮 > 等第二份 > 待领取 > 首轮已齐 —— 已齐的列在队尾但不隐藏(面板不接单,"
@@ -668,8 +681,11 @@ api("/api/expert/queue?limit=10").then(function (q) {
     return r !== 0 ? r : (a.run_id < b.run_id ? -1 : 1);
   });
   document.getElementById("summary").textContent =
-    "可建单任务 " + q.n_tasks + " 条 · 人工分流 " + q.n_manual_triage +
-    " 条 · 不可审 " + q.n_blocked + " 条(扫了 " + q.n_runs_scanned + " 条记录)";
+    "本次扫描 " + q.n_runs_scanned + "/" + q.total_review_records +
+    " 条记录,展开可建单任务 " + q.n_tasks + " 条" +
+    (q.records_not_scanned ? "(还有 " + q.records_not_scanned + " 条记录没扫到)" : "(已扫完)") +
+    " · 人工分流 " + q.n_manual_triage +
+    " 条 · 不可审 " + q.n_blocked + " 条";
   if (!q.tasks.length) {
     document.getElementById("queue").innerHTML =
       "<div class='task err'>队列为空:扫过的这些记录里没有「问题+专业」的建单候选" +

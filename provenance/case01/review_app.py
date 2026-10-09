@@ -193,6 +193,12 @@ def list_runs(safe: int = 0, include_questionable: int = 0):
     `_brief(..., safe=True)` 那套剥离。
     """
     items = [_brief(r, safe=bool(safe)) for r in _discover_runs()]
+    # 排序与 `/api/runs` 对齐(2026-10-09 第五轮体检):此前这里**根本没排序**,`_discover_runs()`
+    # 给的是 run_id 字典序**升序**,于是九块面最前列的是 9 月那批老记录、而索引面最前列的是最新一条
+    # —— 两个面"取第一条"差着 20 天。实测后果:默认视图**最前 20 条**的 `/api/review-package`
+    # 全是 `manual_triage` + 0 候选(那批老记录 Router 还没跑成),末 10 条才出现 `ready` 8。
+    # 读不到 run.json 的行没有 end_date,按空串排在最后(它们本来也不该被当"最新一条"取走)。
+    items.sort(key=lambda it: (str(it.get("end_date") or ""), str(it.get("run_id") or "")), reverse=True)
     hidden = []
     if safe and not include_questionable:
         keep = []
