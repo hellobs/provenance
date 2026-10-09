@@ -66,6 +66,14 @@ function makeSandbox(opts) {
     parent: null,
     document: {
       getElementById: (id) => (els[id] || (els[id] = el())),
+      // querySelector 按 id 形式(".x" / "#x")复用同一个 stub 对象,够页面做"取一个节点改属性"
+      // 这类事;选择器语法不解析(最小 stub 不做 DOM)。2026-10-09 补:页面新加的
+      // syncExpertLink 用了它,stub 缺了就在初始化阶段抛,把探针自己的缺口
+      // 误报成"面板坏了"(CI 上是这么红的)。
+      querySelector: (sel) => {
+        const key = "#qsel:" + String(sel);
+        return els[key] || (els[key] = el());
+      },
       querySelectorAll: () => [],
       createElement: el,
       body: { classList: { add: () => {}, remove: () => {} } },

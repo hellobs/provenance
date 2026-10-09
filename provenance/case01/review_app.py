@@ -476,7 +476,7 @@ _PAGE = r"""<!DOCTYPE html>
   <select id="pick"></select>
   <span class="meta" id="hmeta">加载中…</span>
   <!-- 只读面与审核面是一体的两件事:看 → 判。入口放在这里,专家不必记第二个地址。 -->
-  <a class="expertlink" href="/review/expert" title="对一条「问题＋专业类别」下结论并写回训练线">去专家审核 →</a>
+  <a class="expertlink" id="expertlink" href="/review/expert" title="对一条「问题＋专业类别」下结论并写回训练线">去专家审核 →</a>
 </header>
 <div class="wrap">
   <nav id="nav"></nav>
@@ -888,8 +888,10 @@ async function pick(id) {
 // "去专家审核 →"要带上"我现在在看哪条",否则对面是个凭空的面板、返回时也回不到这条
 // (2026-10-09:返回链接原来写死 /review,记不住来源)。嵌入面下这条链接被 CSS 隐藏,
 // 因为整页跳转会换掉宿主 iframe 的内容且没有回来的路。
+// 用 getElementById 而不是 querySelector:本仓的运行期自查工具(review_panel_probe.js)
+// 只有最小 DOM stub,没实现 querySelector —— 用它会让那个工具在初始化阶段就抛。
 function syncExpertLink(id) {
-  const a = document.querySelector(".expertlink");
+  const a = document.getElementById("expertlink");
   if (!a) return;
   a.href = "/review/expert?run=" + encodeURIComponent(id || "") + "&from=review";
 }

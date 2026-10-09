@@ -35,10 +35,13 @@ def test_probe_dom_stub_covers_host_protocol():
 
     2026-09-25:探针在 `window.addEventListener` 上初始化就抛 —— 宿主协议落地后 stub 没跟上,
     这个唯一的运行期自查工具**静默坏了**(它不在 CI 里,没人发现)。这里钉住它至少能初始化。
+    2026-10-09:同一类再犯一次 —— 页面新增 `syncExpertLink` 用了 `document.querySelector`,
+    stub 里没有,CI 在初始化阶段抛。所以清单里也带上 `querySelector`。
     """
     src = io.open(_PROBE, encoding="utf-8").read()
-    for api in ("addEventListener", "postMessage", "parent"):
-        assert api in src, "探针 stub 缺 {} —— 宿主协议会让它在初始化阶段抛".format(api)
+    for api in ("addEventListener", "postMessage", "parent",
+                "querySelector:", "querySelectorAll:"):
+        assert api in src, "探针 stub 缺 {} —— 页面用到它就会在初始化阶段抛".format(api)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="没有 node,跳过页面 JS 行为检查")
