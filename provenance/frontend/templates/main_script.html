@@ -748,24 +748,24 @@
 				new_sprite.body.y - 8,
 				"",
 				{
-					// 字体从 18px 调小到 14px(2026-10-09 用户要求"字体调小、字尽量显示完"):
-					// 小字号下同一块气泡能容纳更多字,长句不必早早截断。
-					font: "14px monospace",
+					// 字号 12px(2026-10-09 用户反馈"极其拥挤"):14px 时两角色靠近,
+					// 气泡横向各 180px 必然糊在一起。降到 12px + 限宽 128px,
+					// 同一块屏能容下两个人的气泡而不打架。
+					font: "12px monospace",
 					fill: "#000000",
 					backgroundColor: "#ffffcc",
-					padding: { x: 4, y: 4},
+					padding: { x: 4, y: 3 },
 					border:"solid",
 					borderRadius:"10px",
-					// 头顶气泡要能换行(2026-10-09 用户反馈"聊天气泡要支持换行"):
-					// 原来这里没设 wordWrap,长句就横向铺成一行糊在头上。
-					// 限宽 180px(14px 字号下约 12 个中文字/行),超出自动折行。
+					// 限宽 128px(12px 字号下约 10 个中文字/行),超出自动折行
 					align: "left",
-					wordWrap: { width: 180, useAdvancedWrap: true },
+					wordWrap: { width: 128, useAdvancedWrap: true },
 				}
 			).setDepth(3);
-			// 底部对齐:换行后**新行往上长**,最后一行始终贴着角色头顶
-			// (2026-10-09 用户要求"字要从下往上叠")。origin(0,1)= 左上角锚点但纵轴取底部。
-			pronunciatios[persona_name].setOrigin(0, 1);
+			// 锚点:水平**居中**、垂直**底部**(2026-10-09 用户要求"气泡一定要在人的上方")。
+			// origin(0.5,1) ⇒ x 是气泡中线,y 是气泡底边;底边贴着角色头顶,
+			// 换行时新行往上长,气泡始终稳稳挂在角色正上方、不会往左偏。
+			pronunciatios[persona_name].setOrigin(0.5, 1);
 			pronunciatios[persona_name].alpha = 0.7;
 
 			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
@@ -866,6 +866,12 @@
 			if (_focusEl) _focusEl.innerHTML = "";
 		}
 
+		// 气泡定位 + 避让:**必须在 early return 之前**做。
+		// 模拟结束(sim_finished)时 update 会提前 return,而气泡是纯 UI,
+		// 与"模拟是否在跑"无关 —— 放后面会导致结束后气泡卡在最后位置、
+		// 两角色贴近时永久重叠(2026-10-09 用户反馈"极其拥挤"的成因之一)。
+		layoutBubbles();
+
 		if (live_mode && (sim_finished || sim_error)) {
 			return;
 		}
@@ -938,7 +944,13 @@
 				continue;
 			}
 
-			if (dist <= step_px) {
+			// 到达判据必须与下面"每轴推进"的判据同口径(同样是**每轴**比 step_px)。
+			// 2026-10-09 修:原来用 2D 距离 `dist <= step_px` 判到达,而推进要求单轴
+			// `|dx|` 或 `|dy| >= step_px`。角色被避让推离轴线时两个轴都非零,就会掉进
+			// "dist 仍 > step_px(没算到达)、但两轴各自都 < step_px(推不动)"的夹缝 ——
+			// 浮点累加让残差恰好差一丁点时必现(实测卡在离目标 0.8px 处再也走不动,
+			// moved_axis 恒为空 ⇒ 要么原地踏步、要么僵住)。
+			if (Math.abs(dx) <= step_px && Math.abs(dy) <= step_px) {
 				// arrived at current waypoint: snap to it, take the next
 				curr_persona.body.x = target[0];
 				curr_persona.body.y = target[1];
@@ -1007,8 +1019,15 @@
 			}
 		}
 
-		// ---- agent 间分离:hitbox 重叠时,把后到者沿最短轴推开,避免两角色叠在同一格 ----
+		// ---- agent 间分离:hitbox 重叠时,把其中一个沿最短轴推开,避免两角色叠在同一格 ----
 		// (persona body 30x40;两角色中心到中心的最小水平/垂直避让,只推"没被墙挡住"的方向)
+		//
+		// 谁让位(2026-10-09 修):**没在走的那个让在走的那个**。
+		// 原来固定推数组里靠前的那一个,而它可能恰恰是正在走的人 —— 于是他每前进一步
+		// (0.8px)都会被"推离"按重叠量原样推回去,位置纹丝不动、走路动画却每帧都在播。
+		// 用户看到的就是"有走路但被前面的人挡住,一直在同一个地方走"。让停住的那个让路,
+		// 行走的人才能走到目标格;停住的人没有目标可争,被推走后是稳定的。
+		// 两人都在走、或都停着时,保持原来的"靠前的先让"。
 		for (let a = 0; a < agents.length; a++) {
 			let A = personas[agents[a]];
 			for (let b = a + 1; b < agents.length; b++) {
@@ -1018,34 +1037,41 @@
 				let overX = hx - Math.abs(A.body.x - B.body.x);
 				let overY = hy - Math.abs(A.body.y - B.body.y);
 				if (overX > 0 && overY > 0) {
+					let qa = movement_target[agents[a]], qb = movement_target[agents[b]];
+					let aMoving = !!(qa && qa.length), bMoving = !!(qb && qb.length);
+					let push_A = !(aMoving && !bMoving);      // a 在走、b 停着 → 推 b,其余推 a
+					let pushee = push_A ? A : B;
+					let anchor = push_A ? B : A;
 					// 选择要分离的轴:重叠侵入更小者优先推开(最少位移)
 					if (overX <= overY) {
-						let sx = A.body.x < B.body.x ? -overX : overX;
-						let nx = A.body.x + sx;
-						if (!tileWall(nx + 15, A.body.y + 20)) A.body.x = nx;
-						else { let nx2 = A.body.x - sx; if (!tileWall(nx2 + 15, A.body.y + 20)) A.body.x = nx2; }
+						let sx = pushee.body.x < anchor.body.x ? -overX : overX;
+						let nx = pushee.body.x + sx;
+						if (!tileWall(nx + 15, pushee.body.y + 20)) pushee.body.x = nx;
+						else { let nx2 = pushee.body.x - sx; if (!tileWall(nx2 + 15, pushee.body.y + 20)) pushee.body.x = nx2; }
 					} else {
-						let sy = A.body.y < B.body.y ? -overY : overY;
-						let ny = A.body.y + sy;
-						if (!tileWall(A.body.x + 15, ny + 20)) A.body.y = ny;
-						else { let ny2 = A.body.y - sy; if (!tileWall(A.body.x + 15, ny2 + 20)) A.body.y = ny2; }
+						let sy = pushee.body.y < anchor.body.y ? -overY : overY;
+						let ny = pushee.body.y + sy;
+						if (!tileWall(pushee.body.x + 15, ny + 20)) pushee.body.y = ny;
+						else { let ny2 = pushee.body.y - sy; if (!tileWall(pushee.body.x + 15, ny2 + 20)) pushee.body.y = ny2; }
 					}
 				}
 			}
 		}
 
-		// ---- text bubbles: reset to each agent's head (baseline) every frame, then detect overlaps ----
-		// 气泡原点已设为底部对齐(see setOrigin(0,1)):y 是**底边**位置。
-		// 底边放在角色头顶上方 8px,换行时新行往上长(字从下往上叠)。
-		// x 略微偏左(-28),避开角色正前方/正上方,减少与相邻角色气泡重叠(2026-10-09 用户要求"偏左或偏右")。
+	}
+
+	// ---- 气泡定位 + 重叠避让(独立函数:模拟结束后也要跑,见 update 里的调用) ----
+	// 锚点 origin(0.5,1):(x, y) 是气泡**底边中点**。
+	// x 取角色 hitbox 中心(body.x + 15,body 宽 30);y 取角色头顶往上 6px
+	// (2026-10-09 用户明确要求"气泡框一定要在人的上方",不再做 -28 的横向偏移)。
+	// 包围盒 = [x - w/2, x + w/2] × [y - h, y]。
+	// 重叠时把上面的气泡**继续往上叠**(往头顶让位,不遮住下方的人)。
+	function layoutBubbles() {
 		for (let i = 0; i < Object.keys(personas).length; i++) {
 			let name = Object.keys(personas)[i];
-			pronunciatios[name].x = personas[name].body.x - 28;
-			pronunciatios[name].y = personas[name].body.y - 8;
+			pronunciatios[name].x = personas[name].body.x + 15;
+			pronunciatios[name].y = personas[name].body.y - 6;
 		}
-
-		// ---- text bubble overlap: adjacent agents' bubbles offset vertically to avoid occlusion ----
-		// detect on the per-frame baseline; offset only when overlapping; bubbles return when agents separate
 		let bubbles = [];
 		for (let i = 0; i < Object.keys(personas).length; i++) {
 			let name = Object.keys(personas)[i];
@@ -1053,16 +1079,22 @@
 			if (!b.text) continue;
 			bubbles.push({ name: name, x: b.x, y: b.y, w: b.width, h: b.height });
 		}
-		bubbles.sort((a, b) => a.y - b.y || a.x - b.x);
+		// 从下往上处理:先摆好最靠下的,后来的往上让
+		bubbles.sort((a, b) => b.y - a.y || a.x - b.x);
 		for (let i = 1; i < bubbles.length; i++) {
-			let prev = bubbles[i - 1];
 			let cur = bubbles[i];
-			if (cur.x < prev.x + prev.w && prev.x < cur.x + cur.w &&
-				cur.y < prev.y + prev.h && prev.y < cur.y + cur.h) {
-				pronunciatios[cur.name].y = prev.y + prev.h + 2;
-				cur.y = pronunciatios[cur.name].y;
-				cur.h = pronunciatios[cur.name].height;
+			// 与已摆好的每一个比;只要水平有交集就往上抬到不重叠为止
+			for (let j = 0; j < i; j++) {
+				let prev = bubbles[j];
+				let hOverlap = Math.abs(cur.x - prev.x) < (cur.w + prev.w) / 2;
+				let vOverlap = cur.y > prev.y - prev.h && cur.y - cur.h < prev.y;
+				if (hOverlap && vOverlap) {
+					// 抬到 prev 的顶边之上(留 3px 间隙)
+					cur.y = prev.y - prev.h - 3;
+					cur.h = pronunciatios[cur.name].height;
+				}
 			}
+			pronunciatios[cur.name].y = cur.y;
 		}
 	}
 
