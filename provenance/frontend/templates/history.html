@@ -100,6 +100,10 @@
     来源 <span class="mono">/api/runs</span>(所有场景 × 运行方式的历史运行,按场景分层)。
     左侧点场景展开,点单条 run 看详情;详情由本页自渲染,不依赖当前跑的是哪个实时面。
   </div>
+  {# 默认被质检排除的条数必须在这一页上说出来:本页拉的是不带 include_questionable 的
+     /api/runs,标题那个"NNN 条历史记录"是**默认合格集**而不是全库数 ——
+     只写"全库可浏览"会让看的人以为少掉的那些不存在。 #}
+  <div class="explore-sub" id="explore-hidden" style="margin-top:-12px;"></div>
 
   <div class="explore-cols">
     <div class="explore-menu" id="explore-menu"></div>
@@ -344,6 +348,25 @@
 
   function renderMenu(res) {
     var G = groupRuns(res.runs, res.scenarios);
+    // 默认被排除的条数 + 数据源整块跳过,都要在这一页上看得见(两边都是"不静默"的约定)
+    var hid = document.getElementById("explore-hidden");
+    if (hid) {
+      var ex = res.excluded || {};
+      var txt = "";
+      if (ex.count) {
+        txt += '<span class="tag compressed">默认质检过滤</span> 另有 ' + ex.count +
+               ' 条没列在本页(本页拉的是不带 <span class="mono">?include_questionable=1</span>' +
+               ' 的 <span class="mono">/api/runs</span>),逐条原因看同一响应的' +
+               ' <span class="mono">excluded.runs</span>。' +
+               '<div class="hint">' + esc(ex.reason || "") + '</div>';
+      }
+      if ((res.source_errors || []).length) {
+        txt += '<div class="hint" style="color:#9b2c2c;">' +
+               esc(res.source_errors_note || ("有 " + res.source_errors.length + " 个数据源被整块跳过")) +
+               '</div>';
+      }
+      hid.innerHTML = txt;
+    }
     showOverview(res);
     // 概览行
     var ov = document.createElement("a");
