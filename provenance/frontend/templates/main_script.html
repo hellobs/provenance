@@ -255,8 +255,13 @@
 					if (note && !note.textContent) { note.style.display = "block"; note.textContent = ""; }
 					clearInterval(restartPoll); restartPoll = null;
 				} else if (h && h.finished) {
+					// 这句每 3 秒重写一次,会把 WS 那边按 finish_reason 写对的文案**盖掉**:
+					// 实测 --review-only 的面板上显示"结果生成中…",而它从没推演过、也不会有
+					// 结果生成。所以这里也要看 finish_reason,不能只看 finished。
 					document.getElementById("sim-status-text").textContent =
-						"推演已结束,结果生成中…(稍后出现“重开一局”)";
+						h.finish_reason === "review_only"
+							? "仅审阅模式:没有在推演(右栏可翻结果记录)"
+							: "推演已结束,结果生成中…(稍后出现“重开一局”)";
 				}
 			}).catch(function() { /* 网络抖动:下一次再问 */ });
 		}, 3000);

@@ -60,7 +60,7 @@ body { margin: 0; }
          只有调用方注册了 on_restart 才渲染,否则这个服务不支持重开。
          旁边的下拉是**通用**的 restart_choices(本页不知道 A/B/C 是什么):
          选中的值随 POST body 一起交给服务端。"为什么跑的全是 B" —— 现在能在这选。 -->
-    <div id="restart-box" style="display:none; margin-top:6px; display:flex; gap:6px; align-items:center;">
+    <div id="restart-box" style="display:none; margin-top:6px; gap:6px; align-items:center;">
         {% for c in restart_choices or [] %}
         <select id="restart-choice-{{ c.id }}" title="{{ c.label }}"
             style="font:inherit; font-size:12px; padding:3px 4px; border:1px solid #cfd6e0;
