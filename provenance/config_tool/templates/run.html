@@ -51,12 +51,6 @@
     </div>
 </div>
 
-<div class="section">
-    <h2 style="margin-top:0;">运行</h2>
-    <label>受判对象回答 <span class="opt">experiment-eval 需要;留空时自动取场景 inputs 样本回答;sandbox-value 忽略</span></label>
-    <textarea id="input_text" placeholder="选填 … 不填则自动用场景内置样本判定分支"></textarea>
-</div>
-
 <div id="result" style="margin-top:18px;"></div>
 {% endblock %}
 
@@ -157,14 +151,12 @@ function deleteComp(id){
     .then(function(r){return r.json();}).then(function(){ reloadComps(); }).catch(function(){});
 }
 function runComp(compId){
-    var comp = (window.ALL_COMPS||[]).filter(function(c){ return c.id === compId; })[0];
-    // experiment-eval 的"受判对象回答"默认取场景内置样本(inputs.sample_answers),
-    // 文本框只作可选的显式覆盖;留空也能跑,不再强制人工填。
-    var input_text = document.getElementById("input_text").value.trim();
+    // 输入框已从界面移除(2026-10-09):一律取场景内置样本判定分支。
+    // 后端 /api/run/execute 的 input_text 参数保留(留空即走样本),这里固定传空。
     fetch("/api/run/execute", {method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
             composition_id: compId,
-            input_text: input_text
+            input_text: ""
         })})
     .then(function(r){return r.json();})
     .then(render)
