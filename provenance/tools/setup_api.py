@@ -183,7 +183,9 @@ def main(argv=None) -> int:
             if spec.get("key_json"):
                 patch["router_api_key"] = key
         p = _merge_repo_secrets(patch)
-        print("已写入:{}  (已 gitignore,不会入库;合并写,其他 provider 的 key 不动)")
+        # 这行以前漏了 .format(p),于是把 "已写入:{}" 原样打出来 —— 新人最想知道的
+        # "key 落到哪个文件"恰好空着(10-09 实配 bigmodel 时看到)。
+        print("已写入:{}  (已 gitignore,不会入库;合并写,其他 provider 的 key 不动)".format(p))
         print("生效后端:router_provider={}  model={}  base={}".format(provider, model, base))
 
     if not key:

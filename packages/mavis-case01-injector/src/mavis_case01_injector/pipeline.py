@@ -33,15 +33,41 @@ def __getattr__(name):
     raise AttributeError(name)
 
 
+def _resolve_router(local, router_llm, external_router: bool):
+    """小镇面 N7(Router)由谁执行:显式注入 > **provider 配置** > `--external-router` > 本地。
+
+    provider 那一步与批路径 `case01/run.py` 共用 `router_client_from_env()`
+    (读 `CASE01_ROUTER_PROVIDER`,再读 `.secrets.json` 的 `router_provider`),所以
+    `tools/setup_api.py --router bigmodel --key …` 配一次,**两条面走同一个独立 API 模型**。
+    以前这条路只认 `--external-router` 那个开关,于是演示那面的 Router 永远是镇内
+    写建议的那个本地模型自己 —— 04 §五 要防的正是"自我分类"。
+    回落本地要分成两个词:`local_by_config` 是这次故意用本地(无网/无 key),
+    `local_fallback` 是配漏了 —— 只有后者是要修的故障。返回 (client, source)。
+    """
+    from mavis_case01_injector.llm import (OpenRouterClient, LOCAL_ROUTER_PROVIDERS,
+                                           router_client_from_env, router_provider_name)
+
+    if router_llm is not None:
+        return router_llm, "injected_router"
+    client, _ident = router_client_from_env()
+    if client is not None:
+        return client, "router_provider"
+    if external_router:
+        return OpenRouterClient(), "external_router_flag"
+    prov = router_provider_name()
+    return local, ("local_by_config" if prov in LOCAL_ROUTER_PROVIDERS and prov
+                   else "local_fallback")
+
+
 def _attach_reflection(record: dict, llm=None, router_llm=None,
                        external_router: bool = False,
                        reflection_mod=None) -> dict:
     """在映射后的记录上补 Reflection 与 Router（复用 case01 现有实现）。"""
-    from mavis_case01_injector.llm import OpenRouterClient, local_client_from_env
+    from mavis_case01_injector.llm import local_client_from_env
     from mavis_case01_injector._providers import import_reflection
 
     local = llm or local_client_from_env()
-    router = router_llm or (OpenRouterClient() if external_router else local)
+    router, source = _resolve_router(local, router_llm, external_router)
     _refl = reflection_mod or import_reflection()
     ref = _refl.run_reflection(local, record)
     record["reflection"] = {"material": ref["material"], "text": ref["text"],
@@ -56,13 +82,18 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     # 从对象属性探测,不读配置字符串 —— 与批路径同一份实现。
     from mavis_case01_injector.llm import router_identity
     executed_by = dict(router_identity(router))
-    # source 只描述**这条路自己的**选择方式,不与批路径那四个词
-    # (reflect_router / shared_router_llm / local_by_config / local_fallback)混用:
-    # 小镇面从不查 `CASE01_ROUTER_PROVIDER`,所以它没有"按配置刻意本地"这一档。
-    executed_by["source"] = ("injected_router" if router_llm is not None else
-                             ("external_router_flag" if external_router else "local_default"))
+    # source 词表与批路径共用:`router_provider` = 按配置造出来的独立客户端(批侧叫
+    # `reflect_router`,同一个 `router_client_from_env()` 出来的),`local_by_config` /
+    # `local_fallback` = 这次故意本地 / 配漏了。跨面比 `router.executed_by` 时这四个词
+    # 含义一致,不需要再按"哪条路"翻译一遍。
+    executed_by["source"] = source
     executed_by["separate_client_from_reflection"] = router is not local
     executed_by["external_api"] = executed_by.get("provider") == "api"
+    if not executed_by["external_api"]:
+        # 04 §五 没满足要说出口,不能只躺在产物字段里等人来查。
+        print("[!] Router 不是独立 API 模型(source={}):配一条 "
+              "`python provenance/tools/setup_api.py --router bigmodel --key <key>` 再跑"
+              .format(source))
     record["router"]["executed_by"] = executed_by
     print("[case01.pipeline] Router 后端={} {}@{}(与反思共用客户端={})".format(
         executed_by["source"], executed_by["model"], executed_by["host"] or "local",
@@ -237,8 +268,7 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     Router prompt 加 risk_note 要求之前跑的。重跑整条流水线会连反思一起重生成(浪费且改了原文),
     所以这里只重跑 Router;写回时留 `.bak`,并打印旧→新的字段完整度。
     """
-    from mavis_case01_injector.llm import (OpenRouterClient,
-                                           local_client_from_env)
+    from mavis_case01_injector.llm import (local_client_from_env, router_identity)
 
     with open(path, encoding="utf-8") as f:
         rec = json.load(f)
@@ -251,12 +281,21 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     # 于是"按环境变量在 8b 上补跑"实际跑的是 4b,且结果不可复现。
     # 与 orchestrator(2026-10-03)、branch_judge_eval / run --reflect-only
     # (2026-10-05)是同一形态的坑,本处是第三次复现。
-    router = router_llm or (OpenRouterClient() if external_router
-                            else local_client_from_env())
+    local = local_client_from_env()
+    router, source = _resolve_router(local, router_llm, external_router)
     old = ((rec.get("router") or {}).get("issues")) or []
     rout = run_router(router, text)
     rec["router"] = {"raw": rout.get("raw", ""), "issues": rout.get("issues") or [],
                      "expert_pool_version": rout.get("expert_pool_version", "")}
+    # 重跑会**整段替换** rec["router"],以前把上一次盖好的 `executed_by` 一起抹掉了 ——
+    # 补跑一次就把 04 §五 的证据弄丢,比不补更糟。这次重跑用的是谁,重新盖一遍。
+    executed_by = dict(router_identity(router))
+    executed_by["source"] = source
+    executed_by["separate_client_from_reflection"] = router is not local
+    executed_by["external_api"] = executed_by.get("provider") == "api"
+    rec["router"]["executed_by"] = executed_by
+    print("[case01.pipeline] 本次重跑 Router 后端={} {}@{}".format(
+        source, executed_by["model"], executed_by["host"] or "local"))
 
     def complete(issues):
         return sum(1 for i in issues
