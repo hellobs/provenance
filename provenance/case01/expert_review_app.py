@@ -25,7 +25,8 @@
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
 - `/api/expert/decision` 提交一份意见(approve/edit/reject + 自由文本)
 - `/api/expert/marks`   已提交意见的**计数**,不回内容也不回结论(见下)。
-                    没有任务坐标的旧探针不计入任务,单独以 `unattributed` 报数
+                    "几份"按提交主体折、来源非专家的不算,不计数的行在 `excluded` 里
+                    分类报数(口径见 `_opinion_tally` 与 `COUNTING_RULE`)
 
 三条设计口径(都不是审美选择,是规范里读出来的):
 1. **两套词汇在服务端桥接**。平台词 `approve/edit/reject`(《补充规范》§3)与本平台
@@ -102,6 +103,63 @@ def _recent_runs(limit: int, must_include=()):
     return picked, scanned
 
 
+COUNTING_RULE = ("一份意见 = 一个 review.expert_ref 在该任务上的最新版本,且 origin 是 expert"
+                 "(缺省按 expert 算);不计数的情形在 excluded 里报数(缺任务坐标 / "
+                 "来源显式非专家 / 被同主体新版本取代),理由见服务端 `_opinion_tally`")
+
+
+def _opinion_tally(marks):
+    """把盘上的标记行折成"每个任务有几份意见",并**报出三类不计数的情形**(不静默少算)。
+
+    写成一处是因为队列和 `/api/expert/marks` 以前各算各的:两份字典键形状不一致就
+    造出过 `tasks_disputed` 恒为 0 的假零(见 `expert_marks`)。
+
+    两条折算是照 2026-10-09 的台账逐行读出来的(全库 6 行的 origin/version/supersedes
+    都点过),不是凭口径设计:
+    1. 显式 `origin != "expert"` 的行不算意见(缺 `origin` 按 `expert` 算,与《字段映射》
+       §二 的"缺省 expert"一致)。10-07 那条面板自测已被改名 `origin=probe`(导出侧来源门
+       同样拒收),把它当"第一位专家已交"会让任务凭空显示成"首轮齐"。
+    2. 同一 `review.expert_ref` 在一个任务上只算**一份**,取 `version` 最大的那行。
+       依据是《补充规范》§2.2「不能让同一专家占两个首轮名额」;而且"一个任务两行"本身
+       分不出是两份独立意见还是同一位的修订(《字段映射》§二 承诺的 `active` 服务端从没
+       写过,10-09 之前 `version` 还是按任务全部行编的,老行里的 `supersedes` 可能指向
+       别人的意见 —— 写侧已改按主体编号,见 `_prior_count`)。按主体折是当前产物**能算的
+       那一份**:同机部署下两位专家的 ref 都是 `peer:127.0.0.1`,折完就是一份,这如实反映
+       "04 §八 首轮两位"在产物里不可证明(#64)。宁可少数并说明,不多数并谎称"两份一致"。
+    键:三段 `(run_id, issue_id, expert_category_id)`;缺前两段(旧探针经
+    `/api/reflections/mark` 落的,`review` 块为空)的行不算任务。
+    """
+    latest, excluded = {}, {"no_coordinates": 0, "non_expert_origin": 0, "superseded": 0}
+    for m in marks:
+        rv = m.get("review") if isinstance(m.get("review"), dict) else {}
+        rid, iid = rv.get("run_id"), rv.get("issue_id")
+        if not rid or not iid:
+            excluded["no_coordinates"] += 1
+            continue
+        if str(m.get("origin") or "expert") != "expert":
+            excluded["non_expert_origin"] += 1
+            continue
+        k = (str(rid), str(iid), str(rv.get("expert_category_id") or ""))
+        ref = str(rv.get("expert_ref") or m.get("operator") or "unattributed")
+        try:
+            ver = int(str(rv.get("version") or 1))
+        except ValueError:
+            ver = 1
+        cur = latest.get((k, ref))
+        if cur is not None and cur[0] >= ver:
+            excluded["superseded"] += 1        # 旧版本留在盘上,但不再算一份
+            continue
+        if cur is not None:
+            excluded["superseded"] += 1
+        latest[(k, ref)] = (ver, str(m.get("verdict", "")))
+    n_by_task, verdicts_by_task = {}, {}
+    for (k, _ref), (_ver, verdict) in latest.items():
+        n_by_task[k] = n_by_task.get(k, 0) + 1
+        verdicts_by_task.setdefault(k, set()).add(verdict)
+    return {"by_task": n_by_task, "verdicts_by_task": verdicts_by_task,
+            "excluded": excluded, "opinions_counted": sum(n_by_task.values())}
+
+
 @router.get("/api/expert/queue")
 def expert_queue(limit: int = 10):
     """待审队列:每条"问题 + 专业类别"一行(《补充规范》§1.2 的任务粒度)。
@@ -113,21 +171,15 @@ def expert_queue(limit: int = 10):
     from live.reflections import load_marks
 
     # 每条任务已有几份意见、结论是否一致(只到状态为止,见 _review_state 的说明)。
-    # 没有 run_id + issue_id 的标记(旧探针经 /api/reflections/mark 落的,review 块为空)
-    # 不算任务:它们在这里直接跳过,在 expert_marks 里单独报数,理由见那边的注释。
-    # 键用三元组而不是拼好的串:拼串会让 ("a|b","c") 与 ("a","b|c") 撞成同一个键。
-    n_by_task, verdicts_by_task = {}, {}
-    for m in load_marks():
-        rv = m.get("review") if isinstance(m.get("review"), dict) else {}
-        rid, iid = rv.get("run_id"), rv.get("issue_id")
-        if not rid or not iid:
-            continue
-        k = (str(rid), str(iid), str(rv.get("expert_category_id") or ""))
-        n_by_task[k] = n_by_task.get(k, 0) + 1
-        verdicts_by_task.setdefault(k, set()).add(str(m.get("verdict", "")))
+    # "几份"按主体折、非专家来源不算 —— 规则与不计数的三类都在 _opinion_tally 里,
+    # 队列与 /api/expert/marks 共用它(以前两处各写一份,其中一份键形状不一致就
+    # 造出过恒为 0 的假账)。键用三元组而不是拼好的串:拼串会让 ("a|b","c") 与
+    # ("a","b|c") 撞成同一个键。
+    tally = _opinion_tally(load_marks())
+    n_by_task, verdicts_by_task = tally["by_task"], tally["verdicts_by_task"]
     # 已经有 1 份在等第二份、以及已经评满/评崩的那些记录都必须进队列,哪怕已经不在
     # "最近 N 条"里:统筹要能回头核对"这个任务真的齐了没",只收 n==1 会让评完的任务
-    # 从视野里整条消失(实测:唯一一份攒够两条的 E4 任务就因为跌出窗口而看不见)。
+    # 从视野里整条消失(实测:那条 E4 任务在面板上一度看不出任何欠账)。
     pending_runs = sorted({k[0] for k, n in n_by_task.items() if n >= 1})
 
     pool_rows, pool_at = _pool_rows()
@@ -170,11 +222,16 @@ def expert_queue(limit: int = 10):
             "tasks": tasks, "manual_triage": triage, "blocked": blocked,
             "verdict_words": sorted(VERDICT_ALIAS),
             "pool_generated_at": pool_at,
+            # 计数口径跟着队列一起出:平台看到某条任务 n_opinions=0 而盘上确实有行时,
+            # 要能知道是"不算"而不是"没落盘"(三类原因都在 excluded 里)。
+            "opinions_counted": tally["opinions_counted"], "excluded": tally["excluded"],
+            "counting_rule": COUNTING_RULE,
             "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
                     "除最近 limit 条外,凡「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)"
                     "都强制进队列(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > "
                     "争议轮 > 等第二份 > 待领取 > 首轮已齐 —— 已齐的列在队尾但不隐藏(面板不接单,"
                     "要不要过滤由平台按 state_rank 决定)。"
+                    "n_opinions 是「几位主体已交」而不是「盘上有几行」:" + COUNTING_RULE + "。"
                     "review_state 是给统筹看的状态词,不含任何一份意见的结论或文本;"
                     "pool 来自上次 lora_prep --export 的产物(generated_at 标明新鲜度),不是实时真值"}
 
@@ -300,13 +357,14 @@ async def expert_decision(request: Request):
     if errs:
         return JSONResponse({"ok": False, "errors": _for_expert(errs)}, status_code=400)
 
-    prior = _prior_count(run_id, issue_id, category)
+    ref = _server_observed_subject(request)
+    prior = _prior_count(run_id, issue_id, category, ref)
     review = {
         "run_id": run_id, "issue_id": issue_id, "expert_category_id": category,
         "verdict_platform": word, "reason": reason, "anchor": anchor,
         "version": prior + 1, "supersedes": prior and "v{}".format(prior) or "",
         "formation": str(body.get("formation", "")).strip() or "single",
-        "expert_ref": _server_observed_subject(request),
+        "expert_ref": ref,
     }
     if dropped:
         review["dropped_client_keys"] = dropped
@@ -330,15 +388,25 @@ def _ai_speaker(data: dict) -> str:
     return "Investment AI"
 
 
-def _prior_count(run_id: str, issue_id: str, category: str) -> int:
-    """同一"问题 + 专业"已有几份意见(版本号用)。旧意见不覆盖、不删除。"""
+def _prior_count(run_id: str, issue_id: str, category: str, ref: str) -> int:
+    """同一位主体(按 `expert_ref`)在这个任务上已有几版 —— 只用来编号,旧意见不覆盖、不删除。
+
+    以前它数的是**该任务的全部行**,于是第二位专家的第一份意见拿到
+    `version=2 / supersedes="v1"`,而那个 v1 是**别人**的意见:产物里读起来像"这份取代了
+    第一位专家",而《补充规范》§2.2 要的是"同一专家不许占两个名额"。按主体编号之后
+    `supersedes` 只可能指向自己的上一版,读侧的折算(`_opinion_tally`)才站得住。
+    `origin` 缺省按 `expert` 算,显式非专家的行不算某一版(读侧 `_opinion_tally` 同口径)。
+    """
     from live.reflections import load_marks
 
     n = 0
     for m in load_marks():
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
+        if str(m.get("origin") or "expert") != "expert":
+            continue
         if (rv.get("run_id"), rv.get("issue_id"), rv.get("expert_category_id")) == \
-                (run_id, issue_id, category):
+                (run_id, issue_id, category) and \
+                str(rv.get("expert_ref") or m.get("operator") or "unattributed") == ref:
             n += 1
     return n
 
@@ -406,6 +474,7 @@ def _pool_state(by_task: dict, run_id: str, issue_id: str, category: str) -> dic
 def _review_state(n: int, n_distinct_verdicts: int) -> str:
     """任务级审核状态(0904doc 05 §一 要求队列显示"当前审核状态")。
 
+    `n` = 该任务上**不同主体**的当前意见数(折算规则与理由见 `_opinion_tally`)。
     只给状态,不给结论分布 —— 首轮两份意见互不可见(《补充规范》§3)。这里能说的
     上限是"两份一致/不一致",这正是 04 §八.3 判定 Disputed 所需的最小信息。
     """
@@ -448,34 +517,23 @@ def expert_marks():
     from live.reflections import load_marks
 
     marks = load_marks()
-    by_category, by_task = {}, {}
-    verdicts_by_task = {}
-    unattributed = 0
+    tally = _opinion_tally(marks)
+    by_category = {}
     for m in marks:
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
         cat = rv.get("expert_category_id") or "(未标专业)"
         by_category[cat] = by_category.get(cat, 0) + 1
-        rid, iid = rv.get("run_id"), rv.get("issue_id")
-        if not rid or not iid:
-            # 没有任务坐标的意见(旧探针走 /api/reflections/mark,不带 review 块)**不算任务**。
-            # 以前这里把缺的字段填成占位串,于是 2 条探针被折叠成同一个"任务",
-            # `tasks_with_two_or_more` 报 1 而真实任务 0 条达到两份 —— 假账。
-            unattributed += 1
-            continue
-        # 任务粒度与队列一致:run_id + issue_id + 专业。两个字典必须同形 —— 以前
-        # by_task 用两段键、verdicts_by_task 用三段键,disputed 拿两段键去三段字典里
-        # 查永远查不到,`tasks_disputed` 因此恒为 0(又一个假零)。
-        key = "|".join([str(rid), str(iid),
-                        str(rv.get("expert_category_id") or "")])
-        by_task[key] = by_task.get(key, 0) + 1
-        verdicts_by_task.setdefault(key, set()).add(str(m.get("verdict", "")))
+    by_task, verdicts_by_task = tally["by_task"], tally["verdicts_by_task"]
     disputed = sum(1 for k, v in by_task.items()
                    if len(verdicts_by_task.get(k, ())) > 1 and v >= 2)
     return {"total": len(marks), "with_review_block": sum(
         1 for m in marks if isinstance(m.get("review"), dict)),
-        "unattributed": unattributed,
+        "opinions_counted": tally["opinions_counted"],
+        "excluded": tally["excluded"],
+        "counting_rule": COUNTING_RULE,
         "by_category": by_category,
-        "opinions_per_task": sorted(by_task.items(), key=lambda kv: -kv[1])[:20],
+        "opinions_per_task": sorted([("|".join(k), v) for k, v in by_task.items()],
+                                    key=lambda kv: (-kv[1], kv[0]))[:20],
         "tasks_with_two_or_more": sum(1 for v in by_task.values() if v >= 2),
         "tasks_disputed": disputed,
         "visibility": "本接口只给条数;结论与文本不在响应里"}
@@ -588,9 +646,13 @@ function api(u, o) { return fetch(u, o).then(function (r) { return r.json(); });
 // 两处刷新(进页面、提交完)用同一个式子,免得第二处把新增的那半句漏掉
 function countsLine(m) {
   if (!m) return "";
-  return " · 已提交意见 " + m.total + " 份,其中 " + m.tasks_with_two_or_more +
-    " 个任务已有两份以上" +
-    (m.unattributed ? ("(另有 " + m.unattributed + " 份没有任务坐标,不计入任务)") : "");
+  var ex = m.excluded || {}, why = [];
+  if (ex.no_coordinates) why.push(ex.no_coordinates + " 行没有任务坐标");
+  if (ex.non_expert_origin) why.push(ex.non_expert_origin + " 行来源不是专家(自测/模拟)");
+  if (ex.superseded) why.push(ex.superseded + " 行是被新版本取代的旧版");
+  return " · 盘上标记 " + m.total + " 行,计为意见 " + m.opinions_counted +
+    " 份(按提交主体折,同一主体的修订只算一份),其中 " + m.tasks_with_two_or_more +
+    " 个任务已集齐两位" + (why.length ? (";不计入:" + why.join("、")) : "");
 }
 
 var TASKS = [], RISK_ORDER = { high: 0, medium: 1, low: 2 }, POOL_AT = "";
