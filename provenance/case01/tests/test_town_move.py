@@ -11,6 +11,7 @@
 渲染桩与 `test_town_bubble.py` 同一套(小镇页由实时面 `live.routes` 渲染)。
 """
 import os
+import re
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -77,7 +78,10 @@ def test_walkers_arrive_and_stop(index_html, tmp_path):
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0, out
-    assert "13 passed, 0 failed" in out, out
+    # 只看"零失败 + 至少跑了这么多条";不写死精确条数,免得每加一条断言都要改这里。
+    m = re.search(r"(\d+) passed, 0 failed", out)
+    assert m, out
+    assert int(m.group(1)) >= 16, out
 
 
 def test_page_script_keeps_move_helpers(index_html):
@@ -86,6 +90,6 @@ def test_page_script_keeps_move_helpers(index_html):
     探针自带"找不到 moveAgent 就退出 1"的兜底,但那条只在 node 可用时跑;
     这条纯文本断言在无 node 环境下也能守住。
     """
-    for token in ("function moveAgent", "function layoutBubbles",
+    for token in ("function moveAgent", "function layoutBubbles", "function _bubbleHitsBox",
                   "Math.abs(dx) <= step_px && Math.abs(dy) <= step_px"):
         assert token in index_html, "页面脚本缺 {}".format(token)

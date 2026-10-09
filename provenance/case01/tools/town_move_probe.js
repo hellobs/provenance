@@ -105,9 +105,31 @@ function setup(names) {
     sandbox.personas[n] = mkSprite(n);
     sandbox.personas[n].body.x = 0;
     sandbox.personas[n].body.y = 0;
+    // 真实页面里新角色 displayWidth=40、scaleY=scaleX ⇒ 画出来就是 40x40
+    sandbox.personas[n].displayWidth = 40;
+    sandbox.personas[n].displayHeight = 40;
     sandbox.pronunciatios[n] = mkSprite(n + '-bubble');
   }
 }
+
+// 给某个角色挂一句气泡(只设尺寸与文本 —— 真实页面里这两个由 Phaser Text 量出来)
+function bubbleBox(name, w, h) {
+  const t = sandbox.pronunciatios[name];
+  t.width = w;
+  t.height = h;
+  t.text = 'x';
+}
+
+const charRect = (n) => {
+  const p = sandbox.personas[n];
+  return { x: p.body.x, y: p.body.y, w: p.displayWidth, h: p.displayHeight };
+};
+const bubbleRect = (n) => {
+  const t = sandbox.pronunciatios[n];
+  return { x: t.x - t.width / 2, y: t.y - t.height, w: t.width, h: t.height };
+};
+const rectOverlap = (a, b) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 function place(name, tx, ty) {
   sandbox.personas[name].body.x = tx * 32;
@@ -194,19 +216,43 @@ ok(Math.hypot(aiP[0] - ethP[0], aiP[1] - ethP[1]) > 20,
 
 // ============================================================
 // 气泡必须挂在角色**正上方**(2026-10-09 用户硬性要求)
-// 锚点 origin(0.5,1):(x,y) 是气泡底边中点 ⇒ x 该是 hitbox 中心、y 该在角色顶边之上。
+// 锚点 origin(0.5,1):(x,y) 是气泡底边中点 ⇒ x 该对准角色绘制范围的中线,y 该在顶边之上。
 // ============================================================
 setup(['Investment AI', 'Ethan Lin']);
 place('Investment AI', 10, 6);
 place('Ethan Lin', 10, 9);
-sandbox.pronunciatios['Investment AI'].text = 'x';
-sandbox.pronunciatios['Ethan Lin'].text = 'y';
+bubbleBox('Investment AI', 128, 66);
+bubbleBox('Ethan Lin', 134, 42);
 tick(1);
 const aiBody = sandbox.personas['Investment AI'].body;
 const aiBub = sandbox.pronunciatios['Investment AI'];
-ok(Math.abs(aiBub.x - (aiBody.x + 15)) < 0.01,
-   '气泡水平居中于角色,实得 x=' + aiBub.x + ' body.x+15=' + (aiBody.x + 15));
+ok(Math.abs(aiBub.x - (aiBody.x + 20)) < 0.01,
+   '气泡水平居中于角色绘制范围,实得 x=' + aiBub.x + ' 角色中线=' + (aiBody.x + 20));
 ok(aiBub.y <= aiBody.y, '气泡在角色上方(y 是底边),实得 y=' + aiBub.y + ' body.y=' + aiBody.y);
+
+// ============================================================
+// "不要遮挡人":两个人上下相邻站着时,气泡最容易盖住**另一个人**
+// 实测(真实页面):下方角色的气泡占 y 188~230,正好压住上方角色 204~244。
+// ============================================================
+setup(['Investment AI', 'Ethan Lin']);
+place('Investment AI', 10, 6);   // 上
+place('Ethan Lin', 10, 7);       // 下(只差一格)
+bubbleBox('Investment AI', 128, 66);
+bubbleBox('Ethan Lin', 134, 42);
+tick(1);
+let covered = [];
+for (const b of ['Investment AI', 'Ethan Lin']) {
+  for (const c of ['Investment AI', 'Ethan Lin']) {
+    if (rectOverlap(bubbleRect(b), charRect(c))) covered.push(b + ' 的气泡压住 ' + c);
+  }
+}
+ok(covered.length === 0, '任何气泡都不许压住任何角色,实得:' + JSON.stringify(covered));
+ok(rectOverlap(bubbleRect('Investment AI'), bubbleRect('Ethan Lin')) === false,
+   '两个气泡之间也不重叠');
+const ethBub = bubbleRect('Ethan Lin');
+ok(ethBub.y + ethBub.h <= charRect('Investment AI').y,
+   '下方角色的气泡被整体抬到上方角色头顶之上,实得气泡底边=' + ethBub.y +
+   ',上方角色顶边=' + charRect('Investment AI').y + '(越靠上越小)');
 
 // ============================================================
 // 回归:目标格在墙里时,不能"位置不动、腿一直走"
