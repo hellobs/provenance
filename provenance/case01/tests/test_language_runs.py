@@ -29,9 +29,26 @@ def test_role_text_is_separate_and_legacy_is_unchanged():
     apply_role_text(config, tuple(config["agents"]), "zh")
     assert "请用中文" in config["agents"]["Investment AI"]["role_directive"]
     assert "请用中文" in config["agents"]["Ethan Lin"]["role_directive"]
+    config["agents"]["Ethan Lin"]["role_directive"] = "old"
     apply_role_text(config, tuple(config["agents"]), "en")
     assert "Respond in English" in config["agents"]["Investment AI"]["role_directive"]
-    assert "in English" in config["agents"]["Ethan Lin"]["role_directive"]
+    assert config["agents"]["Ethan Lin"]["role_directive"] == "old"
+
+
+def test_english_role_uses_original_scene_settings():
+    root = Path(__file__).resolve().parents[3]
+    agents = {}
+    for name in ("Investment AI", "Ethan Lin"):
+        path = root / "provenance" / "case01" / "injector" / "scenario" / "agents" / name / "agent.json"
+        agents[name] = json.loads(path.read_text(encoding="utf-8"))
+    original = json.loads(json.dumps(agents))
+    apply_role_text({"agents": agents}, tuple(agents), "en")
+    assert agents["Investment AI"]["role_directive"] == original["Investment AI"]["role_directive"].replace(
+        "Respond in Chinese.", "Respond in English.")
+    assert agents["Ethan Lin"] == original["Ethan Lin"]
+    for name in agents:
+        assert {k: v for k, v in agents[name].items() if k != "role_directive"} == {
+            k: v for k, v in original[name].items() if k != "role_directive"}
 
 
 def test_raw_language_survives_mapping_and_manifest():
@@ -67,8 +84,9 @@ def test_english_reflection_and_router_use_english_prompts():
     llm = CapturingLLM("I relied too heavily on the rumor and overlooked its source.")
     result = reflection.run_reflection(llm, {"turns": []}, language="en")
     assert "Respond in English" in llm.messages[0][0]["content"]
-    assert "Review the experience" in llm.messages[0][1]["content"]
-    assert result["quality"]["status"] == "unscored"
+    assert "Review the event" in llm.messages[0][1]["content"]
+    assert result["quality"]["status"] in {"pass", "review", "fail"}
+    assert result["quality"]["max_score"] == 100
 
     router = CapturingLLM("[]")
     result = reflection.run_router(router, "I overlooked the source.", language="en")
