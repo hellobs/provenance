@@ -1,10 +1,14 @@
 """scenario_builder — 场景声明(scenario.yaml)的确定性构建与导出。
 
-业务方用结构化表单填写场景(meta/roles/world/branch/consistency),
+业务方用结构化表单填写场景(meta/roles/world),
 本模块做**确定性映射**(纯表单 → YAML,不做 AI 解析),生成可直接被
 引擎加载的 scenario.yaml。沙盒场景(如 sandbox-value)的资产路径、
 价值权重、沙盒参数统一落在 `world` 标准段(assets/value_tendency/params),
 不产出 custom 逃生舱。
+
+(2026-10-09 会议:「分支判定」功能删除、「一致性信号词」前端不再显示 ⇒
+表单不再采集/回填 branch 与 consistency 两段;原文件里的这两段由
+merge_preserving_unmanaged 原样保留,本模块不再管理。)
 
 设计原则(与 config_tool 其余模块一致):
 - 单一来源:导出的 YAML 用引擎的 schema 校验(引擎可用时),
@@ -56,19 +60,6 @@ def governance_payload(scenario: dict, explicit: str = "") -> dict:
     except Exception as exc:  # noqa: BLE001 —— 拿不到计划就退回本地口径,并如实标记
         return {"roles": gov, "used_engine": False,
                 "engine_note": "{}: {}".format(type(exc).__name__, exc)}
-
-
-def parse_words(text) -> list:
-    """把文本框拆成去重关键词列表(兼容换行/半角/全角逗号/分号)。"""
-    if text is None:
-        return []
-    for sep in ("\n", ",", "，", ";", "；", "、"):
-        text = str(text).replace(sep, "\n")
-    out = []
-    for w in (x.strip() for x in str(text).split("\n")):
-        if w and w not in out:
-            out.append(w)
-    return out
 
 
 def _num(value, default):
@@ -154,28 +145,6 @@ def build_scenario(form: dict) -> dict:
             "type": _strip(f.get("type")) or "str",
         }
 
-    branch = {"default_branch": _strip(form.get("branch_default")) or ""}
-    for k in ("no_buy", "refuse", "conditional", "anti_allin"):
-        words = parse_words(form.get("branch_" + k))
-        if words:
-            branch[k] = words
-    fm = form.get("branch_fallback_map")
-    if isinstance(fm, str):
-        # 与 value_tendency / sandbox_params 同口径:`_form_from_scenario` 回读给 textarea
-        # 的是 JSON **文本**,原实现只认 dict,导致"load → save"一次就把 fallback_map 丢掉。
-        fm = _parse_value_json(fm)
-    if isinstance(fm, dict) and fm:
-        branch["fallback_map"] = fm
-    judge_prompt = _strip(form.get("branch_judge_prompt"))
-    if judge_prompt:
-        branch["judge_prompt"] = judge_prompt
-
-    consistency = {}
-    for k in ("buy_words", "cond_words", "negators", "neg_phrases"):
-        words = parse_words(form.get("cons_" + k))
-        if words:
-            consistency[k] = words
-
     world = {"state_schema": state_schema}
     # 沙盒标准段(sandbox-value 场景):资产路径/价值权重/沙盒参数统一落 world.
     #   (不再用 custom 逃生舱 —— 与引擎的 world 标准段契约对齐)
@@ -194,8 +163,6 @@ def build_scenario(form: dict) -> dict:
         "meta": {k: meta[k] for k in _META_KEYS if k in meta},
         "roles": roles,
         "world": world,
-        "branch": branch,
-        "consistency": consistency,
     }
 
     if not scenario["roles"]:
@@ -256,14 +223,9 @@ def merge_preserving_unmanaged(original: dict, managed: dict,
         world_keys.extend(["assets", "value_tendency", "params"])
     out["world"] = replace_keys(old_world, new_world, world_keys)
 
-    if engine_id == "experiment-eval":
-        out["branch"] = replace_keys(
-            original.get("branch"), managed.get("branch") or {},
-            ("default_branch", "no_buy", "refuse", "conditional",
-             "anti_allin", "fallback_map", "judge_prompt"))
-        out["consistency"] = replace_keys(
-            original.get("consistency"), managed.get("consistency") or {},
-            ("buy_words", "cond_words", "negators", "neg_phrases"))
+    # (2026-10-09 会议:表单不再管理 branch / consistency —— 「分支判定」功能删除、
+    #  「一致性信号词」前端不再显示。两段不再进 managed,也就无需 replace_keys;
+    #  原场景文件里若仍有这两段,由下面的"保留未管理键"逻辑原样带过。)
     return out
 
 

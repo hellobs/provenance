@@ -33,21 +33,9 @@ def _sample_form(**over):
         ],
         "state_schema": [{"field": "approved", "initial": False, "type": "bool"},
                          {"field": "budget", "initial": 100000, "type": "float"}],
-        "branch_default": "C",
-        "branch_no_buy": "不批准,反对\n拒绝",
-        "branch_conditional": "分阶段\n小规模",
-        "branch_fallback_map": {"A": {"approved": True}},
-        "cons_buy_words": "批准\n同意",
-        "cons_negators": "反对\n不",
     }
     form.update(over)
     return form
-
-
-def test_parse_words_normalizes_separators():
-    assert scenario_builder.parse_words("a\nb,c，d；e、f") == ["a", "b", "c", "d", "e", "f"]
-    assert scenario_builder.parse_words(None) == []
-    assert scenario_builder.parse_words(" 已去重\n已去重 ") == ["已去重"]
 
 
 def test_build_scenario_meta_and_roles():
@@ -63,12 +51,16 @@ def test_build_scenario_meta_and_roles():
     assert cfg["world"]["state_schema"]["approved"] == {"initial": False, "type": "bool"}
 
 
-def test_build_scenario_branch_and_consistency():
-    cfg = scenario_builder.build_scenario(_sample_form())
-    assert cfg["branch"]["default_branch"] == "C"
-    assert "不批准" in cfg["branch"]["no_buy"]
-    assert cfg["branch"]["fallback_map"] == {"A": {"approved": True}}
-    assert "批准" in cfg["consistency"]["buy_words"]
+def test_build_scenario_no_longer_emits_branch_or_consistency():
+    """2026-10-09 会议:「分支判定」功能删除、「一致性信号词」前端不再显示。
+
+    表单不再采集这两段 ⇒ 构建出的场景 draft 里不该再有 `branch` / `consistency`
+    键(有了就说明某一层还在偷偷写,与"前端不显示"的口径不符)。
+    """
+    cfg = scenario_builder.build_scenario(_sample_form(
+        branch_default="C", branch_no_buy="反对", cons_buy_words="同意"))
+    assert "branch" not in cfg
+    assert "consistency" not in cfg
 
 
 def test_merge_preserves_unmanaged_sections_and_role_fields():
@@ -79,8 +71,7 @@ def test_merge_preserves_unmanaged_sections_and_role_fields():
     original["inputs"] = {"brief": "keep me"}
     original["timeline"] = [{"at": "09:00", "event": "open"}]
     original["reflection"] = {"enabled": True}
-    changed = scenario_builder.build_scenario(_sample_form(
-        description="只修改描述", branch_judge_prompt="新的判定稿"))
+    changed = scenario_builder.build_scenario(_sample_form(description="只修改描述"))
 
     merged = scenario_builder.merge_preserving_unmanaged(
         original, changed, "experiment-eval")
@@ -91,25 +82,27 @@ def test_merge_preserves_unmanaged_sections_and_role_fields():
     assert merged["inputs"] == original["inputs"]
     assert merged["timeline"] == original["timeline"]
     assert merged["reflection"] == original["reflection"]
-    assert merged["branch"]["judge_prompt"] == "新的判定稿"
 
 
-def test_sandbox_merge_does_not_clear_hidden_experiment_sections():
-    """沙盒编辑不应顺带清除它没有管理的 branch/consistency。"""
+def test_merge_preserves_legacy_branch_and_consistency_from_original():
+    """表单不再管理 branch / consistency(2026-10-09),但**旧场景文件里的这两段
+    要原样保留** —— 保存是整份重写,不能因为表单不显示就把它们抹掉。
+
+    这里显式往 original 里塞回这两段(模拟一份历史 scenario.yaml),再走
+    "只改描述"的保存路径,断言它们一字不差地留在结果里。
+    """
     original = scenario_builder.build_scenario(_sample_form())
-    sandbox = scenario_builder.build_scenario(_sample_form(
-        engine="sandbox-value",
-        sandbox_params=json.dumps({"rounds": 3}),
-        value_tendency=json.dumps({"risk": 0.4}),
-    ))
+    original["branch"] = {"default_branch": "C", "no_buy": ["不建议买"],
+                          "judge_prompt": "历史判定稿"}
+    original["consistency"] = {"buy_words": ["recommend buying"], "negators": ["not"]}
+    changed = scenario_builder.build_scenario(_sample_form(description="只修改描述"))
 
     merged = scenario_builder.merge_preserving_unmanaged(
-        original, sandbox, "sandbox-value")
+        original, changed, "experiment-eval")
 
+    assert merged["meta"]["description"] == "只修改描述"
     assert merged["branch"] == original["branch"]
     assert merged["consistency"] == original["consistency"]
-    assert merged["world"]["params"] == {"rounds": 3}
-    assert merged["world"]["value_tendency"] == {"risk": 0.4}
 
 
 def test_dump_load_roundtrip():

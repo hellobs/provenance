@@ -1037,9 +1037,6 @@ async def scenario_save(request: Request):
             "场景无处落盘:平台目录未声明({} 或 MAVIS_PLATFORM_DIR),"
             "或用 CASE_ENGINE_CASES_ROOT 直接指定场景根".format(engine_bridge.ENV_DIR)]})
     case_id = (cfg.get("meta") or {}).get("case_id")
-    wipe = _wordlist_wipe_errors(case_id, cfg, form)
-    if wipe:
-        return JSONResponse({"ok": False, "errors": wipe})
     try:
         case_id = scenario_builder.safe_case_id(case_id)
         source_case_id = str(form.get("source_case_id") or case_id).strip()
@@ -1140,13 +1137,6 @@ def _engine_catalog() -> dict:
 # 映射与 scenario_builder.build_scenario / _write_scenario_content 严格对偶,
 # 保证"存进去的能原样取回来改",不做 AI 推断。
 # ---------------------------------------------------------------------------
-def _join_words(words) -> str:
-    """词表 list → textarea 单行一个词文案(与 parse_words 可逆)。"""
-    if not words:
-        return ""
-    return "\n".join(str(w) for w in words)
-
-
 def _tendency_join(tend: dict) -> str:
     """initial_tendency dict → 每行"目标:权重"。"""
     if not tend:
@@ -1175,55 +1165,11 @@ def _load_scenario_dict(case_id: str) -> dict | None:
         return yaml.safe_load(f) or {}
 
 
-# 词表两组:表单里留空 ≠ "要清空原文件"。保存走的是**整份重写** scenario.yaml
-# (build_scenario → save_scenario),收起的面板一旦没把值带回来,一次保存就会抹掉
-# 实验设定,并连带改变 scenario_sha256。所以原文件有词、这次提交为空、且没勾
-# 「确认清空」时拦下来报可读原因,不静默落盘。
-_WORDLIST_GROUPS = (
-    ("branch", ("no_buy", "refuse", "conditional", "anti_allin", "fallback_map",
-                "judge_prompt"),
-     "分支判定配置(no_buy/refuse/conditional/anti_allin + fallback_map + judge_prompt)",
-     "confirm_clear_branch_words"),
-    ("consistency", ("buy_words", "cond_words", "negators", "neg_phrases"),
-     "一致性信号词(buy_words/cond_words/negators/neg_phrases)",
-     "confirm_clear_consistency"),
-)
-
-
-def _wordlist_count(section: dict, key: str) -> int:
-    """数一个键里到底有多少条(dict 按分支个数、list 按条数、str 非空算一条)。"""
-    value = (section or {}).get(key)
-    if isinstance(value, dict):
-        return len(value)
-    if isinstance(value, (list, tuple)):
-        return len(value)
-    if isinstance(value, str):
-        return 1 if value.strip() else 0
-    return 0
-
-
-def _wordlist_wipe_errors(case_id: str, cfg: dict, form: dict) -> list:
-    """本次保存会把原有的某个词表键抹成空 → 返回可读错误;无此风险返回空列表。
-
-    只在**编辑已有场景**时生效(新建场景读不到旧文件,自然不拦)。
-    按**键**比而不是按组:只抹掉两类词同样是静默改设定。
-    """
-    old = _load_scenario_dict(case_id or "")
-    if not old:
-        return []
-    errors = []
-    for section, keys, label, confirm_key in _WORDLIST_GROUPS:
-        lost = [k for k in keys
-                if _wordlist_count(old.get(section), k)
-                and not _wordlist_count(cfg.get(section), k)]
-        if lost and not form.get(confirm_key):
-            errors.append(
-                "{}:原场景文件在 {} 里有词,本次提交这几项全为空。保存会整份重写 "
-                "scenario.yaml,把它们抹掉(并改变 scenario_sha256)。"
-                "确实要清空请展开对应面板勾选「确认清空」再存;想沿用原值就别动那个面板"
-                "(编辑已有场景时词表会自动回填)。涉及键:{}".format(
-                    label, section, "、".join(lost)))
-    return errors
+# (2026-10-09 会议:「分支判定」功能整段删除、「一致性信号词」前端不再显示。
+#  两者原先各有一组"留空不许静默抹掉原文件"的守卫(_WORDLIST_GROUPS /
+#  _wordlist_count / _wordlist_wipe_errors),表单已不再采集这两组字段,
+#  守卫随之移除。scenario.yaml 仍可能含有历史 branch/consistency 段 ——
+#  它们由 merge_preserving_unmanaged 从原文件原样保留,不受本工具影响。)
 
 
 def _form_from_scenario(case_id: str, data: dict) -> dict:
@@ -1260,24 +1206,6 @@ def _form_from_scenario(case_id: str, data: dict) -> dict:
             "type": f.get("type", "str"),
         })
     form["state_schema"] = state_schema
-    # 分支判定
-    branch = data.get("branch") or {}
-    form["branch_default"] = branch.get("default_branch", "")
-    form["branch_no_buy"] = _join_words(branch.get("no_buy"))
-    form["branch_refuse"] = _join_words(branch.get("refuse"))
-    form["branch_conditional"] = _join_words(branch.get("conditional"))
-    form["branch_anti_allin"] = _join_words(branch.get("anti_allin"))
-    form["branch_fallback_map"] = json.dumps(
-        branch.get("fallback_map") or {}, ensure_ascii=False, indent=4)
-    # judge_prompt 早先**只在 YAML 里**,表单既不回读也不回写 —— 经本工具存一次
-    # 就会把它整段抹掉(保存是整份重写)。现在按 textarea 往返。
-    form["branch_judge_prompt"] = branch.get("judge_prompt") or ""
-    # 一致性信号
-    cons = data.get("consistency") or {}
-    form["cons_buy_words"] = _join_words(cons.get("buy_words"))
-    form["cons_cond_words"] = _join_words(cons.get("cond_words"))
-    form["cons_negators"] = _join_words(cons.get("negators"))
-    form["cons_neg_phrases"] = _join_words(cons.get("neg_phrases"))
     # 沙盒标准段 → 表单字段
     assets = world.get("assets") or {}
     form["asset_maze"] = assets.get("maze", "")
