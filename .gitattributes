@@ -1,0 +1,9 @@
+# 行尾规则:这台机器是 core.autocrlf=true(系统级 + 用户级都设了),仓里没有本文件时,
+# `git checkout` 会把 LF 的文本换成 CRLF 的工作副本 —— 对 .md/.json 无害,但 **入口脚本致命**:
+# 实测 `git checkout-index` 出来的 serve.sh 有 34 个 CR、setup.sh 有 36 个,而它们的首行是
+# `#!/usr/bin/env sh`。这样的工作副本一旦被打进交付包/拷到 Linux,执行即
+# `/usr/bin/env: 'sh\r': No such file or directory`,和权限位无关(执行位已单独修成 100755)。
+# 只声明 .sh:其余文件维持今天的 autocrlf 行为,不顺手改动别的路径。
+# 本文件也钉 LF:`git add` 时会警告"LF 会被换成 CRLF",而规则表带 CR 不是我们希望赌的解析行为。
+.gitattributes text eol=lf
+*.sh text eol=lf
