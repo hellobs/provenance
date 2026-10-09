@@ -45,6 +45,57 @@
 		el.scrollTop = el.scrollHeight;
 	}
 
+	// ---- 头顶气泡(2026-10-09 改:直接显示聊天记录 + 打字机) ----
+	// 需求原文:"主角头上顶着那个要直接是聊天记录,要有打字机的效果"。
+	// 做法:不把气泡当成"行动摘要",而是把该角色刚说的一句放进气泡,逐字吐出。
+	// 一个角色连说多句时,后一句覆盖前一句(头顶只挂当前这句,不堆叠)。
+	function setBubble(name, speaker, text) {
+		if (!(name in pronunciatios)) return;
+		let t = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+		if (t.length > BUBBLE_MAX_CHARS) t = t.slice(0, BUBBLE_MAX_CHARS) + "…";
+		bubble_full[name] = t;
+		bubble_speaker[name] = speaker || name;
+		bubble_shown[name] = 0;        // 从零开始吐
+	}
+
+	// 无对话内容时,回落到"行动文本"(保持旧观感,不至于让气泡空着)
+	function setActionBubble(name, act) {
+		let a = String(act == null ? "" : act).trim();
+		bubble_last_action[name] = a;
+		if (!bubble_full[name]) {
+			// 仅在当前没有正在打的对话时,才用行动文本占位
+			bubble_speaker[name] = name;
+			bubble_full[name] = a.length > BUBBLE_MAX_CHARS
+				? a.slice(0, BUBBLE_MAX_CHARS) + "…" : a;
+			bubble_shown[name] = bubble_full[name].length;   // 行动文本不打字机,直接全显
+		}
+	}
+
+	// 打字机推进:每帧按经过时间吐字。由场景 update 调用(与移动同一循环)。
+	function tickBubbles(delta) {
+		bubble_type_acc += (delta || 16.67);
+		let per = BUBBLE_TYPE_MS;
+		if (bubble_type_acc < per) return;
+		bubble_type_acc = 0;
+		for (let name in bubble_full) {
+			let full = bubble_full[name] || "";
+			let shown = bubble_shown[name] || 0;
+			if (shown >= full.length) continue;
+			shown += 1;                              // 每 TICK 吐一字(速度由 BUBBLE_TYPE_MS 控)
+			bubble_shown[name] = shown;
+			let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
+			if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
+		}
+	}
+
+	// 直接把气泡内容设满(用于快照/回放的对齐,避免"回放时也在慢慢打字"造成混乱)
+	function flushBubble(name) {
+		let full = bubble_full[name] || "";
+		bubble_shown[name] = full.length;
+		let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
+		if (pronunciatios[name]) pronunciatios[name].setText(head + full);
+	}
+
 	// Render dialogue into the HTML panel (scrollable, speaker highlighted, auto-scroll)
 	function appendChat(t, text) {
 		if (shown_chats[t]) return;
@@ -53,6 +104,8 @@
 		if (!el) return;
 		let html = `<div style="margin-top:8px; color:#999; font-size:12px;">${t}</div>`;
 		let lines = String(text).split("\n");
+		// 2026-10-09:把每行对话也挂到说话人头顶气泡(回放模式同样有打字机)。
+		// 同一时刻可能多人在说,按行顺序后说的覆盖前面的 —— 与 live 侧一致。
 		for (let line of lines) {
 			line = line.trim();
 			if (!line) continue;
@@ -64,6 +117,13 @@
 					let speaker = line.slice(0, idx);
 					let content = line.slice(idx + 2);
 					html += `<div style="margin:3px 0;"><span style="font-weight:bold; color:#2d6cdf;">${speaker}</span>: ${content}</div>`;
+					let sp_persona = speaker;
+					if (!(sp_persona in pronunciatios)) {
+						for (let pn in pronunciatios) {
+							if (pn === sp_persona || pn.replace("_", " ") === sp_persona) { sp_persona = pn; break; }
+						}
+					}
+					if (sp_persona in pronunciatios) setBubble(sp_persona, speaker, content);
 				} else {
 					html += `<div style="margin:3px 0;">${line}</div>`;
 				}
@@ -85,6 +145,16 @@
 
 	var personas = {};
 	var pronunciatios = {};
+	// 头顶气泡内容(2026-10-09):改为"直接显示聊天记录",并带打字机逐字效果。
+	// bubble_full[name] = 该角色当前这句的完整文本;bubble_shown[name] = 已显示到第几字。
+	// 逐字推进由 tickBubbles() 驱动(见场景 update),与移动/避让解耦。
+	var bubble_full = {};             // name -> 完整文本(含"说话人: "前缀)
+	var bubble_shown = {};            // name -> 已显示的字数
+	var bubble_speaker = {};          // name -> 说话人(用于着色)
+	var bubble_last_action = {};      // name -> 兜底行动文本(无对话时显示)
+	const BUBBLE_MAX_CHARS = 60;      // 气泡上限(超出按省略号截断,避免长文糊住画面)
+	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
+	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
 	let anims_direction;
 	let pre_anims_direction;
 	let pre_anims_direction_dict = {};
@@ -370,6 +440,15 @@
 				var spIsAI = (msg.speaker === "AI Advisor");
 				devLog(spIsAI ? "ai" : "chat", (spIsAI ? "[AI] " : "") + msg.speaker + ": " + (msg.text || "").slice(0, 40));
 				appendChatLine(msg.speaker, msg.text);
+				// 2026-10-09:这句同时挂到说话人头顶(打字机逐字吐)
+				var sp_persona = msg.speaker;
+				if (!(sp_persona in pronunciatios)) {
+					// 角色名带空格的(如 "AI Advisor")与内部键可能不同,做个兜底映射
+					for (var pn in pronunciatios) {
+						if (pn === sp_persona || pn.replace("_", " ") === sp_persona) { sp_persona = pn; break; }
+					}
+				}
+				if (sp_persona in pronunciatios) setBubble(sp_persona, msg.speaker, msg.text);
 			} else if (msg.type === "time") {
 				devLog("time", "Game time → " + msg.time);
 				setCurrentTime(msg.time);
@@ -474,7 +553,7 @@
 			personas[name].body.x = a.coord[0] * tile_width;
 			personas[name].body.y = a.coord[1] * tile_width;
 			let act = (a.action || "").trim();
-			pronunciatios[name].setText(name + ": " + (act.length > 20 ? act.substring(0, 20) + "..." : act));
+			setActionBubble(name, act);
 			if (document.getElementById("agent_desc__" + name)) {
 				document.getElementById("current_action__" + name).innerHTML = act;
 				document.getElementById("target_address__" + name).innerHTML = a.location || "";
@@ -511,7 +590,7 @@
 
 		let act = (action || "").trim();
 		if (act.includes("睡觉") || act.toLowerCase().includes("sleep")) act = "Sleeping: " + act;
-		pronunciatios[name].setText(name + ": " + (act.length > 20 ? act.substring(0, 20) + "..." : act));
+		setActionBubble(name, act);
 
 		if (document.getElementById("agent_desc__" + name)) {
 			if (currently) document.getElementById("agent_desc__" + name).innerHTML = currently;
@@ -747,6 +826,9 @@
 	// Update function
 	function update(time, delta) {
 		// Chat panel always visible (show/hide buttons removed)
+
+		// 头顶气泡打字机:每帧按经过时间吐字(与移动同一循环,互不阻塞)
+		tickBubbles(delta);
 
 		// Move camera
 		const camera_speed = 400;
