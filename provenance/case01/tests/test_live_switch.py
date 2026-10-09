@@ -104,20 +104,63 @@ def test_run_stdout_survives_gbk_output():
 
 
 def test_pids_by_port_finds_pid_and_tolerates_noise(monkeypatch):
-    """端口归属判断:命中 LISTENING 行的 PID;命令取不到就回空集合,不抛。"""
+    """端口归属:命中监听行的 PID;命令取不到就回空集合,不抛。
+
+    两平台各自的真实版式**都要喂**:_pids_by_port 现在按 IS_WIN 分叉,而 CI 跑在 ubuntu 上,
+    只喂 Windows 样本的写法会让 POSIX 侧的解析器一条都没被跑到(monkeypatch 把命令换成了
+    Windows 文本,POSIX 解析器拿到它只能返回空集 ⇒ 断言当场就红,不会静默假绿)。
+    """
     import live_switch
 
-    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: (
-        "  TCP    127.0.0.1:5010         0.0.0.0:0              LISTENING       11112\n"
-        "  TCP    127.0.0.1:5010         127.0.0.1:51176        TIME_WAIT       0\n"))
+    win = ("  TCP    127.0.0.1:5010         0.0.0.0:0              LISTENING       11112\n"
+           "  TCP    127.0.0.1:5010         127.0.0.1:51176        TIME_WAIT       0\n")
+    ss = ('LISTEN 0      2048   127.0.0.1:5010      0.0.0.0:*    '
+          'users:(("python3",pid=11112,fd=6))\n'
+          'ESTAB  0      0      127.0.0.1:52110  127.0.0.1:5010 users:(("chrome",pid=99,fd=31))\n')
+    lsof = "11112\n"
+
+    monkeypatch.setattr(live_switch, "IS_WIN", True)
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: win)
     assert live_switch._pids_by_port(5010) == {11112}, "只认 LISTENING,连接态不算"
+
+    monkeypatch.setattr(live_switch, "IS_WIN", False)
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: ss)
+    assert live_switch._pids_by_port(5010) == {11112}, "ss:只认本地地址列正好是该端口的 LISTEN 行"
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: lsof)
+    assert live_switch._pids_by_port(5010) == {11112}, "macOS 没 ss ⇒ lsof 那条路也要通"
 
     monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: "")
     assert live_switch._pids_by_port(5010) == set(), "取不到就空集合,不许崩"
 
 
+def test_procs_by_cmdline_folds_trampoline_on_both_platforms(monkeypatch):
+    """游离实例靠命令行认;父子两 PID(uv 的 trampoline)要折成 1 个逻辑实例。
+
+    Windows 侧 powershell 只输出 `pid,ppid`,POSIX 侧是整行 `ps -eo pid=,ppid=,args=` ⇒
+    两版样本分别喂各自的解析器,断言同一个结论。
+    """
+    import live_switch
+
+    monkeypatch.setattr(live_switch, "IS_WIN", True)
+    monkeypatch.setattr(live_switch, "_run_stdout",
+                        lambda cmd, t: "1234,1200\n1200,1190\n")
+    procs = live_switch._procs_by_cmdline("vizkit.live_run")
+    assert procs == {1234: 1200, 1200: 1190}
+    assert live_switch.n_instances(procs) == 1
+
+    ps = (" 1200  1190 /home/u/.venv/bin/python3 -m case01.vizkit.live_run --branch B\n"
+          " 1234  1200 /home/u/.venv/bin/python3 -m case01.vizkit.live_run --branch B --hold 1800\n"
+          " 4242  4200 ps -eo pid=,ppid=,args=\n")
+    monkeypatch.setattr(live_switch, "IS_WIN", False)
+    monkeypatch.setattr(live_switch, "_run_stdout", lambda cmd, t: ps)
+    procs = live_switch._procs_by_cmdline("vizkit.live_run")
+    assert procs == {1200: 1190, 1234: 1200}, "ps 自查行不算进程"
+    assert live_switch.n_instances(procs) == 1, "父子两 PID 是同一个实例"
+
+
 def test_real_netstat_parsing_does_not_raise():
-    """真调 netstat:在中文 Windows 上跑通(这条就是崩溃点本身)。"""
+    """真调本平台的端口工具:在中文 Windows 上是 netstat(那条崩溃点本身),在 Linux/macOS
+    上是 ss/lsof/netstat。断言只到"拿到集合"为止 —— 真机上有没有人监听不该由测试决定。"""
     from live_switch import _pids_by_port
 
     assert isinstance(_pids_by_port(5010), set)

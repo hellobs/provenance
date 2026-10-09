@@ -54,8 +54,11 @@ import argparse
 import json
 import os
 import re
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -64,6 +67,9 @@ from case01.safestream import tolerant_stdout
 from case_engine.paths import data_root
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# 进程/端口发现与终止在两个平台上用的工具和版式完全不同(netstat 版式、powershell vs
+# ps、taskkill vs signal),所以按平台分叉而不是猜 —— 与 tools/serve_all.py 同一个 IS_WIN。
+IS_WIN = os.name == "nt"
 
 LIVE = {"case00": 5010, "case01": 5010}  # 5010 是唯一实时入口,两 case 互斥共用
 LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
@@ -71,7 +77,7 @@ LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
 # 命令行特征:按它认进程(端口判断不到游离实例)
 CMD_NEEDLE = {"case00": "live_fastapi.py", "case01": "vizkit.live_run"}
 READONLY = {5002: "case01 只读契约", 5003: "case00 存档只读"}
-LOG_DIR = os.path.join(os.environ.get("TEMP", HERE), "dsh_srv")
+LOG_DIR = os.path.join(os.environ.get("TEMP") or tempfile.gettempdir(), "dsh_srv")
 
 
 def records_root():
@@ -107,11 +113,109 @@ def _run_stdout(cmd, timeout):
     return out or ""
 
 
+def _attribution_tools_missing():
+    """POSIX 上"谁在听 5010 / 谁的命令行里有 live_fastapi.py"要靠 ss+netstat+ps 问出来。
+
+    为什么要把"问不到"和"没有"分开说:Ubuntu 精简镜像与 `python:*-slim` 里
+    net-tools/procps/iproute2 常常一个都没装(容器里连 `ps` 都可能没有)。这时本开关
+    打印的 `down` / `未启动` / `本来就没在跑` 只代表**查不到进程**,不代表真没在跑 ——
+    照着它再起一个,就会撞在已被占用的 5010 上(表现是"端口没绑上"自杀,像服务的锅)。
+    Windows 侧走 netstat/powershell,必然有,直接返回空。
+    """
+    if IS_WIN:
+        return []
+    missing = []
+    if not any(shutil.which(t) for t in ("ss", "netstat")):
+        missing.append("ss/netstat(端口归属)")
+    if not shutil.which("ps"):
+        missing.append("ps(命令行归属)")
+    return missing
+
+
 def _pids_by_port(port):
-    """Windows:从 netstat 拿监听该端口的 PID(不依赖 psutil)。"""
-    out = _run_stdout(["netstat", "-ano", "-p", "TCP"], 10)
+    """监听该端口的 PID 集合(不依赖 psutil),按平台选工具与版式。"""
+    if IS_WIN:
+        return _parse_netstat_windows(_run_stdout(["netstat", "-ano", "-p", "TCP"], 10), port)
+    pids = _parse_ss(_run_stdout(["ss", "-H", "-tlnp"], 10), port)
+    if pids:
+        return pids
+    # macOS 没有 ss、Linux 的 netstat 还常被砍掉 PID 列 ⇒ 再问 lsof(与 serve_all.port_owner 同命令)
+    pids = _parse_lsof(_run_stdout(["lsof", "-ti", "tcp:%d" % port, "-s", "TCP:LISTEN"], 10))
+    if pids:
+        return pids
+    # iproute2 没装(Ubuntu 最小镜像常见)时退 netstat;三者都拿不到就是空集 —— 
+    # 与 Windows 侧同语义,调用方按"没在跑"处理,不猜(缺工具本身由 _attribution_tools_missing 出声)。
+    return _parse_netstat_posix(_run_stdout(["netstat", "-tlnp"], 10), port)
+
+
+def _parse_lsof(out):
+    """`lsof -ti tcp:5010 -s TCP:LISTEN` 只吐 PID,一行一个。
+
+    判据是**整行只有一个数字**:`-t` 的输出本就如此,而按"行里任意一串数字"抽会把别的
+    版式(如 netstat 的 Recv-Q/Send-Q、TIME_WAIT 行的 0)当成 PID,蒙出一个不存在的进程。
+    """
+    return {int(line) for line in out.splitlines() if line.strip().isdigit()}
+
+
+def _parse_netstat_windows(out, port):
     pat = re.compile(r"^\s*TCP\s+\S+:%d\s+\S+\s+LISTENING\s+(\d+)\s*$" % port, re.M)
     return {int(m) for m in pat.findall(out)}
+
+
+def _parse_ss(out, port):
+    """`ss -H -tlnp` 的版式(iproute2;`-H` 去表头,列序固定):
+        LISTEN 0 128 127.0.0.1:5010 0.0.0.0:* users:(("python3",pid=1234,fd=6))
+    只认**本地地址列**正好是该端口的 LISTEN 行 —— 对端地址里出现同端口不算。
+    """
+    pids = set()
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) < 5 or cols[0] != "LISTEN":
+            continue
+        if not cols[3].endswith(":%d" % port):
+            continue
+        pids.update(int(m) for m in re.findall(r"\bpid=(\d+)", line))
+    return pids
+
+
+def _parse_netstat_posix(out, port):
+    """`netstat -tlnp` (net-tools) 的版式:
+        tcp        0      0 127.0.0.1:5010      0.0.0.0:*         LISTEN      1234/python3
+    列序 Proto/Recv-Q/Send-Q/Local/Foreign/State/PID-Program ⇒ 状态在第 6 列。
+    """
+    pids = set()
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) < 7 or not cols[0].startswith("tcp"):
+            continue
+        if cols[5] != "LISTEN" or not cols[3].endswith(":%d" % port):
+            continue
+        m = re.match(r"(\d+)/", cols[6])
+        if m:
+            pids.add(int(m.group(1)))
+    return pids
+
+
+def _parse_ps(out, needle):
+    """`ps -eo pid=,ppid=,args=` 的行 → {pid: ppid},只留命令行含 needle 的。
+
+    带上 ppid 的理由与 Windows 侧一致:uv 建的 venv 里解释器可能是 trampoline,
+    一个逻辑实例对应父子两个 PID,只数 PID 会把 1 份报成 2 份。
+    """
+    procs = {}
+    for line in out.splitlines():
+        cols = line.split(None, 2)
+        if len(cols) < 3:
+            continue
+        try:
+            pid, ppid = int(cols[0]), int(cols[1])
+        except ValueError:
+            continue
+        args = cols[2]
+        if needle not in args or args.startswith("ps "):
+            continue
+        procs[pid] = ppid
+    return procs
 
 
 def _procs_by_cmdline(needle):
@@ -121,6 +225,8 @@ def _procs_by_cmdline(needle):
     于是**一个逻辑实例对应父子两个 PID**。带上 ppid 才能数清"几个实例"
     (否则会把 1 个实例误报成 2 个)。
     """
+    if not IS_WIN:
+        return _parse_ps(_run_stdout(["ps", "-eo", "pid=,ppid=,args="], 20), needle)
     # 注意:这里用字符串拼接而不是 % 或 .format——
     # 脚本里有 'python%'(会被 % 当成格式符)和 '{0},{1}'(会被 .format 吃掉)。
     script = ("Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
@@ -234,6 +340,23 @@ def status():
 # ---------------------------------------------------------------------------
 # 停 / 起
 # ---------------------------------------------------------------------------
+def _terminate(pid, force=False):
+    """停一个进程:Windows 走 `taskkill /F`(原本就是强杀),POSIX 走 SIGTERM/SIGKILL。
+
+    POSIX 侧不能照抄 `/F`:直接 SIGKILL 会让 uvicorn 没机会收尾,而 5010 在跑批时
+    还要把当前那局的记录落完 —— 先 SIGTERM,`stop()` 等不到才升级(见调用处)。
+    进程已经自己退了(竞态)不算错,`ProcessLookupError` 直接吞。
+    """
+    try:
+        if IS_WIN:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                           capture_output=True, timeout=20)
+        else:
+            os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+    except (ProcessLookupError, OSError):
+        pass
+
+
 def stop(case, quiet=False):
     pids = live_pids(case)
     if not pids:
@@ -241,12 +364,16 @@ def stop(case, quiet=False):
             print("  {} :{} 本来就没在跑".format(case, LIVE[case]))
         return 0
     for pid in pids:
-        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, timeout=20)
+        _terminate(pid)
     # 等端口真的释放(否则紧接着的 --start 会绑不上)
     for _ in range(20):
         time.sleep(0.5)
         if not live_pids(case):
             break
+    else:
+        # SIGTERM 没收回来的(卡在退出路径上),再强一次 —— 对齐 Windows 侧 taskkill /F
+        for pid in sorted(live_pids(case)):
+            _terminate(pid, force=True)
     if not quiet:
         print("  已停 {} :{} (pid={})".format(case, LIVE[case], ",".join(map(str, sorted(pids)))))
     return len(pids)
@@ -357,8 +484,12 @@ def start(case, args):
     # 于是**任何一次历史 bind 冲突都会永久显示成"当次失败原因"**(本机 err 当时全文就一行旧 10048),
     # 让人以为这次也失败了。旧日志不是当次证据。与 `tools/serve_all.py` 的口径一致。
     with open(log, "wb") as fo, open(err, "wb") as fe:
+        # POSIX 用 `start_new_session`(与 tools/serve_all.py 已验的写法同口径):不加这句,
+        # 子进程留在本开关的进程组里,开关退出后终端的一次 Ctrl+C 会连带把 5010 打死 ——
+        # 而 5010 的设计是"跑完还在保持,供人翻记录"。Windows 侧走 DETACHED_PROCESS。
+        kwargs = {} if IS_WIN else {"start_new_session": True, "stdin": subprocess.DEVNULL}
         subprocess.Popen(cmd, cwd=HERE, stdout=fo, stderr=fe,
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), **kwargs)
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
     if args.host not in ("127.0.0.1", "localhost", ""):
@@ -373,8 +504,11 @@ def start(case, args):
                 print("    http://{}:{}/{}{}".format(
                     ip, LIVE[case], tail, _reachable(ip, LIVE[case])))
         else:
-            print("    (一个都没取到:用 ipconfig 自己看一眼)")
-        print("  对方连不上时先查防火墙是否放行该端口(Windows 常把新网络判成 Public)。")
+            print("    (一个都没取到:用 {} 自己看一眼)".format(
+                "ipconfig" if IS_WIN else "ip addr"))
+        print("  对方连不上时先查防火墙是否放行该端口({})。".format(
+            "Windows 常把新网络判成 Public" if IS_WIN
+            else "Linux 看 `ufw status`/firewalld;容器里还要看宿主机有没有映射该端口"))
     mapper_log = ""
     if run_id:
         print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
@@ -404,8 +538,10 @@ def start(case, args):
         if port_pids:
             print("     ⚠ :{} **确实在听**(PID {}),只是归属判不出来 ⇒ **不自动收掉**".format(
                 LIVE[case], ", ".join(str(x) for x in sorted(port_pids))))
-            print("        先 HTTP 确认一下:curl.exe -s http://127.0.0.1:{}/health".format(LIVE[case]))
-            print("        确认要停:`python live_switch.py --stop {}`,或 Stop-Process -Id <pid>".format(case))
+            print("        先 HTTP 确认一下:{} -s http://127.0.0.1:{}/health".format(
+                "curl.exe" if IS_WIN else "curl", LIVE[case]))
+            print("        确认要停:`python live_switch.py --stop {}`,或 {}".format(
+                case, "Stop-Process -Id <pid>" if IS_WIN else "kill <pid>"))
         else:
             print("     正在收掉这个游离实例,避免留下'看不见的第二个推演'……")
             stop(case, quiet=True)
@@ -481,12 +617,23 @@ def _all_lan_ips() -> list:
     routed = _lan_ip()
     if routed:
         ips.append(routed)
-    # 列不全只影响提示,不该让起服务失败:helper 出错就回空串,循环自然跳过
-    out = _run_stdout(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-         "(Get-NetIPAddress -AddressFamily IPv4).IPAddress"], 10)
-    for line in out.splitlines():
-        ip = line.strip()
+    # 列不全只影响提示,不该让起服务失败:helper 出错就回空串/空表,循环自然跳过
+    if IS_WIN:
+        raw = _run_stdout(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "(Get-NetIPAddress -AddressFamily IPv4).IPAddress"], 10).splitlines()
+        cands = [s.strip() for s in raw]
+    else:
+        # Linux/macOS(iproute2):`2: eth0 inet 10.0.0.5/24 brd 10.0.0.255 scope global eth0`
+        # ⇒ 第 3 列是 inet、第 4 列是地址,去掉 /掩码。没装 iproute2 时退 `hostname -I`。
+        cands = []
+        for cols in (l.split() for l in _run_stdout(["ip", "-4", "-o", "addr", "show"], 10).splitlines()):
+            if len(cols) >= 4 and cols[2] == "inet":
+                cands.append(cols[3].split("/")[0])
+        if not cands:
+            cands = _run_stdout(["hostname", "-I"], 10).split()
+    for ip in cands:
+        ip = ip.strip()
         if ip and ip not in ips and not ip.startswith(("127.", "169.254.")):
             ips.append(ip)
     return ips
@@ -498,6 +645,12 @@ def main():
     # 覆盖写预警发生在 `stop(other)`/`stop(case)` 之后,抛 UnicodeEncodeError 就等于
     # 把两个实时面都停了却没起新的(正是本文件要防的"先弄没在跑的面")。
     tolerant_stdout()
+    missing = _attribution_tools_missing()
+    if missing:
+        # 先出声再干活:否则 --start 会按"没在跑"的假前提往下走(见 _attribution_tools_missing)
+        print("[live_switch] ⚠ 本机缺 {} —— 下面所有 `down/未启动/本来就没在跑` 只代表"
+              "**查不到进程**,不代表真没在跑。先补齐再信本开关:"
+              "apt-get install iproute2 net-tools procps".format("、".join(missing)))
     ap = argparse.ArgumentParser(description="实时面开关:保证同时只有一个实时可视化在跑")
     ap.add_argument("--status", action="store_true", help="只看现状,不动任何进程")
     ap.add_argument("--start", choices=["case00", "case01"], help="起某个 case 的实时面(先停另一个与本 case 旧实例)")
