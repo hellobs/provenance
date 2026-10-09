@@ -93,8 +93,14 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
                           "options": ["auto", "A", "B", "C"],
                           "value": "auto" if branch_mode == "judge" else branch}],
         # 顶栏外部工具链接:mavis 的角色/场景配置工具是**独立进程**(默认 8060),
-        # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)
-        extra_nav_links=[{"label": "配置工具 ↗",
+        # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)。
+        # "专家审核"排在前面,且**只在挂了结果面板时给** —— 九块/专家队列都由
+        # with_review 那侧的 review_app 挂,不挂就是 404(与数据界面同一判据)。
+        extra_nav_links=([{"label": "专家审核", "url": "/review/expert",
+                           "title": "专家审批面板:候选队列 / 逐条 verdict / 纠正文本"
+                                   "(⚠ 无鉴权真写口)"}]
+                         if with_review else []) +
+                        [{"label": "配置工具 ↗",
                           "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
                                                 "http://127.0.0.1:8060/"),
                           "title": "mavis 的角色/场景配置工具(独立进程;"

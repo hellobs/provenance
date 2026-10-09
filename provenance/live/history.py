@@ -85,6 +85,72 @@ templates.env.globals["extra_nav_links"] = [
      "title": "mavis 的角色/场景配置工具(独立进程;地址用 MAVIS_CONFIG_TOOL_URL 覆盖)"},
 ]
 
+
+# 专家审核面的路径与端点函数名(case01/expert_review_app.py:697-698)
+EXPERT_FACE_PATH = "/review/expert"
+EXPERT_FACE_ENDPOINT = "expert_index"
+
+
+def _route_paths(app) -> set:
+    """把 app 上**所有层**的路由路径摊平成一个集合。
+
+    为什么手写递归:本版 starlette 的 `include_router` 不在 `app.routes` 里摊平,
+    而是塞成 `_IncludedRouter`(它没有 `.path`/`.routes`,只有 `original_router`)。
+    2026-10-09 实测:只数 `getattr(r,"path")` 会得到 6 条默认路由、
+    `/review/expert` 看不见 ⇒ 顶栏的"专家审核"永远不出现(假阴性)。
+    """
+    out = set()
+    seen = set()
+
+    def walk(routes, depth=0):
+        if depth > 6:
+            return
+        for r in routes or []:
+            if id(r) in seen:
+                continue
+            seen.add(id(r))
+            p = getattr(r, "path", None)
+            if p:
+                out.add(p)
+            for attr in ("original_router", "routes", "app"):
+                sub = getattr(r, attr, None)
+                inner = getattr(sub, "routes", None) if sub is not None else None
+                if inner:
+                    walk(inner, depth + 1)
+
+    walk(getattr(app, "routes", []))
+    return out
+
+
+def _face_serves(app, path: str) -> bool:
+    """这个面上有没有 `path` 这条路由 —— 两条独立判据,任一命中即算有:
+    ① 自己摊平路由树;② Starlette 公开的 `url_path_for`(按端点函数名,不随版本变)。
+    单用②要写死函数名,单用①会被路由树实现细节骗到 —— 两条同用才不会"面在、按钮不出现"。
+    """
+    if path in _route_paths(app):
+        return True
+    try:
+        app.url_path_for(EXPERT_FACE_ENDPOINT)
+        return True
+    except Exception:  # noqa: BLE001 - 名字没注册就是 KeyError/BuildError,按"没有"处理
+        return False
+
+
+def nav_links_for(app) -> list:
+    """顶栏链接:外部工具是环境变量给的,**专家审核面只有它真挂着的时候才给链接**。
+
+    为什么按"路由在不在"判而不是按 case 判:5010 单入口、case00 与 case01 互斥,
+    `/review/expert` 由 case01 的 review_app 挂(`live_run.py` 的 `with_review`),
+    case00 面上压根没有这条路由 —— 写死一个入口就是自己造 404,
+    与《给平台侧_嵌入与数据接入》§二"拿错面就是 404"是同一条边界。
+    """
+    links = list(templates.env.globals.get("extra_nav_links") or [])
+    if _face_serves(app, EXPERT_FACE_PATH):
+        links.insert(0, {"label": "专家审核", "url": EXPERT_FACE_PATH,
+                         "title": "专家审批面板:候选队列 / 逐条 verdict / 纠正文本"
+                                 "(case01 面专有;⚠ 无鉴权真写口)"})
+    return links
+
 router = APIRouter()
 
 
@@ -543,7 +609,8 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
 async def explore_page(request: Request) -> HTMLResponse:
     """数据界面:纯数据浏览,不依赖运行状态;由 history.html 渲染。"""
     return templates.TemplateResponse(request, "history.html",
-                                      {"embed": "explore", "title": "历史数据"})
+                                      {"embed": "explore", "title": "历史数据",
+                                       "extra_nav_links": nav_links_for(request.app)})
 
 
 @router.get("/api/review-package/{run_id}", response_model=ReviewPackageResponse,
