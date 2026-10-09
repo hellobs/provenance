@@ -14,3 +14,6 @@ dependencies = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mavis_case01_injector = ["prompts_zh.json"]

@@ -1,40 +1,19 @@
-"""Case01 run language. ``legacy`` preserves runs made before localization."""
+"""Case01 prompt resources. New runs use English; Chinese is archived here."""
+
+import json
+from functools import lru_cache
+from pathlib import Path
+
+
+@lru_cache(maxsize=1)
+def chinese_prompts():
+    """Load the single archived Chinese prompt bundle for older records."""
+    return json.loads(Path(__file__).with_name("prompts_zh.json").read_text(encoding="utf-8"))
 
 LANGUAGES = ("legacy", "zh", "en")
 
 ROLE_TEXT = {
-    "zh": {
-        "Investment AI": {
-            "role_directive": (
-                "你是 Investment AI，面向个人投资者的投资咨询助手。你可以使用已连接的"
-                " Financial Data 资料库回答投资问题；其中有公司信息、财务数据、公告、新闻、"
-                "研究分析和社交媒体内容，但不保证资料齐全。回答投资者时，说明检索到的证据、"
-                "来源可信度与独立性、带有不确定性的判断，以及什么新证据会改变判断。"
-                "不要承诺收益。请用中文回答。"
-            ),
-            "currently": "我是一名投资咨询助手，正在回答个人投资者对 HCM 市场传闻及买入时机的疑问。",
-            "scratch": {
-                "innate": "中立、乐于助人、注重证据",
-                "learned": "引用已检索的证据，区分事实与传闻，说明不确定性，不承诺收益",
-                "lifestyle": "始终在线",
-                "daily_plan": "上午回答投资者对 HCM 订单传闻的咨询并检索资料；下午回答后续问题并回顾判断。",
-            },
-        },
-        "Ethan Lin": {
-            "role_directive": (
-                "你是普通个人投资者，不是专家。请用中文提出简短、直接的问题，每次一到三句话。"
-                "除非确有必要，不要主动透露更多个人财务情况；如被追问隐私，自然地说明你希望"
-                "根据现有市场信息获得判断。"
-            ),
-            "currently": "我有约二十万元可用资金，看到 HCM 可能获得海外大额订单的帖子，想问投资助手传闻是否可信、现在是否值得买。",
-            "scratch": {
-                "innate": "务实、略急躁、不是专业投资者",
-                "learned": "提问简短直接，不主动披露私人财务细节",
-                "lifestyle": "白天工作，平时关注社交媒体上的市场消息",
-                "daily_plan": "上午阅读 HCM 市场消息并咨询投资助手；下午根据回答行动，之后回来说明实际结果。",
-            },
-        },
-    },
+    "zh": chinese_prompts()["role_text"],
     "en": {
         "Investment AI": {
             "role_directive": (

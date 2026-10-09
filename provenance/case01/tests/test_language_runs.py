@@ -1,7 +1,8 @@
-"""Language selection must survive raw runs, mapping, and model calls."""
+"""New Case01 runs use English; older records retain their recorded language."""
 
 import pytest
 import json
+from pathlib import Path
 
 from case01 import reflection
 from mavis_case01_injector.language import apply_role_text
@@ -34,7 +35,7 @@ def test_role_text_is_separate_and_legacy_is_unchanged():
 
 
 def test_raw_language_survives_mapping_and_manifest():
-    raw = run_pipeline(branch="B", dry_run=True, language="en")
+    raw = run_pipeline(branch="B", dry_run=True)
     assert raw["language"] == "en"
     assert raw["injector"]["language"] == "en"
     assert raw["manifest"]["language"] == "en"
@@ -45,9 +46,14 @@ def test_raw_language_survives_mapping_and_manifest():
     with pytest.raises(ValueError, match="conflicts"):
         run_pipeline(raw_record=raw["injector"], dry_run=True, language="zh")
 
+    old_raw = dict(raw["injector"])
+    old_raw.pop("language")
+    old_mapped = run_pipeline(raw_record=old_raw, dry_run=True)
+    assert old_mapped["language"] == "legacy"
+
 
 def test_bridge_raw_record_manifest_has_language(tmp_path):
-    bridge = MavisBridge(nodes=default_nodes("B"), dry_run=True, branch="B", language="en")
+    bridge = MavisBridge(nodes=default_nodes("B"), dry_run=True, branch="B")
     bridge.run()
     path = tmp_path / "raw.json"
     bridge.save(str(path))
@@ -78,3 +84,14 @@ def test_router_rerun_uses_record_language(tmp_path):
     router = CapturingLLM("[]")
     rerun_router_only(str(path), router_llm=router)
     assert "Respond in English" in router.messages[0][0]["content"]
+
+
+def test_chinese_prompts_are_archived_together():
+    from mavis_case01_injector.world import branch
+    path = (Path(__file__).resolve().parents[3] / "packages" / "mavis-case01-injector"
+            / "src" / "mavis_case01_injector" / "prompts_zh.json")
+    archive = json.loads(path.read_text(encoding="utf-8"))
+    assert archive["role_text"]["Ethan Lin"]["role_directive"]
+    assert archive["reflection_prompt"] == reflection.REFLECTION_PROMPT_CN
+    assert archive["router_prompt"] == reflection.ROUTER_PROMPT_CN
+    assert archive["branch_judge"] == branch.JUDGE_PROMPT

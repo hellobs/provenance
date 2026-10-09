@@ -259,7 +259,7 @@ if not _LIVE_PY or not os.path.isfile(_LIVE_PY):
     _LIVE_PY = sys.executable
 
 
-def _launch_live(case_id: str, language: str = "legacy") -> dict:
+def _launch_live(case_id: str) -> dict:
     """运行组合时,把 5010 切到该 case 的实时面。
 
     **非阻塞**:live_switch --start 要等端口绑上(最长约 36s),这里 Popen 即返回,
@@ -280,8 +280,6 @@ def _launch_live(case_id: str, language: str = "legacy") -> dict:
     try:
         with open(out, "ab") as fo, open(err, "ab") as fe:
             cmd = [_LIVE_PY, switch, "--start", live_case]
-            if live_case == "case01":
-                cmd.extend(["--language", language])
             subprocess.Popen(
                 cmd,
                 cwd=_PLATFORM_DIR, stdout=fo, stderr=fe,
@@ -1479,9 +1477,6 @@ async def run_execute(request: Request):
     case_id = str((body or {}).get("case_id") or "").strip()
     engine_id = str((body or {}).get("engine_id") or "").strip()
     input_text = str((body or {}).get("input_text") or "").strip()
-    language = str((body or {}).get("language") or "legacy").strip().lower()
-    if language not in ("legacy", "zh", "en"):
-        return JSONResponse({"ok": False, "errors": ["language 必须为 zh 或 en"]})
     if comp_id:
         c = compositions.find(_comps(), comp_id)
         if c is None:
@@ -1499,7 +1494,7 @@ async def run_execute(request: Request):
     ok, summary, errors = engine_runner.run_case(
         _PLATFORM_DIR, case_id, engine_id=engine_id, input_text=input_text)
     # 联动 5010:运行组合即把实时入口切到该 case(非阻塞;case00 首页=小镇+治理面板,case01=小镇+结果)
-    live = _launch_live(case_id, language=language)
+    live = _launch_live(case_id)
     return JSONResponse({"ok": ok, "summary": summary, "errors": errors,
                          "case_id": case_id, "engine_used": summary.get("_engine_id", ""),
                          "live": live})

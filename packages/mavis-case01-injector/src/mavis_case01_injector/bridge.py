@@ -70,7 +70,7 @@ class MavisBridge:
         judge_llm: Optional[object] = None,
         backend_kind: str = "",
         think_workers: int = 0,
-        language: str = "legacy",
+        language: str = "en",
     ):
         self.nodes = list(nodes or [])
         # 调用方给的序列长度就是它要的步数(冒烟/收时间窗用的截断也在这里)。

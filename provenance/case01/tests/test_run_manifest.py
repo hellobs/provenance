@@ -260,9 +260,10 @@ def test_branch_mode_and_judge_prompt_version_recorded(tmp_path):
     v = rec["manifest"]["judge_prompt_version"]
     assert isinstance(v, str) and len(v) == 12
 
-    from case01.world.branch import JUDGE_PROMPT
-    assert v == text_sha256(JUDGE_PROMPT)[:12]
-    assert v == sha256_12(JUDGE_PROMPT)
+    from case01.world.branch import JUDGE_PROMPT_EN
+    assert rec["manifest"]["language"] == "en"
+    assert v == text_sha256(JUDGE_PROMPT_EN)[:12]
+    assert v == sha256_12(JUDGE_PROMPT_EN)
 
     # 反思/路由提示词版本也记了
     pv = rec["manifest"]["prompt_versions"]
