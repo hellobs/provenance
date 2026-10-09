@@ -20,10 +20,12 @@
                     **本面板没有接**,所以引这个地址拿到的与 `/review/expert` 完全一样
                     (含大标题与"← 回到只读面")。要给平台做嵌入版式,照 `review_app` 那套补,
                     别把这两个地址对外说成两种版式。
-- `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开)
+- `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开;除最近若干条外,
+                    「已有 1 份意见、在等第二份」的记录强制进队列并按状态排序,见 `_recent_runs`)
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
 - `/api/expert/decision` 提交一份意见(approve/edit/reject + 自由文本)
-- `/api/expert/marks`   已提交意见的**计数**,不回内容也不回结论(见下)
+- `/api/expert/marks`   已提交意见的**计数**,不回内容也不回结论(见下)。
+                    没有任务坐标的旧探针不计入任务,单独以 `unattributed` 报数
 
 三条设计口径(都不是审美选择,是规范里读出来的):
 1. **两套词汇在服务端桥接**。平台词 `approve/edit/reject`(《补充规范》§3)与本平台
@@ -54,8 +56,13 @@ MAX_QUEUE_RUNS = 30          # 队列最多扫多少条记录(每条要读一次
 MAX_TEXT_CHARS = 200_000     # 与标记端点同一条上限,超长一律拒
 
 
-def _recent_runs(limit: int):
-    """取最近落地的若干条记录。
+def _recent_runs(limit: int, must_include=()):
+    """取最近落地的若干条记录,**外加必须进队列的那几条**(不受 mtime 窗口影响)。
+
+    为什么要 `must_include`:这函数原本只按 mtime 取最近 N 条,于是"已经有 1 份意见、
+    在等第二份"的记录一变旧就**从队列里消失** —— 而 04 §八 首轮要两份独立意见,
+    第二位专家恰恰就该找这种记录。实测过这个死角:全库唯一一份带任务坐标的意见挂在
+    `batch-261007-212235-sample8b15-009`,它早不在最近 10 条里,面板上看不出任何欠账。
 
     排序**按 run.json 的 mtime,不按 run_id 字典序**(实测错过一次):
     run_id 前缀不统一 —— `batch-261007-203649-arm8bC-001` 与 `probe-1003-1217`、
@@ -66,20 +73,23 @@ def _recent_runs(limit: int):
     from .review_app import _discover_runs, _runs_dir
     from . import full_context as fc
 
-    dated = []
+    by_run = {}
     for run_id in _discover_runs():
         path = os.path.join(_runs_dir(), run_id, "run.json")
         try:
-            dated.append((os.path.getmtime(path), run_id, path))
+            by_run[run_id] = (os.path.getmtime(path), path)
         except OSError:
             continue
+    order = sorted(by_run, key=lambda r: (-by_run[r][0], r))
+    window = order[:max(1, min(limit, MAX_QUEUE_RUNS))]
+    # 欠第二份的记录排在窗口前面,并且总数一起受 MAX_QUEUE_RUNS 限(每条要读一次 run.json)
+    forced = [r for r in must_include if r in by_run and r not in window]
+    queue_ids = forced + window
     picked, scanned = [], 0
-    for _, run_id, path in sorted(dated, key=lambda x: (-x[0], x[1])):
-        if len(picked) >= max(1, min(limit, MAX_QUEUE_RUNS)):
-            break
+    for run_id in queue_ids[:MAX_QUEUE_RUNS]:
         scanned += 1
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(by_run[run_id][1], "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:      # noqa: BLE001 —— 读不动的记录不进队列,计数里如实说
             continue
@@ -101,22 +111,31 @@ def expert_queue(limit: int = 10):
     from .review_export import build_review_package
     from live.reflections import load_marks
 
-    # 每条任务已有几份意见、结论是否一致(只到状态为止,见 _review_state 的说明)
+    # 每条任务已有几份意见、结论是否一致(只到状态为止,见 _review_state 的说明)。
+    # 没有 run_id + issue_id 的标记(旧探针经 /api/reflections/mark 落的,review 块为空)
+    # 不算任务:它们在这里直接跳过,在 expert_marks 里单独报数,理由见那边的注释。
+    # 键用三元组而不是拼好的串:拼串会让 ("a|b","c") 与 ("a","b|c") 撞成同一个键。
     n_by_task, verdicts_by_task = {}, {}
     for m in load_marks():
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
-        k = "|".join([str(rv.get("run_id", "")), str(rv.get("issue_id", "")),
-                      str(rv.get("expert_category_id", ""))])
+        rid, iid = rv.get("run_id"), rv.get("issue_id")
+        if not rid or not iid:
+            continue
+        k = (str(rid), str(iid), str(rv.get("expert_category_id") or ""))
         n_by_task[k] = n_by_task.get(k, 0) + 1
         verdicts_by_task.setdefault(k, set()).add(str(m.get("verdict", "")))
+    # 已有 1 份、在等第二份的那些记录必须进队列,哪怕已经不在"最近 N 条"里
+    pending_runs = sorted({k[0] for k, n in n_by_task.items() if n == 1})
+
     pool_rows, pool_at = _pool_rows()
 
-    picked, scanned = _recent_runs(limit)
+    picked, scanned = _recent_runs(limit, must_include=pending_runs)
     tasks, triage, blocked = [], [], []
     for run_id, data in picked:
         pkg = build_review_package(data, run_id)
         for c in pkg["task_candidates"]:
-            k = "|".join([run_id, c["issue_id"], c["expert_category_id"]])
+            k = (run_id, c["issue_id"], str(c["expert_category_id"] or ""))
+            n = n_by_task.get(k, 0)
             tasks.append({
                 "run_id": run_id,
                 "issue_id": c["issue_id"],
@@ -129,8 +148,9 @@ def expert_queue(limit: int = 10):
                 "anchor": {"sentence_ids": c["evidence_sentence_ids"],
                            "quote": c["evidence_quote"]},
                 # 05 §一:任务未点开也要能看见"当前审核状态";05 §六:池状态。
-                "review_state": _review_state(n_by_task.get(k, 0),
-                                              len(verdicts_by_task.get(k, ()))),
+                "n_opinions": n,
+                "review_state": _review_state(n, len(verdicts_by_task.get(k, ()))),
+                "state_rank": _state_rank(n, len(verdicts_by_task.get(k, ()))),
                 "pool": _pool_state(pool_rows, run_id, c["issue_id"],
                                     c["expert_category_id"]),
             })
@@ -139,12 +159,19 @@ def expert_queue(limit: int = 10):
                            "reason": t["reason"]})
         if pkg["blocked_reasons"]:
             blocked.append({"run_id": run_id, "reasons": pkg["blocked_reasons"]})
+    # 服务端就把工作列表排好:平台侧直接读这个接口的话,不该要求它自己懂 state_rank 的语义。
+    # 面板那边同款排序在 _EXPERT_PAGE 的 TASKS.sort 里。
+    tasks.sort(key=lambda t: (t["state_rank"], _RISK_ORDER.get(t["risk"], 3), t["run_id"]))
     return {"n_runs_scanned": scanned, "n_tasks": len(tasks),
             "n_manual_triage": len(triage), "n_blocked": len(blocked),
             "tasks": tasks, "manual_triage": triage, "blocked": blocked,
             "verdict_words": sorted(VERDICT_ALIAS),
             "pool_generated_at": pool_at,
             "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
+                    "除最近 limit 条外,凡「已有 1 份意见、在等第二份」的记录都强制进队列"
+                    "(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > 争议轮 > "
+                    "等第二份 > 待领取 > 首轮已齐 —— 已齐的仍列在队尾(面板不接单,"
+                    "要不要过滤由平台按 state_rank 决定)。"
                     "review_state 是给统筹看的状态词,不含任何一份意见的结论或文本;"
                     "pool 来自上次 lora_prep --export 的产物(generated_at 标明新鲜度),不是实时真值"}
 
@@ -389,6 +416,25 @@ def _review_state(n: int, n_distinct_verdicts: int) -> str:
     return "争议轮(累计 {} 份)".format(n)
 
 
+# 队列排序档(数字小的排前面)。为什么按状态而不是按时间:04 §八 的活儿分三种
+# —— 等第二份、等追加、还没人看 —— 一位专家再来时最先该干的是**把别人的首轮补齐**,
+# 而不是又开一条新的;按 mtime 取窗口会把这类记录整条藏掉(实测就藏掉过)。
+_STATE_RANK = {"disputed": 0, "escalation": 1, "needs_second": 2,
+               "unclaimed": 3, "complete": 4}
+_RISK_ORDER = {"high": 0, "medium": 1, "low": 2}   # 与面板里的 RISK_ORDER 同口径
+
+
+def _state_rank(n: int, n_distinct_verdicts: int) -> int:
+    if n == 0:
+        return _STATE_RANK["unclaimed"]
+    if n == 1:
+        return _STATE_RANK["needs_second"]
+    if n == 2:
+        return (_STATE_RANK["disputed"] if n_distinct_verdicts > 1
+                else _STATE_RANK["complete"])
+    return _STATE_RANK["escalation"]
+
+
 @router.get("/api/expert/marks")
 def expert_marks():
     """只回计数。结论与文本一律不给 —— 首轮两份意见互不可见(《补充规范》§3:71)。
@@ -401,19 +447,30 @@ def expert_marks():
     marks = load_marks()
     by_category, by_task = {}, {}
     verdicts_by_task = {}
+    unattributed = 0
     for m in marks:
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
         cat = rv.get("expert_category_id") or "(未标专业)"
         by_category[cat] = by_category.get(cat, 0) + 1
-        key = "{}|{}".format(rv.get("run_id", "(无 run_id)"), rv.get("issue_id", "-"))
+        rid, iid = rv.get("run_id"), rv.get("issue_id")
+        if not rid or not iid:
+            # 没有任务坐标的意见(旧探针走 /api/reflections/mark,不带 review 块)**不算任务**。
+            # 以前这里把缺的字段填成占位串,于是 2 条探针被折叠成同一个"任务",
+            # `tasks_with_two_or_more` 报 1 而真实任务 0 条达到两份 —— 假账。
+            unattributed += 1
+            continue
+        # 任务粒度与队列一致:run_id + issue_id + 专业。两个字典必须同形 —— 以前
+        # by_task 用两段键、verdicts_by_task 用三段键,disputed 拿两段键去三段字典里
+        # 查永远查不到,`tasks_disputed` 因此恒为 0(又一个假零)。
+        key = "|".join([str(rid), str(iid),
+                        str(rv.get("expert_category_id") or "")])
         by_task[key] = by_task.get(key, 0) + 1
-        tkey = "|".join([str(rv.get("run_id", "")), str(rv.get("issue_id", "")),
-                         str(rv.get("expert_category_id", ""))])
-        verdicts_by_task.setdefault(tkey, set()).add(str(m.get("verdict", "")))
+        verdicts_by_task.setdefault(key, set()).add(str(m.get("verdict", "")))
     disputed = sum(1 for k, v in by_task.items()
                    if len(verdicts_by_task.get(k, ())) > 1 and v >= 2)
     return {"total": len(marks), "with_review_block": sum(
         1 for m in marks if isinstance(m.get("review"), dict)),
+        "unattributed": unattributed,
         "by_category": by_category,
         "opinions_per_task": sorted(by_task.items(), key=lambda kv: -kv[1])[:20],
         "tasks_with_two_or_more": sum(1 for v in by_task.values() if v >= 2),
@@ -518,36 +575,46 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
     <div id="queue"><div class="task s">队列加载中…</div></div>
   </div>
   <div id="work"><h2>选左侧一条任务</h2><div class="meta">
-     队列取最近记录里可建单的候选;读正文请展开"反思全文"。</div></div>
+     队列取最近记录里可建单的候选,并排在前面标出「已有 1 份、在等第二份」的那些;
+     读正文请展开"反思全文"。</div></div>
 </main>
 <script>
 var TASK = null, FULL = "";
 function esc(s) { var d = document.createElement("div"); d.textContent = (s == null ? "" : String(s)); return d.innerHTML; }
 function api(u, o) { return fetch(u, o).then(function (r) { return r.json(); }); }
+// 两处刷新(进页面、提交完)用同一个式子,免得第二处把新增的那半句漏掉
+function countsLine(m) {
+  if (!m) return "";
+  return " · 已提交意见 " + m.total + " 份,其中 " + m.tasks_with_two_or_more +
+    " 个任务已有两份以上" +
+    (m.unattributed ? ("(另有 " + m.unattributed + " 份没有任务坐标,不计入任务)") : "");
+}
 
 var TASKS = [], RISK_ORDER = { high: 0, medium: 1, low: 2 }, POOL_AT = "";
 
 api("/api/expert/queue?limit=10").then(function (q) {
   POOL_AT = q.pool_generated_at ? ("(上次导出 " + q.pool_generated_at + ")")
                                : "(还没有导出产物)";
-  TASKS = q.tasks.slice().sort(function (a, b) {          // 高风险的排前面
+  TASKS = q.tasks.slice().sort(function (a, b) {
+    // 服务端已经按同一式子排过(见 expert_queue 末尾),这里只是重渲染时的稳定性兜底
+    var s = (a.state_rank == null ? 9 : a.state_rank) - (b.state_rank == null ? 9 : b.state_rank);
+    if (s !== 0) return s;
     var r = RISK_ORDER[a.risk] - RISK_ORDER[b.risk];
-    return r !== 0 ? r : (a.run_id < b.run_id ? 1 : -1);
+    return r !== 0 ? r : (a.run_id < b.run_id ? -1 : 1);
   });
   document.getElementById("summary").textContent =
     "可建单任务 " + q.n_tasks + " 条 · 人工分流 " + q.n_manual_triage +
     " 条 · 不可审 " + q.n_blocked + " 条(扫了 " + q.n_runs_scanned + " 条记录)";
   if (!q.tasks.length) {
     document.getElementById("queue").innerHTML =
-      "<div class='task err'>队列为空:最近的记录里没有「问题+专业」的建单候选" +
+      "<div class='task err'>队列为空:扫过的这些记录里没有「问题+专业」的建单候选" +
       "(看上面的人工分流与不可审计数)。</div>";
   }
   drawQueue();
   document.getElementById("risk").onchange = drawQueue;
   return api("/api/expert/marks");
 }).then(function (m) {
-  document.getElementById("counts").textContent = m ? (" · 已提交意见 " + m.total +
-    " 份,其中 " + m.tasks_with_two_or_more + " 个任务已有两份以上") : "";
+  document.getElementById("counts").textContent = countsLine(m);
 });
 
 function drawQueue() {
@@ -684,8 +751,7 @@ function send() {
       " · SFT 门问题 " + (e.sft_errors || []).length +
       " · 偏好对问题 " + esc((e.dpo_errors || []).join("; ")) + "</div>";
     api("/api/expert/marks").then(function (m) {
-      document.getElementById("counts").textContent = " · 已提交意见 " + m.total +
-        " 份,其中 " + m.tasks_with_two_or_more + " 个任务已有两份以上";
+      document.getElementById("counts").textContent = countsLine(m);
     });
   });
 }
