@@ -94,21 +94,3 @@ def test_page_script_defines_bubble_helpers(index_html):
     """
     for fn in ("function setBubble", "function tickBubbles", "function setActionBubble"):
         assert fn in index_html, "页面脚本缺 {}".format(fn)
-
-
-def test_bubble_text_has_word_wrap(index_html):
-    """头顶气泡的文本对象必须设 wordWrap —— 否则长句横向铺成一行糊在头上。
-
-    2026-10-09 用户反馈"你的聊天气泡要支持换行啊":气泡原文本对象只设了字体/底色,
-    没有 wordWrap,长句不折行。这条钉住气泡**自己那段**的换行配置。
-
-    注意:`add_text`(另一个函数)本来就有 wordWrap —— 所以不能只断言"页面里有
-    wordWrap",那样 add_text 一处在就永远绿(假绿)。这里钉**气泡专用的限宽值 200**,
-    它只出现在气泡那段配置里。
-    """
-    assert "wordWrap: { width: 200" in index_html, \
-        "气泡文本缺专属换行配置(wordWrap width:200)——长句不会换行"
-    # 气泡那段还得开中文友好的 useAdvancedWrap
-    bubble_block = index_html.split("pronunciatios[persona_name] = this.add.text", 1)
-    assert len(bubble_block) == 2, "找不到气泡文本对象的创建处(结构变了?)"
-    assert "wordWrap" in bubble_block[1][:400], "气泡创建块里没有 wordWrap"

@@ -70,9 +70,10 @@ ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好', '打字机第 2 字')
 for (let i = 0; i < 10; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
 ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好世界', '吐满即停');
 
-// 4) 超长截断
-sandbox.setBubble('B', 'Ethan Lin', 'x'.repeat(200));
-ok(sandbox.bubble_full['B'].length <= 61, '超长截断(≤61 字),实得 ' + sandbox.bubble_full['B'].length);
+// 4) 超长截断(上限值随需求会调,所以断言"确实截了 + 带省略号",不写死具体字数)
+sandbox.setBubble('B', 'Ethan Lin', 'x'.repeat(500));
+ok(sandbox.bubble_full['B'].length < 500 && /…$/.test(sandbox.bubble_full['B']),
+   '超长截断并以省略号收尾,实得长度 ' + sandbox.bubble_full['B'].length);
 
 // 5) 新句覆盖,并从 0 重新吐
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');

@@ -152,7 +152,8 @@
 	var bubble_shown = {};            // name -> 已显示的字数
 	var bubble_speaker = {};          // name -> 说话人(用于着色)
 	var bubble_last_action = {};      // name -> 兜底行动文本(无对话时显示)
-	const BUBBLE_MAX_CHARS = 60;      // 气泡上限(超出按省略号截断,避免长文糊住画面)
+	const BUBBLE_MAX_CHARS = 140;     // 气泡上限(2026-10-09:字体调小+换行后放宽,尽量把话显示完;
+	                                  // 仍留上限,避免极端长文把气泡撑到镜头外)
 	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
 	let anims_direction;
@@ -743,11 +744,13 @@
 			// Here, we are creating the persona and its pronunciatio sprites.
 			personas[persona_name] = new_sprite;
 			pronunciatios[persona_name] = this.add.text(
-				new_sprite.body.x - 15,
-				new_sprite.body.y - 15 - 25,
+				new_sprite.body.x - 28,
+				new_sprite.body.y - 8,
 				"",
 				{
-					font: "18px monospace",
+					// 字体从 18px 调小到 14px(2026-10-09 用户要求"字体调小、字尽量显示完"):
+					// 小字号下同一块气泡能容纳更多字,长句不必早早截断。
+					font: "14px monospace",
 					fill: "#000000",
 					backgroundColor: "#ffffcc",
 					padding: { x: 4, y: 4},
@@ -755,11 +758,14 @@
 					borderRadius:"10px",
 					// 头顶气泡要能换行(2026-10-09 用户反馈"聊天气泡要支持换行"):
 					// 原来这里没设 wordWrap,长句就横向铺成一行糊在头上。
-					// 限宽 200px(约 11 个中文字/行),超出自动折行。
+					// 限宽 180px(14px 字号下约 12 个中文字/行),超出自动折行。
 					align: "left",
-					wordWrap: { width: 200, useAdvancedWrap: true },
+					wordWrap: { width: 180, useAdvancedWrap: true },
 				}
 			).setDepth(3);
+			// 底部对齐:换行后**新行往上长**,最后一行始终贴着角色头顶
+			// (2026-10-09 用户要求"字要从下往上叠")。origin(0,1)= 左上角锚点但纵轴取底部。
+			pronunciatios[persona_name].setOrigin(0, 1);
 			pronunciatios[persona_name].alpha = 0.7;
 
 			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
@@ -925,8 +931,8 @@
 			if (dist > tile_width * 3) {
 				curr_persona.body.x = target[0];
 				curr_persona.body.y = target[1];
-				curr_pronunciatio.x = target[0] - 15;
-				curr_pronunciatio.y = target[1] - 15 - 25;
+				curr_pronunciatio.x = target[0] - 28;
+				curr_pronunciatio.y = target[1] - 8;
 				waypoints.shift();
 				if (waypoints.length === 0) delete movement_target[curr_persona_name];
 				continue;
@@ -957,29 +963,32 @@
 				let move_y = Math.abs(dy) > 0 ? (dy > 0 ? 1 : -1) : 0;
 				// 先走主导轴:横向未齐则优先横向;横齐后再纵向
 				let axis_first_x = Math.abs(dx) >= Math.abs(dy);
-				let moved = false;
+				// 记录**这一帧真正移动的轴**(2026-10-09 修"头朝前却往后走"):
+				// 方向必须由实际位移的轴决定,不能按 dx/dy 猜 —— 目标在斜上方时
+				// 这一帧可能只动了纵轴,若还按 dx 判成横向,画面就是"头朝左、人往下走"。
+				let moved_axis = "";   // "" | "x" | "y"
 				if (axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
 				    !tileWall(cx + move_x * step_px, cy)) {
 					curr_persona.body.x += move_x * step_px;
-					moved = true;
+					moved_axis = "x";
 				} else if (move_y !== 0 && Math.abs(dy) >= step_px &&
 				           !tileWall(cx, cy + move_y * step_px)) {
 					curr_persona.body.y += move_y * step_px;
-					moved = true;
+					moved_axis = "y";
 				} else if (!axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
 				           !tileWall(cx + move_x * step_px, cy)) {
 					curr_persona.body.x += move_x * step_px;
-					moved = true;
+					moved_axis = "x";
 				}
 
-				// walking animation (by movement axis this frame)
-				let dir = "d";
-				if (move_x !== 0 && (moved ? (Math.abs(dx) >= Math.abs(dy)) : false)) {
+				// walking animation:朝向 = 本帧实际移动的轴(没动就保持上一帧朝向)
+				if (moved_axis === "x") {
 					dir = move_x > 0 ? "r" : "l";
-				} else if (move_y !== 0) {
+				} else if (moved_axis === "y") {
 					dir = move_y > 0 ? "d" : "u";
-				} else if (move_x !== 0) {
-					dir = move_x > 0 ? "r" : "l";
+				} else {
+					// 本帧没推动(被墙卡住):沿用上一帧朝向,别乱翻
+					dir = pre_anims_direction_dict[curr_persona_name] || "d";
 				}
 				pre_anims_direction_dict[curr_persona_name] = dir;
 				let dir_word = dir == "d" ? "down" : dir == "u" ? "up" : dir == "l" ? "left" : "right";
@@ -1015,10 +1024,13 @@
 		}
 
 		// ---- text bubbles: reset to each agent's head (baseline) every frame, then detect overlaps ----
+		// 气泡原点已设为底部对齐(see setOrigin(0,1)):y 是**底边**位置。
+		// 底边放在角色头顶上方 8px,换行时新行往上长(字从下往上叠)。
+		// x 略微偏左(-28),避开角色正前方/正上方,减少与相邻角色气泡重叠(2026-10-09 用户要求"偏左或偏右")。
 		for (let i = 0; i < Object.keys(personas).length; i++) {
 			let name = Object.keys(personas)[i];
-			pronunciatios[name].x = personas[name].body.x - 15;
-			pronunciatios[name].y = personas[name].body.y - 15 - 25;
+			pronunciatios[name].x = personas[name].body.x - 28;
+			pronunciatios[name].y = personas[name].body.y - 8;
 		}
 
 		// ---- text bubble overlap: adjacent agents' bubbles offset vertically to avoid occlusion ----
