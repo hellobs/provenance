@@ -446,8 +446,31 @@ def _index_html(recs) -> str:
 
 
 def main():
-    targets = sys.argv[1:] or [d for d in os.listdir(RUNS_DIR)
-                               if os.path.isdir(os.path.join(RUNS_DIR, d))]
+    argv = sys.argv[1:]
+    flags = [a for a in argv if a.startswith("-")]
+    if flags:
+        # 本工具没有开关。不拦的话 `--help` 会被当成一个 run_id 往下走,而 `_load_run`
+        # 对"目录不存在"不报错(它只 setdefault 空的 turns)⇒ 结果是在 /viewer 目录里
+        # 写出一个空白页 `--help.html` 并打印 "rendered ->"。仓里现在就躺着这个文件
+        # (data/case01/html/--help.html,2026-09-21 那次 `-m case01.render --help` 留下的)。
+        print("render 不认参数:{} —— 用法只有两种:`python -m case01.render`(渲染全部)或 "
+              "`python -m case01.render <run_id>`(单条)。".format(" ".join(flags)),
+              file=sys.stderr)
+        return 2
+    print("记录根 = {}\n输出目录 = {}".format(RUNS_DIR, OUT_DIR))
+    targets = argv or [d for d in os.listdir(RUNS_DIR)
+                       if os.path.isdir(os.path.join(RUNS_DIR, d))]
+    missing = [r for r in targets if not os.path.isfile(
+        os.path.join(RUNS_DIR, r, "run.json"))]
+    if missing:
+        # 点名要渲染某条却没这条 = 名字敲错或根指错,不能"渲染出一条空白页"当成功
+        print("[失败] 这几条在 {} 下没有 run.json:{}".format(
+            RUNS_DIR, ", ".join(missing)), file=sys.stderr)
+        return 2
+    if not targets:
+        print("⚠ {} 下一条记录都没有 —— 先确认上面这个根是不是你要的那个"
+              "(可用 CASE01_RUNS_ROOT 指)。".format(RUNS_DIR), file=sys.stderr)
+        return 1
     os.makedirs(OUT_DIR, exist_ok=True)
     recs = []
     for run_id in targets:
@@ -461,10 +484,12 @@ def main():
         with open(p, "w", encoding="utf-8") as f:
             f.write(_page_html(rec))
         print("rendered -> {}".format(p))
-    with open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8") as f:
+    index = os.path.join(OUT_DIR, "index.html")
+    with open(index, "w", encoding="utf-8") as f:
         f.write(_index_html(recs))
-    print("index -> {}\\index.html".format(OUT_DIR))
+    print("index -> {}".format(index))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
