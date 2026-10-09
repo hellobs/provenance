@@ -217,12 +217,31 @@ def test_utf8_env_pins_key_without_touching_os_environ():
     assert utf8_env({"A": "1"})["A"] == "1", "给定的 base 必须被继承"
 
 
-@pytest.mark.skipif(not sys.platform.startswith("win"), reason="netstat 是 Windows 路径")
-def test_port_listening_returns_bool_instead_of_raising():
-    """看护进程的端口探活:取不到也只能给 bool,不能 TypeError。"""
+def test_port_listening_answers_for_both_states():
+    """看护进程的端口探活:只能给 bool,而且**正反两态都要对得上**。
+
+    原来这条只测"关掉端口 ⇒ 不抛",且标着 skipif(win)。换成一次本机 TCP 连接后:
+    只测负例的话,"永远返回 False"的实现也能过 —— 而那恰好就是 Linux 上 netstat
+    版式不命中时的故障形态(连等 3 轮就判"这条不会写记录")。所以补一个真监听套接字。
+    """
+    import socket
+
     from case01.tools import map_after_run
 
-    assert map_after_run._port_listening(59999) in (True, False)
+    live = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    live.bind(("127.0.0.1", 0))
+    live.listen(1)
+    free = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    free.bind(("127.0.0.1", 0))
+    free_port = free.getsockname()[1]
+    free.close()  # 用"刚释放的端口"当负例:写死的 59999 落在动态端口段里,随时可能正被别的服务占着
+    try:
+        assert map_after_run._port_listening(live.getsockname()[1]) is True, \
+            "真有人听必须说得出 True"
+        assert map_after_run._port_listening(free_port) is False, \
+            "没人听必须说得出 False(且不能抛 —— 负例走的就是这条路)"
+    finally:
+        live.close()
 
 
 # ---------------------------------------------------------------------------
@@ -232,8 +251,9 @@ def test_capture_call_sites_use_the_shared_helper():
     from case01.tools import map_after_run
     from case01.vizkit import live_run
 
-    for fn, name in ((map_after_run._port_listening, "map_after_run._port_listening"),
-                     (map_after_run.run_mapping, "map_after_run.run_mapping"),
+    # map_after_run._port_listening 不在名单里:它现在是一次 socket 连接,
+    # 不再取外部命令的字节输出(取字节的活儿只剩下面的 run_mapping / _map_run)。
+    for fn, name in ((map_after_run.run_mapping, "map_after_run.run_mapping"),
                      (live_run._map_run, "live_run._map_run")):
         src = inspect.getsource(fn)
         assert "run_text(" in src, \

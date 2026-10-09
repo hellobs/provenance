@@ -33,7 +33,7 @@
 import argparse
 import json
 import os
-import re
+import socket
 import sys
 import time
 from datetime import datetime
@@ -65,18 +65,43 @@ def log(msg: str) -> None:
 
 
 def _port_listening(port: int) -> bool:
-    """Windows:netstat 看该端口是否还有 LISTENING。取不到就当作 True(保守)。
+    """该端口上**还有没有人**在听 —— 只答布尔,不问"是谁"。
 
-    必须走 `safestream.run_text`:`-X utf8` 下 netstat 的 GBK 字节会让
-    `text=True` 严格解码失败并把 stdout 交回 None,`re.search(pat, None)`
-    于是 TypeError —— 看护进程**直接崩**,而崩的位置看起来像"端口检查失败"。
+    这里原来是 `netstat -ano -p TCP` + Windows 版式正则,在 Linux 上两个方向都错:
+    net-tools 没装时异常路径返回 True(保守,还能等);装了反而更糟 —— Linux 的 netstat
+    印的是 `LISTEN` 而不是 `LISTENING`,正则永不命中 ⇒ 一律 False,看护连等 3 轮就判
+    "实时面已经没了、这条不会写记录"而退出,而实时面其实还在跑。macOS 的 netstat 不认
+    `-p`,同理不可信。
+
+    本函数只在 `raw.json` **还没出现**时被调,要的就是"本机这个端口通不通"这一件事
+    ⇒ 一次 TCP 连接即可,三个平台都不缺,也不再解析外部命令的字节(2026-10-04 那次
+    GBK 崩溃正是出在解析 netstat 输出上)。socket 都建不出来时按 True:与原本"取不到
+    就保守地继续等"同语义。
+
+    写清前提:探的是 127.0.0.1/::1,所以对默认的 `--host 127.0.0.1` 与跨机的
+    `--host 0.0.0.0` 都成立;若把实时面绑到某个**非回环网卡地址**,这里看不见它,
+    会判成"没在听"⇒ 看护提前报"这条不会写记录"。这种绑法不在任何手册里,真要用
+    就别带 `--port`(让它只按文件大小稳定来判断写完)。
     """
     try:
-        out = run_text(["netstat", "-ano", "-p", "TCP"], timeout=10).stdout
-    except Exception:  # noqa: BLE001
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except OSError:
         return True
-    return bool(re.search(r"^\s*TCP\s+\S+:%d\s+\S+\s+LISTENING\s+\d+\s*$" % port,
-                          out, re.M))
+    try:
+        for host in ("127.0.0.1", "::1"):
+            s = socket.socket(socket.AF_INET6 if host == "::1" else probe.family,
+                              socket.SOCK_STREAM)
+            s.settimeout(1.0)
+            try:
+                s.connect((host, port))
+                return True
+            except OSError:
+                pass
+            finally:
+                s.close()
+    finally:
+        probe.close()
+    return False
 
 
 def _size(path: str) -> int:
