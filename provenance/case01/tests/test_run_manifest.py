@@ -267,9 +267,10 @@ def test_branch_mode_and_judge_prompt_version_recorded(tmp_path):
     # 反思/路由提示词版本也记了
     pv = rec["manifest"]["prompt_versions"]
     assert len(pv.get("reflection", "")) == 12 and len(pv.get("router", "")) == 12
-    # scenario 文件里那个字段也留哈希 —— 但它叫 `judge_prompt` 装的却是 Router 提示词,
-    # 且运行时无人读它(判定用的是上面的模块常量),所以键名如实写成 *_field(2026-10-08)
-    assert pv.get("scenario_branch_judge_field"), "scenario 的该字段要留版本指纹"
+    # 2026-10-09:scenario 的 branch 段整段删除(「分支判定」功能删除)⇒ 该字段已不存在,
+    # 不再记 scenario_branch_judge_field。判定提示词的真实版本由 branch_judge 提供(模块常量)。
+    assert pv.get("branch_judge"), "判定提示词的模块常量哈希要留痕"
+    assert "scenario_branch_judge_field" not in pv, "branch 段已删,不该再记该字段指纹"
 
 
 def test_prompt_hash_is_content_bound():

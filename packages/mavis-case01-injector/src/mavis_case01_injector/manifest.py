@@ -98,7 +98,6 @@ _REASON_UNKNOWN_COMMIT = "git rev-parse 取不到 HEAD,且 .git/HEAD 不可读"
 _REASON_FINANCIAL_ABSENT = "资料目录不存在:{}"
 _REASON_PROMPT_UNREADABLE = "读不到提示词({}):{}"
 _REASON_NO_CLIENT = "未给 judge_llm,无法从客户端探测"
-_REASON_NO_JUDGE_PROMPT = "scenario 的 branch.judge_prompt 不可用:{}"
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -249,47 +248,6 @@ def default_financial_data_dir() -> str:
     """检索资料目录:`case01/data/financial`(阶段 3:路径解析经 _providers)。"""
     from mavis_case01_injector._providers import default_financial_data_dir as _dfd
     return _dfd()
-
-
-def _scenario_judge_prompt(scenario_path: str) -> Tuple[str, str]:
-    """scenario.yaml 的 `branch.judge_prompt`(判定提示词的**权威来源**)。
-
-    返回 (prompt, error)。读不了就返回 ("", 原因),由调用方记进 warnings。
-    不 import yaml:这里只要一个字符串字段,用行扫描即可,少一个依赖少一处失败点。
-    """
-    if not scenario_path or not os.path.isfile(scenario_path):
-        return "", "scenario 文件不存在:{}".format(scenario_path or "(未给)")
-    try:
-        with open(scenario_path, encoding="utf-8") as f:
-            lines = f.read().splitlines()
-    except OSError as e:
-        return "", "读 scenario 失败:{}".format(e)
-    # 定位顶层 `branch:` 段,再找它缩进下的 `judge_prompt:`(两种写法都认)
-    in_branch = False
-    for i, line in enumerate(lines):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip())
-        if indent == 0:
-            in_branch = line.strip().startswith("branch:")
-            continue
-        if not in_branch:
-            continue
-        stripped = line.strip()
-        if stripped.startswith("judge_prompt:"):
-            rest = stripped.split(":", 1)[1].strip()
-            if rest in (">-", ">", "|", "|-", ""):
-                block = [rest] if rest else []
-                for follow in lines[i + 1:]:
-                    if not follow.strip():
-                        block.append("")
-                        continue
-                    if len(follow) - len(follow.lstrip()) <= indent:
-                        break
-                    block.append(follow.strip())
-                return "\n".join(block).strip(), ""
-            return rest, ""
-    return "", "scenario 的 branch.judge_prompt 段没找到"
 
 
 def _prompt_versions() -> Tuple[Dict[str, str], List[str]]:
@@ -586,12 +544,11 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     # 其实是 Router 提示词 —— 与"警告文案里的标签≠测量点"同一族错。
     # 改法:键名如实叫 scenario 的**字段**哈希(它就是一个场景文件里的字段),
     # 判定提示词的真实版本继续由 `prompts["branch_judge"]`(模块常量)提供。
-    judge_prompt, jp_err = _scenario_judge_prompt(sp)
-    if judge_prompt:
-        prompts["scenario_branch_judge_field"] = sha256_12(text_sha256(judge_prompt))
-    else:
-        warnings.append("scenario_branch_judge_field=null:" +
-                        _REASON_NO_JUDGE_PROMPT.format(jp_err))
+    #
+    # 2026-10-09 会议:scenario 的 branch 段整段删除(「分支判定」功能删除),该字段
+    # **已不存在** ⇒ 不再记 `scenario_branch_judge_field`(读了也只会是空)。判定提示词
+    # 的真实版本仍由 `prompts["branch_judge"]` 提供 —— 判定逻辑本身自包含在 injector 包
+    # (`world/branch.py` 模块常量),不依赖 scenario 文件。
     judge_prompt_version = prompts.get("branch_judge") or None
     if not judge_prompt_version:
         warnings.append("judge_prompt_version=null:读不到 case01.world.branch.{}".format(

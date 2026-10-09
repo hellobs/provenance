@@ -2,8 +2,9 @@
 """分支判定对照评估:关键词规则 vs LLM 判定 vs 实际走的线。
 
 回答的问题(2026-09-27 用户立项"LLM 判定分支,你来做"):
-- 成品记录的 T0 AI 回答,规则表(scenario.yaml 词表)和 LLM 判定
-  各判到哪个分支?与记录实际走的线一致吗?
+- 成品记录的 T0 AI 回答,规则表(injector 包 `world/branch.py` 的 `RuleBranchRouter`
+  内置词表)和 LLM 判定各判到哪个分支?与记录实际走的线一致吗?
+  (2026-10-09 会议后,词表不再来自 `scenario.yaml` 的 `branch` 段 —— 该段已删除。)
 - judge 模式的记录:actual = LLM 判定结果,可量"判定准确率";
   preset 模式的记录:actual = 操作者预设(可能与 AI 立场矛盾,那是另一回事)——
   对这类记录,有意义的指标是 **规则 vs LLM 的一致性**。
@@ -41,7 +42,6 @@ sys.path.insert(0, os.path.abspath(CK))
 from case_engine.paths import data_root  # noqa: E402
 
 RUNS = data_root("case01.records", env_var="CASE01_RUNS_ROOT")
-SCENARIO = os.path.join(CK, "cases", "case01_stock", "scenario.yaml")
 OUT_ROOT = os.path.join(CK, "results", "analysis", "branch_judge_eval")
 
 BIGMODEL_URL = "https://open.bigmodel.cn/api/paas/v4"
