@@ -373,11 +373,18 @@ for _r in (PKG,):
                 _all_py.append(os.path.join(_dp, _f))
 
 
-def _refs(name, kind="import"):
-    """谁引用了这个模块(返回 非测试文件 列表)。
+_SELF = os.path.relpath(os.path.abspath(__file__), PKG).replace("\\", "/")
+
+
+def _refs(name, tests=False):
+    """谁引用了这个模块。默认返回**非测试**文件列表;`tests=True` 只要测试文件。
 
     认三种写法:from case01.x import / from ..x import / 字符串引用("case01.x:app")。
     这几类都要认,否则会把还在跑的模块(如 case01.serve 由 uvicorn 以字符串启动)误判成死代码。
+
+    两个文件必须排除:**本模块自己**(`_refs` 认 `case01.x` 这种字符串形态,于是体检工具
+    自己的说明文字里提一次名字,就把那个模块的引用数从 0 抬成 1 —— 2026-10-09 我写
+    `_cli_mentions` 的文档串时当场撞上)与被测模块本身。
     """
     import re as _re
     # 三种写法都要认,少一种就会把"还在跑的模块"判成死代码(已踩过两次):
@@ -392,7 +399,7 @@ def _refs(name, kind="import"):
     out = set()
     for pth in _all_py:
         rel = os.path.relpath(pth, PKG).replace("\\", "/")
-        if rel == "case01/{}.py".format(name):
+        if rel in ("case01/{}.py".format(name), _SELF):
             continue
         try:
             txt = io.open(pth, encoding="utf-8", errors="replace").read()
@@ -400,28 +407,81 @@ def _refs(name, kind="import"):
             continue
         if not p.search(txt):
             continue
-        if os.path.basename(pth).startswith("test_") or "/tests/" in rel:
+        in_tests = os.path.basename(pth).startswith("test_") or "/tests/" in rel
+        if in_tests != bool(tests):      # 默认只要非测试;tests=True 时只要测试
             continue
         out.add(rel)
     return sorted(out)
 
 
+def _cli_mentions(name):
+    """文档/脚本里把这个模块**当命令点名**了几处(形如 `python -m case01.render`)。
+
+    为什么要单列:引用计数天生测不到 CLI 入口 —— 它没有 import 方。2026-10-09 实测
+    `case01/render.py` 非测试引用 0 处,而 `case01/README.md:90` 就在教人敲
+    `python -m case01.render`(它产 5002 `/viewer` 挂的那批静态页)。把这种模块报成
+    "候选死代码",离一次误删只差一个人手滑 —— `case01/viz.py` 已经按引用计数误删过一次
+    (教训写在 `docs/0923_体检报告.md:61`、`docs/0924_下一步方向_给实现侧.md:89`)。
+
+    同样排除被测模块自己(它 docstring 里的用法行不是"别人在用它")与本工具自己,
+    数出来的才是**外部点名**。
+    """
+    import re as _re
+
+    pat = _re.compile(r"-m\s+case01(?:\.\w+)*\.{}\b".format(_re.escape(name)))
+    skip = (_SELF, "case01/{}.py".format(name))
+    hits = []
+    for _dp, _dn, _fn in os.walk(PKG):
+        _dn[:] = [d for d in _dn if d not in (".venv", ".venv-live", "__pycache__",
+                                              ".uv-cache", "node_modules", "build")]
+        for _f in _fn:
+            if not _f.endswith((".md", ".cmd", ".sh", ".ps1", ".py")):
+                continue
+            pth = os.path.join(_dp, _f)
+            rel = os.path.relpath(pth, PKG).replace("\\", "/")
+            if rel in skip:
+                continue
+            try:
+                n = len(pat.findall(io.open(pth, encoding="utf-8", errors="replace").read()))
+            except OSError:
+                continue
+            if n:
+                hits.append((rel, n))
+    return hits
+
+
 _legacy = ["orchestrator", "run", "consistency", "reflection", "run_naming", "render", "viz"]
-_dead, _dup = [], []
+_left = ("orchestrator", "run", "consistency", "reflection")
+
+
+def _loc(name):
+    fp = os.path.join(PKG, "case01", "{}.py".format(name))
+    return len(io.open(fp, encoding="utf-8", errors="replace").read().split("\n"))
+
+
+_dead, _dup, _cli_by_mod, _testref_by_mod = [], [], {}, {}
 for m in _legacy:
-    fp = os.path.join(PKG, "case01", "{}.py".format(m))
-    if not os.path.isfile(fp):
+    if not os.path.isfile(os.path.join(PKG, "case01", "{}.py".format(m))):
         continue
-    loc = len(io.open(fp, encoding="utf-8", errors="replace").read().split("\n"))
+    loc = _loc(m)
     refs = _refs(m)
-    engine_twin = os.path.join(PKG, "case_engine", "{}.py".format(m))
-    if not refs:
+    trefs = _refs(m, tests=True)
+    cli = _cli_mentions(m)
+    n_cli = sum(n for _f, n in cli)
+    _cli_by_mod[m], _testref_by_mod[m] = cli, len(trefs)
+    # "死代码"要三种计数同时为 0:只看非测试 import 会把 CLI 入口(render)和
+    # 仍被测试用的模块(viz)一起误判成可删 —— 后者已经真误删过一次。
+    alive = bool(refs or trefs or n_cli)
+    if not alive:
         _dead.append((m, loc))
+    engine_twin = os.path.join(PKG, "case_engine", "{}.py".format(m))
     if os.path.isfile(engine_twin):
         _dup.append((m, loc, len(io.open(engine_twin, encoding="utf-8",
                                         errors="replace").read().split("\n"))))
-    say("legacy", bool(refs), "case01/{}: {} 行,非测试引用 {} 处{}".format(
-        m, loc, len(refs), "" if refs else "  ← 候选死代码"))
+    say("legacy", alive, "case01/{}: {} 行 / 非测试 import {} 处 / 测试引用 {} 个文件 / "
+                         "`-m case01.{}` 点名 {} 处{}".format(
+            m, loc, len(refs), len(trefs), m, n_cli,
+            "" if alive else "  ← 三种计数全 0,候选死代码"))
 engine_loc = 0
 for _dp, _dn, _fn in os.walk(os.path.join(PKG, "case_engine")):
     _dn[:] = [d for d in _dn if d != "__pycache__"]
@@ -429,13 +489,16 @@ for _dp, _dn, _fn in os.walk(os.path.join(PKG, "case_engine")):
         if _f.endswith(".py") and "tests" not in _dp:
             engine_loc += len(io.open(os.path.join(_dp, _f), encoding="utf-8",
                                       errors="replace").read().split("\n"))
-legacy_loc = sum(loc for _m, loc in _dead) + sum(
-    len(io.open(os.path.join(PKG, "case01", m + ".py"), encoding="utf-8", errors="replace")
-        .read().split("\n")) for m in ("orchestrator", "run", "consistency", "reflection")
-    if os.path.isfile(os.path.join(PKG, "case01", m + ".py")))
+legacy_loc = sum(_loc(m) for m in _left if os.path.isfile(
+    os.path.join(PKG, "case01", m + ".py")))
 print("  · 与 case_engine 同名(职责重复)的案例侧模块: {}".format(
     ", ".join("{}({}行 vs 引擎{}行)".format(m, a, b) for m, a, b in _dup) or "无"))
-print("  · 死代码候选: {}".format(", ".join("{}({}行)".format(m, n) for m, n in _dead) or "无"))
+print("  · 死代码候选(非测试 import／测试引用／CLI 点名 **全 0** 才算): {}".format(
+    ", ".join("{}({}行)".format(m, n) for m, n in _dead) or "无"))
+for _m in ("render", "viz"):
+    if _cli_by_mod.get(_m):
+        print("  · case01/{} 的 `-m` 点名在: {}".format(
+            _m, "、".join("{}({}处)".format(f, n) for f, n in _cli_by_mod[_m][:3])))
 case01_uses_engine = _refs("case_engine")
 say("legacy", False if not case01_uses_engine else True,
     "case01 是否引用 case_engine: {}".format("是" if case01_uses_engine else
