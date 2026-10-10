@@ -102,17 +102,17 @@
 </style>
 
 <div class="explore-wrap">
-  <div class="explore-title">历史数据一览</div>
+  <div class="explore-title">Historical Runs</div>
   <div class="explore-sub">
-    来源 <span class="mono">/api/runs</span>(所有场景 × 运行方式的历史运行,按场景分层)。
-    左侧点场景展开,点单条 run 看详情;详情由本页自渲染,不依赖当前跑的是哪个实时面。
+    Source: <span class="mono">/api/runs</span>. Runs are grouped by scenario and run type.
+    Expand a scenario on the left and select a run to view its details.
   </div>
   {# 默认被质检排除的条数必须在这一页上说出来:本页拉的是不带 include_questionable 的
      /api/runs,标题那个"NNN 条历史记录"是**默认合格集**而不是全库数 ——
      只写"全库可浏览"会让看的人以为少掉的那些不存在。 #}
   <div class="explore-sub" style="margin-top:-12px;">
     <label style="display:inline-block;cursor:pointer;user-select:none;">
-      <input type="checkbox" id="explore-all"> 显示全部记录(含存疑/调试跑/已废弃/未落盘,<span id="explore-all-n">0</span> 条)
+      <input type="checkbox" id="explore-all"> Show all records, including questionable, debug, deprecated, and unreadable runs (<span id="explore-all-n">0</span>)
     </label>
   </div>
   <div class="explore-sub" id="explore-hidden" style="margin-top:-12px;"></div>
@@ -139,10 +139,10 @@
      两边必须是同一个串 —— 此前失败路径抄了一份 `margin-top:12px`(没有 class="hint"),
      与真实占位符不相等 ⇒ replace 永远不命中,读失败就**一直显示"加载详情中…"**,
      错误消息算出来了却扔掉。 */
-  var LOADING = '<div class="hint" style="margin-top:14px;">加载详情中…</div>';
+  var LOADING = '<div class="hint" style="margin-top:14px;">Loading details…</div>';
 
   function labelTxt(source) {
-    return source === "review" ? "成品 run" : source === "checkpoint" ? "运行时痕迹" : "压缩成品";
+    return source === "review" ? "Final run" : source === "checkpoint" ? "Runtime trace" : "Compressed record";
   }
   function tagCls(source) {
     return source === "review" ? "review" : source === "checkpoint" ? "checkpoint" : "compressed";
@@ -150,12 +150,12 @@
   // 质检枚举(API 英文原值)→ 中文标签。定义口径以 live/history.py 的
   // _HIDDEN_QUALITY 注释与 full_context.py 为准,改这里只改展示不改契约。
   var QUALITY_LABEL = {
-    ok: "合格",
-    unverified: "未质检",
-    questionable: "存疑",
-    debug: "调试跑",
-    deprecated: "已废弃",
-    unreadable: "未落盘"
+    ok: "Passed",
+    unverified: "Not reviewed",
+    questionable: "Questionable",
+    debug: "Debug run",
+    deprecated: "Deprecated",
+    unreadable: "Not saved"
   };
   function qualityTag(q) {
     if (!q) return "—";
@@ -171,7 +171,7 @@
       groups[s.case_id] = { name: s.name || s.case_id, engine: s.engine,
                             engine_name: s.engine_name || s.engine, items: [] };
     });
-    var ungrouped = { name: "未归档数据", engine: "", engine_name: "", items: [] };
+    var ungrouped = { name: "Uncategorized data", engine: "", engine_name: "", items: [] };
     (runs || []).forEach(function (r) {
       var cid = r.case_id || "";
       if (groups[cid]) groups[cid].items.push(r);
@@ -204,25 +204,25 @@
     // (空白读起来像"这条没有分支",而真相是"这一类行压根不给这个字段")。
     var hasManifest = Object.prototype.hasOwnProperty.call(r, "manifest_status");
     var manifestTxt = hasManifest
-      ? esc(r.manifest_status) + " (警告 " + esc(r.manifest_warning_count) + " 条)"
-      : "本行不带该键(case00 痕迹/压缩成品/读不出的行)";
+      ? esc(r.manifest_status) + " (" + esc(r.manifest_warning_count) + " warnings)"
+      : "Not available for this record type";
     var h = '<div class="card-pad">' +
       '<span class="tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
       '<span class="tag">' + esc(r.case_name || r.case_id || "—") + '</span>' +
       '<div class="card-id">' + esc(r.run_id) + '</div>' + extra +
-      row("场景", esc(r.case_name || r.case_id || "—")) +
-      row("运行方式", esc(r.engine_name || r.engine_id || "—")) +
-      row("分支", esc(r.branch || "—")) +
-      row("质检标记", qualityTag(r.quality) +
+      row("Scenario", esc(r.case_name || r.case_id || "—")) +
+      row("Run type", esc(r.engine_name || r.engine_id || "—")) +
+      row("Branch", esc(r.branch || "—")) +
+      row("Quality label", qualityTag(r.quality) +
           (r.quality && r.reason ? ' <span class="hint">' + esc(r.reason) + '</span>' : "")) +
-      row("一致性", esc(r.consistency || "—") +
-          (r.branch_source ? ' <span class="hint">分支来源 ' + esc(r.branch_source) + '</span>' : "")) +
-      row("可复现情况", manifestTxt) +
-      row("开始时间", esc(r.start_date || "—")) +
-      row("结束时间", esc(r.end_date || "—")) +
-      row("对话轮次", esc(r.n_turns != null ? r.n_turns : "—")) +
-      row("反思条数", esc(r.n_reflections != null ? r.n_reflections : "—")) +
-      row("数据完整性", r.has_graph ? "完整" : "—") +
+      row("Consistency", esc(r.consistency || "—") +
+          (r.branch_source ? ' <span class="hint">Branch source: ' + esc(r.branch_source) + '</span>' : "")) +
+      row("Reproducibility", manifestTxt) +
+      row("Start time", esc(r.start_date || "—")) +
+      row("End time", esc(r.end_date || "—")) +
+      row("Conversation turns", esc(r.n_turns != null ? r.n_turns : "—")) +
+      row("Reflections", esc(r.n_reflections != null ? r.n_reflections : "—")) +
+      row("Data completeness", r.has_graph ? "Complete" : "—") +
       LOADING +
       '</div>';
     return h;
@@ -241,7 +241,7 @@
       .then(function (rsp) { return rsp.json().then(function (j) { return { ok: rsp.ok, j: j }; }); })
       .then(function (res) {
         if (!res.ok || !res.j.ok) {
-          var msg = (res.j && res.j.errors && res.j.errors[0]) ? res.j.errors[0] : "读详情失败";
+          var msg = (res.j && res.j.errors && res.j.errors[0]) ? res.j.errors[0] : "Could not read details";
           detail.innerHTML = briefCard(r).replace(
             LOADING,
             '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">' + esc(msg) + '</div>');
@@ -255,7 +255,7 @@
       .catch(function (err) {
         detail.innerHTML = briefCard(r).replace(
           LOADING,
-          '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">详情请求失败: ' +
+          '<div class=\"alert alert-danger\" style=\"margin-top:10px;\">Detail request failed: ' +
           esc(String(err && err.message || err)) + '</div>');
       });
   }
@@ -273,13 +273,13 @@
              '<div class="kv-v mono">' +
              esc(typeof v === "string" ? v : JSON.stringify(v)) + '</div></div>';
     });
-    return out || '<div class="hint">(无)</div>';
+    return out || '<div class="hint">(None)</div>';
   }
 
   function renderReview(body, r) {
     var inner = "";
     var t = body.turns || [], rt = body.router || {}, rf = body.reflection || {};
-    inner += sec("概览", kvRows({
+    inner += sec("Overview", kvRows({
       "run_id": body.run_id, "branch": r.branch,
       "start_date": body.start_date, "end_date": body.end_date,
       "n_turns": t.length, "n_retrievals": (body.retrievals || []).length,
@@ -300,8 +300,8 @@
     if (_sum && typeof _sum !== "string") {
       try { _sum = JSON.stringify(_sum, null, 2); } catch (e) { _sum = String(_sum); }
     }
-    if (_sum) inner += sec("摘要", '<pre class="quote">' + esc(_sum) + '</pre>');
-    if (rf.text) inner += sec("反思", '<pre class="quote">' + esc(rf.text) + '</pre>');
+    if (_sum) inner += sec("Summary", '<pre class="quote">' + esc(_sum) + '</pre>');
+    if (rf.text) inner += sec("Reflection", '<pre class="quote">' + esc(rf.text) + '</pre>');
     // 对话 turns
     if (t.length) {
       var conv = t.map(function (turn, i) {
@@ -311,7 +311,7 @@
         return '<div class="kv"><div class="kv-k">#' + (i + 1) + ' ' + esc(who) + '</div>' +
                '<div class="kv-v">' + esc(g) + '</div></div>';
       }).join("");
-      inner += sec("对话(" + t.length + ")", conv);
+      inner += sec("Conversation (" + t.length + ")", conv);
     }
     if ((rt.issues || []).length) {
       var issues = rt.issues.map(function (it) {
@@ -321,10 +321,10 @@
                '<span class="tag ' + cls + '">' + esc(it.risk || "risk") + '</span>' +
                (it.field ? '<span class="tag">' + esc(it.field) + '</span>' : '') +
                '<div style="margin-top:5px;">' + esc(it.summary || JSON.stringify(it)) + '</div>' +
-               (it.risk_note ? '<div class="hint" style="margin-top:3px;">风险:' + esc(it.risk_note) + '</div>' : '') +
+               (it.risk_note ? '<div class="hint" style="margin-top:3px;">Risk: ' + esc(it.risk_note) + '</div>' : '') +
                '</div>';
       }).join("");
-      inner += sec("问题分流(" + (rt.issues || []).length + ")", issues);
+      inner += sec("Issue routing (" + (rt.issues || []).length + ")", issues);
     }
     detail.innerHTML = briefCard(r).replace(
       LOADING,
@@ -342,14 +342,14 @@
         return '<div class="kv"><div class="kv-k">[' + (i + 1) + '] ' + esc(who) + '</div>' +
                '<div class="kv-v">' + esc(txt) + '</div></div>';
       }).join("");
-      inner += sec("对话(" + msgs.length + "/" + (conv.messages || []).length + ")", list);
+      inner += sec("Conversation (" + msgs.length + "/" + (conv.messages || []).length + ")", list);
     } else {
-      inner += sec("对话", '<div class="hint">该痕迹无对话消息(可能只有倾向/轨迹快照)</div>');
+      inner += sec("Conversation", '<div class="hint">This trace has no conversation messages; it may only contain tendency or trajectory snapshots.</div>');
     }
     var shots = (body.shots || []).map(function (s) {
       return '<li>' + esc(s) + '</li>';
     }).join("");
-    if (shots) inner += sec("倾向/轨迹快照", '<ul style="padding-left:18px; margin:0;">' + shots + '</ul>');
+    if (shots) inner += sec("Tendency and trajectory snapshots", '<ul style="padding-left:18px; margin:0;">' + shots + '</ul>');
     detail.innerHTML = briefCard(r).replace(
       LOADING,
       '<div style="margin-top:4px;">' + inner + '</div>');
@@ -360,8 +360,8 @@
     detail.innerHTML = briefCard(r).replace(
       LOADING,
       '<div style="margin-top:4px;">' +
-      '<div class="hint">压缩成品仅保留文件清单,原始运行见对应场景的痕迹/成品。</div>' +
-      (files ? sec("内容文件", '<ul style="padding-left:18px; margin:0;">' + files + '</ul>') : '') +
+      '<div class="hint">Compressed records retain only a file list. See the corresponding runtime trace or final record for details.</div>' +
+      (files ? sec("Content files", '<ul style="padding-left:18px; margin:0;">' + files + '</ul>') : '') +
       '</div>');
   }
 
@@ -374,11 +374,11 @@
     }
     detail.innerHTML =
       '<div class="card-pad">' +
-      '<div class="explore-title" style="font-size:17px;">汇总</div>' +
-      '<div class="stat-row">' + stat("成品 run", by.review) +
-        stat("运行时痕迹", by.checkpoint) + stat("压缩成品", by.compressed) + '</div>' +
-      '<div class="hint" style="margin-top:10px;">左侧按【场景 · 运行方式】列出全部历史运行:' +
-      '点场景标题展开,点单条 run 看详情。详情由本页自渲染,不依赖当前跑的是哪个实时面。</div>' +
+      '<div class="explore-title" style="font-size:17px;">Summary</div>' +
+      '<div class="stat-row">' + stat("Final runs", by.review) +
+        stat("Runtime traces", by.checkpoint) + stat("Compressed records", by.compressed) + '</div>' +
+      '<div class="hint" style="margin-top:10px;">All historical runs are grouped by scenario and run type on the left. ' +
+      'Expand a scenario and select a run to view its details.</div>' +
       '</div>';
   }
 
@@ -399,15 +399,15 @@
       var ex = exAll;
       var txt = "";
       if (ex.count) {
-        txt += '<span class="tag compressed">默认质检过滤</span> 另有 ' + ex.count +
-               ' 条没列在本页(本页拉的是不带 <span class="mono">?include_questionable=1</span>' +
-               ' 的 <span class="mono">/api/runs</span>),逐条原因看同一响应的' +
+        txt += '<span class="tag compressed">Default quality filter</span> Another ' + ex.count +
+               ' runs are hidden because this page requests <span class="mono">/api/runs</span> without ' +
+               '<span class="mono">?include_questionable=1</span>. See each reason in' +
                ' <span class="mono">excluded.runs</span>。' +
                '<div class="hint">' + esc(ex.reason || "") + '</div>';
       }
       if ((res.source_errors || []).length) {
         txt += '<div class="hint" style="color:#9b2c2c;">' +
-               esc(res.source_errors_note || ("有 " + res.source_errors.length + " 个数据源被整块跳过")) +
+               esc(res.source_errors_note || (res.source_errors.length + " data sources were skipped")) +
                '</div>';
       }
       hid.innerHTML = txt;
@@ -417,9 +417,9 @@
     var ov = document.createElement("a");
     ov.href = "javascript:void(0);";
     ov.className = "mi on";
-    ov.innerHTML = '<span class="mi-tag">总计</span>' +
+    ov.innerHTML = '<span class="mi-tag">Total</span>' +
                    '<span class="mi-text" style="font-family:inherit;">' +
-                   (res.runs || []).length + ' 条历史记录</span>';
+                   (res.runs || []).length + ' historical runs</span>';
     ov.addEventListener("click", function () { clearActive(); ov.classList.add("on"); showOverview(res); });
     menu.appendChild(ov);
 
@@ -429,7 +429,7 @@
       var t = document.createElement("a");
       t.href = "javascript:void(0);";
       t.className = "mg";
-      t.innerHTML = '<span class="mi-tag">场景</span>' +
+      t.innerHTML = '<span class="mi-tag">Scenario</span>' +
                     '<span class="mg-name" title="' + esc(name + " · " + engineName) + '">' +
                     esc(name) + ' <span class="mg-eng">· ' + esc(engineName) + '</span></span>' +
                     '<span class="mg-n">' + n + '</span>';
@@ -447,14 +447,14 @@
       a.innerHTML = '<span class="mi-tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
                     '<span class="mi-text" title="' + esc(r.run_id) + '">' + esc(r.run_id) + '</span>' +
                     mini +
-                    (r.n_turns ? '<span class="mi-n">' + r.n_turns + ' 轮</span>' : '');
+                    (r.n_turns ? '<span class="mi-n">' + r.n_turns + ' turns</span>' : '');
       a.addEventListener("click", function () { clearActive(); a.classList.add("on"); renderDetail(r); });
       return a;
     }
     // 场景顺序:发现层顺序 + 未归档兜底
     G.order.forEach(function (cid) {
       var g = G.groups[cid];
-      var title = sectionTitle(g.name, g.engine_name || "运行方式", g.items.length);
+      var title = sectionTitle(g.name, g.engine_name || "Run type", g.items.length);
       var body = document.createElement("div");
       body.style.display = "none";
       g.items.forEach(function (r) { body.appendChild(runLink(r)); });
@@ -466,7 +466,7 @@
       doc.appendChild(body);
     });
     if (G.ungrouped.items.length) {
-      var t2 = sectionTitle(G.ungrouped.name, "未归档", G.ungrouped.items.length);
+      var t2 = sectionTitle(G.ungrouped.name, "Uncategorized", G.ungrouped.items.length);
       var b2 = document.createElement("div");
       b2.style.display = "none";
       G.ungrouped.items.forEach(function (r) { b2.appendChild(runLink(r)); });
@@ -487,7 +487,7 @@
       .then(function (rsp) { return rsp.json(); })
       .then(function (res) { renderMenu(res); })
       .catch(function (err) {
-        showError("读取 /api/runs 失败: " + String(err && err.message || err));
+        showError("Could not read /api/runs: " + String(err && err.message || err));
       });
   }
   var allBox = document.getElementById("explore-all");

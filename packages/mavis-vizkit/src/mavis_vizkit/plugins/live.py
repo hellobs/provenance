@@ -56,13 +56,13 @@ class LiveVisualizer(Visualizer):
                  run_id: str = ""):
         if not alias:
             raise ValueError(
-                "live 插件需要 alias(角色→贴图名映射),由调用方提供,不应猜默认值")
+                "Live plugin requires an alias map from agents to textures")
         if not scenario_dir:
             raise ValueError(
-                "live 插件需要 scenario_dir(角色坐标场景目录),由调用方提供")
+                "Live plugin requires scenario_dir with agent coordinates")
         if not static_root or not template_dir:
             raise ValueError(
-                "live 插件需要 static_root 与 template_dir(前端资源根),由调用方提供")
+                "Live plugin requires static_root and template_dir")
         self.host = host
         self.port = int(port)
         self.alias = dict(alias)
@@ -287,7 +287,7 @@ class LiveVisualizer(Visualizer):
             except Exception:
                 # 单个客户端推送失败不影响其它客户端,但**必须留痕**——
                 # 否则表现就是"某个人页面上什么都没有",而日志里也什么都没有。
-                log.warning("向一个客户端推送失败(type=%s)", msg.get("type"), exc_info=True)
+                log.warning("Failed to push to one client (type=%s)", msg.get("type"), exc_info=True)
 
     def pending(self) -> List[dict]:
         return list(self._pending)
@@ -311,7 +311,7 @@ class LiveVisualizer(Visualizer):
         from fastapi.staticfiles import StaticFiles
         from fastapi.templating import Jinja2Templates
 
-        app = FastAPI(title="mavis-vizkit 实时可视化(小镇风格)")
+        app = FastAPI(title="mavis-vizkit Live Town Visualization")
 
         # 被平台嵌入时需要跨源取数:白名单用环境变量给,并把取值打出来(不静默)。
         # 2026-09-23 安全体检:默认**不再是** `*` —— 这些面没有鉴权,`*` 等于让任意网页
@@ -337,7 +337,7 @@ class LiveVisualizer(Visualizer):
 
         print("[embed] CORS allow_origins = {}{}".format(
             _EMBED_ORIGINS,
-            "" if _EMBED_ENV.strip() else "  (未设 EMBED_ALLOW_ORIGINS → 只允许本机来源)"))
+            "" if _EMBED_ENV.strip() else "  (EMBED_ALLOW_ORIGINS unset; local origins only)"))
 
         # 响应压缩(2026-09-24 体检):本插件此前不压任何响应,而挂在它上面的整页
         # HTML 与记录 JSON 实测可达 ~1 MB(键名重复度高,压缩比很好)。调用方若要
@@ -346,7 +346,7 @@ class LiveVisualizer(Visualizer):
         from fastapi.middleware.gzip import GZipMiddleware as _GZipMiddleware
 
         app.add_middleware(_GZipMiddleware, minimum_size=1024)
-        print("[http] 响应压缩 = gzip(minimum_size=1024)")
+        print("[http] Response compression = gzip(minimum_size=1024)")
 
         templates = Jinja2Templates(directory=self.template_dir)
         # 顶栏可挂**外部工具链接**(本包不认识它们是什么,只透传 {label,url} 列表):
@@ -460,7 +460,7 @@ class LiveVisualizer(Visualizer):
                 if ctype and ctype != "application/json":
                     return JSONResponse(
                         {"ok": False,
-                         "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+                         "errors": ["Content-Type: application/json is required; form submissions are unsupported"]},
                         status_code=415)
                 payload = {}
                 try:
@@ -480,16 +480,16 @@ class LiveVisualizer(Visualizer):
                     waited = (time.time() - self._restart_at
                               if self._restart_at > 0 else 0.0)
                     if waited > _RESTART_PENDING_TTL:
-                        log.info("上一次重开请求过了 %.0f 秒仍没有新一局开跑,自动失效", waited)
+                        log.info("Previous restart request expired after %.0f seconds without a new run", waited)
                         self._restart_pending = False
                     else:
                         return {"ok": False,
-                                "error": "已经重开过一次了:等新一局开始(或这一局结果出来)再点"}
+                                "error": "Restart already requested; wait for the next run or final results"}
                 try:
                     res = await asyncio.get_running_loop().run_in_executor(
                         None, lambda: self.on_restart(payload))
                 except Exception as exc:  # noqa: BLE001 - 失败要如实回给页面
-                    log.warning("重开回调失败", exc_info=True)
+                    log.warning("Restart callback failed", exc_info=True)
                     return {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}
                 if isinstance(res, dict) and res.get("ok") is False:
                     return res
@@ -518,7 +518,7 @@ class LiveVisualizer(Visualizer):
                     # **倒退**回去(本插件是实时可视化,不是回放)。丢掉并留痕。
                     dropped = len(self.drain_pending())
                     if dropped:
-                        log.info("客户端接入时已有快照,跳过 %d 条历史事件(避免角色倒退)",
+                        log.info("Snapshot available on client connection; skipped %d historical events",
                                  dropped)
                 else:
                     for msg in self.drain_pending():
@@ -530,7 +530,7 @@ class LiveVisualizer(Visualizer):
                 if self._finished:
                     await ws.send_json({"type": "done",
                                         "reason": self._finish_reason or "run_finished"})
-                log.info("客户端接入(当前 %d 个,追赶快照=%s,已结束=%s)",
+                log.info("Client connected (current=%d, snapshot=%s, finished=%s)",
                          len(self._clients), bool(catch), self._finished)
                 while True:
                     await ws.send_json(await q.get())
@@ -538,7 +538,7 @@ class LiveVisualizer(Visualizer):
                 pass
             except Exception:
                 # 断线是常态,但"不是断线"的异常必须留痕,否则前端黑屏无从排查。
-                log.warning("websocket 连接异常关闭", exc_info=True)
+                log.warning("WebSocket connection closed unexpectedly", exc_info=True)
             finally:
                 hb.cancel()
                 if q in self._clients:
@@ -555,7 +555,7 @@ class LiveVisualizer(Visualizer):
             pass
         except Exception:
             # 心跳失败基本等于这条连接死了;记一行日志,便于对照"页面为什么停住"。
-            log.debug("心跳终止(连接已关闭)", exc_info=True)
+            log.debug("Heartbeat stopped (connection closed)", exc_info=True)
 
 
 register("live", LiveVisualizer)

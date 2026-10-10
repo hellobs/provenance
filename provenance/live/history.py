@@ -80,9 +80,9 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend/templates
 # 顶栏外部工具链接:mavis 仓的 config_tool 是**独立进程**(默认 8060),
 # 地址可用环境变量 MAVIS_CONFIG_TOOL_URL 覆盖(换机/换端口)。
 templates.env.globals["extra_nav_links"] = [
-    {"label": "配置工具 ↗", "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
+    {"label": "Configuration Tool ↗", "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
                                                  "http://127.0.0.1:8060/"),
-     "title": "mavis 的角色/场景配置工具(独立进程;地址用 MAVIS_CONFIG_TOOL_URL 覆盖)"},
+     "title": "Mavis role and scene configuration tool (separate service; override its URL with MAVIS_CONFIG_TOOL_URL)"},
 ]
 
 
@@ -146,9 +146,9 @@ def nav_links_for(app) -> list:
     """
     links = list(templates.env.globals.get("extra_nav_links") or [])
     if _face_serves(app, EXPERT_FACE_PATH):
-        links.insert(0, {"label": "专家审核", "url": EXPERT_FACE_PATH,
-                         "title": "专家审批面板:候选队列 / 逐条 verdict / 纠正文本"
-                                 "(case01 面专有;⚠ 无鉴权真写口)"})
+        links.insert(0, {"label": "Expert Review", "url": EXPERT_FACE_PATH,
+                         "title": "Expert review: candidate queue, individual verdicts, and corrections "
+                                 "(case01 only; writes require no authentication)"})
     return links
 
 router = APIRouter()

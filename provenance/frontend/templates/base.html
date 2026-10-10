@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Reverie</title>
@@ -7,6 +7,7 @@
        (2026-09-27 前端离线化;此前"本地+CDN 两条都加载"并非兜底,反而多一次外网请求) -->
   <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-theme.min.css">
+  <script src="/static/english_only.js"></script>
 </head>
 
 <body class="top-navigation" data-embed="{{ embed|default('') }}" data-chrome="{{ chrome|default('1') }}" style="background-color: white{% if not embed or embed in ("scene", "explore") %}; padding-top: 56px{% endif %}">
@@ -19,12 +20,12 @@
   <nav id="top-nav" class="navbar navbar-default navbar-fixed-top" style="z-index: 400;">
     <div class="container-fluid">
       <div class="navbar-header">
-        <span class="navbar-brand">Reverie · 场景运行与数据</span>
+        <span class="navbar-brand">Reverie · Simulation and Data</span>
       </div>
       <ul class="nav navbar-nav">
-        <li{% if nav_embed == '' %} class="active"{% endif %}><a href="/">运行场景(小镇)</a></li>
-        <li{% if nav_embed == 'scene' %} class="active"{% endif %}><a href="/embed/scene">当前场景</a></li>
-        <li{% if nav_embed == 'explore' %} class="active"{% endif %}><a href="/embed/explore">数据界面</a></li>
+        <li{% if nav_embed == '' %} class="active"{% endif %}><a href="/">Live Simulation</a></li>
+        <li{% if nav_embed == 'scene' %} class="active"{% endif %}><a href="/embed/scene">Current Scene</a></li>
+        <li{% if nav_embed == 'explore' %} class="active"{% endif %}><a href="/embed/explore">Data Explorer</a></li>
         {# 外部工具链接(如 mavis 的 config_tool,独立进程):由调用方经 extra_nav_links
            传 {label,url};没有就不渲染 —— 模板不认识具体是哪个工具。 #}
         {% for l in extra_nav_links or [] %}

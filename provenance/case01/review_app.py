@@ -354,10 +354,10 @@ def get_run(run_id: str, safe: int = 0):
 #   一行都不留空。JS 里**不点名**任何动作或字段(那是实验词,会顶到上面那条棘轮),
 #   所以这段说明留在 Python 侧。
 _PAGE = r"""<!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GTC Case 01 · 成品记录审阅</title>
+<title>GTC Case 01 · Results and Records</title>
 <style>
   /* 中性配色:深色页头(原来是墨绿 #1d3a2f)已去掉,改成浅色页头 + 单一蓝色强调色。
      理由:这块面板要嵌进治理平台/小镇界面,深色大面积色块既不协调也难与别家风格共存;
@@ -483,11 +483,11 @@ _PAGE = r"""<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>GTC Case 01 · 成品记录审阅</h1>
+  <h1>GTC Case 01 · Results and Records</h1>
   <select id="pick"></select>
-  <span class="meta" id="hmeta">加载中…</span>
+  <span class="meta" id="hmeta">Loading…</span>
   <!-- 只读面与审核面是一体的两件事:看 → 判。入口放在这里,专家不必记第二个地址。 -->
-  <a class="expertlink" id="expertlink" href="/review/expert" title="对一条「问题＋专业类别」下结论并写回训练线">去专家审核 →</a>
+  <a class="expertlink" id="expertlink" href="/review/expert" title="Review an issue and specialty, then submit your verdict">Open Expert Review →</a>
 </header>
 <div class="wrap">
   <nav id="nav"></nav>
@@ -495,23 +495,23 @@ _PAGE = r"""<!DOCTYPE html>
 </div>
 <script>
 const TABS = [
-  ["overview",   "概览",     () => null,                                  "这一次运行的来龙去脉与结果总览"],
-  ["turns",      "对话",     d => (d.turns || []).length,                 "咨询者与 Investment AI 的逐轮问答"],
-  ["retrievals", "检索",     d => (d.retrievals || []).length,            "当轮查到了哪些资料（以及那天有没有注入新事实）"],
-  ["events",     "事件",     d => (d.events || []).length,                "剧情事件按日期释放的流水"],
-  ["states",     "状态",     d => (d.state_history || []).length,         "资金、持仓、买卖价逐日快照"],
-  ["reflection", "反思",     d => ((d.reflection || {}).text ? 1 : 0),    "运行后的反思全文（八项内容;是否带小标题随批次而异,见第十轮体检)"],
-  ["router",     "问题分流", d => ((d.router || {}).issues || []).length,  "从反思里拆出的带风险的行为/判断（含风险等级）"],
-  ["injector",   "注入器",   d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
-                                                                          "注入器的节点、释放了哪些事件、事件怎么定义"],
+  ["overview",   "Overview", () => null,                                  "Run background and outcome"],
+  ["turns",      "Conversation", d => (d.turns || []).length,              "Conversation between the investor and Investment AI"],
+  ["retrievals", "Retrieval", d => (d.retrievals || []).length,             "Evidence retrieved during each turn"],
+  ["events",     "Events", d => (d.events || []).length,                   "Story events released by date"],
+  ["states",     "State", d => (d.state_history || []).length,             "Daily cash, holdings, and trading snapshots"],
+  ["reflection", "Reflection", d => ((d.reflection || {}).text ? 1 : 0),    "Post-run reflection"],
+  ["router",     "Issue Routing", d => ((d.router || {}).issues || []).length, "Risk-bearing judgments identified in the reflection"],
+  ["injector",   "Injector", d => ("injector" in d) ? (((d.injector || {}).nodes) || []).length : null,
+                                                                          "Nodes and released events"],
   // 审计徽标只数**引擎侧**的交互留痕(release_events / interaction);
   // 不数事实层记账(随 T0 一次算出的那几条流水)——后者在进度还是 0/7 时就已存在,
   // 显示成徽标会让人误以为"没开始就出了审计"(2026-10-09 用户两次追问)。
   // 事实层的条目在审计页签里照常列出。
-  ["audit",      "审计",     d => (d.audit || []).filter(
+  ["audit",      "Audit",     d => (d.audit || []).filter(
                                 x => x.action === "release_events" || x.action === "interaction"
                               ).length,
-                                                                          "引擎侧交互留痕(释放事件/交互);事实层的事件记账见本页签内条目"],
+                                                                          "Engine interaction trail and recorded events"],
 ];
 let DATA = null, TAB = "overview";
 // 记录 → 引擎归属:靠近端拿到的清单里每条都带 engine(索引字段)。
@@ -1076,6 +1076,7 @@ async function boot() {
 }
 boot();
 </script>
+<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 
@@ -1103,10 +1104,10 @@ def embed_review():
 # 为什么放我们这边:对接说明书里的协议必须是**能跑起来看的**,不是纸上约定;
 # 平台侧照抄这 40 行,再换成自己的布局即可。
 _DEMO_PARENT = r"""<!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>嵌入示例(宿主侧 · 平台侧参考实现)</title>
+<title>Embedding Example (Host Application)</title>
 <style>
   body { font: 14px/1.6 system-ui, "Microsoft YaHei", sans-serif; margin: 0; display: flex; height: 100vh; }
   #left { width: 340px; box-sizing: border-box; border-right: 1px solid #e5e7eb; padding: 14px; overflow: auto; }
@@ -1123,20 +1124,20 @@ _DEMO_PARENT = r"""<!DOCTYPE html>
 </head>
 <body>
 <div id="left">
-  <h3>宿主侧参考实现</h3>
-  <p>平台侧要写的就是这一小块:一个 <code>iframe</code> + 一个 <code>message</code> 监听。
-     协议见《给平台侧_嵌入与数据接入》。</p>
-  <div>收到的消息(最近 12 条):</div>
-  <div class="log" id="log">(等 iframe 就绪…)</div>
+  <h3>Host Application Example</h3>
+  <p>The host needs an <code>iframe</code> and a <code>message</code> listener.
+     See the embedding and data integration guide for the protocol.</p>
+  <div>Received messages (latest 12):</div>
+  <div class="log" id="log">(Waiting for iframe…)</div>
   <div id="picks"></div>
   <div>
-    <button data-tab="overview">→ 让 iframe 切到「概览」</button>
-    <button data-tab="reflection">→ 让 iframe 切到「反思」</button>
-    <button data-tab="router">→ 让 iframe 切到「问题分流」</button>
+    <button data-tab="overview">→ Show Overview in iframe</button>
+    <button data-tab="reflection">→ Show Reflections in iframe</button>
+    <button data-tab="router">→ Show Issue Routing in iframe</button>
   </div>
 </div>
 <div id="right">
-  <iframe id="f" src="/embed/review?embed=1" title="case01 结果记录(嵌入面)"></iframe>
+  <iframe id="f" src="/embed/review?embed=1" title="case01 results (embedded view)"></iframe>
 </div>
 <script>
 var frame = document.getElementById("f");
@@ -1159,17 +1160,18 @@ window.addEventListener("message", function (ev) {
     picks.innerHTML = "";
     (m.runs || []).slice(0, 5).forEach(function (id) {
       var b = document.createElement("button");
-      b.textContent = "\u2192 让 iframe 切到 " + id;
+      b.textContent = "\u2192 Select run " + id + " in iframe";
       b.onclick = function () { send({ type: "mavis:select-run", run_id: id }); };
       picks.appendChild(b);
     });
-    add("(共 " + (m.runs || []).length + " 条记录,上面只列前 5 条)");
+    add("(" + (m.runs || []).length + " runs total; showing the first five above)");
   }
 });
 Array.prototype.forEach.call(document.querySelectorAll("button[data-tab]"), function (b) {
   b.onclick = function () { send({ type: "mavis:set-tab", tab: b.dataset.tab }); };
 });
 </script>
+<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 

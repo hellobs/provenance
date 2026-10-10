@@ -842,10 +842,10 @@ def expert_marks():
 
 
 _EXPERT_PAGE = r"""<!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>专家审核面板(参照实现)</title>
+<title>Expert Review Panel</title>
 <style>
   body { font: 14px/1.65 system-ui, "Microsoft YaHei", sans-serif; margin: 0;
          background: #f6f8fa; color: #1f2328; }
@@ -908,46 +908,44 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>专家审核面板 · 参照实现</h1>
-  <p>一条「问题 + 专业类别」一份意见。界面由平台侧重写,这里是<b>字段与后果的样子</b>。
+  <h1>Expert Review Panel</h1>
+  <p>Submit one opinion for each issue and specialty. The platform can replace this reference interface; it shows <b>the fields and their effects</b>.
      <span class="meta" id="counts"></span>
-     <a href="/review" class="meta" id="backlink">← 回到只读面(看记录)</a></p>
-  <p class="how">怎么做:<b>①</b> 左边选一条任务(可按风险高低筛) → <b>②</b> 右边<b>默认只给
-     你要审的那条问题</b>和它在原文里的定位,想看整篇再点"读整篇反思原文" →
-     <b>③</b> 选一个结论:认可 = 这段反思核心成立、无需实质修改;<b>建议修改</b> = 方向有价值但有
-     遗漏/表述错/泛化过度,只改你负责那几句;<b>不成立</b> = 核心逻辑有实质问题。
-     选「认可」时文本框会锁住(写了会被拒)。</p>
+     <a href="/review" class="meta" id="backlink">← Back to records</a></p>
+  <p class="how">How to review: <b>1.</b> Select a task on the left (optionally filter by risk). <b>2.</b> The right side shows
+     <b>the selected issue</b> and its location in the source text. Open the full reflection if needed.
+     <b>3.</b> Choose a verdict: Approve means the core reflection is sound; Suggest revision means it has value but needs a focused correction;
+     Reject means its core reasoning is unsound. The correction box is disabled for Approve.</p>
   <details class="rubric">
-    <summary>审核基准(《技术集成流程》§七:所有专家共用这一套,不分工各写一套答案)</summary>
+    <summary>Review criteria (shared by all experts)</summary>
     <ol>
-      <li><b>事实与因果是否成立</b>:有没有事实错误、错误归因,或把相关直接写成因果。</li>
-      <li><b>是否真正吸收了本次经历</b>:是识别了判断里的关键问题,还是只把结果复述了一遍。</li>
-      <li><b>结果偏见</b>：不能因为后来涨了/跌了,就倒推当时的判断必然对或必然错。</li>
-      <li><b>不合理泛化</b>:一次经历不能直接变成一条过宽的未来规则。</li>
-      <li><b>是否遗漏重要价值因素</b>:例如用户的风险暴露、不可逆后果、行动与不行动的机会成本。</li>
+      <li><b>Facts and causality</b>: Check for factual mistakes, incorrect attribution, and unsupported causal claims.</li>
+      <li><b>Learning from this experience</b>: Identify the key judgment issue instead of merely repeating the outcome.</li>
+      <li><b>Outcome bias</b>: Do not judge an earlier decision solely by whether the price later rose or fell.</li>
+      <li><b>Overgeneralization</b>: One experience should not become an overly broad future rule.</li>
+      <li><b>Omitted values</b>: Consider risk exposure, irreversible consequences, and the opportunity cost of action or inaction.</li>
     </ol>
-    <div class="meta">这一栏只是把研究侧定的审核规则摆在你手边;怎么判、判成哪一档都由你决定,
-      系统不替你打分。原文见 0904doc《04｜Reflection → Governance Platform 技术集成流程》第七节。</div>
+    <div class="meta">These criteria guide your review. You decide the verdict; the system does not score it for you.</div>
   </details>
 </header>
 <main>
   <div id="left">
-    <div class="meta" id="summary">队列加载中…</div>
+    <div class="meta" id="summary">Loading review queue…</div>
     <div id="filter">
-      <label for="risk">按风险筛</label>
+      <label for="risk">Filter by risk</label>
       <select id="risk">
-        <option value="">全部</option>
-        <option value="high">只看 high</option>
-        <option value="medium">只看 medium</option>
-        <option value="low">只看 low</option>
+        <option value="">All</option>
+        <option value="high">High only</option>
+        <option value="medium">Medium only</option>
+        <option value="low">Low only</option>
       </select>
       <span class="meta" id="riskn"></span>
     </div>
-    <div id="queue"><div class="task s">队列加载中…</div></div>
+    <div id="queue"><div class="task s">Loading review queue…</div></div>
   </div>
-  <div id="work"><h2>选左侧一条任务</h2><div class="meta">
-     队列取最近记录里可建单的候选,并排在前面标出「已有 1 份、在等第二份」的那些;
-     读正文请展开"反思全文"。</div></div>
+  <div id="work"><h2>Select a task on the left</h2><div class="meta">
+     The queue shows review candidates from recent records. Tasks awaiting a second opinion appear first.
+     Expand the full reflection to read its source text.</div></div>
 </main>
 <script>
 var TASK = null, FULL = "";
@@ -1173,6 +1171,7 @@ function send() {
   });
 }
 </script>
+<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 

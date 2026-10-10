@@ -72,11 +72,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 IS_WIN = os.name == "nt"
 
 LIVE = {"case00": 5010, "case01": 5010}  # 5010 是唯一实时入口,两 case 互斥共用
-LIVE_NAME = {"case00": "原初 6 角色小镇(live_fastapi.py)",
-             "case01": "注入器推演(vizkit town)"}
+LIVE_NAME = {"case00": "Original six-agent town (live_fastapi.py)",
+             "case01": "Injector simulation (vizkit town)"}
 # 命令行特征:按它认进程(端口判断不到游离实例)
 CMD_NEEDLE = {"case00": "live_fastapi.py", "case01": "vizkit.live_run"}
-READONLY = {5002: "case01 只读契约", 5003: "case00 存档只读"}
+READONLY = {5002: "case01 read-only contract", 5003: "case00 read-only archive"}
 LOG_DIR = os.path.join(os.environ.get("TEMP") or tempfile.gettempdir(), "dsh_srv")
 
 
@@ -126,9 +126,9 @@ def _attribution_tools_missing():
         return []
     missing = []
     if not any(shutil.which(t) for t in ("ss", "netstat")):
-        missing.append("ss/netstat(端口归属)")
+        missing.append("ss/netstat (port owner)")
     if not shutil.which("ps"):
-        missing.append("ps(命令行归属)")
+        missing.append("ps (process command line)")
     return missing
 
 
@@ -275,7 +275,7 @@ def probe(case):
             "n_inst": n_instances(procs), "listening": _port_bound_by(case),
             "simulating": None, "detail": ""}
     if not info["listening"]:
-        info["detail"] = "未监听端口"
+        info["detail"] = "Port is not listening"
         return info
     if case == "case01":
         h = _http_json("http://127.0.0.1:%d/health" % port)
@@ -289,7 +289,7 @@ def probe(case):
                 h.get("roles"), h.get("pending"), h.get("clients"),
                 h.get("finished"), ("(%s)" % reason) if reason else "")
         else:
-            info["detail"] = "端口在听,但 /health 取不到"
+            info["detail"] = "Port is listening, but /health is unavailable"
     else:
         g = _http_json("http://127.0.0.1:%d/api/goals" % port)
         if g:
@@ -297,7 +297,7 @@ def probe(case):
             info["simulating"] = bool(n)
             info["detail"] = "倾向数据 {} 个角色(--no-sim 时为 0 = 只是 Web 层)".format(n)
         else:
-            info["detail"] = "端口在听,但 /api/goals 取不到"
+            info["detail"] = "Port is listening, but /api/goals is unavailable"
     return info
 
 
@@ -310,31 +310,31 @@ def _state(i):
       (2026-09-19 加了 finished 字段;在那之前分不清"还在跑"和"跑完在保持"。)
     """
     if not i["listening"]:
-        return "未启动"
+        return "Not running"
     if i["case"] == "case00":
-        return "在推演" if i["simulating"] else "在听(未在推演:--no-sim)"
+        return "Simulating" if i["simulating"] else "Listening (no simulation: --no-sim)"
     reason = i.get("finish_reason", "")
     if i["simulating"]:
-        return "在推演"
+        return "Simulating"
     if reason == "review_only":
-        return "仅审阅(未在推演)"
-    return "在听(已跑完)"
+        return "Review only (no simulation)"
+    return "Listening (run completed)"
 
 
 def status():
-    print("实时面(同时只允许一个在跑):")
+    print("Live services (only one may run at a time):")
     for case in ("case00", "case01"):
         i = probe(case)
-        warn = "  [!] 有 {} 个实例(含游离)".format(i["n_inst"]) if i["n_inst"] > 1 else ""
+        warn = "  [!] {} instances (including detached)".format(i["n_inst"]) if i["n_inst"] > 1 else ""
         print("  {:<6} :{:<5} {:<22} {}{}".format(case, i["port"], _state(i), i["detail"], warn))
-    print("只读面(不跑模拟,可随时全开):")
+    print("Read-only services (no simulation):")
     for port, what in sorted(READONLY.items()):
         pids = sorted(_pids_by_port(port))
         print("  :{:<5} {:<24} {}".format(port, what,
               "listening pid={}".format(pids[0]) if pids else "down"))
-    print("\n平台侧只需要一个地址: http://<host>:5010/ (唯一实时入口,当前选中的 case 在此)")
-    print("  case00:首页=小镇+治理约束面板+干预时间轴 ｜ 纯场景 /embed/scene ｜ 纯治理 /embed/goals")
-    print("  case01:首页=小镇+结果记录 ｜ 只看结果 /embed/review ｜ 只看小镇 /embed/scene")
+    print("\nPlatform entry point: http://<host>:5010/ (the selected case is served here)")
+    print("  case00: home = town + governance panel + intervention timeline | scene /embed/scene | governance /embed/goals")
+    print("  case01: home = town + results | results /embed/review | scene /embed/scene")
 
 
 # ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ def stop(case, quiet=False):
     pids = live_pids(case)
     if not pids:
         if not quiet:
-            print("  {} :{} 本来就没在跑".format(case, LIVE[case]))
+            print("  {} :{} was not running".format(case, LIVE[case]))
         return 0
     for pid in pids:
         _terminate(pid)
@@ -375,7 +375,7 @@ def stop(case, quiet=False):
         for pid in sorted(live_pids(case)):
             _terminate(pid, force=True)
     if not quiet:
-        print("  已停 {} :{} (pid={})".format(case, LIVE[case], ",".join(map(str, sorted(pids)))))
+        print("  Stopped {} :{} (pid={})".format(case, LIVE[case], ",".join(map(str, sorted(pids)))))
     return len(pids)
 
 
@@ -392,8 +392,8 @@ def _warn_overwrite(explicit_run_id, run_id, out_rel):
     for p in (os.path.join(HERE, out_rel),
               os.path.join(records_root(), run_id, "run.json")):
         if os.path.isfile(p):
-            print("  ⚠ {} 已存在 —— run_id={} 是覆盖写,旧那条会没。"
-                  "要留着对照就换个 --run-id,或先把 {} 整个目录挪走。".format(
+            print("  Warning: {} already exists. Reusing run_id={} will overwrite that record. "
+                  "Choose another --run-id or move the {} directory first.".format(
                       p, run_id, os.path.dirname(p)))
             return
 
@@ -415,18 +415,18 @@ def start(case, args):
     # 绑非本机必须先声明,而且要**先于停旧实例**判断:否则用户敲错一个 host,
     # 旧服务先被杀掉、然后才报"拒绝绑定",等于把在跑的面弄没了(安全体检 2026-09-23)。
     from live.netguard import require_explicit_remote
-    require_explicit_remote(args.host, where="5010 实时面")
+    require_explicit_remote(args.host, where="5010 live service")
     if review_only:
-        print("仅审阅模式(--review-only):不跑推演,只服务界面。")
+        print("Review-only mode (--review-only): serving the interface without running a simulation.")
     else:
-        print("按「同时只允许一个实时面」的规则——先停另一个,再停本 case 的旧实例(防游离):")
+        print("Only one live service may run at a time. Stopping the other case and older instances:")
     # 两 case **共用 5010(唯一入口)**:无论对方是推演还是仅审阅,都得先停——
     # 否则对方占着 5010,新进程绑不上端口(而 injector 游离实例会照跑推演,
     # 外面却看不出第二份存在)。
     stop(other)
     stop(case)
     if live_pids(case) or live_pids(other):
-        print("  [!] 仍有实时进程没清干净,继续起会得到两个实例;先手工处理:")
+        print("  [!] Live processes remain. Resolve them before starting another instance:")
         for c in ("case00", "case01"):
             print("    {}: {}".format(c, sorted(live_pids(c))))
         return 1
@@ -434,7 +434,7 @@ def start(case, args):
     # 绑非本机地址必须显式声明(安全体检 2026-09-23):5010 有 3 个写端点、全栈无鉴权。
     # (上面 start() 里已经判过,这里再判一次只是防有人直接调这个函数。)
     from live.netguard import exposure_lines, require_explicit_remote
-    require_explicit_remote(args.host, where="5010 实时面")
+    require_explicit_remote(args.host, where="5010 live service")
 
     os.makedirs(LOG_DIR, exist_ok=True)
     run_id, out = "", ""
@@ -470,7 +470,7 @@ def start(case, args):
         if str(getattr(args, "seed", "") or "").strip():
             # 对外口径是"只有一个种子",所以种子**接不住的那一面**必须自己说清楚,
             # 不能让人以为 case00 也被固定了(help 里写的是 `case01:`)。
-            print("  ⚠ --seed 只作用于 case01;case00 这一面不接种子,这一局是**非确定**的。")
+            print("  Warning: --seed applies only to case01; case00 remains nondeterministic.")
         cmd = [sys.executable, "live_fastapi.py", "--name", args.name, "--start", args.sim_start,
                "--stride", str(args.stride), "--port", str(LIVE["case00"]),
                "--host", args.host]
@@ -499,32 +499,32 @@ def start(case, args):
         child_proc = subprocess.Popen(
             cmd, cwd=HERE, stdout=fo, stderr=fe, env=child_env,
             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), **kwargs)
-    print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
-    print("  日志:{}".format(log))
+    print("  Started {} :{} -> {}".format(case, LIVE[case], " ".join(cmd)))
+    print("  Log: {}".format(log))
     if args.host not in ("127.0.0.1", "localhost", ""):
         # 跨机对接:把所有候选地址印出来(别只印路由那一个,也别让人手抄)
         for line in exposure_lines(args.host, LIVE[case]):
             print("  " + line)
         ips = _all_lan_ips()
-        print("  绑定 {} → 平台侧跨机可用地址(本机所有非回环 IPv4):".format(args.host))
+        print("  Bound to {}. Addresses reachable from other hosts (non-loopback IPv4):".format(args.host))
         if ips:
             for i, ip in enumerate(ips):
-                tail = "   ← 默认路由走这张" if i == 0 else ""
+                tail = "   <- default route" if i == 0 else ""
                 print("    http://{}:{}/{}{}".format(
                     ip, LIVE[case], tail, _reachable(ip, LIVE[case])))
         else:
-            print("    (一个都没取到:用 {} 自己看一眼)".format(
+            print("    (No address detected; inspect with {})".format(
                 "ipconfig" if IS_WIN else "ip addr"))
-        print("  对方连不上时先查防火墙是否放行该端口({})。".format(
-            "Windows 常把新网络判成 Public" if IS_WIN
-            else "Linux 看 `ufw status`/firewalld;容器里还要看宿主机有没有映射该端口"))
+        print("  If other hosts cannot connect, check the firewall ({}).".format(
+            "Windows may classify a new network as Public" if IS_WIN
+            else "check `ufw status`/firewalld and any container port mapping"))
     mapper_log = ""
     if run_id:
-        print("  本次 run_id: {}   (名字里的日期是真实运行时间,记录里的 start/end date 是模拟剧情日期)".format(run_id))
-        print("  原始记录将落盘到: {}".format(out))
+        print("  Run ID: {} (ID date is the actual run time; record dates are simulation dates)".format(run_id))
+        print("  Raw record path: {}".format(out))
         final = os.path.join(records_root(), run_id, "run.json")
-        print("  跑完自动映射成成品记录: {}".format(final))
-        print("    (手动等价命令: python -m case01.injector.pipeline --run-id {}"
+        print("  Final record will be generated at: {}".format(final))
+        print("    (Equivalent manual command: python -m case01.injector.pipeline --run-id {}"
               " --from-record {} --reflect --out {})".format(run_id, out, final))
 
     # 校验:进程活着 **且端口真绑上了**。只等端口不够——绑不上时进程还会继续跑模拟。
@@ -541,18 +541,18 @@ def start(case, args):
         #   ② 失败信息要可诊断:把"两侧各看到什么"打出来,而不是只给一句"没绑上"。
         ours = live_pids(case)
         port_pids = _pids_by_port(LIVE[case])
-        print("\n  [失败] 起来后端口没绑上(常见原因:端口被别的进程占着)。")
-        print("     判据:本 case 进程 {} 个 / :{} 监听 PID {} 个 / 交集 {} 个".format(
+        print("\n  [FAIL] Service started but could not bind its port (another process may own it).")
+        print("     Check: {} case processes / :{} has {} listening PIDs / {} in common".format(
             len(ours), LIVE[case], len(port_pids), len(set(ours) & port_pids)))
         if port_pids:
-            print("     ⚠ :{} **确实在听**(PID {}),只是归属判不出来 ⇒ **不自动收掉**".format(
+            print("     Warning: :{} is listening (PID {}), but ownership is unclear; leaving it running.".format(
                 LIVE[case], ", ".join(str(x) for x in sorted(port_pids))))
-            print("        先 HTTP 确认一下:{} -s http://127.0.0.1:{}/health".format(
+            print("        Check HTTP first: {} -s http://127.0.0.1:{}/health".format(
                 "curl.exe" if IS_WIN else "curl", LIVE[case]))
-            print("        确认要停:`python live_switch.py --stop {}`,或 {}".format(
+            print("        To stop it: `python live_switch.py --stop {}` or {}".format(
                 case, "Stop-Process -Id <pid>" if IS_WIN else "kill <pid>"))
         else:
-            print("     正在收掉这个游离实例,避免留下'看不见的第二个推演'……")
+            print("     Stopping this detached instance to prevent a second hidden simulation...")
             stop(case, quiet=True)
         tail = ""
         try:
@@ -561,30 +561,30 @@ def start(case, args):
         except Exception:  # noqa: BLE001
             pass
         if tail.strip():
-            print("    stderr 尾部:\n" + tail.strip())
+            print("    Recent stderr:\n" + tail.strip())
         return 1
 
     if run_id and not args.no_map:
         # 映射现在由实时面进程**自己顺序做**(case01/vizkit/live_run.py 的 _map_run):
         # 重开一局时再另起看护进程会并发抢同一个 Ollama。这里只提示一句。
-        print("  跑完由实时面自己顺序映射(重开一局也会映射),不发看护进程")
+        print("  The live service will map the record after the run, including restarted runs.")
 
-    print("\n现状:")
+    print("\nCurrent status:")
     for c in ("case00", "case01"):
         j = probe(c)
-        extra = "  实例数={}".format(j["n_inst"]) if j["n_inst"] else ""
+        extra = "  instances={}".format(j["n_inst"]) if j["n_inst"] else ""
         print("  {:<6} :{:<5} {}{}".format(c, j["port"], _state(j), extra))
-    print("\n平台入口(一个): http://<host>:5010/  (当前选中的 case 在此;case00 首页权重面板,case01 小镇+结果)")
+    print("\nPlatform entry point: http://<host>:5010/ (the selected case is served here)")
     if not args.no_follow:
         # 2026-10-10 用户反馈"都按任意键继续了,为什么后续还会有日志打印出来":
         # 服务是 DETACHED 起的、输出重定向到日志文件,所以**启动器退出后窗口就是死壳**,
         # 而日志还在那个文件里继续长 —— 设计如此,但没告诉人在哪儿看。
         # 这里默认跟读日志(像 tail -f);Ctrl+C 只停跟随,**不杀服务**。
-        print("\n---- 跟随日志(Ctrl+C 停止跟随,服务继续跑)----")
+        print("\n---- Following log (Ctrl+C stops following; the service keeps running) ----")
         try:
             _follow(log, err, child_proc)
         except KeyboardInterrupt:
-            print("\n[已停止跟随] 服务仍在跑:`python live_switch.py --stop {}`".format(case))
+            print("\n[Stopped following] Service is still running: `python live_switch.py --stop {}`".format(case))
     return 0
 
 
@@ -757,36 +757,33 @@ def main():
     missing = _attribution_tools_missing()
     if missing:
         # 先出声再干活:否则 --start 会按"没在跑"的假前提往下走(见 _attribution_tools_missing)
-        print("[live_switch] ⚠ 本机缺 {} —— 下面所有 `down/未启动/本来就没在跑` 只代表"
-              "**查不到进程**,不代表真没在跑。先补齐再信本开关:"
-              "apt-get install iproute2 net-tools procps".format("、".join(missing)))
-    ap = argparse.ArgumentParser(description="实时面开关:保证同时只有一个实时可视化在跑")
-    ap.add_argument("--status", action="store_true", help="只看现状,不动任何进程")
-    ap.add_argument("--start", choices=["case00", "case01"], help="起某个 case 的实时面(先停另一个与本 case 旧实例)")
-    ap.add_argument("--stop", choices=["case00", "case01", "all"], help="停实时面(不碰只读面)")
-    ap.add_argument("--nodes", type=int, default=0, help="case01:只跑前 N 个节点(0=全部)")
+        print("[live_switch] Warning: missing {}. Any 'down' status may mean process discovery failed. "
+              "Install the required tools: apt-get install iproute2 net-tools procps".format(", ".join(missing)))
+    ap = argparse.ArgumentParser(description="Live service switch: allow only one simulation interface at a time")
+    ap.add_argument("--status", action="store_true", help="Show current status without changing processes")
+    ap.add_argument("--start", choices=["case00", "case01"], help="Start a case after stopping the other case and older instances")
+    ap.add_argument("--stop", choices=["case00", "case01", "all"], help="Stop live services without affecting read-only services")
+    ap.add_argument("--nodes", type=int, default=0, help="case01: run the first N nodes (0 = all)")
     # 平台侧对接要用:默认只绑本机;给 0.0.0.0(或 LIVE_HOST=0.0.0.0)才允许跨机访问。
     ap.add_argument("--host", default=os.environ.get("LIVE_HOST", "127.0.0.1"),
-                    help="实时面绑定地址:默认 127.0.0.1(只本机);平台侧跨机对接给 0.0.0.0")
-    ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
-    ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到仓根 data/case01/raw/<run_id>/raw.json)")
-    ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
+                    help="Bind address; default 127.0.0.1. Use 0.0.0.0 for access from another host")
+    ap.add_argument("--hold", type=float, default=1800, help="case01: seconds to keep the service running after the simulation")
+    ap.add_argument("--out", default="", help="case01: raw record path (default: data/case01/raw/<run_id>/raw.json)")
+    ap.add_argument("--run-id", default="", help="case01: explicit run ID (default: <YYMMDD>-live-case01-mavis-<branch>-<HHMM>)")
     ap.add_argument("--seed", default="",
-                    help="case01:**唯一的种子入口**(整数)。设了会把模型采样与小镇世界动力学"
-                         "一起固定(世界流按 master+run_id 派生);不设=保持今天的非确定行为。"
-                         "也可用环境变量 CASE01_SEED")
-    ap.add_argument("--name", default="demo", help="case00:模拟名")
+                    help="case01: integer seed for model sampling and town dynamics; also accepts CASE01_SEED")
+    ap.add_argument("--name", default="demo", help="case00: simulation name")
     ap.add_argument("--sim-start", dest="sim_start", default="20250213-09:30",
-                    help="case00:模拟起始时间(与 --start 的 case 选择不是一回事)")
-    ap.add_argument("--stride", type=int, default=2, help="case00:步长(分钟)")
+                    help="case00: simulation start time")
+    ap.add_argument("--stride", type=int, default=2, help="case00: time step in minutes")
     ap.add_argument("--no-sim", action="store_true",
-                    help="case00:只服务 Web 层不跑模拟(不算实时面,但仍占端口)")
+                    help="case00: serve the web interface without running a simulation")
     ap.add_argument("--no-follow", dest="no_follow", action="store_true",
-                    help="启动后不跟读日志(默认跟读,像 tail -f;Ctrl+C 只停跟随不杀服务)")
+                    help="Do not follow the log after startup (default: follow; Ctrl+C only stops following)")
     ap.add_argument("--no-map", dest="no_map", action="store_true",
-                    help="case01:跑完不自动映射成成品记录(默认自动映射)")
+                    help="case01: skip automatic final-record generation")
     ap.add_argument("--review-only", dest="review_only", action="store_true",
-                    help="case01:不推演,只把界面(小镇 + 结果记录)起来;可随时开着翻记录")
+                    help="case01: serve the town and results interface without running a simulation")
     args = ap.parse_args()
 
     if args.start:
@@ -803,4 +800,6 @@ def main():
 
 
 if __name__ == "__main__":
+    from live.english_output import install_english_output
+    install_english_output()
     sys.exit(main())

@@ -56,8 +56,8 @@ def resolve_restart_choice(raw):
     if choice in ("", "AUTO"):
         return None
     raise ValueError(
-        "不再支持指定分支(预设已全部剔除,2026-10-10):branch={!r} 无效,"
-        "分支只由 T0 回答判定".format(raw))
+        "Preset branches are no longer supported: branch={!r} is invalid; "
+        "the branch is determined only from the T0 answer".format(raw))
 
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
@@ -81,7 +81,7 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         # 这一局的名字报给 /health:平台侧只嵌画布时靠它把画布与记录对上(2026-09-24)
         run_id=run_id,
         # ?embed=1:卡片里的 iframe 用压缩版式(去掉大标题与页边距),贴合 380px 宽的卡片
-        extra_panels=[{"id": "review", "label": "结果记录",
+        extra_panels=[{"id": "review", "label": "Results and Records",
                        "url": "/review?embed=1"}],
         on_restart=on_restart,
         # **不给"分支"选择器**:预设分支已全部剔除(2026-10-10),分支只由 T0 判定,
@@ -90,20 +90,20 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)。
         # "专家审核"排在前面,且**只在挂了结果面板时给** —— 九块/专家队列都由
         # with_review 那侧的 review_app 挂,不挂就是 404(与数据界面同一判据)。
-        extra_nav_links=([{"label": "专家审核", "url": "/review/expert",
-                           "title": "专家审批面板:候选队列 / 逐条 verdict / 纠正文本"
-                                   "(⚠ 无鉴权真写口)"}]
+        extra_nav_links=([{"label": "Expert Review", "url": "/review/expert",
+                           "title": "Expert review: candidate queue, verdicts, and corrections"
+                                   " (write access; no authentication)"}]
                          if with_review else []) +
-                        [{"label": "配置工具 ↗",
+                        [{"label": "Configuration Tool ↗",
                           "url": os.environ.get("MAVIS_CONFIG_TOOL_URL",
                                                 "http://127.0.0.1:8060/"),
-                          "title": "mavis 的角色/场景配置工具(独立进程;"
-                                   "地址可用 MAVIS_CONFIG_TOOL_URL 覆盖)"}])
+                          "title": "Mavis agent and scene configuration tool (separate process;"
+                                   " override with MAVIS_CONFIG_TOOL_URL)"}])
     if with_review:
         from ..review_app import attach_to
         # "本次实跑还没成品记录"的提示就靠这个:实跑跑完自动映射之后,下拉里才会出现它。
         attach_to(live.app, current_run_id=run_id,
-                  note="实跑跑完会自动映射成成品记录")
+                  note="The completed run will be mapped to a final record automatically")
     # 统一历史数据界面(/api/runs + /embed/explore)与 case00 同一个共享模块,
     # 于是 case01 实时面同样可开数据界面、同样能翻到 all 的历史。
     from live.history import router as history_router
@@ -142,19 +142,19 @@ def _map_run(run_id, raw_out, rng_info=None):
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
            "--run-id", run_id,
            "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
-    print("  正在映射成品记录(约 1-2 分钟)…")
+    print("  Mapping the final record (about 1–2 minutes)…")
     t0 = time.time()
     proc = run_text(cmd, cwd=PKG_ROOT, env=utf8_env())
     tail = (proc.stdout or "").strip()[-800:]
     if tail:
         print(tail)
     if proc.returncode != 0 or not os.path.exists(out):
-        print("  [!] 映射失败(exit={}):可在 provenance/provenance 下手工重跑:\n      {}"
+        print("  [!] Mapping failed (exit={}): rerun manually from provenance/provenance:\n      {}"
               .format(proc.returncode, " ".join(cmd)))
         if (proc.stderr or "").strip():
-            print("      stderr 尾部:", proc.stderr.strip()[-400:])
+            print("      stderr tail:", proc.stderr.strip()[-400:])
         return False
-    print("  成品记录已生成({:.0f}s) -> {}".format(time.time() - t0, out))
+    print("  Final record generated ({:.0f}s) -> {}".format(time.time() - t0, out))
     # 种子链留痕也要落在**成品记录**旁边:起面时那份 `rng.json` 只跟着 `--out`
     # 指向的原始记录(`data/case01/raw/<run_id>/` 一带),而结果面板与复盘读的是
     # 这里这份成品 `run.json` —— 成品记录旁边没有 rng.json 的话,
@@ -167,43 +167,41 @@ def _map_run(run_id, raw_out, rng_info=None):
 
 def main(argv=None):
     tolerant_stdout()
-    ap = argparse.ArgumentParser(description="case01 单一界面:实时小镇 + 结果记录")
+    ap = argparse.ArgumentParser(description="Case01 interface: live town and results")
     ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
     ap.add_argument("--seed", default="",
-                    help="唯一种子入口(整数):固定模型采样 + 小镇世界动力学;"
-                         "不设=非确定。派生参数会留痕在记录旁的 rng.json")
+                    help="Master seed (integer) for model sampling and town dynamics; "
+                         "if omitted, the run is nondeterministic. Derived seeds are recorded in rng.json")
     ap.add_argument("--think-workers", dest="think_workers", type=int, default=None,
-                    help="并行思考线程数。缺省:设了 --seed 就是 1(串行,让同一个种子"
-                         "落到同一个角色的同一次抽样上),没设 seed 则按角色数。"
-                         "0=总是按角色数(快,但轨迹分配仍随线程调度变)")
+                    help="Concurrent reasoning workers. Defaults to 1 when --seed is set, "
+                         "otherwise the number of agents. Use 0 to always use one worker per agent")
     ap.add_argument("--port", type=int, default=5010)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--max-retries", type=int, default=3)
-    ap.add_argument("--hold", type=float, default=60.0, help="运行结束后保持服务的秒数")
-    ap.add_argument("--nodes", type=int, default=0, help="只跑前 N 个节点(0=全部;冒烟用)")
+    ap.add_argument("--hold", type=float, default=60.0, help="Seconds to keep the service open after a run")
+    ap.add_argument("--nodes", type=int, default=0, help="Run only the first N nodes (0 means all)")
     ap.add_argument("--out", default="",
-                    help="第一局原始记录的落盘路径(缺省按 run_id 派生到 "
-                         "仓根 data/case01/raw/<run_id>/raw.json;重开一局总是按新 run_id 派生)")
+                    help="Raw output path for the first run; defaults to "
+                         "data/case01/raw/<run_id>/raw.json under the repository root")
     ap.add_argument("--review-only", dest="review_only", action="store_true",
-                    help="只服务界面(小镇 + 结果记录),不跑推演;用于随时翻成品记录")
+                    help="Serve the town and results interface without running a simulation")
     ap.add_argument("--no-restart", dest="no_restart", action="store_true",
-                    help="不提供页面上的『重开一局』按钮(默认提供)")
+                    help="Hide the Start New Run button")
     ap.add_argument("--exit-after-hold", dest="exit_after_hold", action="store_true",
-                    help="保持期(--hold)结束后就退出(默认:只要页面上还有『重开一局』"
-                         "按钮就一直等,免得按钮点了没反应)")
+                    help="Exit when the --hold period ends, even when restart remains available")
     ap.add_argument("--no-map", dest="no_map", action="store_true",
-                    help="跑完不自动映射成成品记录(默认自动映射,由本进程顺序做)")
+                    help="Skip automatic mapping to a final record")
     args = ap.parse_args(argv)
 
     # 绑非本机地址必须显式声明:这些面没有任何鉴权(安全体检 2026-09-23)。
     from live.netguard import require_explicit_remote
-    require_explicit_remote(args.host, where="5010 实时面")
+    require_explicit_remote(args.host, where="5010 live interface")
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
     if len(roles) != 2:
-        print("--roles 需要正好两个角色名")
+        print("--roles requires exactly two agent names")
         return 2
 
     scenario = args.scenario_dir or SCENARIO
@@ -219,7 +217,7 @@ def main(argv=None):
             # 不认识的取值**不再静默当成 judge**(2026-09-24 第十轮体检):以前 {"branch":"D"}
             # 会被当成 auto,回一句"已受理:下一局由 AI 的 T0 回答判定分支" —— 调用方以为
             # 自己选了 D,实际跑的是 AI 判定,谁都不知道。现在明确拒绝并说明合法取值。
-            print("重开请求被拒:{}".format(exc))
+            print("Restart request rejected: {}".format(exc))
             return {"ok": False, "error": str(exc)}
         restart_flag.set()
         # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
@@ -231,10 +229,10 @@ def main(argv=None):
         from ..review_app import clear_live, set_current_run
         clear_live()
         set_current_run("", "")
-        print("收到重开请求:下一局由 AI 的 T0 回答判定分支;"
-              "当前这一局跑完(或保持期结束)后立刻开")
+        print("Restart request received: the next run branch will be determined by the AI T0 answer;"
+              " it will start when the current run or hold period ends")
         return {"ok": True,
-                "detail": "已受理:下一局由 AI 的 T0 回答判定分支",
+                "detail": "Accepted: the next run's branch will be determined from the AI's T0 answer",
                 "branch": None, "mode": "judge"}
 
     live = build_service(host=args.host, port=args.port, roles=roles,
@@ -243,18 +241,18 @@ def main(argv=None):
     # 页面上有没有「重开一局」按钮(没注册回调就没有)
     can_restart = not args.no_restart
     live.start()
-    print("界面已启动: {}  (小镇 + 右栏“结果记录”卡片;Ctrl+C 结束)".format(live.url()))
+    print("Interface started: {} (town and Results and Records panel; Ctrl+C to stop)".format(live.url()))
 
     if args.review_only:
         # 不推演,只服务界面。告诉页面"没有在推演",别让人对着空小镇猜
         # (状态点会显示成"仅审阅模式")。这样它就是个可以随时开着的只读面。
         live.finish("review_only")
-        print("仅审阅模式:没有在推演,小镇为空;右栏“结果记录”卡片可翻仓根 data/case01/runs/")
+        print("Review mode: no simulation is running; the town is empty. Browse final records in the right panel.")
         try:
             while True:
                 time.sleep(3600)
         except KeyboardInterrupt:
-            print("已停止")
+            print("Stopped")
             live.close()
             return 0
 
@@ -274,9 +272,9 @@ def main(argv=None):
             debug_note = ""
             node_cap = int(args.nodes or 0)
             if node_cap > 0:
-                debug_note = ("--nodes {} 截断了整局节点序列:末节点被当成最终反馈节点"
+                debug_note = ("--nodes {} truncated the run; the last node is treated as final feedback"
                               .format(node_cap))
-                print("**调试跑**:" + debug_note)
+                print("**Debug run**: " + debug_note)
             # 每跑一次就该有一个能唯一定位的名字:**日期在最前**(便于按时间排序)、
             # 带 case 与引擎、实跑再带 HHMM(同一天跑多次也不撞)。名字里的日期是
             # **真实运行时间**;记录里的 start_date/end_date 是模拟剧情日期,不是一回事。
@@ -291,7 +289,7 @@ def main(argv=None):
                 base = live_run_id("auto")
                 run_id = unique_run_id(base)
                 if run_id != base:
-                    print("名字 {} 已被占用(上一局),改用 {}".format(base, run_id))
+                    print("Run ID {} is already in use; using {} instead".format(base, run_id))
             ran_once = True
             # --out 只对**第一局**生效(2026-10-06 修:此前它被完全忽略,而 live_switch
             # 既把它传给本进程、又照它打印手工映射命令 —— 于是那条命令指向一个从不存在
@@ -302,13 +300,13 @@ def main(argv=None):
             # 老根已不存在),成品记录却在新根,两半不同源。
             out = (args.out if (first_round and args.out)
                    else os.path.join(data_root("case01.raw"), run_id, "raw.json"))
-            print("本次 run_id: {} (分支由 T0 回答判定)".format(run_id))
+            print("Current run_id: {} (branch determined from the T0 answer)".format(run_id))
             # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
             # 否则刷新后的页面会收到上一局的 done / 旧位置。
             live.begin_run()
             # 面板是建服务时挂上去的,那时 run_id 还没生成;这里补告一次,
             # 好让面板能写出"本次实跑 <run_id> 还没成品记录(跑完自动生成)"。
-            set_current_run(run_id, "实跑跑完会自动映射成成品记录")
+            set_current_run(run_id, "The completed run will be mapped to a final record automatically")
             # 每一局都重新应用种子链:世界流按 master+run_id 派生,而"重开一局"会
             # 现铸新 run_id —— 若只在启动时播一次,重开的那局会沿用上一局的轨迹。
             rng_master = resolve_master(args.seed)
@@ -323,10 +321,10 @@ def main(argv=None):
                 workers = 1 if rng_master is not None else 0
             if rng_info is not None:
                 rng_info["engine_think_workers"] = workers
-                print("思考线程数:{}({})".format(
-                    workers or "按角色数",
-                    "种子链默认串行,保证同种子同抽样" if args.think_workers is None
-                    else "由 --think-workers 指定"))
+                print("Reasoning workers: {} ({})".format(
+                    workers or "one per agent",
+                    "serial by default for reproducible seeded sampling" if args.think_workers is None
+                    else "set by --think-workers"))
             # 2026-10-08(防"第四棵树"):引擎的现场存档根此前由注入器 `setdefault` 成
             # `<scenario>/checkpoints`,于是 case01 的引擎状态落在 `case01/injector/scenario/checkpoints/`
             # (85 个模拟、和场景模板混在一起)。这里在起桥**之前**用引擎自己的开关把它指到
@@ -362,16 +360,16 @@ def main(argv=None):
             try:
                 record = bridge.run()
                 # 分支是 T0 跑完才判出来的,这里打的就是真实分支。
-                print("运行完成:", json.dumps(record.get("summary") or {}, ensure_ascii=False))
-                print("  分支:{} (source={}) run_id={}".format(
+                print("Run completed:", json.dumps(record.get("summary") or {}, ensure_ascii=True))
+                print("  Branch: {} (source={}) run_id={}".format(
                     record.get("branch"), record.get("branch_source"), run_id))
                 # 谁写的 Ethan 的台词 —— 必须一眼可见(2026-10-10 用户:"这个字段也要显示啊")。
                 # 之前这个信息只埋在 run.json 里,页面上完全看不出来。
                 _eb = record.get("ethan_backend") or "unknown"
-                _warn = "" if _eb.startswith("api(") else "   ← 警告:不是外部 API!"
-                print("  Ethan 后端: {}{}".format(_eb, _warn))
+                _warn = "" if _eb.startswith("api(") else "   ← Warning: this is not an external API!"
+                print("  Ethan backend: {}{}".format(_eb, _warn))
                 bridge.save(out)
-                print("记录已保存 ->", out)
+                print("Record saved ->", out)
                 # 派生参数随记录同目录留痕(不动 run.json 的键集)
                 # 取绝对目录:`--out` 现在可以是调用方给的路径,若只给个文件名
                 # dirname 会是空串,write_side_record 会当"没目录"直接不写。
@@ -384,27 +382,27 @@ def main(argv=None):
                 # 但失败原因会在 stdout 与页面提示里写明。
                 try:
                     if record.get("branch") == "undetermined":
-                        print("  判官没能判定 A/B/C(没有预设分支可退回,2026-10-10 剔除),"
-                              "跳过映射。记录里 branch=undetermined。")
+                        print("  The judge could not determine A/B/C; no predefined branch is available,"
+                              " so mapping is skipped. The record has branch=undetermined.")
                     elif not args.no_map:
                         _map_run(run_id, out, rng_info)
                     else:
-                        print("  (--no-map:跳过映射;手工命令见 docs)")
+                        print("  (--no-map: mapping skipped; see the manual command in the docs)")
                 finally:
                     live.set_restart_ready(True)
                 if args.hold > 0:
-                    print("推演已结束,服务保持 {:.0f} 秒(此刻页面显示“已结束”,"
-                          "并给出“重开一局”按钮)…".format(args.hold))
+                    print("Simulation finished. Keeping the service open for {:.0f} seconds (the page now shows Finished,"
+                          " with a Start New Run button)…".format(args.hold))
                     # 保持期内**等重开请求**:收到就立刻开新的一局,不用等满
                     if restart_flag.wait(timeout=args.hold):
-                        print("保持期内收到重开请求,立即开新的一局")
+                        print("Restart requested during the hold period; starting a new run now")
             except KeyboardInterrupt:
-                print("已中断")
+                print("Interrupted")
                 live.finish("interrupted")
                 exit_code = 130
                 break
             except Exception as exc:  # noqa: BLE001 - 页面也必须看到失败
-                print("运行失败: {}: {}".format(type(exc).__name__, exc))
+                print("Run failed: {}: {}".format(type(exc).__name__, exc))
                 live.finish("error:{}".format(type(exc).__name__))
                 exit_code = 1
                 break
@@ -422,28 +420,30 @@ def main(argv=None):
                 # 按钮就变成谎言 —— 点了没反应(用户反馈"重开一局这个功能有问题"的最常见来源)。
                 # 所以默认**不退出**,继续等服务被 Ctrl+C;要旧行为请显式 --exit-after-hold。
                 if can_restart and not args.exit_after_hold:
-                    print("保持期结束,但页面上仍有「重开一局」按钮:"
-                          "服务继续等(要退出请 Ctrl+C,或启动时加 --exit-after-hold)")
+                    print("The hold period ended, but the page still offers Start New Run:"
+                          " the service will keep waiting (Ctrl+C to stop, or use --exit-after-hold).")
                     restart_flag.clear()
                     try:
                         while not restart_flag.wait(timeout=3600):
-                            print("仍在等待「重开一局」…(服务在线,记录已生成)")
+                            print("Waiting for Start New Run… (service online, record generated)")
                     except KeyboardInterrupt:
-                        print("已中断")
+                        print("Interrupted")
                         break
-                    print("收到重开请求,开始新的一局")
+                    print("Restart requested; starting a new run")
                 else:
                     break
             # 分支由 AI 的 T0 回答判定(2026-10-10 剔除预设分支后不再有 branch 变量;
             # 这一行原先 print(…分支 {})，只在**服务关闭那一刻**才会执行到 ——
             # 所以之前一直没暴露,直到用户关窗口才炸 NameError)。
-            print("本局结束(分支由 AI 的 T0 回答判定,见上面打印的 source=judge)")
+            print("Run ended (branch determined from the AI T0 answer; see source=judge above)")
     finally:
         live.close()      # 进程要退出了:现在才关服务本身
         clear_live()      # 别让面板一直显示一个已经不动的"实时"
-        print("服务已关闭")
+        print("Service closed")
     return exit_code
 
 
 if __name__ == "__main__":
+    from live.english_output import install_english_output
+    install_english_output()
     sys.exit(main())

@@ -1,4 +1,5 @@
 <script type="text/javascript">
+	if (window.enforceEnglishPhaser) window.enforceEnglishPhaser();
 	// Initialize variables from Flask context
 	let step = {{ step|tojson }};
 	let step_size = {{ sec_per_step|tojson }} * 1000; // Convert to milliseconds
@@ -573,7 +574,7 @@
 	function goalsUnavailable(why) {
 		var panel = document.getElementById("goals-panel");
 		if (panel) panel.style.display = "none";
-		devLog("sys", "治理约束面板已收起:" + why);
+		devLog("sys", "Governance controls hidden: " + why);
 	}
 
 	// ================= 运行状态指示(live 模式) =================
@@ -592,7 +593,7 @@
 		window.__sim_status = state;
 		// 重开按钮**不在这里显示**:用户要求"结果出完了才给再来一次的按钮",
 		// 而"结果出完"是服务端的事(映射完成)——由下面的轮询按 restart_ready 决定。
-		devLog("sys", "状态 → " + (text || state));
+		devLog("sys", "Status: " + (text || state));
 	}
 	// ================= 推演结束的醒目提示 =================	// 用户明确要求:"要保证推演结束后有提示"。状态块那行小字不够醒目,
 	// 所以结束(含出错/中断)时给一条居中大横幅;成品记录还在生成也一起说清楚。
@@ -608,30 +609,30 @@
 		var b = document.getElementById("done-banner");
 		var text, color;
 		if (String(reason).indexOf("error") === 0) {
-			text = "推演出错:" + String(reason).replace(/^error:?/, "") +
-				"　结果可能不完整,请看右栏与日志";
+			text = "Simulation error: " + String(reason).replace(/^error:?/, "") +
+				". Results may be incomplete; check the right panel and logs.";
 			color = "rgba(201,42,42,0.95)";
 		} else if (reason === "interrupted") {
-			text = "推演被中断(没跑完),结果可能不完整";
+			text = "Simulation interrupted. Results may be incomplete.";
 			color = "rgba(178,106,0,0.95)";
 		} else if (reason === "review_only") {
-			text = "仅审阅模式:没有在推演";
+			text = "Review mode: no simulation is running.";
 			color = "rgba(75,85,99,0.95)";
 		} else {
-			text = "推演结束" + (extra || "") +
+			text = "Simulation finished" + (extra || "") +
 				"<br><span style='font-weight:normal;font-size:12.5px'>" +
-				"成品记录正在生成(约 1-2 分钟),生成后右栏“结果记录”会自动切到它," +
-				"左上角随后才出现“重开一局”</span>";
+				"The final record is being generated (about 1–2 minutes). The right panel will switch to it automatically, " +
+				"then Start New Run will appear at the top left.</span>";
 			color = "rgba(15,157,88,0.95)";
 		}
-		if (!b) { devLog("sys", "推演结束:" + reason); return; }
+		if (!b) { devLog("sys", "Simulation finished: " + reason); return; }
 		b.style.background = color;
 		b.innerHTML = text;
 		b.style.display = "block";
 		b.style.animation = "none";
 		void b.offsetWidth;
 		b.style.animation = "storyFlash 0.5s ease-in-out 3";
-		devLog("sys", "结束提示已显示:" + reason);
+		devLog("sys", "Completion notice displayed: " + reason);
 		// 25 秒后收起横幅,但状态块会一直写着"已结束",不会回到"看不出在不在跑"。
 		setTimeout(function() { b.style.display = "none"; }, 25000);
 	}
@@ -654,7 +655,7 @@
 					box.style.display = "flex";
 					box.style.pointerEvents = "";
 					document.getElementById("sim-status-text").textContent =
-						"推演已结束,结果已生成(可以重开)";
+						"Simulation finished. Results are ready; you can start a new run.";
 					if (note && !note.textContent) { note.style.display = "block"; note.textContent = ""; }
 					clearInterval(restartPoll); restartPoll = null;
 				} else if (h && h.finished) {
@@ -663,8 +664,8 @@
 					// 结果生成。所以这里也要看 finish_reason,不能只看 finished。
 					document.getElementById("sim-status-text").textContent =
 						h.finish_reason === "review_only"
-							? "仅审阅模式:没有在推演(右栏可翻结果记录)"
-							: "推演已结束,结果生成中…(稍后出现“重开一局”)";
+							? "Review mode: no simulation is running; browse records on the right."
+							: "Simulation finished. Generating results; Start New Run will appear shortly.";
 				}
 			}).catch(function() { /* 网络抖动:下一次再问 */ });
 		}, 3000);
@@ -682,7 +683,7 @@
 			payload[id] = sels[i].value;
 		}
 		if (box) box.style.pointerEvents = "none";
-		if (btn) { btn.disabled = true; btn.textContent = "正在重开…"; }
+		if (btn) { btn.disabled = true; btn.textContent = "Starting new run…"; }
 		fetch("/control/restart", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -694,22 +695,22 @@
 					// 受理即**收起按钮**(用户:"既然重开了一次,重开按钮就应该被禁用"):
 					// 不靠 800ms 后的刷新兜底 —— 刷新前这段时间也不能再点。
 					if (box) { box.style.display = "none"; box.style.pointerEvents = ""; }
-					if (note) { note.style.display = "block"; note.textContent = "已重开,页面即将刷新…"; }
-					devLog("sys", "重开已受理:" + (d.detail || d.run_id || ""));
+					if (note) { note.style.display = "block"; note.textContent = "New run started; refreshing the page…"; }
+					devLog("sys", "Restart accepted: " + (d.detail || d.run_id || ""));
 					setTimeout(function() { location.reload(); }, 800);
 				} else {
-					var msg = (d && (d.error || d.detail)) || "未知原因";
-					if (note) { note.style.display = "block"; note.textContent = "重开失败:" + msg; }
-					devLog("error", "重开失败:" + msg);
+					var msg = (d && (d.error || d.detail)) || "Unknown reason";
+					if (note) { note.style.display = "block"; note.textContent = "Restart failed: " + msg; }
+					devLog("error", "Restart failed: " + msg);
 					if (box) box.style.pointerEvents = "";
-					if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
+					if (btn) { btn.disabled = false; btn.textContent = "Start New Run"; }
 				}
 			})
 			.catch(function(e) {
-				if (note) { note.style.display = "block"; note.textContent = "重开请求失败:" + e.message; }
-				devLog("error", "重开请求失败:" + e.message);
+				if (note) { note.style.display = "block"; note.textContent = "Restart request failed: " + e.message; }
+				devLog("error", "Restart request failed: " + e.message);
 				if (box) box.style.pointerEvents = "";
-				if (btn) { btn.disabled = false; btn.textContent = "重开一局"; }
+				if (btn) { btn.disabled = false; btn.textContent = "Start New Run"; }
 			});
 	}
 
@@ -736,18 +737,18 @@
 		let sse_state = "connecting";
 		let lastMsgTs = Date.now();  // 最后收到消息的时间(服务端每 5 秒发心跳)
 		let sim_running = false;     // 是否已经收到过推演数据(区别于"连上了但还没开始")
-		setSimStatus("connecting", "连接中…");
+		setSimStatus("connecting", "Connecting…");
 		let ws = new WebSocket("ws://" + location.host + "/ws");
-		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); setSimStatus("connecting", "已连接,等待推演数据…"); };
-		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setSimStatus("error", "连接已断开,3 秒后重连…"); setTimeout(function() { location.reload(); }, 3000); };
-		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); setSimStatus("error", "连接出错"); };
+		ws.onopen = function() { sse_state = "connected"; devLog("sys", "WebSocket connected"); setSimStatus("connecting", "Connected; waiting for simulation data…"); };
+		ws.onclose = function() { sse_state = "error"; devLog("sys", "WebSocket closed, reconnecting in 3s"); setSimStatus("error", "Connection lost; reconnecting in 3 seconds…"); setTimeout(function() { location.reload(); }, 3000); };
+		ws.onerror = function() { sse_state = "error"; devLog("sys", "WebSocket error"); setSimStatus("error", "Connection error"); };
 		// (WebSocket disconnect is handled by onclose: reload page after 3s to reconnect)
 		ws.onmessage = function(e) {
 			lastMsgTs = Date.now();  // 任意消息(含心跳)都视为连接健康
 			const msg = JSON.parse(e.data);
 			if (msg.type === "agent") {
 				var isAI = msg.role_type === "ai_tool";
-				if (!sim_running) { sim_running = true; setSimStatus("running", "推演进行中"); }
+				if (!sim_running) { sim_running = true; setSimStatus("running", "Simulation running"); }
 				// 场景驱动仅在 scene/独立页执行;面板模式只消费倾向数据
 				if (wantScene) {
 					devLog(isAI ? "ai" : "agent", (isAI ? "[AI] " : "") + msg.name + " → " + (msg.action || "").slice(0, 30) + " @ " + JSON.stringify(msg.coord));
@@ -2764,4 +2765,3 @@
 		});
 	});
 </script>
-

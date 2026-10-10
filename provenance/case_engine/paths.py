@@ -77,7 +77,7 @@ def data_root(kind: str, *, env_var: str = "", what: str = "") -> str:
         if raw:
             return require_abs_path(raw, what=what or env_var)
     if kind not in DATA_KINDS:
-        raise KeyError("未知数据根 {!r};可用:{}".format(kind, sorted(DATA_KINDS)))
+        raise KeyError("Unknown data root {!r}; available roots: {}".format(kind, sorted(DATA_KINDS)))
     new_rel, old_rel = DATA_KINDS[kind]
     new = os.path.join(REPO_ROOT, *new_rel.split("/"))
     old = os.path.join(PKG_ROOT, *old_rel.split("/"))
@@ -87,8 +87,9 @@ def data_root(kind: str, *, env_var: str = "", what: str = "") -> str:
         if kind not in _warned:
             _warned.add(kind)
             sys.stderr.write(
-                "[data_root] {} 还在老位置 {} —— 请按 docs/仓库布局说明.md 迁移到 {}。"
-                "本次已用老位置继续。\n".format(kind, old, new))
+                "[data_root] {} remains at the legacy path {}. Move it to {} "
+                "as described in the repository layout guide. Continuing with the legacy path.\n"
+                .format(kind, old, new))
         return old
     return new
 

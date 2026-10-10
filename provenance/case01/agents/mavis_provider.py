@@ -62,7 +62,7 @@ def _env_seed():
     try:
         return int(text)
     except ValueError:
-        print("[case01.llm] CASE01_LLM_SEED 不是整数,按未设处理:{!r}".format(text), flush=True)
+        print("[case01.llm] CASE01_LLM_SEED is not an integer; ignoring it: {!r}".format(text), flush=True)
         return None
 
 
@@ -156,16 +156,16 @@ class Case01SafeProvider:
             # mavis 的 failsafe 里存着 "X 说的话没有得到回应" / "X 进行了一次对话"
             # 这种**看起来完全正常**的句子 —— 落到记录里就等于凭空造了一句话。
             # 宁缺毋造:这些调用点失败就让上层知道(对话轮空),不拿兜底值充数。
-            print(_red("[case01.llm] !! 调用点 {} 命中兜底值,按宁缺毋造**拒绝返回**"
-                       "(不写进产物): failsafe={!r}".format(caller, failsafe)),
+            print(_red("[case01.llm] Fallback reached at {}. Refusing to return fabricated dialogue: "
+                       "failsafe={!r}".format(caller, failsafe)),
                   flush=True)
             raise RuntimeError(
-                "{} 调用失败且该调用点禁用兜底值(不静默造假)".format(caller))
+                "{} failed and its fallback is disabled to avoid fabricated output".format(caller))
         if result is None:
             # 2026-10-10 用户要求"不允许静默处理":走到兜底值必须喊出来 ——
             # 兜底值(如字符串"嗯")会被当成模型的话显示/入库,静默就是造假。
-            print(_red("[case01.llm] !! 全部尝试失败,返回**兜底值**(不是模型说的):"
-                       " caller={} failsafe={!r} 累计={} 次".format(
+            print(_red("[case01.llm] All attempts failed. Returning a fallback, not model output:"
+                       " caller={} failsafe={!r} count={}".format(
                            caller, failsafe, self.summary["total"][2])),
                   flush=True)
             return failsafe
@@ -247,9 +247,9 @@ class Case01SafeProvider:
         # 端点能力差异不能悄悄吞掉。
         if response.status_code == 400 and response_format:
             self._response_format_supported = False
-            print(_red("[case01.llm] !! 端点拒绝 response_format={} (HTTP 400),"
-                       "降级为不带 response_format 重试一次(已记住该端点不支持)。"
-                       "端点原文: {}".format(
+            print(_red("[case01.llm] Endpoint rejected response_format={} (HTTP 400). "
+                       "Retrying once without it and caching the limitation. "
+                       "Endpoint response: {}".format(
                            response_format.get("type"),
                            (response.text or "")[:200])),
                   flush=True)
@@ -269,8 +269,8 @@ class Case01SafeProvider:
         if choice.get("finish_reason") == "length":
             self.truncations += 1
             self.last_truncation = {"caller": caller, "max_tokens": int(max_tokens)}
-            print("[case01.llm] 输出被 max_tokens 截断: caller={} max_tokens={} "
-                  "累计={} 次".format(caller, max_tokens, self.truncations), flush=True)
+            print("[case01.llm] Output truncated by max_tokens: caller={} max_tokens={} "
+                  "count={}".format(caller, max_tokens, self.truncations), flush=True)
         return choice["message"]["content"]
 
     def _token_limit(self, caller, return_type):
