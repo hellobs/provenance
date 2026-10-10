@@ -424,6 +424,23 @@ class MavisBridge:
                                 judge_llm=self.judge_llm,
                                 backend_kind=self.backend_kind,
                                 llms=town or None)
+        # 兜底值统计(2026-10-10 用户:"还有哪些地方出现 failsafe!!!"):
+        # mavis 的 prompt 库里有 20+ 处 failsafe,命中时会返回**看起来正常的一句话**
+        # ("X 说的话没有得到回应" / "X 进行了一次对话"),落进产物就等于凭空造话。
+        # 这里按调用点把命中次数汇总进清单 —— 兜底不再是看不见的事。
+        _fs = {}
+        for _c in list(town.values()) + ([self.judge_llm] if self.judge_llm else []):
+            for _k, _v in (getattr(_c, "summary", None) or {}).items():
+                if isinstance(_v, list) and len(_v) >= 3 and _v[2]:
+                    _fs[_k] = _fs.get(_k, 0) + int(_v[2])
+        meta["failsafe_by_caller"] = _fs
+        meta["failsafe_total"] = sum(_fs.values())
+        if _fs:
+            msg = ("本次运行有 {} 次调用落到兜底值(不是模型说的): {}".format(
+                meta["failsafe_total"],
+                ", ".join("{}={}".format(k, v) for k, v in sorted(_fs.items()))))
+            meta.setdefault("warnings", []).append(msg)
+            print("[case01] [warn] " + msg, flush=True)
         self._manifest_meta_cache = (key, dict(meta))
         return meta
 

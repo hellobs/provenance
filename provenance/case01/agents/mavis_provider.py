@@ -69,6 +69,13 @@ class Case01SafeProvider:
         self.enabled = True
         # 端点不支持 response_format 而降级的次数(运行清单里要能查)
         self.response_format_downgrades = 0
+        # 这些调用点**禁用兜底值**:失败就报错,不用 failsafe 充数
+        # (它们的 failsafe 是"看起来正常的一句话",会污染对话/记录)。
+        # 可用 think.llm.forbid_failsafe 覆盖;设 "__never__" 可关掉这个保护。
+        _forbid = self.config.get("forbid_failsafe",
+                                  ["generate_chat", "generate_chat_check_repeat"])
+        self.forbid_failsafe_callers = set(
+            x for x in _forbid if x and x != "__never__")
         self.summary = {"total": [0, 0, 0]}
         # 截断计数(finish_reason == "length"):截断的输出与完整输出长得一模一样,
         # 记进 summary 才会出现在 mavis 的角色日志/state 里,而不是只有天知道。
@@ -112,6 +119,15 @@ class Case01SafeProvider:
         index = 2 if result is None else 1
         self.summary["total"][index] += 1
         self.summary[caller][index] += 1
+        if result is None and caller in self.forbid_failsafe_callers:
+            # 2026-10-10 用户要求"不允许静默处理",而且对话类兜底最恶劣:
+            # mavis 的 failsafe 里存着 "X 说的话没有得到回应" / "X 进行了一次对话"
+            # 这种**看起来完全正常**的句子 —— 落到记录里就等于凭空造了一句话。
+            # 宁缺毋造:这些调用点失败就让上层知道(对话轮空),不拿兜底值充数。
+            print("[case01.llm] !! 调用点 {} 命中兜底值,按宁缺毋造**拒绝返回**"
+                  "(不写进产物): failsafe={!r}".format(caller, failsafe), flush=True)
+            raise RuntimeError(
+                "{} 调用失败且该调用点禁用兜底值(不静默造假)".format(caller))
         if result is None:
             # 2026-10-10 用户要求"不允许静默处理":走到兜底值必须喊出来 ——
             # 兜底值(如字符串"嗯")会被当成模型的话显示/入库,静默就是造假。
