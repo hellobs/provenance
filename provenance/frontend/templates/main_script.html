@@ -929,6 +929,24 @@
 		//  3) agent hitbox 之间的分离 —— 移动前检查目标格被他角色占据则不推进。
 		let step_px = 0.8 * (delta || 16.67) / 16.67;   // constant ~48px/s ≈ 1.5 tiles/s
 		let agents = Object.keys(personas);
+
+		// 下一格是不是站着**别人**(2026-10-10 用户:"又出现一个人像推箱子一样把另外
+		// 一个推着走了!!!不允许,前者那个人就应该直接停下来或则 BFS 换条路")。
+		// 站着 ⇒ **本帧不推进**(位置不动、也不播走路动画)。
+		// 已经和对方同格的不算"挡路" —— 那种是两人本来就站在一起,不是挡在路中间。
+		function otherOnTile(self, tx, ty) {
+			let my = personas[self].body;
+			let mtx = Math.floor(my.x / tile_width), mty = Math.floor(my.y / tile_width);
+			for (let i = 0; i < agents.length; i++) {
+				let n = agents[i];
+				if (n === self) continue;
+				let b = personas[n].body;
+				let ox = Math.floor(b.x / tile_width), oy = Math.floor(b.y / tile_width);
+				if (ox === mtx && oy === mty) continue;      // 已经同格
+				if (ox === tx && oy === ty) return true;
+			}
+			return false;
+		}
 		for (let i = 0; i < agents.length; i++) {
 			let curr_persona_name = agents[i];
 			let curr_persona = personas[curr_persona_name];
@@ -989,15 +1007,21 @@
 				// 这一帧可能只动了纵轴,若还按 dx 判成横向,画面就是"头朝左、人往下走"。
 				let moved_axis = "";   // "" | "x" | "y"
 				if (axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
-				    !tileWall(cx + move_x * step_px, cy)) {
+				    !tileWall(cx + move_x * step_px, cy) &&
+				    !otherOnTile(curr_persona_name, Math.floor((cx + move_x * step_px) / tile_width),
+				                                Math.floor(cy / tile_width))) {
 					curr_persona.body.x += move_x * step_px;
 					moved_axis = "x";
 				} else if (move_y !== 0 && Math.abs(dy) >= step_px &&
-				           !tileWall(cx, cy + move_y * step_px)) {
+				           !tileWall(cx, cy + move_y * step_px) &&
+				           !otherOnTile(curr_persona_name, Math.floor(cx / tile_width),
+				                               Math.floor((cy + move_y * step_px) / tile_width))) {
 					curr_persona.body.y += move_y * step_px;
 					moved_axis = "y";
 				} else if (!axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
-				           !tileWall(cx + move_x * step_px, cy)) {
+				           !tileWall(cx + move_x * step_px, cy) &&
+				           !otherOnTile(curr_persona_name, Math.floor((cx + move_x * step_px) / tile_width),
+				                                       Math.floor(cy / tile_width))) {
 					curr_persona.body.x += move_x * step_px;
 					moved_axis = "x";
 				}
@@ -1028,18 +1052,16 @@
 			}
 		}
 
-		// ---- agent 间分离:hitbox 重叠时,把其中一个沿最短轴推开,避免两角色叠在同一格 ----
+		// ---- agent 间分离:**只用于把两个"都停着"的角色错开**,绝不碰正在走的角色 ----
 		// (persona body 30x40;两角色中心到中心的最小水平/垂直避让,只推"没被墙挡住"的方向)
 		//
-		// 谁让位(2026-10-10 修):**没在走的那个让在走的那个**,而且**两个都在走时谁也不推**。
-		// 原来固定推数组里靠前的那一个 —— 它若正在走,每帧 0.8px 的前进会被推离**原样推回**
-		// (净位移 0、位置不动而走路动画照播);若推离幅度比步长大(两人一前一后隔 1~2 格
-		// 同向走同一格时正是如此),净位移变负 ⇒ **人物反过来走**。这两种正是用户反馈的
-		// "有走路但被前面的人挡住,一直在同一个地方走"。让停住的那个让路就没有这个问题:
-		// 它没有目标可争,被推走后是稳定的;两个都在走就都别推,让各自走到自己的目标。
-		// 两人都在走或都停着时,仍按原来的"靠前的先让"。
-		const SEP_STEP_MAX = 8;   // 让位每帧最多挪 8px:远大于行走步长(0.8px),保证一定让得开;
-		                          // 又不至于在到位那一帧"啪"地弹开一整格(实测很扎眼)
+		// 为什么这么严(2026-10-10 用户:"又出现一个人像推箱子一样把另外一个人推着走了!!!
+		// 不允许,前者那个人就应该直接停下来或则 BFS 换条路"):
+		//   走的人一格都不许碰别人 —— 下一格站着人就**停下**(见上面的 `otherOnTile`),
+		//   推人的动作一律没有。所以只要有任一方还在走,这里直接跳过。
+		//   真正需要"分开"的只有一种:两个都停着却叠在了一起(例如同一节点被摆到同一格),
+		//   那时把靠前的那个挪开一点点,谁也没有在走路,不存在推。
+		const SEP_STEP_MAX = 8;   // 让位每帧最多挪 8px:避免在到位那一帧"啪"地弹开一整格
 		for (let a = 0; a < agents.length; a++) {
 			let A = personas[agents[a]];
 			for (let b = a + 1; b < agents.length; b++) {
@@ -1050,11 +1072,9 @@
 				let overY = hy - Math.abs(A.body.y - B.body.y);
 				if (overX > 0 && overY > 0) {
 					let qa = movement_target[agents[a]], qb = movement_target[agents[b]];
-					let aMoving = !!(qa && qa.length), bMoving = !!(qb && qb.length);
-					if (aMoving && bMoving) continue;      // 两个都在走 → 谁也别推
-					let push_A = !aMoving;                 // 谁在走就推另一个;都不走推靠前的
-					let pushee = push_A ? A : B;
-					let anchor = push_A ? B : A;
+					// 只要有人在走就一个都不动 —— 绝不推人
+					if ((qa && qa.length) || (qb && qb.length)) continue;
+					let pushee = A, anchor = B;
 					// 选择要分离的轴:重叠侵入更小者优先推开(最少位移);每帧上限 SEP_STEP_MAX
 					if (overX <= overY) {
 						let step = Math.min(overX, SEP_STEP_MAX);
@@ -1081,13 +1101,18 @@
 
 	// ---- 气泡定位 + 避让(独立函数:模拟结束后也要跑,见 update 里的调用) ----
 	// 锚点 origin(0.5,1):(x, y) 是气泡**底边中点**;包围盒 = [x-w/2, x+w/2] × [y-h, y]。
-	// 三条约束(2026-10-09/10 用户要求"气泡框一定要在人的上面,不要遮挡人"):
-	//   1) 底边贴在自己头顶之上(留 BUBBLE_GAP);
-	//   2) **不得压住任何一个角色**。两个人挨着站时,下面那位的对话气泡会正好盖住
-	//      上面那个人的身子 —— 实测:下方角色气泡占 y 188~230,压住上方角色 204~244,
-	//      画面上就是"气泡挡住了一个人"。所以避让对象不只是气泡,还包括所有角色的绘制范围;
-	//   3) 气泡之间不重叠。两个都在头顶就撞上时**先左右分开**(按说话先后从左到右排),
-	//      分不开才往上叠(见下面 ①②)。
+	// 两条约束(2026-10-09/10 用户要求):
+	//   1) **不得压住任何一个角色**。两个人挨着站时,下面那位的对话气泡会正好盖住
+	//      上面那个人的身子 —— 实测:下方角色气泡占 y 188~230,压住上方角色 204~244。
+	//      所以避让对象不只是气泡,还包括所有角色的绘制范围;
+	//   2) 气泡之间不重叠。
+	// **摆位策略**(2026-10-10 用户:"如果一定要在上方的话,Ethan 的话直接飘到 AI 去了,
+	// 我还是不再苛刻要求一定在上方,但是尽可能要在偏上方的位置"):
+	//   先落在**本人正上方**;撞到人/撞到别的气泡时,**先左右挪**(挪到"偏上方"的斜位),
+	//   而且是**一步就挪到刚好不撞**的最小位移;左右都挪不开才往上抬。
+	//   严格"必须正上方"会把下面那个人的气泡一路抬到上面那个人头上,离本人很远 ——
+	//   宁可偏一点,也要留在本人附近。
+	// 排序用"说话序号":从左往右读就是聊天次序(用户:"Ethan 说完之后 AI 才说")。
 	// (BUBBLE_GAP / BUBBLE_STACK_GAP 两个常量与其它气泡常量放在一起,见文件上方。)
 
 	// 相交判定:气泡用"底边中点 + 宽高",角色/另一气泡用普通左上角矩形。
@@ -1114,56 +1139,62 @@
 			// (padding + borderRadius),于是开局每个角色头顶都挂着一枚空黄条
 			// (2026-10-10 用户反馈"文字为空的时候,不应该有显示")。
 			t.setVisible(!!t.text);
-			t.x = chars[i].x + chars[i].w / 2;      // 正上方:对准角色**绘制**的中线
+			t.x = chars[i].x + chars[i].w / 2;      // 基线:本人正上方,对准绘制中线
 			t.y = chars[i].y - BUBBLE_GAP;          // 底边贴住头顶
 			if (!t.text) continue;
 			bubbles.push({ name: names[i], x: t.x, y: t.y, w: t.width, h: t.height,
-			               seq: bubble_seq[names[i]] || 0 });
+			               seq: bubble_seq[names[i]] || 0, box: null, kind: null });
 		}
-		// ---- ① 左右分开(2026-10-10 用户反馈"这两个框就不会左右撇开吗")----
-		// 两个人上下相邻时,两个气泡都居中在角色头顶,只能靠上下堆叠解决 ——
-		// 画面上就成了"一个人头顶两段话",而且下面那段必然压到上面那个人。
-		// 这里改成:**只有真的撞上了才左右分开**,各让一半。
-		// 排序用"说话序号"而不是位置:先说的靠左、后说的靠右 ⇒ **从左往右读
-		// 就是聊天次序**(用户要求"Ethan 说完之后 AI 才说,注意聊天次序")。
-		let byTalk = bubbles.slice().sort((a, b) => (a.seq || 1e9) - (b.seq || 1e9) || a.x - b.x);
-		for (let i = 1; i < byTalk.length; i++) {
-			let prev = byTalk[i - 1], cur = byTalk[i];
-			// 只在"上下也压着"的时候才需要分开;各自头顶上方互不重叠就保持原位
-			if (cur.y <= prev.y - prev.h || cur.y - cur.h >= prev.y) continue;
-			let need = (prev.w + cur.w) / 2 + BUBBLE_STACK_GAP - (cur.x - prev.x);
-			if (need > 0) {
-				prev.x -= need / 2;
-				cur.x += need / 2;
+		// 从左到右 = 说话先后(用户:"注意聊天次序")。先说的先摆,后说的往后让。
+		bubbles.sort((a, b) => (a.seq || 1e9) - (b.seq || 1e9) || a.x - b.x);
+
+		// 已摆好的框(既是避让对象,也保证彼此不重叠)
+		let placed = [];
+		// 撞上了谁:角色 → {box, kind:'char'};已摆好的气泡 → {box, kind:'bubble'}
+		function firstHit(cur, x, y) {
+			for (let c = 0; c < chars.length; c++) {
+				if (_bubbleHitsBox(x, y, cur.w, cur.h, chars[c])) return { box: chars[c], kind: "char" };
 			}
+			for (let j = 0; j < placed.length; j++) {
+				let pv = placed[j];
+				if (_bubbleHitsBox(x, y, cur.w, cur.h,
+				                   { x: pv.x - pv.w / 2, y: pv.y - pv.h, w: pv.w, h: pv.h })) {
+					return { box: { x: pv.x - pv.w / 2, y: pv.y - pv.h, w: pv.w, h: pv.h },
+					         kind: "bubble" };
+				}
+			}
+			return null;
 		}
-		// ---- ② 上下避让:压到角色就抬上去 ----
-		// 自下而上摆(最靠下的先钉住);抬起只减小 y、不改尺寸 ⇒ 每轮严格变小,
-		// 有限步内收敛,不会来回抖。
-		bubbles.sort((a, b) => b.y - a.y || a.x - b.x);
+
 		for (let i = 0; i < bubbles.length; i++) {
 			let cur = bubbles[i];
-			for (let guard = 0; guard < chars.length + bubbles.length + 2; guard++) {
-				let lifted = false;
-				for (let c = 0; c < chars.length; c++) {
-					if (_bubbleHitsBox(cur.x, cur.y, cur.w, cur.h, chars[c])) {
-						cur.y = chars[c].y - BUBBLE_GAP;
-						lifted = true;
+			// 横向只让一次(让完就锁定方向),此后只往上抬 ⇒ x 至多变一次、y 单调变小,
+			// 有限步必然收敛,不会在"往右 / 往左"之间来回抖。
+			let triedSideways = false;
+			for (let guard = 0; guard < 2 * (chars.length + placed.length) + 4; guard++) {
+				let hit = firstHit(cur, cur.x, cur.y);
+				if (!hit) break;
+				let moved = false;
+				if (!triedSideways) {
+					// 刚好**整块错开**所需的左右位移(不是"刚好不再相交"——
+					// 两个框几乎重在一起时后者算出来是负数,会误判成"不用让"而直接上抬,
+					// 结果后说话的人反而压在上面)。撞的是"已摆好的气泡"时优先往右,
+					// 保住"先说的在左、后说的在右"的阅读次序。
+					let needR = (hit.box.x + hit.box.w) + BUBBLE_STACK_GAP - (cur.x - cur.w / 2);
+					let needL = (cur.x + cur.w / 2) - (hit.box.x - BUBBLE_STACK_GAP);
+					if (needR > 0.01 && (hit.kind === "bubble" || needL <= 0.01 || needR <= needL)) {
+						if (!firstHit(cur, cur.x + needR, cur.y)) { cur.x += needR; moved = true; }
 					}
-				}
-				for (let j = 0; j < i; j++) {
-					let prev = bubbles[j];
-					if (_bubbleHitsBox(cur.x, cur.y, cur.w, cur.h,
-					                   { x: prev.x - prev.w / 2, y: prev.y - prev.h,
-					                     w: prev.w, h: prev.h })) {
-						cur.y = prev.y - prev.h - BUBBLE_STACK_GAP;
-						lifted = true;
+					if (!moved && needL > 0.01 && hit.kind !== "bubble") {
+						if (!firstHit(cur, cur.x - needL, cur.y)) { cur.x -= needL; moved = true; }
 					}
+					if (moved) triedSideways = true;
 				}
-				if (!lifted) break;
+				if (!moved) cur.y = hit.box.y - BUBBLE_GAP;   // 左右都挪不开 → 抬到它上方
 			}
+			placed.push(cur);
 		}
-		// 写回(x 在 ① 里改过,y 在 ② 里改过)
+		// 写回
 		for (let i = 0; i < bubbles.length; i++) {
 			pronunciatios[bubbles[i].name].x = bubbles[i].x;
 			pronunciatios[bubbles[i].name].y = bubbles[i].y;
