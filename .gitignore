@@ -262,5 +262,5 @@ provenance/case01/data/*
 !provenance/case01/data/financial_sources/
 
 # case01 本地私密配置(Ethan 外部 API 密钥等)——绝不进仓库
-case01.env.local
-provenance/case01.env.local
+case01.local.cmd
+provenance/case01.local.cmd
