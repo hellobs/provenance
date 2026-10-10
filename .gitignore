@@ -264,3 +264,8 @@ provenance/case01/data/*
 # case01 本地私密配置(Ethan 外部 API 密钥等)——绝不进仓库
 case01.local.cmd
 provenance/case01.local.cmd
+
+# GTC 赛题材料(不在本仓版本控制范围内)。此前只"未跟踪、未忽略" ⇒ 永远挂在
+# git status 上,一次 `git add -A` 就会扫进提交;现在两个会话并行写同一个工作树,
+# 这个风险是活的。(2026-10-10 用户要求)
+/GTC/
