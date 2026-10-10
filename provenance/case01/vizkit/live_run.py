@@ -431,7 +431,10 @@ def main(argv=None):
                     print("收到重开请求,开始新的一局")
                 else:
                     break
-            print("重开:开始新的一局(分支 {})".format(branch))
+            # 分支由 AI 的 T0 回答判定(2026-10-10 剔除预设分支后不再有 branch 变量;
+            # 这一行原先 print(…分支 {})，只在**服务关闭那一刻**才会执行到 ——
+            # 所以之前一直没暴露,直到用户关窗口才炸 NameError)。
+            print("本局结束(分支由 AI 的 T0 回答判定,见上面打印的 source=judge)")
     finally:
         live.close()      # 进程要退出了:现在才关服务本身
         clear_live()      # 别让面板一直显示一个已经不动的"实时"
