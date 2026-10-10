@@ -41,7 +41,7 @@
 用法(在 `provenance/provenance` 下执行)
 --------------------------------------
     python live_switch.py --status
-    python live_switch.py --start case01 [--nodes 2] [--hold 1800] [--branch B] [--no-map]
+    python live_switch.py --start case01 [--nodes 2] [--hold 1800] [--no-map]
     python live_switch.py --start case01 --review-only     # 不推演,只翻成品记录
     python live_switch.py --start case00 [--stride 2]
     python live_switch.py --stop case01 | case00 | all
@@ -448,14 +448,13 @@ def start(case, args):
             # 每跑一次就该有一个记录,而且名字带**真实日期时刻**:这里统一生成,
             # 落盘路径也按它派生,并把后续映射命令打出来——免得手抄长命令时把名字写岔
             # (名字写岔会让 5002 与结果面板对同一条记录显示两个名字,实测踩过)。
-            # judge 模式下分支要等 T0 跑完才定,名字里就不该写一个假的分支字母(用 auto);
+            # 分支要等 T0 跑完才判出来,名字里就不该写一个假的分支字母(用 auto);
             # 重开一局时循环里现铸的名字也走同一套口径(见 live_run.py)。
-            run_id = args.run_id or live_run_id("auto" if args.branch_mode == "judge" else args.branch)
+            run_id = args.run_id or live_run_id("auto")
             # 2026-10-08:原始记录的家挪到仓根 `data/case01/raw/`(搬迁期新优先、老回落并出声)。
             out = args.out or os.path.join(data_root("case01.raw"), run_id, "raw.json")
             _warn_overwrite(args.run_id, run_id, out)
-            cmd = [sys.executable, "-m", "case01.vizkit.live_run", "--branch", args.branch,
-                   "--branch-mode", args.branch_mode,
+            cmd = [sys.executable, "-m", "case01.vizkit.live_run",
                    "--host", args.host,
                    "--port", str(LIVE["case01"]), "--hold", str(args.hold),
                    "--run-id", run_id, "--out", out]
@@ -515,8 +514,8 @@ def start(case, args):
         print("  原始记录将落盘到: {}".format(out))
         final = os.path.join(records_root(), run_id, "run.json")
         print("  跑完自动映射成成品记录: {}".format(final))
-        print("    (手动等价命令: python -m case01.injector.pipeline --branch {} --run-id {}"
-              " --from-record {} --reflect --out {})".format(args.branch, run_id, out, final))
+        print("    (手动等价命令: python -m case01.injector.pipeline --run-id {}"
+              " --from-record {} --reflect --out {})".format(run_id, out, final))
 
     # 校验:进程活着 **且端口真绑上了**。只等端口不够——绑不上时进程还会继续跑模拟。
     bound = False
@@ -660,11 +659,6 @@ def main():
     ap.add_argument("--host", default=os.environ.get("LIVE_HOST", "127.0.0.1"),
                     help="实时面绑定地址:默认 127.0.0.1(只本机);平台侧跨机对接给 0.0.0.0")
     ap.add_argument("--hold", type=float, default=1800, help="case01:跑完保持服务的秒数")
-    ap.add_argument("--branch", default="B", help="case01:分支 A/B/C(judge 模式下仅作兜底)")
-    ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
-                    choices=["judge", "preset"],
-                    help="case01:judge=先跑 T0 再由 AI 的回答判定分支"
-                         "(0904doc 01 §六 的设计原意,默认);preset=分支由 --branch 指定")
     ap.add_argument("--out", default="", help="case01:原始记录落盘路径(默认按 run_id 派生到仓根 data/case01/raw/<run_id>/raw.json)")
     ap.add_argument("--run-id", default="", help="case01:显式指定 run_id(默认 <YYMMDD>-live-case01-mavis-<分支>-<HHMM>)")
     ap.add_argument("--seed", default="",

@@ -19,8 +19,7 @@ import pytest
 from case01.atomicio import atomic_write_text
 from case01.injector.manifest import (
     MANIFEST_VERSION, REQUIRED_KEYS, attach_manifest, build_manifest,
-    collect_run_meta, file_sha256, sha256_12, text_sha256,
-)
+    collect_run_meta, file_sha256, sha256_12, text_sha256)
 from case01.injector.pipeline import run_pipeline
 
 
@@ -41,7 +40,7 @@ def _judge_kind(**kw):
     return collect_run_meta({}, **kw)["judge"]
 
 
-def _raw_record(branch="B", branch_mode="preset", **extra):
+def _raw_record( **extra):
     raw = {"schema_version": "injector-0.1", "run_id": "m-1", "mode": "mavis",
            "branch": branch, "branch_mode": branch_mode, "roles": [],
            "nodes": [{"node_id": "node-1", "date": "2026-08-27", "step": 1,
@@ -58,7 +57,7 @@ def _raw_record(branch="B", branch_mode="preset", **extra):
 def test_manifest_has_all_required_keys(tmp_path):
     """dry-run 落盘的记录里必须有完整的 manifest 段,键一个不缺。"""
     out = tmp_path / "run.json"
-    rec = run_pipeline(branch="B", dry_run=True, out_path=str(out))
+    rec = run_pipeline(dry_run=True, out_path=str(out))
     saved = json.load(open(out, encoding="utf-8"))
 
     assert isinstance(saved.get("manifest"), dict), "记录里必须有 manifest 段"
@@ -76,7 +75,7 @@ def test_manifest_has_all_required_keys(tmp_path):
 def test_manifest_written_before_reflection_and_survives(tmp_path):
     """manifest 在写盘前挂好:接反思只补反思/路由,不许把清单冲掉。"""
     out = tmp_path / "run.json"
-    rec = run_pipeline(branch="B", dry_run=True, out_path=str(out))
+    rec = run_pipeline(dry_run=True, out_path=str(out))
     before = json.loads(json.dumps(rec["manifest"]))
     # 再挂一次(模拟"重跑 Router 又走了一遍 attach")→ 必须原样保留,不覆盖
     again = attach_manifest(rec, collect_run_meta({}))
@@ -174,7 +173,7 @@ def test_atomic_write_failure_keeps_old_content_and_no_temp_left(tmp_path):
 def test_pipeline_write_failure_does_not_clobber_existing_record(tmp_path, monkeypatch):
     """走完整 run_pipeline:落盘失败时,目标文件仍是上一次那条记录。"""
     out = tmp_path / "run.json"
-    good = run_pipeline(branch="B", dry_run=True, out_path=str(out))
+    good = run_pipeline(dry_run=True, out_path=str(out))
     before = out.read_text(encoding="utf-8")
 
     import case_engine.atomicio as atomicio
@@ -184,7 +183,7 @@ def test_pipeline_write_failure_does_not_clobber_existing_record(tmp_path, monke
 
     monkeypatch.setattr(atomicio.os, "replace", boom)
     with pytest.raises(OSError):
-        run_pipeline(branch="A", dry_run=True, out_path=str(out))
+        run_pipeline(dry_run=True, out_path=str(out))
 
     assert out.read_text(encoding="utf-8") == before
     assert json.load(open(out, encoding="utf-8"))["manifest"] == good["manifest"]
@@ -238,7 +237,7 @@ def test_judge_unknown_is_loud_not_silent():
 def test_judge_fields_flow_into_saved_record(tmp_path):
     """端到端:judge/api 与 rules 两种后端都如实进落盘记录。"""
     out_api = tmp_path / "api.json"
-    run_pipeline(branch="B", dry_run=True, out_path=str(out_api),
+    run_pipeline(dry_run=True, out_path=str(out_api),
                  judge_llm=FakeJudge("api", "some/model", temperature=0.25))
     m_api = json.load(open(out_api, encoding="utf-8"))["manifest"]
     assert m_api["judge"] == "api"
@@ -246,32 +245,11 @@ def test_judge_fields_flow_into_saved_record(tmp_path):
     assert m_api["temperature"]["judge"] == 0.25
 
     out_rules = tmp_path / "rules.json"
-    run_pipeline(branch="B", dry_run=True, out_path=str(out_rules),
+    run_pipeline(dry_run=True, out_path=str(out_rules),
                  judge_backend_kind="rules")
     m_rules = json.load(open(out_rules, encoding="utf-8"))["manifest"]
     assert m_rules["judge"] == "rules"
     assert m_rules["judge_model"] is None
-
-
-def test_branch_mode_and_judge_prompt_version_recorded(tmp_path):
-    """branch_mode 如实;judge_prompt_version 是判定提示词的 12 位哈希。"""
-    rec = run_pipeline(branch="B", dry_run=True, branch_mode="judge")
-    assert rec["manifest"]["branch_mode"] == "judge"
-    v = rec["manifest"]["judge_prompt_version"]
-    assert isinstance(v, str) and len(v) == 12
-
-    from case01.world.branch import JUDGE_PROMPT_EN
-    assert rec["manifest"]["language"] == "en"
-    assert v == text_sha256(JUDGE_PROMPT_EN)[:12]
-    assert v == sha256_12(JUDGE_PROMPT_EN)
-
-    # 反思/路由提示词版本也记了
-    pv = rec["manifest"]["prompt_versions"]
-    assert len(pv.get("reflection", "")) == 12 and len(pv.get("router", "")) == 12
-    # 2026-10-09:scenario 的 branch 段整段删除(「分支判定」功能删除)⇒ 该字段已不存在,
-    # 不再记 scenario_branch_judge_field。判定提示词的真实版本由 branch_judge 提供(模块常量)。
-    assert pv.get("branch_judge"), "判定提示词的模块常量哈希要留痕"
-    assert "scenario_branch_judge_field" not in pv, "branch 段已删,不该再记该字段指纹"
 
 
 def test_prompt_hash_is_content_bound():

@@ -215,32 +215,9 @@ class TestOrchestratorCMonitor:
                 return s["state"]
         return None
 
-    def test_wait_trigger_fires_and_exits(self, tmp_path, monkeypatch):
-        llm = self._patch(monkeypatch, self.PLAN_TRIGGERED, tmp_path)
-        rec = run_case01(llm=llm, timeline="C", run_id="c-mon-fire")
-        d = rec.data
-        # 09-02 收盘 34.8 < 40 → 触发买入 0.3
-        s02 = self._snap(rec, "2026-09-02")
-        assert s02["hcm_shares"] is True
-        assert abs(s02["held_fraction"] - 0.3) < 1e-9
-        assert abs(s02["entry_price_usd"] - 34.8) < 1e-9
-        # 09-07 退出(与 A 同一退出规则)
-        s07 = self._snap(rec, "2026-09-07")
-        assert s07["exited"] is True
-        # 现金 = 70% 保留 + 30%*(27.4/34.8)
-        expect = 200_000 * 0.7 + 60_000 * (27.4 / 34.8)
-        assert abs(s07["cash_rmb"] - expect) < 5.0
-        # 监测日志
-        mon = d["condition_monitor"]
-        assert [m["fired"] for m in mon] == [False, False, True]
-        checks = [a for a in d["audit"] if a["action"] == "condition_check"]
-        assert len(checks) == 3
-        # 最终状态现金一致
-        assert abs(self._snap(rec, FINAL_DATE)["cash_rmb"] - expect) < 5.0
-
     def test_wait_never_fires(self, tmp_path, monkeypatch):
         llm = self._patch(monkeypatch, self.PLAN_NEVER, tmp_path)
-        rec = run_case01(llm=llm, timeline="C", run_id="c-mon-none")
+        rec = run_case01(llm=llm, run_id="c-mon-none")
         d = rec.data
         assert all(not m["fired"] for m in d["condition_monitor"])
         for s in d["state_history"]:

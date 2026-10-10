@@ -115,7 +115,7 @@ def test_all_keys_are_unique_for_platform_dedup(record):
 
 
 def test_blocked_and_safe_views(record):
-    record.update(branch="A", injector={"secret": True}, debug="truncated")
+    record.update(injector={"secret": True}, debug="truncated")
     out = build_review_package(record, "r1")
     assert out["status"] == "blocked"
     assert out["snapshot"] is None and not out["task_candidates"]

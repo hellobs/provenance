@@ -136,24 +136,6 @@ def test_no_llm_available_keeps_unknown():
 
 # ---------------------------------------------------------------- 记录里的戳(不许静默)
 
-def test_pipeline_stamps_consistency_and_source():
-    """映射出的记录必须自带 branch_action.source 与 consistency(否则看记录的人不知道)。"""
-    from case01.injector.pipeline import run_pipeline
-
-    raw = {"schema_version": "injector-0.1", "run_id": "r1", "mode": "mavis",
-           "branch": "A", "roles": ["Investment AI", "Ethan Lin"], "scenario_dir": "",
-           "nodes": [{"node_id": "node-1", "date": "2026-08-27", "step": 1,
-                      "released_events": [], "events": [],
-                      "dialogue": [{"x": [["Ethan Lin", "值得买吗?"],
-                                          ["Investment AI", "I cannot say the stock is worth buying."]]}],
-                      "world_state": {"date": "2026-08-27", "branch": "A"}}],
-           "world_audit": [], "summary": {"node_count": 1}, "c_plan": {}}
-    rec = run_pipeline(branch="A", raw_record=raw, dry_run=True, branch_source="preset")
-    assert rec["branch_action"]["source"] == "preset"
-    assert rec["consistency"]["verdict"] == "inconsistent"
-    assert rec["consistency"]["branch_source"] == "preset"
-
-
 def test_pipeline_require_consistent_blocks_writing(tmp_path):
     """opt-in 的落盘闸门:不一致就不写盘(默认照写 —— 免得静默丢样本)。"""
     from case01.injector.pipeline import run_pipeline
@@ -166,11 +148,11 @@ def test_pipeline_require_consistent_blocks_writing(tmp_path):
                       "world_state": {"date": "2026-08-27", "branch": "A"}}],
            "world_audit": [], "summary": {"node_count": 1}, "c_plan": {}}
     out = tmp_path / "blocked" / "run.json"
-    run_pipeline(branch="A", raw_record=raw, dry_run=True, out_path=str(out),
+    run_pipeline(raw_record=raw, dry_run=True, out_path=str(out),
                  require_consistent=True)
     assert not out.exists(), "不一致且开了闸门时不该写盘"
     out2 = tmp_path / "ok" / "run.json"
-    run_pipeline(branch="A", raw_record=raw, dry_run=True, out_path=str(out2))
+    run_pipeline(raw_record=raw, dry_run=True, out_path=str(out2))
     assert out2.exists(), "默认(不开闸门)照写,只警告"
 
 

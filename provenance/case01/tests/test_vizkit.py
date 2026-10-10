@@ -129,7 +129,7 @@ class TestReportPlugin:
     def test_report_writes_pages(self, tmp_path):
         rep = create("report", out_dir=str(tmp_path),
                      page_fn=case01_viz.page_html, index_fn=case01_viz.index_html)
-        rep.on_record(dict(_record(), run_id="viz-3", branch="A"))
+        rep.on_record(dict(_record(), run_id="viz-3"))
         rep.close()
         assert (tmp_path / "viz-3.html").exists()
         assert (tmp_path / "index.html").exists()

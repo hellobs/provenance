@@ -42,8 +42,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from case01.world.branch import (  # noqa: E402
-    PLAN_MAX_TOKENS, ConditionPlanParser,
-)
+    PLAN_MAX_TOKENS, ConditionPlanParser)
 from case01.consistency import attach_consistency  # noqa: E402
 from case01.reflection import run_router  # noqa: E402
 from case01.tools.batch_run import _failure_tail  # noqa: E402
@@ -200,7 +199,7 @@ def test_attach_consistency_keeps_existing_source():
     """已写好的 source 不能被默认值盖掉(judge 记录被标成 preset 是误标注)。"""
     rec = _record()
     rec["branch_action"]["source"] = "judge-failed"
-    out = attach_consistency(rec, branch_source="preset")
+    out = attach_consistency(rec, branch_source="judge")
     assert out["branch_action"]["source"] == "judge-failed"
 
 

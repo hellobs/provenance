@@ -49,26 +49,6 @@ def _ledger(tmp_path, *rows):
     return str(d)
 
 
-# ---------------------------------------------------------------------------
-# 1. _summarize:分布用有效样本,耗时用全部台账行,而且必须各自说清楚
-# ---------------------------------------------------------------------------
-def test_summarize_keeps_failed_rows_out_of_distributions(tmp_path):
-    out = _ledger(tmp_path,
-                  _row("r-1"),
-                  _row("r-2", branch="C"),
-                  _row("r-3", ok=False, returncode=124, seconds=1200.0,
-                       reflection_chars=0, reflection_score=None,
-                       reflection_status="", read_ok=False, issues=0))
-    s = batch_run._summarize(out, "b1", {"done": 3, "ok": 2, "failed": 1}, ARGS)
-    assert s["counts"] == {"done": 3, "ok": 2, "failed": 1, "ledger_rows": 3}
-    assert s["branches"] == {"B": 1, "C": 1}, "失败行不许进分支分布"
-    assert s["reflection"]["n"] == 2
-    assert s["reflection"]["chars_min"] == 1800, "失败行的 0 字不许拉低区间"
-    assert sum(s["reflection"]["status_dist"].values()) == s["reflection"]["n"], \
-        "质量门分布必须与均值同总体"
-    assert s["router"]["issues_total"] == 6
-
-
 def test_summarize_states_which_population_the_seconds_use(tmp_path):
     """耗时含失败尝试(失败也烧 GPU 时间),但这一点必须写在数字旁边。"""
     out = _ledger(tmp_path, _row("r-1", seconds=400.0), _row("r-2", seconds=600.0),

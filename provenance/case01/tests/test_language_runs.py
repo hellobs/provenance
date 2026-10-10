@@ -52,7 +52,7 @@ def test_english_role_uses_original_scene_settings():
 
 
 def test_raw_language_survives_mapping_and_manifest():
-    raw = run_pipeline(branch="B", dry_run=True)
+    raw = run_pipeline(dry_run=True)
     assert raw["language"] == "en"
     assert raw["injector"]["language"] == "en"
     assert raw["manifest"]["language"] == "en"
@@ -70,7 +70,7 @@ def test_raw_language_survives_mapping_and_manifest():
 
 
 def test_bridge_raw_record_manifest_has_language(tmp_path):
-    bridge = MavisBridge(nodes=default_nodes("B"), dry_run=True, branch="B")
+    bridge = MavisBridge(nodes=default_nodes("B"), dry_run=True)
     bridge.run()
     path = tmp_path / "raw.json"
     bridge.save(str(path))

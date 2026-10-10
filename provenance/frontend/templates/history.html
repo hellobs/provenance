@@ -77,6 +77,13 @@
   .tag.review { border-color: #9db6d0; color: #1f4e79; }
   .tag.checkpoint { border-color: #cbd5e1; color: #475569; }
   .tag.compressed { border-color: #d6cfc0; color: #6b5b3e; }
+  /* 质检标记按类型着色(API 仍给英文枚举,这里纯展示映射) */
+  .tag.q-ok { border-color: #9cc7a6; color: #1f6b34; background: #f2f9f3; }
+  .tag.q-unverified { border-color: #cbd5e1; color: #6b7280; background: #f9fafb; }
+  .tag.q-questionable { border-color: #e0b25c; color: #8a5a12; background: #fdf6e9; }
+  .tag.q-debug { border-color: #9db6d0; color: #1f4e79; background: #f1f6fb; }
+  .tag.q-deprecated { border-color: #c9a0a0; color: #8a2f2f; background: #fbf2f2; }
+  .tag.q-unreadable { border-color: #b9a080; color: #6b4e1e; background: #faf5ec; }
   .kv { display: flex; gap: 14px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
   .kv-k { flex: 0 0 116px; color: #6b7280; font-size: 12.5px; }
   .kv-v { flex: 1 1 auto; min-width: 0; color: #1f2933; font-size: 13px; overflow-wrap: anywhere; }
@@ -103,6 +110,11 @@
   {# 默认被质检排除的条数必须在这一页上说出来:本页拉的是不带 include_questionable 的
      /api/runs,标题那个"NNN 条历史记录"是**默认合格集**而不是全库数 ——
      只写"全库可浏览"会让看的人以为少掉的那些不存在。 #}
+  <div class="explore-sub" style="margin-top:-12px;">
+    <label style="display:inline-block;cursor:pointer;user-select:none;">
+      <input type="checkbox" id="explore-all"> 显示全部记录(含存疑/调试跑/已废弃/未落盘,<span id="explore-all-n">0</span> 条)
+    </label>
+  </div>
   <div class="explore-sub" id="explore-hidden" style="margin-top:-12px;"></div>
 
   <div class="explore-cols">
@@ -134,6 +146,22 @@
   }
   function tagCls(source) {
     return source === "review" ? "review" : source === "checkpoint" ? "checkpoint" : "compressed";
+  }
+  // 质检枚举(API 英文原值)→ 中文标签。定义口径以 live/history.py 的
+  // _HIDDEN_QUALITY 注释与 full_context.py 为准,改这里只改展示不改契约。
+  var QUALITY_LABEL = {
+    ok: "合格",
+    unverified: "未质检",
+    questionable: "存疑",
+    debug: "调试跑",
+    deprecated: "已废弃",
+    unreadable: "未落盘"
+  };
+  function qualityTag(q) {
+    if (!q) return "—";
+    var label = QUALITY_LABEL[q] || q;
+    return '<span class="tag q-' + esc(q) + '">' + label + '</span>' +
+           (QUALITY_LABEL[q] ? ' <span class="hint">' + esc(q) + '</span>' : "");
   }
 
   // 场景分组:先用 /api/runs 的 scenarios 初始化分组,再把 runs 归进所属场景。
@@ -185,11 +213,11 @@
       row("场景", esc(r.case_name || r.case_id || "—")) +
       row("运行方式", esc(r.engine_name || r.engine_id || "—")) +
       row("分支", esc(r.branch || "—")) +
-      row("质检标记", esc(r.quality || "—") +
+      row("质检标记", qualityTag(r.quality) +
           (r.quality && r.reason ? ' <span class="hint">' + esc(r.reason) + '</span>' : "")) +
       row("一致性", esc(r.consistency || "—") +
           (r.branch_source ? ' <span class="hint">分支来源 ' + esc(r.branch_source) + '</span>' : "")) +
-      row("复现指纹", manifestTxt) +
+      row("可复现情况", manifestTxt) +
       row("开始时间", esc(r.start_date || "—")) +
       row("结束时间", esc(r.end_date || "—")) +
       row("对话轮次", esc(r.n_turns != null ? r.n_turns : "—")) +
@@ -347,11 +375,15 @@
   }
 
   function renderMenu(res) {
+    menu.innerHTML = "";   // 切换"全部/合格"会重拉,先清空,避免两组菜单叠在一起
     var G = groupRuns(res.runs, res.scenarios);
     // 默认被排除的条数 + 数据源整块跳过,都要在这一页上看得见(两边都是"不静默"的约定)
     var hid = document.getElementById("explore-hidden");
+    var exAll = res.excluded || {};
+    var nSpan = document.getElementById("explore-all-n");
+    if (nSpan && exAll.count) { nSpan.textContent = exAll.count; }
     if (hid) {
-      var ex = res.excluded || {};
+      var ex = exAll;
       var txt = "";
       if (ex.count) {
         txt += '<span class="tag compressed">默认质检过滤</span> 另有 ' + ex.count +
@@ -395,8 +427,13 @@
       a.href = "javascript:void(0);";
       a.className = "mi";
       a.style.paddingLeft = "22px";
+      // 全量模式下只给默认会被过滤的四类贴标签(合格/未质检默认就在列表里,不贴省噪声)
+      var mini = ["questionable", "debug", "deprecated", "unreadable"].indexOf(r.quality) >= 0
+        ? ' <span class="tag q-' + esc(r.quality) + '" style="margin-left:4px;">' +
+          QUALITY_LABEL[r.quality] + '</span>' : "";
       a.innerHTML = '<span class="mi-tag ' + tagCls(r.source) + '">' + labelTxt(r.source) + '</span>' +
                     '<span class="mi-text" title="' + esc(r.run_id) + '">' + esc(r.run_id) + '</span>' +
+                    mini +
                     (r.n_turns ? '<span class="mi-n">' + r.n_turns + ' 轮</span>' : '');
       a.addEventListener("click", function () { clearActive(); a.classList.add("on"); renderDetail(r); });
       return a;
@@ -430,12 +467,19 @@
     menu.appendChild(doc);
   }
 
-  fetch("/api/runs", { cache: "no-store" })
-    .then(function (rsp) { return rsp.json(); })
-    .then(function (res) { renderMenu(res); })
-    .catch(function (err) {
-      showError("读取 /api/runs 失败: " + String(err && err.message || err));
-    });
+  function loadRuns() {
+    var all = document.getElementById("explore-all");
+    var url = "/api/runs" + (all && all.checked ? "?include_questionable=1" : "");
+    fetch(url, { cache: "no-store" })
+      .then(function (rsp) { return rsp.json(); })
+      .then(function (res) { renderMenu(res); })
+      .catch(function (err) {
+        showError("读取 /api/runs 失败: " + String(err && err.message || err));
+      });
+  }
+  var allBox = document.getElementById("explore-all");
+  if (allBox) { allBox.addEventListener("change", loadRuns); }
+  loadRuns();
 })();
 </script>
 {% endblock content %}

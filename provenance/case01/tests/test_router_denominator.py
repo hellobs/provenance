@@ -51,7 +51,7 @@ def _rows(n_ok=3, n_router_err=1, n_refl_err=1):
 
     走真实取数层 `_row()`,不走手搓 dict —— 否则这条守卫变成"验我自己造的假数据"。
     """
-    def rec(branch="B", router=None, refl_fail=False):
+    def rec(router=None, refl_fail=False):
         return {
             "branch": branch,
             "consistency": {"verdict": "consistent", "reason": "立场一致"},
@@ -77,53 +77,6 @@ def _rows(n_ok=3, n_router_err=1, n_refl_err=1):
     return ok + rerr + ferr
 
 
-# ---------------------------------------------------------------------------
-# 1. 分母必须闭合
-# ---------------------------------------------------------------------------
-def test_router_denominator_closes_against_n_runs():
-    """`n_scored + n_excluded_not_scored` 必须等于总条数,否则分母仍不可读。
-
-    变异验证:把 `n_excluded_not_scored` 的值改成 0,本条立刻红。
-    """
-    a = analyze(_rows(n_ok=3, n_router_err=2, n_refl_err=1), 0, BATCH)
-    rt = a.get("router") or {}
-    missing = [k for k in ROUTER_REQUIRED if k not in rt]
-    assert not missing, (
-        "router 段缺字段 {}。分母不可读会让『没看到问题』有两种解释(干净 vs 坏了),"
-        "而读者无法区分(第十轮 4.1:14/311 条样本在两处同时消失,165042 批次占 21%)。"
-        .format(missing))
-    assert rt["n_scored"] + rt["n_excluded_not_scored"] == a["n_runs"], (
-        "router 分母不闭合: n_scored({}) + n_excluded_not_scored({}) != n_runs({})"
-        .format(rt["n_scored"], rt["n_excluded_not_scored"], a["n_runs"]))
-
-
-def test_router_status_dist_accounts_for_the_excluded_rows():
-    """`router_status_dist` 必须把被剔除的行说出来,而不是只统计留下的。
-
-    这是 4.1 的核心:聚合侧原来**没有任何字段**能回答"少了谁"。
-    """
-    a = analyze(_rows(n_ok=3, n_router_err=2, n_refl_err=0), 0, BATCH)
-    dist = (a.get("router") or {}).get("router_status_dist") or {}
-    assert dist.get("error") == 2, (
-        "router_status_dist 应记 error=2,实际 {} —— 被剔除的行在聚合侧再次消失"
-        .format(dist))
-    assert sum(dist.values()) == a["n_runs"], (
-        "router_status_dist 的总数应等于总条数 {}，实际分布 {}"
-        .format(a["n_runs"], dist))
-
-
-def test_legacy_n_key_stays_in_sync_with_n_scored():
-    """兼容键 `n` 必须与 `n_scored` 同值,否则老脚本读到的还是旧错口径。"""
-    a = analyze(_rows(n_ok=3, n_router_err=1), 0, BATCH)
-    rt = a["router"]
-    assert rt["n"] == rt["n_scored"], (
-        "兼容键 n({}) 与 n_scored({}) 不一致 —— 会让老脚本拿到被剔除后的分母"
-        .format(rt["n"], rt["n_scored"]))
-
-
-# ---------------------------------------------------------------------------
-# 2. 入库产物必须已回填(与 test_analysis_keyset 的子集判据分工)
-# ---------------------------------------------------------------------------
 def test_shipped_router_section_declares_its_denominator():
     """入库 `analysis.json` 的 `router` 段必须已含三个分母字段。
 

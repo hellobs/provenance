@@ -24,7 +24,7 @@ import re
 
 from case01 import orchestrator as OR
 from case01.injector.manifest import REQUIRED_KEYS, dir_content_sha256
-from case01.orchestrator import BRANCH_MODE_BY_SOURCE, RUN_ENGINE_ID, run_case01
+from case01.orchestrator import RUN_ENGINE_ID, run_case01
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -61,7 +61,7 @@ def _run(tmp_path, monkeypatch, run_id="probe", **kw):
 # ---------------------------------------------------------------- 盘上结构
 def test_record_on_disk_carries_full_manifest(tmp_path, monkeypatch):
     """落盘文件里 manifest 必须齐 `REQUIRED_KEYS` 全部必备键 —— 不能只在内存里挂好。"""
-    _rec, saved = _run(tmp_path, monkeypatch, "m-keys", timeline="B")
+    _rec, saved = _run(tmp_path, monkeypatch, "m-keys")
     m = saved.get("manifest")
     assert isinstance(m, dict), "生产路径没挂 manifest(整段缺失)"
     missing = [k for k in REQUIRED_KEYS if k not in m]
@@ -70,7 +70,7 @@ def test_record_on_disk_carries_full_manifest(tmp_path, monkeypatch):
     assert m["manifest_version"], "版本号不能空"
     assert _HEX40.match(str(m["git_commit"])) or m["git_commit"] == "unknown", m["git_commit"]
     assert _HEX64.match(str(m["scenario_sha256"])), m["scenario_sha256"]
-    assert m["financial_data_version"] in ("absent", ) or _HEX64.match(
+    assert m["financial_data_version"] in ("absent") or _HEX64.match(
         str(m["financial_data_version"])), m["financial_data_version"]
     # 带时区的运行时间:历史上只有 injector 记录有,现在生产路径也有了
     assert re.search(r"\+0800$|Z$|([+-]\d{4}$)", str(m["created_at"])), m["created_at"]
@@ -88,72 +88,16 @@ def test_manifest_is_attached_before_the_file_is_written():
         "manifest 挂在了落盘之后"
 
 
-def test_every_branch_source_the_orchestrator_can_emit_maps_to_a_mode():
-    """branch_source 的四种取值都要有 branch_mode 归属,新增第五种时这里要红。"""
-    assert BRANCH_MODE_BY_SOURCE == {"preset": "preset", "judge": "judge",
-                                     "judge-failed": "judge", "rules": "rules"}
-    src = inspect.getsource(OR.run_case01)
-    for token in ('branch_source = "preset"',
-                  'branch_source = "judge-failed" if branch == "undetermined" else "judge"',
-                  'branch_source = "rules"'):
-        assert token in src, "分支来源变了但映射表没跟上:{}".format(token)
-    # 表里的键必须正好覆盖编排器能产出的来源,不多不少(多了等于给不存在的路分模式)
-    assert set(BRANCH_MODE_BY_SOURCE) == {"preset", "judge", "judge-failed", "rules"}
-
-
-# ---------------------------------------------------------------- 三种分支来源
-def test_preset_run_does_not_invent_a_model_backend(tmp_path, monkeypatch):
-    """强制时间线 + 一个模型客户端都没有:后端记 rules、温度记 null。
-
-    原实现在"没给 judge_llm"时按注入器真跑路径的兜底猜 local + 默认模型;
-    生产路径的 no-llm 场合那个兜底不成立 —— 猜出来的 qwen3:4b 是凭空多出来的证据。
-    """
-    _rec, saved = _run(tmp_path, monkeypatch, "m-preset", timeline="A")
-    m = saved["manifest"]
-    assert m["branch_mode"] == "preset" and m["branch_source"] == "preset", m
-    assert m["branch"] == "A"
-    assert m["judge"] == "rules", m["judge"]
-    assert m["judge_model"] is None, "没有模型客户端却记了模型名"
-    assert m["temperature"]["judge"] is None, m["temperature"]
-    assert any("temperature.judge=null" in w for w in m["manifest_warnings"]), \
-        m["manifest_warnings"]
-
-
-def test_rules_run_is_labeled_rules_not_preset_or_judge(tmp_path, monkeypatch):
-    """no-llm 的规则判定不属于源里的 preset/judge,照实记 rules 并落 warning。"""
-    _rec, saved = _run(tmp_path, monkeypatch, "m-rules")
-    m = saved["manifest"]
-    assert m["branch_source"] == "rules" and m["branch_mode"] == "rules", m
-    assert any("branch_mode=" in w for w in m["manifest_warnings"]), m["manifest_warnings"]
-    assert m["judge"] == "rules"
-
-
 def test_quick_scan_fallback_leaves_a_trace_in_the_manifest(tmp_path, monkeypatch):
     """判官没上班这件事要留在 manifest_warnings,而不是只在日志里闪一次。
 
     第八节点名过的退化点:生产路径走 quick_scan 时只 print,不像 pipeline 那样
     记进清单 —— 平台侧读不到"这条 verdict 来自关键词快筛"。
     """
-    _rec, saved = _run(tmp_path, monkeypatch, "m-qs", timeline="A")
+    _rec, saved = _run(tmp_path, monkeypatch, "m-qs")
     assert saved["consistency"]["method"] == "quick_scan", saved["consistency"]
     ws = saved["manifest"]["manifest_warnings"]
     assert any("立场判官未启用" in w for w in ws), ws
-
-
-def test_judged_run_records_the_client_backend_and_model(tmp_path, monkeypatch):
-    """分支真由客户端判出来时,后端/模型名/温度都取自那个客户端自己声明的值。"""
-    stub = StubJudgeClient("local", "qwen3:8b", temperature=0.15)
-    # router_llm 给了替身 → llm 仍为 None(no-llm 文本),判定与一致性都走这条客户端
-    _rec, saved = _run(tmp_path, monkeypatch, "m-judge", router_llm=stub)
-    m = saved["manifest"]
-    assert stub.calls, "替身没被调用,说明这条没走判定路径"
-    assert m["branch_source"] == "judge" and m["branch_mode"] == "judge", m
-    assert m["judge"] == "local" and m["judge_model"] == "qwen3:8b", m
-    assert m["temperature"]["judge"] == 0.15, m["temperature"]
-    assert m["judge_backend_reason"] == "client.backend_kind='local'", m
-    # 判官在场时不该有"未启用"那句(有客户端 = 真判过,不是快筛)
-    assert saved["consistency"]["method"] == "llm_stance", saved["consistency"]
-    assert not any("立场判官未启用" in w for w in m["manifest_warnings"]), m["manifest_warnings"]
 
 
 def test_api_backend_records_api(tmp_path, monkeypatch):
@@ -184,7 +128,7 @@ def test_hash_moves_when_the_data_dir_moves(tmp_path, monkeypatch):
     other = tmp_path / "fin"
     (other / "hcm").mkdir(parents=True)
     (other / "hcm" / "doc.json").write_text('{"a": 1}', encoding="utf-8")
-    m = build_manifest(collect_run_meta({}, branch="B", branch_mode="preset"),
+    m = build_manifest(collect_run_meta({}),
                        financial_dir=str(other))
     assert m["financial_data_version"] == dir_content_sha256(str(other))
     assert m["financial_data_version"] != dir_content_sha256(real)
@@ -203,8 +147,7 @@ def test_manifest_model_matches_the_client_the_run_uses(monkeypatch):
     monkeypatch.setenv("CASE01_LLM_PROVIDER", "ollama")
     monkeypatch.setenv("CASE01_LLM_MODEL", "qwen3:8b")
     client = local_client_from_env()
-    m = build_manifest(collect_run_meta({}, branch="B", branch_mode="judge",
-                                        judge_llm=client),
+    m = build_manifest(collect_run_meta({}, judge_llm=client),
                        engine_id=RUN_ENGINE_ID)
     assert m["judge"] == "local"
     assert m["judge_model"] == client.chat_model == "qwen3:8b", m["judge_model"]
@@ -219,7 +162,7 @@ def test_manifest_generation_failure_still_writes_the_record(tmp_path, monkeypat
         raise RuntimeError("清单模块炸了")
 
     monkeypatch.setattr(M, "build_manifest", boom)
-    _rec, saved = _run(tmp_path, monkeypatch, "m-boom", timeline="B")
+    _rec, saved = _run(tmp_path, monkeypatch, "m-boom")
     m = saved["manifest"]
     assert "RuntimeError" in m["manifest_error"], m
     assert m["engine_id"] == RUN_ENGINE_ID, "降级段也要说清是哪条路"

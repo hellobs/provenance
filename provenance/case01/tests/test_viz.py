@@ -65,7 +65,7 @@ def test_page_handles_empty_record():
 
 
 def test_index_links_all_runs():
-    html = viz.index_html([_sample(), dict(_sample(), run_id="sample-2", branch="A")])
+    html = viz.index_html([_sample(), dict(_sample(), run_id="sample-2")])
     assert "sample-1.html" in html and "sample-2.html" in html
     assert "关键结果对照" in html
 

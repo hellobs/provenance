@@ -63,7 +63,7 @@ def test_record_uses_world_state_when_present():
         "condition_monitor": [],
         "summary": {"node_count": len(nodes)},
     }
-    mapped = to_case01_record(record, branch="A")
+    mapped = to_case01_record(record)
     assert len(mapped["state_history"]) == len(nodes)
     assert mapped["state_history"][0]["state"]["hcm_shares"] is True
     # world 审计被合并进 audit,且不再报 state_history 缺口
@@ -71,18 +71,6 @@ def test_record_uses_world_state_when_present():
     assert not any(g.startswith("state_history") for g in mapped["compat"]["gaps"])
     assert not any(g.startswith("world_audit") for g in mapped["compat"]["gaps"])
 
-
-def test_record_without_world_state_reports_gap():
-    record = {
-        "schema_version": "injector-0.1", "run_id": "r", "mode": "dry-run",
-        "nodes": [{"node_id": "node-1", "date": "2026-08-27", "events": [], "world_state": None}],
-        "summary": {},
-    }
-    mapped = to_case01_record(record, branch="C")
-    assert mapped["state_history"] == []
-    gaps = mapped["compat"]["gaps"]
-    assert any(g.startswith("state_history") for g in gaps)
-    assert any("Branch C" in g for g in gaps)
 
 def test_final_feedback_context_per_branch():
     fa, _n, _i = _run_facts("A")

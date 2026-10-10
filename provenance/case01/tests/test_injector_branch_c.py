@@ -43,8 +43,7 @@ class TestManualCPlan:
         p.write_text(_json.dumps(plan, ensure_ascii=False), encoding="utf-8")
         b = MavisBridge(nodes=default_nodes("C", roles=["Investment AI", "Ethan Lin"]),
                         roles=("Investment AI", "Ethan Lin"), scenario_dir="",
-                        run_id="manual", dry_run=True, branch="C",
-                        c_plan_file=str(p))
+                        run_id="manual", dry_run=True, c_plan_file=str(p))
         b.facts = Case01Facts("C", run_id="manual")
         return b
 
@@ -272,11 +271,10 @@ class TestInjectedLlm:
         llm = RecorderLlm()
         bridge = MavisBridge(
             nodes=_nodes("C"), roles=["Investment AI", "Ethan Lin"],
-            dry_run=True, branch="C", c_plan_llm=llm,
-        )
+            dry_run=True, c_plan_llm=llm)
         assert bridge.c_plan_llm is llm
 
     def test_default_bridge_keeps_c_plan_llm_none(self):
         """缺省不注入时 c_plan_llm 为 None(运行时回退 Ollama),不改变既有行为。"""
-        bridge = MavisBridge(nodes=_nodes("C"), dry_run=True, branch="C")
+        bridge = MavisBridge(nodes=_nodes("C"), dry_run=True)
         assert bridge.c_plan_llm is None

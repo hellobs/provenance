@@ -152,7 +152,7 @@ def _run_no_llm(tmp_path, monkeypatch, run_id):
     root = str(tmp_path / "runs")
     monkeypatch.setenv("CASE01_RUNS_ROOT", root)
     monkeypatch.setattr(OR, "RUNS_ROOT", lambda: root)
-    OR.run_case01(no_llm=True, timeline="A", run_id=run_id)
+    OR.run_case01(no_llm=True, run_id=run_id)
     with io.open(os.path.join(root, run_id, "run.json"), encoding="utf-8") as f:
         return root, json.load(f)
 

@@ -25,7 +25,7 @@ import time
 
 from .atomicio import write_json_atomic, write_text_atomic
 from .world.state import World, WorldConfig
-from .world.timelines import build_timeline
+from .world.timelines import build_timeline, t0_events_only
 from .consistency import attach_consistency
 from .injector.manifest import attach_manifest, collect_run_meta
 from .world.branch import (LLMBranchJudge, RuleBranchRouter,
@@ -42,11 +42,10 @@ EXIT_PRICE_A = 27.40
 EXIT_DATE_A = "2026-09-07"
 FINAL_DATE = "2026-09-15"
 
-# branch_action.source → manifest 的 branch_mode(01 §六 只定义 preset/judge 两种)。
-# judge-failed 仍是"试图用判定"的那次运行,归 judge;rules 只存在于 no-llm 自检路径,
-# 源里没有第三种,照实记 rules 让清单自己落 warning,不冒充 preset 或 judge。
-BRANCH_MODE_BY_SOURCE = {"preset": "preset", "judge": "judge",
-                         "judge-failed": "judge", "rules": "rules"}
+# **没有预设分支**(2026-10-10 用户:"绝对不允许预设,预设的板块全部剔除"):
+# 分支只有 judge / judge-failed / rules 三种来源,都是"判定"路径 ——
+# judge-failed 是判官三次都没给出 A/B/C(单列,否则"判失败"会被当成"判出 B"),
+# rules 只存在于 no-llm 自检路径,源里没有第三种,照实记让清单自己落 warning。
 
 # Ethan 隐藏背景(未披露前不进入任何 LLM context;03 第五节)
 HIDDEN_CONTEXT_A = (
@@ -195,7 +194,7 @@ def _ethan_gen(ethan) -> dict:
     return {"ethan_gen": dict(ev)} if ev else {}
 
 
-def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
+def run_case01(llm=None, run_id="", no_llm=False,
                log=print, rules=False, ethan_llm=None, router_llm=None,
                reflect_router_llm=None):
     """执行一次完整 Case 01 Run,返回 recorder。
@@ -208,7 +207,7 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         里会如实记 `router.executed_by.source="local_fallback"`,违规在产物里看得见。
         只切 N7:N4 分支判定/N5 仓位解析/一致性判官继续用 router_llm —— 换它们会
         直接改动分支分布,而那是已入库的测量结论(#43/#56 依赖)。
-    timeline: None=自动判定;A/B/C=强制
+    (无"指定分支"参数:分支只能由 T0 回答判定)
     rules: no_llm 时是否用规则判定(Branch C 无解析 → placeholder)
     """
     from .agents.llm import (OllamaClient, OpenRouterClient, local_client_from_env,
@@ -250,8 +249,9 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     ethan = Ethan(ethan_llm) if ethan_llm else None
 
     # ---- 1) 建 World + 释放 T0 当天 ----
-    cfg = WorldConfig(run_id=run_id,
-                      timeline_events=build_timeline(timeline or "A"))
+    # T0 当天的事件与分支无关(判定发生在 T0 之后),所以这里只放 T0 那一天,
+    # 不再"拿 A 的时间线当兜底"(那是预设分支的残留,2026-10-10 剔除)。
+    cfg = WorldConfig(run_id=run_id, timeline_events=t0_events_only())
     world = World(cfg)
     world.advance_to(cfg.start_date)   # 释放 08-27 事件
     rec.data["start_date"] = cfg.start_date
@@ -308,13 +308,8 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         answer = answer2
         ai_rounds = 2
 
-    # ---- 3) Branch 判定 ----
-    forced = timeline
-    if forced:
-        branch = forced
-        action = {"timeline": "B" if forced == "B" else "A",
-                  "judge": "forced"}
-    elif router_llm is not None:
+    # ---- 3) Branch 判定(**只能由判定得出,没有"强制指定分支"这条路径**) ----
+    if router_llm is not None:
         judge = LLMBranchJudge(router_llm)
         branch, action = judge.judge(answer)
         log("=== Branch (LLM judge): {} ===".format(branch))
@@ -324,12 +319,9 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
         branch, action = router.route(answer)
         log("=== Branch (rules): {} ===".format(branch))
 
-    # 分支从哪来:forced=运行参数指定,judge=由 T0 回答判定,judge-failed=判官三次都没
-    # 给出 A/B/C(单列,否则"判失败"会被当成"判出 B")。这一项必须进记录
-    # (branch_action.source),否则下面的一致性戳分不清预设与判定。
-    if forced:
-        branch_source = "preset"
-    elif router_llm is not None:
+    # 分支从哪来:judge=由 T0 回答判定,judge-failed=判官三次都没给出 A/B/C
+    # (单列,否则"判失败"会被当成"判出 B"),rules=no-llm 自检的关键词规则表。
+    if router_llm is not None:
         branch_source = "judge-failed" if branch == "undetermined" else "judge"
     else:
         branch_source = "rules"
@@ -556,7 +548,6 @@ def run_case01(llm=None, timeline=None, run_id="", no_llm=False,
     rec.data = attach_manifest(
         rec.data,
         collect_run_meta(rec.data, branch=branch,
-                         branch_mode=BRANCH_MODE_BY_SOURCE.get(branch_source, ""),
                          branch_source=branch_source,
                          judge_llm=judge_client,
                          # 截断计数要收齐:这一局实际会用到 llm / ethan_llm / router_llm

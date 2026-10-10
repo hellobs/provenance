@@ -130,7 +130,7 @@ def test_run_lands_in_env_root_and_read_side_finds_it(tmp_path, monkeypatch):
     env = tmp_path / "records"
     env.mkdir()
     monkeypatch.setenv("CASE01_RUNS_ROOT", str(env))
-    rec = run_case01(no_llm=True, timeline="B", run_id="env-root-probe")
+    rec = run_case01(no_llm=True, run_id="env-root-probe")
 
     written = env / "env-root-probe" / "run.json"
     assert written.is_file(), "写侧没认环境变量,记录落回了默认根"
@@ -143,37 +143,6 @@ def test_run_lands_in_env_root_and_read_side_finds_it(tmp_path, monkeypatch):
     # 关键:两代"默认根"里都不能留下这条(否则每次跑测都在污染真实记录目录)
     for cand in (DEFAULT_ROOT, NEW_ROOT):
         assert not os.path.exists(os.path.join(cand, "env-root-probe")), cand
-
-
-def test_live_face_maps_into_the_same_root(tmp_path, monkeypatch):
-    """5010 小镇面"跑完自动映射"的目标也必须跟写侧同根(2026-10-08 漏改过这一环)。
-
-    漏改时**不会报错**:映射子进程照常成功,只是成品记录落进老根,而面板/复盘读新根
-    ⇒ 现场跑完一条,界面一片空白。`live_switch` 打印的手动重跑命令同根(它给人照着敲)。
-    """
-    pytest.importorskip("mavis_vizkit")
-    import live_switch
-    from case01.vizkit import live_run as LR
-
-    env = str(tmp_path / "records")
-    monkeypatch.setenv("CASE01_RUNS_ROOT", env)
-    assert live_switch.records_root() == OR.RUNS_ROOT()
-
-    captured = {}
-
-    class _Proc:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def fake_run_text(cmd, **kw):
-        captured["cmd"] = list(cmd)
-        return _Proc()
-
-    monkeypatch.setattr(LR, "run_text", fake_run_text)
-    LR._map_run("probe-run", "B", str(tmp_path / "raw.json"), None)
-    out = captured["cmd"][captured["cmd"].index("--out") + 1]
-    assert out == os.path.join(env, "probe-run", "run.json"), out
 
 
 def test_data_root_priority_rule(tmp_path, monkeypatch):

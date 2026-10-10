@@ -226,16 +226,14 @@ def test_现读env的种子要声明回实例并进清单(monkeypatch):
     calls = _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
     provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
     assert provider.seed == 20261015, "发出去的种子必须声明回实例"
-    meta = collect_run_meta({}, branch="B", branch_mode="judge",
-                            judge_llm=None, llms={"小镇 Ethan Lin": provider})
+    meta = collect_run_meta({}, judge_llm=None, llms={"小镇 Ethan Lin": provider})
     assert meta["seed"] == 20261015, meta
     # 没播种时仍然是 null(不许把"取不到"写成"固定过")
     monkeypatch.delenv("CASE01_LLM_SEED", raising=False)
     bare = _provider()
     _patch_post(monkeypatch, "stop", content='{"res": "嗯"}')
     bare.completion("说点什么", return_type=TextResponse, failsafe="嗯")
-    meta2 = collect_run_meta({}, branch="B", branch_mode="judge",
-                             judge_llm=None, llms={"小镇 Ethan Lin": bare})
+    meta2 = collect_run_meta({}, judge_llm=None, llms={"小镇 Ethan Lin": bare})
     assert meta2["seed"] is None, meta2
 
 

@@ -59,12 +59,10 @@ class MavisBridge:
         max_retries: int = 5,
         dry_run: bool = True,
         anchor_coord: Optional[List[int]] = None,
-        branch: str = "A",
         use_case01_facts: bool = True,
         meeting_coord: Optional[List[int]] = None,
         c_plan_llm: Optional[object] = None,
         visualizers: Optional[List[object]] = None,
-        branch_mode: str = "preset",
         c_plan_file: str = "",
         debug_note: str = "",
         judge_llm: Optional[object] = None,
@@ -90,20 +88,18 @@ class MavisBridge:
         self.max_retries = int(max_retries)
         self.dry_run = bool(dry_run)
         self.anchor_coord = list(anchor_coord) if anchor_coord else None
-        self.branch = branch
-        # 分支来源:preset(运行参数) / judge(由 T0 回答判定,01 §六 的设计原意)
-        if branch_mode not in ("preset", "judge"):
-            raise ValueError("branch_mode 只能是 preset 或 judge,收到 {!r}".format(branch_mode))
-        self.branch_mode = branch_mode
+        # 分支**只能由 T0 回答判定**得出(2026-10-10 用户:"绝对不允许预设,预设的板块
+        # 全部剔除")。判定之前没有分支 —— 不给默认值、不接受调用方传入。
+        self.branch = "undetermined"
         # 判定后端(**只用于运行清单,不改变判定行为**):真跑时 judge 走本地 Ollama;
         # 显式传 judge_llm/backend_kind 时按它记(测试替身、外部 API、规则判定都能如实落账)。
         self.judge_llm = judge_llm
         self.backend_kind = backend_kind or ""
-        # 运行清单轻量部分的缓存(键 = 决定它的那四个量),避免每步重算
+        # 运行清单轻量部分的缓存(键 = 决定它的那几个量),避免每步重算
         self._manifest_meta_cache: Optional[tuple] = None
-        # judge 模式下 T0 跑完之前**不能**自称 preset —— 否则映射出来的记录会显示
-        # "分支来源=实验设计预设",看着像 preset 跑(用户实测反馈)。空串 = 待判定。
-        self.branch_source = "preset" if branch_mode == "preset" else ""
+        # T0 跑完之前**不能**自称已判定 —— 否则记录会显示一个来路不明的分支来源。
+        # 空串 = 待判定;判定成功后恒为 "judge"(失败为 "judge-failed")。
+        self.branch_source = ""
         self.judge_info: Dict[str, object] = {}
         self.finish_reason = ""
         self.use_case01_facts = bool(use_case01_facts)
@@ -221,10 +217,12 @@ class MavisBridge:
     def run(self) -> dict:
         """按节点推进,返回本次运行的记录。
 
-        `branch_mode="judge"` 时**保留 0904doc 01 §六 的设计原意**:先跑 T0(咨询当天),
-        用 Investment AI 在 T0 的实际回答判定本次进入 A/B/C,再按该分支的预设时间线跑完
-        其余节点(市场世界仍不由模型临时生成)。`branch_mode="preset"` 则是可控对照:
-        分支由运行参数指定,T0 不参与判定。
+        **分支只能由判定得出**(2026-10-10 用户:"绝对不允许预设,预设的板块全部剔除"):
+        先跑 T0(咨询当天),用 Investment AI 在 T0 的实际回答判定本次进入 A/B/C,
+        再按该分支的时间线跑完其余节点(市场世界仍不由模型临时生成)。
+        没有判定就没有分支:判不出来时 `finish_reason="branch_undetermined"`,
+        不给默认值、不静默挑一条。
+        `dry_run` 下除非注入了 `judge_llm`(测试替身),否则同样判不了 → 停在 T0。
         """
         if not self.dry_run:
             self._build_mavis()
@@ -265,8 +263,10 @@ class MavisBridge:
                 "background_retrievals": list(self._current_retrievals),
             })
 
-            # judge 模式:第一个节点(T0)落地后立刻判定分支,然后换成该分支的后续节点重排。
-            if (self.branch_mode == "judge" and step_index == 0 and not self.dry_run):
+            # 分支判定:T0 落地后立刻判定,然后换成该分支的后续节点重排。
+            # 没有判定就没有分支 —— dry_run 且没注入 judge_llm 时不判定(不调真 LLM),
+            # 分支保持 undetermined,下面按既有语义收尾。
+            if step_index == 0 and (self.judge_llm is not None or not self.dry_run):
                 self._decide_branch_from_t0(self.records[-1], t0_node=node)
                 nodes = list(self.nodes)
                 if self.branch == "undetermined":
@@ -391,12 +391,12 @@ class MavisBridge:
         """
         from .manifest import collect_run_meta
 
-        key = (self.branch, self.branch_mode, self.branch_source, self.language,
+        key = (self.branch, self.branch_source, self.language,
                repr(self.judge_info))
         cached = self._manifest_meta_cache
         if cached and cached[0] == key:
             return dict(cached[1])
-        raw = {"branch": self.branch, "branch_mode": self.branch_mode,
+        raw = {"branch": self.branch,
                "language": self.language,
                "branch_source": self.branch_source, "judge_info": dict(self.judge_info),
                "mode": "dry-run" if self.dry_run else "mavis"}
@@ -410,7 +410,7 @@ class MavisBridge:
             _llm = getattr(_agent, "_llm", None)
             if _llm is not None:
                 town["小镇 {}".format(_name)] = _llm
-        meta = collect_run_meta(raw, branch_mode=self.branch_mode,
+        meta = collect_run_meta(raw,
                                 judge_llm=self.judge_llm,
                                 backend_kind=self.backend_kind,
                                 llms=town or None)
@@ -429,9 +429,8 @@ class MavisBridge:
             "run_id": self.run_id,
             "mode": "dry-run" if self.dry_run else "mavis",
             "branch": self.branch,
-            # 分支从哪来:preset=运行参数指定;judge=由 T0 回答判定(01 §六 的设计原意);
-            # preset-fallback=判定失败退回预设(记录里必须看得出来)
-            "branch_mode": self.branch_mode,
+            # 分支从哪来:恒为 judge(由 T0 回答判定,01 §六 的设计原意)/ judge-failed。
+            # **没有 preset** —— 2026-10-10 用户要求剔除全部预设分支的口子。
             "branch_source": self.branch_source,
             "judge_info": dict(self.judge_info),
             "finish_reason": self.finish_reason,

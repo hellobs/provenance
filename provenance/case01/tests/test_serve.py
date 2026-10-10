@@ -42,13 +42,11 @@ def _write_run(root, run_id, **over):
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     _write_run(tmp_path, "run-01")
-    _write_run(tmp_path, "run-02", branch="C",
-               branch_action={"timeline": "A", "judge": "llm",
+    _write_run(tmp_path, "run-02", branch_action={"timeline": "A", "judge": "llm",
                               "c_plan": {"action": "wait"}},
                reflection={}, router={})
     # run-03:预设分支但 T0 立场矛盾(quality=questionable)→ 默认不该出现在 /api/runs
-    _write_run(tmp_path, "run-03", branch="A",
-               branch_action={"timeline": "A", "judge": "preset",
+    _write_run(tmp_path, "run-03", branch_action={"timeline": "A", "judge": "preset",
                               "source": "preset", "c_plan": None},
                consistency={"verdict": "inconsistent", "reason": "A 线但 AI 只有谨慎表述",
                             "branch_source": "preset"},
@@ -165,14 +163,6 @@ class TestListAndDetail:
         assert m["router"]["issues"][0]["risk"] == "High"
         assert m["router"]["postprocess"] == {}
         assert m["audit"][0]["action"] == "set_branch"
-
-    def test_detail_missing_reflection(self, client):
-        r = client.get("/api/runs/run-02")
-        m = r.json()
-        assert m["reflection"]["generated"] is False
-        assert m["reflection"]["quality"] == {}
-        assert m["router"]["issues"] == []
-        assert m["branch_summary"].startswith("条件化方案")
 
     def test_404_unknown(self, client):
         assert client.get("/api/runs/nope").status_code == 404

@@ -55,17 +55,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from case01.consistency import (  # noqa: E402
         STANCE_TO_BRANCH, attach_consistency, judge_consistency,
-        _count_signals, quick_scan,
-    )
+        _count_signals, quick_scan)
     from case01.world.branch import (  # noqa: E402
-        JUDGE_PROMPT, STANCE_PROMPT, LLMStanceJudge,
-    )
+        JUDGE_PROMPT, STANCE_PROMPT, LLMStanceJudge)
 except ImportError as exc:                                  # pragma: no cover
     pytest.skip(
         "一致性判据改造尚未实现(批次 261003-192735 跑完中,期间不得改 case01 源码):"
         "缺 {}".format(exc),
-        allow_module_level=True,
-    )
+        allow_module_level=True)
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +127,7 @@ def test_stance_judge_outputs_one_of_four_stances():
         ("buy_now", '{"stance":"buy_now","reason":"建议立即重仓"}'),
         ("wait", '{"stance":"wait","reason":"维持零仓位"}'),
         ("conditional", '{"stance":"conditional","reason":"待签约后分批"}'),
-        ("unclear", '{"stance":"unclear","reason":"没说清当前动作"}'),
-    ):
+        ("unclear", '{"stance":"unclear","reason":"没说清当前动作"}')):
         got, info = LLMStanceJudge(_StubLLM([raw])).judge("任意回答")
         assert got == stance, (got, info)
         assert info["judge"] == "llm"
@@ -163,8 +159,7 @@ def test_consistent_when_llm_stance_matches_branch():
     for branch, stance, raw in (
         ("A", "buy_now", '{"stance":"buy_now","reason":"立即重仓"}'),
         ("B", "wait", '{"stance":"wait","reason":"维持零仓位"}'),
-        ("C", "conditional", '{"stance":"conditional","reason":"待签约后分批"}'),
-    ):
+        ("C", "conditional", '{"stance":"conditional","reason":"待签约后分批"}')):
         out = judge_consistency(_rec(branch, ZH_WAIT), llm=_StubLLM([raw]))
         assert out["verdict"] == "consistent", (branch, out)
         assert out["method"].startswith("llm_stance"), out
@@ -306,13 +301,6 @@ def test_attach_consistency_stamps_method_and_disagreement():
     assert cs["method"].startswith("llm_stance"), cs
     assert "disagreement" in cs, cs
     assert "quick_scan" in cs, cs
-
-
-def test_attach_consistency_without_llm_keeps_working():
-    """不传 llm 的老调用方不能被打断(默认行为不变)。"""
-    out = attach_consistency(_rec("B", ZH_WAIT), branch_source="preset")
-    assert out["consistency"]["method"] == "quick_scan"
-    assert out["branch_action"]["source"] == "preset"
 
 
 def test_attach_consistency_does_not_mutate_input():

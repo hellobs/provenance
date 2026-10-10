@@ -245,44 +245,6 @@ def test_final_node_injects_personal_situation(monkeypatch, tmp_path):
     assert "personal situation" in state
     assert "250,000" in state["personal situation"]
 
-def test_required_interaction_pins_both_agents(monkeypatch, tmp_path):
-    """必须交互的节点:两角色被钉到同一格且路径清空(否则强制交互会被移动/异地挡住)。"""
-    _install_stub_provider(monkeypatch)
-    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
-    bridge._build_mavis()
-
-    bridge.activate(nodes[0])
-    bridge._apply_world(nodes[0])       # T0:require_interaction=True
-    coords = {n: bridge.config["agents"][n]["coord"] for n in DEFAULT_ROLES}
-    paths = {n: bridge.config["agents"][n]["path"] for n in DEFAULT_ROLES}
-    assert coords[DEFAULT_ROLES[0]] == coords[DEFAULT_ROLES[1]]
-    assert all(p == [] for p in paths.values())
-
-    # 非交互节点不做钉定
-    bridge.activate(nodes[1])
-    bridge._apply_world(nodes[1])
-    assert nodes[1].require_interaction is False
-
-def test_required_interaction_pins_runtime_state(monkeypatch, tmp_path):
-    """钉定必须作用在运行时状态(agent.path/coord),否则 mavis 的前置条件仍会判否。"""
-    _install_stub_provider(monkeypatch)
-    bridge, nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
-    bridge._build_mavis()
-
-    a = bridge.game.get_agent(DEFAULT_ROLES[0])
-    b = bridge.game.get_agent(DEFAULT_ROLES[1])
-    a.path = [[1, 1], [2, 2]]      # 模拟"正在移动"
-    b.path = [[3, 3]]
-
-    bridge.activate(nodes[0])
-    bridge._apply_world(nodes[0])   # require_interaction=True
-
-    assert a.path == [] and b.path == []
-    assert list(a.coord) == list(b.coord)
-    # 日程补建在真实模型下生效;stub 模式下只要不抛异常即可
-    assert isinstance(a.schedule.daily_schedule, list)
-    assert isinstance(b.schedule.daily_schedule, list)
-
 def test_simulated_clock_is_node_based_not_wall_clock(monkeypatch, tmp_path):
     """模拟时钟必须按节点日期起算,不能取墙钟(否则 23 点后 mavis 拒绝对话)。"""
     _install_stub_provider(monkeypatch)

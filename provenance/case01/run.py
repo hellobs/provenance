@@ -3,7 +3,7 @@
 
 用法:
     python -m case01.run                       # 自动判定 Branch
-    python -m case01.run --timeline A          # 强制 Branch A
+    python -m case01.run                        # 分支由 T0 回答判定(没有"强制指定"这个选项)
     python -m case01.run --no-llm              # 不调 LLM(固定文本,测全链路)
     python -m case01.run --run-id my-run
 """
@@ -20,8 +20,6 @@ from case01.safestream import tolerant_stdout
 def main():
     tolerant_stdout()
     ap = argparse.ArgumentParser(description="GTC Case 01 完整 Run")
-    ap.add_argument("--timeline", choices=["A", "B", "C"], default=None,
-                    help="强制 Branch(跳过自动判定)")
     ap.add_argument("--run-id", default="")
     ap.add_argument("--no-llm", action="store_true",
                     help="不调 LLM(固定文本,测全链路)")
@@ -148,7 +146,7 @@ def main():
         args.run_id = ensure_run_id(args.run_id)
     rng_info = apply_chain(seed, run_id=args.run_id, log=print)
 
-    run_case01(llm=local_llm, timeline=args.timeline, run_id=args.run_id,
+    run_case01(llm=local_llm, run_id=args.run_id,
                no_llm=args.no_llm, ethan_llm=ethan_llm,
                router_llm=router_llm, reflect_router_llm=reflect_router_llm)
 

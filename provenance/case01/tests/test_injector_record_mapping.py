@@ -44,7 +44,7 @@ def _sample_bridge_record() -> dict:
 
 
 def test_mapped_record_has_all_case01_top_keys():
-    mapped = to_case01_record(_sample_bridge_record(), branch="A")
+    mapped = to_case01_record(_sample_bridge_record())
     assert set(CASE01_TOP_KEYS).issubset(set(mapped))
     assert mapped["compat"]["missing_keys"] == []
     # 原始节点记录作为新增段保留
@@ -52,7 +52,7 @@ def test_mapped_record_has_all_case01_top_keys():
 
 
 def test_turns_events_and_final_feedback_mapping():
-    mapped = to_case01_record(_sample_bridge_record(), branch="A")
+    mapped = to_case01_record(_sample_bridge_record())
     assert mapped["turns"] == [
         {"speaker": "ethan", "date": "2026-08-27", "text": "Is it credible?"},
         {"speaker": "ai", "date": "2026-08-27", "text": "No official order yet."},
@@ -91,7 +91,7 @@ def test_injected_items_keep_their_source_and_story_events_do_not():
     assert nodes[0].events[1]["source"] == "盘面"
 
     mapped = to_case01_record({"nodes": [{"node_id": nodes[0].node_id, "date": nodes[0].date,
-                                          "events": nodes[0].events}]}, branch="A")
+                                          "events": nodes[0].events}]})
     injected = mapped["retrievals"][0]["injected"]
     assert [d["source"] for d in injected] == ["HCM 公告", "盘面"]
     # 顶层 events(契约 §2.2 里**专家能看到**的那块)也必须带出处:
@@ -125,6 +125,6 @@ def test_mapping_covers_real_case01_run_json():
     path = os.path.join(FIXTURES, "260905-demo-case01-old-C", "run.json")
     with open(path, encoding="utf-8") as f:
         real = json.load(f)
-    mapped = to_case01_record(_sample_bridge_record(), branch="C")
+    mapped = to_case01_record(_sample_bridge_record())
     missing = [k for k in real.keys() if k not in mapped]
     assert missing == [], "缺少 case01 run.json 的顶层键: {}".format(missing)

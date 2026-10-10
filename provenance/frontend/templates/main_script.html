@@ -958,10 +958,15 @@
 			if (_focusEl) _focusEl.innerHTML = "";
 		}
 
-		// 模拟结束后 update 提前 return,跳过本帧的移动/避让 —— 但气泡是纯 UI,
-		// 与"模拟是否在跑"无关,结束后也必须摆一次,否则气泡卡在最后位置。
-		// (另一处调用在 update 末尾:那时本帧的位置才算定下来。)
+		// 模拟结束后 update 提前 return,跳过本帧的移动/避让 —— 但**动画与移动是两回事**:
+		// 动画是 Phaser 自己在播,不经过这里。只 return 的话,收尾那一刻正好在走路的人
+		// 会**停在原地继续摆腿**(用户截图:推演结束了这人还在原地踏步)。
+		// 所以这里把所有人的走路动画停掉、路径队列清空,人才真的"停下来了"。
 		if (live_mode && (sim_finished || sim_error)) {
+			for (let n in personas) {
+				if (personas[n].anims) personas[n].anims.stop();
+				delete movement_target[n];
+			}
 			layoutBubbles();
 			return;
 		}

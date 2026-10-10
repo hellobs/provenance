@@ -2,7 +2,7 @@
 """完整流水线:节点序列 -> mavis 驱动 -> case01 兼容记录 ->（可选）Reflection/Router。
 
 用法（真实运行,需 Ollama）:
-    python -m case01.injector.pipeline --branch B --reflect --out runs_injector/B.json
+    python -m case01.injector.pipeline --reflect --out runs_injector/run.json
 
 dry-run 不加载 mavis,只产出同构记录（CI/联调用）。
 """
@@ -122,7 +122,7 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     return record
 
 
-def _attach_consistency(record: dict, branch_source: str = "preset", llm=None) -> dict:
+def _attach_consistency(record: dict, branch_source: str = "", llm=None) -> dict:
     """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
 
     实现已上移到 `consistency.attach_consistency`(2026-10-03):case01 编排器那条
@@ -137,18 +137,22 @@ def _attach_consistency(record: dict, branch_source: str = "preset", llm=None) -
     return attach_consistency(record, branch_source=branch_source, llm=llm)
 
 
-def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
+def run_pipeline(scenario_dir: str = "", run_id: str = "",
                  roles: Tuple[str, ...] = DEFAULT_ROLES, dry_run: bool = False,
                  max_retries: int = 2, reflect: bool = False,
                  external_router: bool = False, llm=None, router_llm=None,
                  out_path: str = "", raw_record: Optional[dict] = None,
-                 fill_facts: bool = False, branch_source: str = "preset",
-                 require_consistent: bool = False, branch_mode: str = "preset",
+                 fill_facts: bool = False,
+                 require_consistent: bool = False,
                  judge_llm=None, judge_backend_kind: str = "",
                  scenario_path: str = "", financial_dir: str = "",
                  reflection_mod=None, language: str = None) -> dict:
     """跑一条完整流水线,返回 case01 兼容记录。
 
+    **没有"指定分支"这回事**(2026-10-10 用户:"绝对不允许预设,预设的板块全部剔除"):
+    分支只能来自 T0 回答的判定结果。本函数不再接受 branch / branch_mode /
+    branch_source;原始记录里判不出分支(branch 为空或 "undetermined")时,
+    原样带着 undetermined 往下走,由 `finish_reason="branch_undetermined"` 显式收尾。
     raw_record: 直接给一份已有的 injector 原始记录(跳过驱动),用于事后映射/接反思。
     fill_facts: 对不含 world_state 的旧记录,用纯逻辑重算事实层快照。
     judge_llm / judge_backend_kind: 判定后端(**只用于运行清单**,不改变判定行为)。
@@ -164,38 +168,31 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
         raise ValueError("requested language conflicts with raw record language")
     language = check_language(language or raw_language or
                               ("legacy" if raw_record is not None else "en"))
-    branch = branch or (raw_record or {}).get("branch", "B")
-    run_id = run_id or (raw_record or {}).get("run_id") or "injector-{}".format(branch)
+    run_id = run_id or (raw_record or {}).get("run_id") or "injector-run"
+    branch_source = ""      # 恒由原始记录给出(judge / judge-failed / rules)
 
     if raw_record is not None:
         raw = raw_record
-        if fill_facts:
-            from .worldfacts import enrich_record_with_facts
-
-            enrich_record_with_facts(raw, branch=branch)
     else:
-        nodes = default_nodes(branch, roles=list(roles))
+        # 先按"未定"排一条 T0 时间线,跑完由判定换成 A/B/C 的后续节点。
+        nodes = default_nodes("undetermined", roles=list(roles))
         bridge = MavisBridge(nodes=nodes, roles=roles, scenario_dir=scenario_dir,
                              run_id=run_id, max_retries=max_retries, dry_run=dry_run,
-                             branch=branch, branch_mode=branch_mode,
                              judge_llm=judge_llm,
                              backend_kind=judge_backend_kind, language=language)
         raw = bridge.run()
 
-    # 原始记录里的分支才是**实际跑出来的**分支(judge 模式:跑完 T0 才判定;
-    # 映射时必须以它为准,否则记录的 branch 字段会跟实际跑的市场世界对不上),
-    # 分支来源与分支模式同理(judge / preset / preset-fallback;judge / preset)。
-    # 2026-10-04 实测:`branch_mode` 以前不在这里取,而映射 CLI 的 `--branch-mode`
-    # 默认 preset —— 于是 live 那一局真实由 LLM 判了分支(raw 里 branch_mode=judge
-    # 且带 judge_info),映射出的成品记录清单却写着 preset,把"可控对照"与
-    # "AI 判定"两种性质混成同一个值,看清单的人无从分辨。
-    if isinstance(raw, dict):
-        if raw.get("branch"):
-            branch = raw["branch"]
-        if raw.get("branch_source"):
-            branch_source = raw["branch_source"]
-        if raw.get("branch_mode"):
-            branch_mode = raw["branch_mode"]
+    # 分支只有一个来源:原始记录里**实际判出来**的那个。
+    # 映射已有记录时也走这里 —— 记录里的分支就是那次跑的真实分支。
+    branch = (raw or {}).get("branch") or "undetermined"
+    if fill_facts and raw is not None:
+        from .worldfacts import enrich_record_with_facts
+
+        enrich_record_with_facts(raw, branch=branch)
+
+    # 分支来源也只认原始记录里那一份(judge / judge-failed / rules)。
+    if isinstance(raw, dict) and raw.get("branch_source"):
+        branch_source = raw["branch_source"]
 
     record = to_case01_record(raw, branch=branch, run_id=run_id,
                               c_plan=raw.get("c_plan") if isinstance(raw, dict) else None)
@@ -204,9 +201,10 @@ def run_pipeline(branch: str = "B", scenario_dir: str = "", run_id: str = "",
 
     # 运行清单一律在**写盘之前**挂上(manifest 段本身就是这次运行的证据;
     # 事后补挂等于把"跑完才知道的"当成"跑之前就有的")。
-    run_meta = collect_run_meta(raw, branch=branch, branch_mode=branch_mode,
+    run_meta = collect_run_meta(raw, branch=branch,
                                 judge_llm=judge_llm,
-                                backend_kind=judge_backend_kind)
+                                backend_kind=judge_backend_kind,
+                                branch_source=branch_source)
     run_meta["language"] = language
     attach_manifest(record, run_meta, scenario_path=scenario_path,
                     financial_dir=financial_dir)
@@ -335,7 +333,6 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
 
 def main():
     ap = argparse.ArgumentParser(description="case01 injector 完整流水线")
-    ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
     ap.add_argument("--roles", default="Investment AI,Ethan Lin")
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
@@ -350,11 +347,6 @@ def main():
                     help="对已有的 injector 原始记录做映射/接反思(不重新驱动)")
     ap.add_argument("--fill-facts", action="store_true",
                     help="对旧记录用纯逻辑补算事实层快照(world_state/world_audit)")
-    ap.add_argument("--branch-source", default="preset", choices=["preset", "judge"],
-                    help="分支是预设的还是由 AI 回答判定的(写进记录的 branch_action.source)")
-    ap.add_argument("--branch-mode", default="preset", choices=["preset", "judge"],
-                    help="judge=先跑 T0 再由 AI 回答判定分支(01 §六 的设计原意);"
-                         "preset=分支由 --branch 指定(可控对照)")
     ap.add_argument("--require-consistent", action="store_true",
                     help="记录的 T0 立场与分支不一致/判不了时不写盘(默认照写但会警告)")
     ap.add_argument("--router-only", default="",
@@ -381,13 +373,14 @@ def main():
         if "nodes" not in raw and isinstance(raw.get("injector"), dict):
             raw = raw["injector"]
 
+    # 分支不在命令行里指定:一律先跑 T0,再由 AI 回答判定(01 §六)。
+    # 判不出来就是 undetermined(见 --require-consistent),不给默认值。
     record = run_pipeline(
-        branch=args.branch, scenario_dir=args.scenario_dir, run_id=args.run_id,
+        scenario_dir=args.scenario_dir, run_id=args.run_id,
         roles=roles, dry_run=args.dry_run, max_retries=args.max_retries,
         reflect=args.reflect, external_router=args.external_router, out_path=args.out,
         raw_record=raw, fill_facts=args.fill_facts,
-        branch_source=args.branch_source, require_consistent=args.require_consistent,
-        branch_mode=args.branch_mode,
+        require_consistent=args.require_consistent,
     )
     if args.out:
         print("saved ->", args.out)

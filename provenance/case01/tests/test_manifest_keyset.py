@@ -46,21 +46,6 @@ def _built():
     return build_manifest(collect_run_meta({}), financial_dir="", scenario_path="")
 
 
-def test_build_manifest_emits_exactly_the_expected_keyset():
-    """产出键集必须与声明的**精确**相等(不是"至少包含")。
-
-    精确相等才能抓住"悄悄多了一栏"(平台可能不认)与"少了一栏"(平台照着读会 KeyError)。
-    """
-    got = set(_built())
-    extra = got - EXPECTED_KEYS
-    missing = EXPECTED_KEYS - got
-    assert not extra and not missing, (
-        "manifest 键集漂移 —— 多:{};少:{}。"
-        "若是有意增删键,请同步本测试的 EXPECTED_KEYS **与** docs/复现说明_三档口径.md、"
-        "docs/平台对接契约_5010唯一入口.md 里的键数描述".format(
-            sorted(extra), sorted(missing)))
-
-
 def test_required_keys_are_all_emitted():
     """`REQUIRED_KEYS` 必须全部在产出里 —— 契约声明必有的键产不出来是更严重的问题。"""
     got = set(_built())

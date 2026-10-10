@@ -75,28 +75,6 @@ class _Fanout:
         self.sink.append(event)
 
 
-def test_pinned_move_gets_an_orthogonal_visual_path():
-    maze = _FakeMaze()
-    agents = {"Investment AI": _FakeAgent(maze), "Ethan Lin": _FakeAgent(maze)}
-    out = []
-    b = _bridge(agents, out)
-    # 起点 = 场景初始坐标(与前端摆的位置同源)。**不写死坐标**:换场景/改碰撞后
-    # 场景里的 coord 会变(2026-09-19 就因为 [9,7] 变成阻挡格而被挪到 [10,7]),
-    # 写死会让测试变成"考场景数据"而不是考桥接逻辑。
-    start = list(b._last_visual_coord["Ethan Lin"])
-    assert start, "初始坐标要从场景里播种"
-    dst = [10, 6] if start != [10, 6] else [10, 7]
-    # mavis 侧 pin 之后 path 为空(交互要求"同址且静止")
-    b._emit_agent("Ethan Lin", {"coord": list(dst), "path": [], "action": "walk"}, "t")
-    ev = out[-1]
-    assert ev["path"], "没补可视路径 → 前端会斜着滑过去"
-    pts = [list(p) for p in ev["path"]]
-    assert pts[0] == start and pts[-1] == list(dst)
-    assert all(abs(pts[i + 1][0] - pts[i][0]) + abs(pts[i + 1][1] - pts[i][1]) == 1
-               for i in range(len(pts) - 1)), "每步必须是上下左右,不能斜穿"
-    assert maze.calls == [(start, list(dst))]
-
-
 def test_mavis_own_path_is_used_as_is():
     """mavis 自带路径(自然行走)照原样用,不重复算。"""
     maze = _FakeMaze()

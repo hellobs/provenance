@@ -133,8 +133,7 @@ def test_manifest_records_the_client_seed_not_env():
     from case01.agents.llm import OllamaClient
 
     client = OllamaClient(chat_model="qwen3:8b", seed=4242)
-    m = build_manifest(collect_run_meta({}, branch="C", branch_mode="judge",
-                                        judge_llm=client),
+    m = build_manifest(collect_run_meta({}, judge_llm=client),
                        engine_id="case01-run")
     assert m["seed"] == 4242, m["seed"]
 
@@ -148,7 +147,7 @@ def test_manifest_seed_null_is_not_a_warning():
 
 def test_rules_backend_records_no_seed():
     """规则判定没有采样,写个种子等于谎报调过模型(与 temperature.judge 同口径)。"""
-    meta = collect_run_meta({}, branch="B", branch_mode="preset", backend_kind="rules")
+    meta = collect_run_meta({}, backend_kind="rules")
     assert meta["seed"] is None
     assert build_manifest(meta, financial_dir="", scenario_path="")["seed"] is None
 

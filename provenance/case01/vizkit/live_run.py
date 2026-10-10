@@ -8,7 +8,7 @@ roles / alias / scenario / 前端资源根 作为参数喂给它,并把 case01 �
 (独立的 5004 面板服务因此退役,见 case01/review_app.py 的 docstring。)
 
 用法(在 provenance/provenance 下):
-    python -m case01.vizkit.live_run --branch B --port 5010
+    python -m case01.vizkit.live_run --port 5010
     python -m case01.vizkit.live_run --review-only          # 不推演,只翻成品记录
 然后浏览器打开 http://127.0.0.1:5010/ —— 左边小镇实时动,右栏是对话与"结果记录"卡片
 (点卡片头部可收起/展开,点"单独打开 ↗"整页看)。
@@ -44,26 +44,24 @@ SCENARIO = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "injector", "scenario")
 
 
-def resolve_restart_choice(raw, current_branch="B"):
-    """把 `POST /control/restart` 里的取值翻成 (分支, 模式);不认识的取值抛 ValueError。
+def resolve_restart_choice(raw):
+    """校验 `POST /control/restart` 的 branch 取值;返回 None(判定由 AI 做)。
 
-    为什么单独一个函数而不是写死在回调里:取值口径要能被单测钉住(回调在 main() 的闭包里,
-    起真服务才能测)。口径:
-      - `A` / `B` / `C` → 预设分支(可控对照),mode=preset
-      - 空 / `auto`     → 交给 AI 的 T0 回答判定,mode=judge(分支参数只作兜底)
-      - 其它            → 拒绝。**不能**当 auto:调用方以为选了别的,实际跑的是 AI 判定。
+    **没有"指定分支"这条路径了**(2026-10-10 用户:"绝对不允许预设,预设的板块全部剔除"):
+    分支只能由 T0 回答判定,所以页面上不再有分支下拉,请求里也不该带 branch。
+    空 / `auto` = 照常判定;带 A/B/C(老客户端的遗留字段)一律**明确拒绝**,
+    不能静默当成 auto —— 调用方以为选了 B,实际跑的是 AI 判定,谁都不知道。
     """
     choice = str(raw or "").strip().upper()
-    if choice in ("A", "B", "C"):
-        return choice, "preset"
     if choice in ("", "AUTO"):
-        return current_branch, "judge"
-    raise ValueError("不认识的 branch 取值 {!r}:只能是 A / B / C / auto".format(raw))
+        return None
+    raise ValueError(
+        "不再支持指定分支(预设已全部剔除,2026-10-10):branch={!r} 无效,"
+        "分支只由 T0 回答判定".format(raw))
 
 
 def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
-                  scenario_dir="", with_review=True, on_restart=None, branch="B",
-                  branch_mode="judge"):
+                  scenario_dir="", with_review=True, on_restart=None):
     """建**一个**服务:实时小镇 + case01 结果面板(九块)。
 
     为什么要挂在一起(2026-09-19 用户拍板"只维护一个界面"):
@@ -86,12 +84,8 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
         extra_panels=[{"id": "review", "label": "结果记录",
                        "url": "/review?embed=1"}],
         on_restart=on_restart,
-        # 重开时可以在页面上选:自动(由 AI 的 T0 回答判定,01 §六 的设计原意)或指定分支
-        # ("auto" 是默认 —— 保留设计原意;选 A/B/C 则退回 preset 对照)
-        restart_choices=[{"id": "branch",
-                          "label": "分支",
-                          "options": ["auto", "A", "B", "C"],
-                          "value": "auto" if branch_mode == "judge" else branch}],
+        # **不给"分支"选择器**:预设分支已全部剔除(2026-10-10),分支只由 T0 判定,
+        # 页面上就没有可选项。
         # 顶栏外部工具链接:mavis 的角色/场景配置工具是**独立进程**(默认 8060),
         # 地址由 case01 侧给,vizkit 只负责渲染(它不认识"配置工具"这个词)。
         # "专家审核"排在前面,且**只在挂了结果面板时给** —— 九块/专家队列都由
@@ -126,7 +120,7 @@ def build_service(host="127.0.0.1", port=5010, roles=None, run_id="",
     return live
 
 
-def _map_run(run_id, branch, raw_out, rng_info=None):
+def _map_run(run_id, raw_out, rng_info=None):
     """把这一局的原始记录映射成成品记录(**在本进程里顺序做**,不另起看护进程)。
 
     为什么改成顺序做:重开一局时如果每局都起一个独立的映射看护进程,连点几次就会
@@ -146,7 +140,7 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
     out = os.path.join(data_root("case01.records", env_var="CASE01_RUNS_ROOT"),
                        run_id, "run.json")
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
-           "--branch", branch, "--run-id", run_id,
+           "--run-id", run_id,
            "--from-record", os.path.abspath(raw_out), "--out", out, "--reflect"]
     print("  正在映射成品记录(约 1-2 分钟)…")
     t0 = time.time()
@@ -174,12 +168,6 @@ def _map_run(run_id, branch, raw_out, rng_info=None):
 def main(argv=None):
     tolerant_stdout()
     ap = argparse.ArgumentParser(description="case01 单一界面:实时小镇 + 结果记录")
-    ap.add_argument("--branch", default="B", choices=["A", "B", "C"],
-                    help="兜底分支:judge 模式下只有在判不出来时才用它")
-    ap.add_argument("--branch-mode", dest="branch_mode", default="judge",
-                    choices=["judge", "preset"],
-                    help="judge=先跑 T0 再由 AI 的回答判定分支(0904doc 01 §六 的设计原意,默认);"
-                         "preset=分支由 --branch 指定(可控对照)")
     ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
@@ -223,22 +211,16 @@ def main(argv=None):
     # 回调只做一件事:把重开请求(含页面上选的分支)记下来;真正的重开由下面的主循环执行
     # (不能在回调里直接跑推演,那是 HTTP 线程池的活)。
     restart_flag = threading.Event()
-    restart_req = {"branch": ""}
-    # 闭包里要读"当前分支":回调是 HTTP 线程池里跑的,不能直接用 args
-    branch_now = [args.branch]
 
     def request_restart(payload=None):
         try:
-            branch, mode = resolve_restart_choice((payload or {}).get("branch"),
-                                                  current_branch=branch_now[0])
+            resolve_restart_choice((payload or {}).get("branch"))
         except ValueError as exc:
             # 不认识的取值**不再静默当成 judge**(2026-09-24 第十轮体检):以前 {"branch":"D"}
             # 会被当成 auto,回一句"已受理:下一局由 AI 的 T0 回答判定分支" —— 调用方以为
             # 自己选了 D,实际跑的是 AI 判定,谁都不知道。现在明确拒绝并说明合法取值。
             print("重开请求被拒:{}".format(exc))
             return {"ok": False, "error": str(exc)}
-        restart_req["branch"] = branch
-        restart_req["mode"] = mode
         restart_flag.set()
         # **立刻**把"已结束"状态清掉:页面此刻正在刷新,不清的话连上来会收到
         # pending 里那条上一局的 done,变成"重开后又突然说推演结束"(用户实测反馈)。
@@ -249,16 +231,14 @@ def main(argv=None):
         from ..review_app import clear_live, set_current_run
         clear_live()
         set_current_run("", "")
-        print("收到重开请求:下一局 {};当前这一局跑完(或保持期结束)后立刻开".format(
-            "由 AI 的 T0 回答判定分支" if mode == "judge" else "预设 {} 线".format(branch)))
+        print("收到重开请求:下一局由 AI 的 T0 回答判定分支;"
+              "当前这一局跑完(或保持期结束)后立刻开")
         return {"ok": True,
-                "detail": ("已受理:下一局由 AI 的 T0 回答判定分支" if mode == "judge"
-                           else "已受理:下一局走 {} 线".format(branch)),
-                "branch": branch, "mode": mode}
+                "detail": "已受理:下一局由 AI 的 T0 回答判定分支",
+                "branch": None, "mode": "judge"}
 
     live = build_service(host=args.host, port=args.port, roles=roles,
                          run_id=args.run_id, scenario_dir=scenario,
-                         branch=args.branch, branch_mode=args.branch_mode,
                          on_restart=None if args.no_restart else request_restart)
     # 页面上有没有「重开一局」按钮(没注册回调就没有)
     can_restart = not args.no_restart
@@ -282,20 +262,12 @@ def main(argv=None):
 
     exit_code = 0
     ran_once = False
-    branch = args.branch
-    branch_mode = args.branch_mode
     try:
         while True:
             restart_flag.clear()
-            # 分支方式由页面上的下拉决定(重开时可以换):auto=由 AI 的 T0 回答判定(默认),
-            # A/B/C=预设(可控对照)。没选就沿用启动时的 --branch/--branch-mode。
-            if restart_req.get("branch"):
-                branch = restart_req["branch"]
-                branch_mode = restart_req.get("mode") or branch_mode
-                restart_req["branch"] = ""
-                restart_req["mode"] = ""
-            branch_now[0] = branch        # 回调里读"当前分支"用
-            nodes = default_nodes(branch, roles=list(roles))
+            # 分支**只能由 T0 回答判定**(预设已全部剔除,2026-10-10):
+            # 这里只排 T0 那一天,判定落地后由桥把后续节点整段换成该分支的时间线。
+            nodes = default_nodes("undetermined", roles=list(roles))
             debug_note = ""
             if args.nodes > 0:
                 if args.nodes < len(nodes):
@@ -316,7 +288,7 @@ def main(argv=None):
             if args.run_id and not ran_once:
                 run_id = args.run_id
             else:
-                base = live_run_id("auto" if branch_mode == "judge" else branch)
+                base = live_run_id("auto")
                 run_id = unique_run_id(base)
                 if run_id != base:
                     print("名字 {} 已被占用(上一局),改用 {}".format(base, run_id))
@@ -330,7 +302,7 @@ def main(argv=None):
             # 老根已不存在),成品记录却在新根,两半不同源。
             out = (args.out if (first_round and args.out)
                    else os.path.join(data_root("case01.raw"), run_id, "raw.json"))
-            print("本次 run_id: {} (分支方式={} 兜底分支={})".format(run_id, branch_mode, branch))
+            print("本次 run_id: {} (分支由 T0 回答判定)".format(run_id))
             # 新的一局开始:把上一局的残留(已结束标记、积压事件、追赶快照)全清掉,
             # 否则刷新后的页面会收到上一局的 done / 旧位置。
             live.begin_run()
@@ -367,8 +339,7 @@ def main(argv=None):
             bridge = MavisBridge(
                 nodes=nodes, roles=roles, scenario_dir=scenario,
                 run_id=run_id,
-                dry_run=False, max_retries=args.max_retries, branch=branch,
-                branch_mode=branch_mode,
+                dry_run=False, max_retries=args.max_retries,
                 debug_note=debug_note,
                 visualizers=[live],
                 think_workers=workers,
@@ -387,8 +358,7 @@ def main(argv=None):
                               total_nodes=len(nodes))
             try:
                 record = bridge.run()
-                # judge 模式:分支是 T0 跑完才定的;run_id 里那段分支名先按兜底值起,
-                # 这里把**真实分支**打出来(记录里的 branch 以判定结果为准)。
+                # 分支是 T0 跑完才判出来的,这里打的就是真实分支。
                 print("运行完成:", json.dumps(record.get("summary") or {}, ensure_ascii=False))
                 print("  分支:{} (source={}) run_id={}".format(
                     record.get("branch"), record.get("branch_source"), run_id))
@@ -406,11 +376,10 @@ def main(argv=None):
                 # 但失败原因会在 stdout 与页面提示里写明。
                 try:
                     if record.get("branch") == "undetermined":
-                        print("  Judge could not determine A/B/C; mapping skipped. "
-                              "Select a branch in the UI and restart.")
+                        print("  判官没能判定 A/B/C(没有预设分支可退回,2026-10-10 剔除),"
+                              "跳过映射。记录里 branch=undetermined。")
                     elif not args.no_map:
-                        # 用**判定后的**真实分支做映射(judge 模式下 branch 参数只是兜底)
-                        _map_run(run_id, record.get("branch") or branch, out, rng_info)
+                        _map_run(run_id, out, rng_info)
                     else:
                         print("  (--no-map:跳过映射;手工命令见 docs)")
                 finally:

@@ -106,7 +106,24 @@ def timeline_b() -> Dict[str, List[dict]]:
 BRANCH_TO_TIMELINE = {"A": "A", "B": "B", "C": "A"}
 
 
+def t0_events_only() -> Dict[str, List[dict]]:
+    """只要 T0(咨询当天)这一天的事件。
+
+    分支判定发生在 T0 **之后**(01 §六),所以"还没判定"的那一段世界必须与分支无关 ——
+    不能再靠"拿 A 的时间线当兜底"那种隐式做法(2026-10-10 用户要求剔除全部预设)。
+    """
+    return {"2026-08-27": _t0_events()}
+
+
 def build_timeline(branch: str):
+    """按分支取时间线。
+
+    `branch="undetermined"`(**尚未判定**):返回的只是 T0 那一天 —— 判定落地之后
+    `MavisBridge._decide_branch_from_t0` 会用真分支的时间线把后续节点整段换掉。
+    这里**不是**"把未定当成 A",而是"未定时只需要 T0"。
+    """
+    if branch == "undetermined":
+        return t0_events_only()
     if branch == "B":
         return timeline_b()
     return timeline_a()  # A 与 C

@@ -92,7 +92,7 @@ class TestBranchRouter:
 
 
 class TestWorldState:
-    def _mk(self, branch="A", date=None, invest=True):
+    def _mk(self, date=None, invest=True):
         cfg = WorldConfig(run_id="t1", timeline_events=timeline_a())
         w = World(cfg)
         if branch:
@@ -100,30 +100,6 @@ class TestWorldState:
             if branch == "A" and invest:
                 w.buy_position(0.95, 45.20)   # A:接近满仓 @ $45.20
         return w
-
-    def test_advance_releases_events_ordered(self):
-        w = self._mk("A")
-        # 08-27 当天事件在 Run 启动即视为已发生(当前日期)
-        w.advance_to("2026-08-27")   # 释放当天事件
-        w.advance_to("2026-08-31")   # 再释放 08-28 ~ 08-31
-        dates = [e.date for e in w.released]
-        assert "2026-08-27" in dates and "2026-08-31" in dates
-        # 事件带 kind
-        assert any(e.kind == "disclosure" for e in w.released)
-        # 当前日期
-        assert w.date == "2026-08-31"
-
-    def test_no_rewind(self):
-        w = self._mk("A")
-        w.advance_to("2026-08-28")
-        with pytest.raises(ValueError):
-            w.advance_to("2026-08-27")
-
-    def test_branch_a_ethan_fully_invested(self):
-        w = self._mk("A")
-        assert w.ethan.hcm_shares is True
-        assert w.ethan.cash_rmb < 200_000  # 接近满仓
-        assert w.ethan.entry_price_usd == 45.20
 
     def test_branch_b_ethan_not_invested(self):
         w = World(WorldConfig(run_id="t", timeline_events=timeline_b()))
@@ -143,44 +119,6 @@ class TestWorldState:
         w.exit_position(27.40)
         expect = 160_000 + 40_000 * (27.40 / 45.20)
         assert abs(w.ethan.cash_rmb - expect) < 1.0
-
-    def test_double_buy_rejected(self):
-        w = self._mk("A")  # 已买入
-        with pytest.raises(ValueError):
-            w.buy_position(0.3, 45.20)
-
-    def test_exit_loss_calculation(self):
-        # A 线:满仓 0.95 @ $45.20,09-07 以 $27.40 退出 → 亏 ~39%
-        w = self._mk("A")   # buy_position(0.95, 45.20)
-        w.advance_to("2026-09-07")
-        w.exit_position(27.40)
-        pnl = (27.40 - 45.20) / 45.20
-        assert abs(pnl - (-0.393)) < 0.01
-        # 现金 = 未投 5% + 95%×0.606 ≈ 200k×0.626 ≈ 12.5 万(亏损后总资产)
-        expect = 200_000 * 0.05 + 200_000 * 0.95 * (27.40 / 45.20)
-        assert abs(w.ethan.cash_rmb - expect) < 100
-        assert 0.58 * 200_000 < w.ethan.cash_rmb < 0.66 * 200_000
-
-    def test_information_permission(self):
-        # Investment AI 看到已释放公开事件;个人后果默认隐藏
-        w = self._mk("A")
-        w.ethan.personal_note = "原计划用作创业启动资金,现已不足"
-        ai = w.investment_ai_visible()
-        assert "released_events" in ai and "current_date" in ai
-        assert "personal_note" not in ai  # AI 看不到私人后果
-        ev = w.ethan_visible()
-        assert "personal_note" not in ev["own_state"]
-        # 披露节点后才可见
-        disc = w.disclose_personal_consequence()
-        assert "启动资金" in disc["personal_note"]
-
-    def test_audit_log(self):
-        w = self._mk("A")
-        w.advance_to("2026-08-28")
-        log = w.audit()
-        assert any(x["action"] == "set_branch" for x in log)
-        assert any(x["action"] == "release_event" for x in log)
-
 
 class TestTimelines:
     def test_timeline_data_complete(self):

@@ -15,12 +15,13 @@
       `manifest_error` 清单,而不是把一个没有 manifest 的记录打扮成正常的。
 
 语义口径(与 GTC 源文档一致,不新增设定):
-    - `branch_mode`:preset(可控对照,分支由运行参数定) / judge(T0 回答判定,01 §六);
-      跑规则判定的场合(no-llm 自检)记 `rules`,并留一条 warnings ——
-      源里没有第三种模式,不能把它打扮成 preset 或 judge;
+    - **分支一律由 T0 回答判定**(01 §六),没有"预设分支"这个档位 ——
+      2026-10-10 用户要求把预设分支的入口、字段、清单项全部剔除。
+      因此清单里**不再有 `branch_mode`**;判不出来就是 `branch="undetermined"`
+      + `finish_reason="branch_undetermined"`,不给默认值。
     - `judge`:`local`(本地 Ollama/HF 权重) / `api`(OpenRouter 等外部 API) / `rules`
-      (关键词规则,不调 LLM);preset 模式下写的是"这次配置里实际的判定后端",
-      记录里同时有 `branch_mode` 说明它没被调用过;
+      (关键词规则,不调 LLM);`branch_source` 记 `judge` / `judge-failed`,
+      跑规则判定的场合(no-llm 自检)记 `rules` 并留一条 warnings;
     - `temperature`:判定 0.1、反思 0.4、路由 0.2(反思/路由取 `case01.reflection`
       里的常量,同一来源,不两处写数);`judge=rules` 时判定温度记 `null` ——
       规则没有温度,填 0.1 等于谎报调过模型;
@@ -52,7 +53,6 @@ REQUIRED_KEYS = (
     "created_at",
     "git_commit",
     "engine_id",
-    "branch_mode",
     "judge",
     "judge_model",
     "judge_prompt_version",
@@ -404,7 +404,7 @@ def _detail_text(counts: Dict[str, int]) -> str:
 
 
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
-                     branch_mode: str = "", judge_llm: Any = None,
+                     judge_llm: Any = None,
                      backend_kind: str = "",
                      branch_source: str = "",
                      llms: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -437,8 +437,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
                                         else detect_temperature(judge_llm, cached_judge)}
         if branch:
             meta["branch"] = branch
-        if branch_mode:
-            meta["branch_mode"] = branch_mode
+        meta.pop("branch_mode", None)      # 没有 preset 了(2026-10-10 剔除)
         meta["branch_source"] = (branch_source or meta.get("branch_source")
                                  or raw.get("branch_source", "") or "")
         meta["judge_model"] = meta.get("judge_model") or ""
@@ -450,7 +449,6 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     meta: Dict[str, Any] = {
         "branch": branch or raw.get("branch", "") or "",
         "language": raw.get("language", "legacy"),
-        "branch_mode": branch_mode or raw.get("branch_mode", "") or "preset",
         "branch_source": branch_source or raw.get("branch_source", "") or "",
         "judge_info": dict(raw.get("judge_info") or {}),
         "mode": raw.get("mode", "") or "",
@@ -592,10 +590,6 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     if judge_kind not in _BACKEND_KINDS:
         warnings.append("judge={!r}:{}".format(judge_kind,
                                                meta.get("judge_backend_reason", "判不出后端")))
-    branch_mode = str(meta.get("branch_mode", "") or "")
-    if branch_mode not in ("preset", "judge"):
-        warnings.append("branch_mode={!r} 不在 preset/judge 之内".format(branch_mode))
-
     # 截断计数:此前只活在 lane 日志/一次 print 里,清单读不到(2026-10-05 体检 §七)。
     # 非零才进 warnings —— 0 是常态,不占位。
     truncations = int(meta.get("truncations") or 0)
@@ -616,7 +610,6 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         "engine_id": engine_id,
         "language": language,
         "branch": meta.get("branch", "") or "",
-        "branch_mode": branch_mode,
         "branch_source": meta.get("branch_source", "") or "",
         "judge": judge_kind or None,
         "judge_backend_reason": meta.get("judge_backend_reason", "") or "",

@@ -2,8 +2,8 @@
 """injector CLI(骨架)。
 
 用法:
-    python -m case01.injector.run_injector --timeline B --dry-run
-    python -m case01.injector.run_injector --timeline B --scenario-dir <mavis 场景目录>
+    python -m case01.injector.run_injector --dry-run
+    python -m case01.injector.run_injector --scenario-dir <mavis 场景目录>
 """
 import argparse
 import json
@@ -15,8 +15,6 @@ from .nodes import default_nodes
 
 def main():
     ap = argparse.ArgumentParser(description="case01 injector(dry-run / mavis 驱动)")
-    ap.add_argument("--timeline", default="A", choices=["A", "B", "C"],
-                    help="使用哪条 timeline 生成节点(B/C 见 case01.world.timelines)")
     ap.add_argument("--roles", default="Investment AI,Ethan Lin",
                     help="两个角色名,逗号分隔")
     ap.add_argument("--scenario-dir", default="",
@@ -34,7 +32,9 @@ def main():
         print("--roles 需要正好两个角色名")
         sys.exit(2)
 
-    nodes = default_nodes(args.timeline, roles=list(roles))
+    # 分支只由 T0 判定得出(预设已全部剔除,2026-10-10):这里先排 T0 那一天,
+    # 判定落地后由桥把后续节点换成该分支的时间线。
+    nodes = default_nodes("undetermined", roles=list(roles))
     bridge = MavisBridge(
         nodes=nodes, roles=roles, scenario_dir=args.scenario_dir,
         run_id=args.run_id, max_retries=args.max_retries, dry_run=args.dry_run,

@@ -267,7 +267,7 @@ def test_branch_collapse_is_called_out_in_numbers_not_left_to_the_reader(sandbox
             for i in range(10)]
     a = ba.analyze(rows, 0, BATCH)
     assert a["branch_top"]["share"] == 0.9 and a["branch_top"]["collapse_warning"]
-    few = [ba._row("s-%02d" % i, dict(FLAT, branch="B")) for i in range(4)]
+    few = [ba._row("s-%02d" % i, dict(FLAT)) for i in range(4)]
     assert not ba.analyze(few, 0, BATCH)["branch_top"]["collapse_warning"], \
         "4 条样本不足以谈『分布偏斜』,不许报警"
 
@@ -279,7 +279,7 @@ def _primary(sandbox, n, batch=BATCH, start=1):
     """在 runs 目录造 n 条一手 run.json(id 尾号 start..start+n-1)。"""
     for i in range(start, start + n):
         rid = "batch-%s-%03d" % (batch, i)
-        _write_run_json(sandbox, rid, dict(NESTED, branch="C"))
+        _write_run_json(sandbox, rid, dict(NESTED))
     return ["batch-%s-%03d" % (batch, i) for i in range(start, start + n)]
 
 

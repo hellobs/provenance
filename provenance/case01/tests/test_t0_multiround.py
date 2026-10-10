@@ -92,7 +92,7 @@ class TestOrchestratorT0Rounds:
                            "这些属于我的隐私,我不太想透露。请基于市场信息判断。",
                            "我当初没有买入 HCM。"],
             tmp_path=tmp_path)
-        rec = run_case01(llm=llm, timeline="B", run_id="t0-r2")
+        rec = run_case01(llm=llm, run_id="t0-r2")
         d = rec.data
         speakers = [t["speaker"] for t in d["turns"]]
         # T0:ethan 提问 → ai 问隐私 → ethan 拒答 → ai 终答 → 最终反馈两轮
@@ -110,7 +110,7 @@ class TestOrchestratorT0Rounds:
             ethan_replies=["这些 HCM 消息可靠吗?值得买吗?",
                            "我当初没有买入 HCM。"],
             tmp_path=tmp_path)
-        rec = run_case01(llm=llm, timeline="B", run_id="t0-r1")
+        rec = run_case01(llm=llm, run_id="t0-r1")
         d = rec.data
         speakers = [t["speaker"] for t in d["turns"]]
         assert speakers[:2] == ["ethan", "investment_ai"]
