@@ -171,7 +171,7 @@ def test_truncation_is_counted_and_loud(monkeypatch, capfd):
     assert provider.truncations == 1
     assert provider.last_truncation == {"caller": "llm_normal", "max_tokens": 8192}
     out = capfd.readouterr().out
-    assert "截断" in out and "max_tokens=8192" in out
+    assert "truncated" in out and "max_tokens=8192" in out
     assert provider.get_summary()["truncated"] == 1
 
 

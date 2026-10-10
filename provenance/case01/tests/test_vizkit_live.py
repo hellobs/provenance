@@ -128,7 +128,8 @@ def test_page_has_loud_end_of_run_banner():
     body = TestClient(_live(port=5092).app).get("/").text
     assert 'id="done-banner"' in body
     assert "showDoneBanner" in body
-    for piece in ("推演结束", "成品记录正在生成", "推演被中断", "推演出错"):
+    for piece in ("Simulation finished", "The final record is being generated",
+                  "Simulation interrupted", "Simulation error"):
         assert piece in body, "结束提示缺少 {} 文案".format(piece)
     # 结束横幅要盖在剧情事件横幅之上(结束是最该被看见的)
     assert "z-index: 320" in body
@@ -243,7 +244,7 @@ def test_second_restart_request_is_refused_until_the_next_run_starts():
     assert c.get("/health").json()["restart_pending"] is True
     # 再来一次:被拒(页面此时也不该有按钮,因为 restart_ready 已被清)
     r2 = c.post("/control/restart", json={}).json()
-    assert r2["ok"] is False and "已经重开过一次" in r2["error"]
+    assert r2["ok"] is False and "Restart already requested" in r2["error"]
     assert len(calls) == 1, "第二次请求不该再交给回调"
     # 新一局开跑 → 解除
     live.begin_run()

@@ -28,18 +28,18 @@ def test_n_instances_folds_trampoline_pair():
 
 
 def test_state_only_claims_what_it_can_prove():
-    assert _state({"case": "case01", "listening": False, "simulating": None}) == "未启动"
+    assert _state({"case": "case01", "listening": False, "simulating": None}) == "Not running"
     # case01:靠 /health 的 finished 分清"还在推演"与"跑完在保持"(2026-09-19 起)
-    assert _state({"case": "case01", "listening": True, "simulating": True}) == "在推演"
+    assert _state({"case": "case01", "listening": True, "simulating": True}) == "Simulating"
     assert _state({"case": "case01", "listening": True, "simulating": False,
-                   "finish_reason": "run_finished"}) == "在听(已跑完)"
+                   "finish_reason": "run_finished"}) == "Listening (run completed)"
     # 仅审阅(--review-only):服务在,但没有在推演
     assert _state({"case": "case01", "listening": True, "simulating": False,
-                   "finish_reason": "review_only"}) == "仅审阅(未在推演)"
+                   "finish_reason": "review_only"}) == "Review only (no simulation)"
     # case00:倾向角色数是可靠信号
-    assert _state({"case": "case00", "listening": True, "simulating": True}) == "在推演"
+    assert _state({"case": "case00", "listening": True, "simulating": True}) == "Simulating"
     assert _state({"case": "case00", "listening": True,
-                   "simulating": False}) == "在听(未在推演:--no-sim)"
+                   "simulating": False}) == "Listening (no simulation: --no-sim)"
 
 
 def test_two_live_faces_share_single_live_entry():
