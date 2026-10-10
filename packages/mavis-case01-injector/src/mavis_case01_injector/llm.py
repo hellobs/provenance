@@ -632,26 +632,34 @@ OPENROUTER_ROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 #                 (参数被忽略照样 200)。DeepSeek 认 `thinking`;vLLM/Qwen 认 `chat_template_kwargs`;
 #                 所以自托管那路两种一起发,各家只看懂自己那一个。OpenRouter 留空 = 没实测过,不猜。
 #   needs_base    没有有意义的默认端点(自托管)⇒ 不填就报错而不是猜。
+#   role          这一家在**演示里的定位**(10-10 用户口径:deepseek 是演示主力、
+#                 bigmodel 的 GLM 是备选、OpenRouter 是最最后备选)。写进表里而不是只写
+#                 在文档里,是为了 `--show` 那份"给平台填的清单"和手册不会各说一套;
+#                 表的本体顺序就是这个优先级(`--show` 按插入顺序打,不按字母序)。
 # 默认模型名取的是**这家端点当下真的服务什么**(2026-10-10 用配置里那份 key 打 /models:
 # 只有 `deepseek-flash` / `deepseek-v4-pro`)。别照公开文档写 `deepseek-chat` —— 那个名字
 # 在这把 key 上取不到,而"模型不存在"和"网络失败"在这条路上同形。
 ROUTER_PROVIDERS = {
     "deepseek": {
+        "role": "演示主力",
         "base": "https://api.deepseek.com/v1", "model": "deepseek-flash",
         "key_env": ("DEEPSEEK_API_KEY", "CASE01_ROUTER_API_KEY"),
         "key_json": ("deepseek_api_key", "router_api_key"),
         "client": "openai",
         "extra_body": {"thinking": {"type": "disabled"}}},
     "bigmodel": {
+        "role": "备选(免费池会整段 429:10-09 晚连续、10-10 下午一次;隔十几分钟又可用)",
         "base": BIGMODEL_BASE_URL, "model": BIGMODEL_ROUTER_MODEL,
         "key_env": ("BIGMODEL_API_KEY",), "key_json": ("bigmodel_api_key",),
         "client": "openai",
         "extra_body": {"thinking": {"type": "disabled"}}},
     "openrouter": {
+        "role": "最最后备选(10-10 两次实测这把 key 被拒:HTTP 403 / Key limit exceeded)",
         "base": "https://openrouter.ai/api/v1", "model": OPENROUTER_ROUTER_MODEL,
         "key_env": ("OPENROUTER_API_KEY",), "key_json": ("openrouter_api_key",),
         "client": "openai", "extra_body": None},
     "vllm": {
+        "role": "自托管/内网 OpenAI 兼容端点(必须给端点与模型名)",
         "base": "", "model": "",
         "key_env": ("CASE01_ROUTER_API_KEY",), "key_json": ("router_api_key",),
         "client": "vllm", "needs_base": True,
@@ -662,6 +670,62 @@ ROUTER_PROVIDERS = {
 
 def _host_of(base: str) -> str:
     return str(base or "").split("//")[-1].split("/")[0]
+
+
+# 那张表的三个读取口 —— Router(N7)与 Ethan(N3)**共用同一份解析**,免得又长出第二套。
+# (10-10:用户要求"一套东西同时能配 deepseek/bigmodel/OpenRouter"。N7 已经是一张表,
+#  但 N3 那侧还是 CASE01_ETHAN_BASE_URL/_MODEL/_API_KEY 三个环境变量各敲一遍,
+#  同一个后端在两处写法不同 ⇒ 对接方必须知道两套。下面两个函数是那"一套"。)
+def provider_spec(name: str) -> dict:
+    """按后端名取表里的一项;不认识就 ValueError 并列名单(不静默回落,配错要看得见)。"""
+    key = str(name or "").strip().lower()
+    spec = ROUTER_PROVIDERS.get(key)
+    if spec is None:
+        raise ValueError("后端名只认 {}(还有 {}/{}=故意用本地),收到:{!r}".format(
+            "/".join(ROUTER_PROVIDERS), "/".join(LOCAL_ROUTER_PROVIDERS),
+            "与各家同名", name))
+    return spec
+
+
+def provider_endpoint(name: str, base: str = "", model: str = "",
+                      router_overrides: bool = True):
+    """这一家实际用哪个端点/模型:显式给的 > (Router 那层的覆盖) > 表默认值。
+
+    `base`/`model` 是调用方**已经定下来**的值(比如 Ethan 那侧的 CASE01_ETHAN_*)。
+    `router_overrides=True` 时才去试 `CASE01_ROUTER_BASE_URL`/`_MODEL` 与
+    `.secrets.json` 的 `router_base_url`/`router_model` —— 那两个键是**给 N7 用的**,
+    N3(Ethan)不要它们:否则"今天拿 CASE01_ROUTER_BASE_URL 对照了一下 Router"会把
+    Ethan 的台词也写到那个端点上去,而两件事在产物里都叫"外部 API"。
+    """
+    spec = provider_spec(name)
+    env_b = "CASE01_ROUTER_BASE_URL" if router_overrides else ""
+    env_m = "CASE01_ROUTER_MODEL" if router_overrides else ""
+    b = (str(base or "").strip()
+         or os.environ.get(env_b, "").strip()
+         or (_secret_value("", "router_base_url") if router_overrides else "")
+         or spec["base"])
+    m = (str(model or "").strip()
+         or os.environ.get(env_m, "").strip()
+         or (_secret_value("", "router_model") if router_overrides else "")
+         or spec["model"])
+    return b, m
+
+
+def provider_key(name: str, env_first=()) -> str:
+    """这一家的 key:`env_first` 里的环境变量名先试,再按表里 key_env → key_json 的顺序。
+
+    只回长度不为 0 的值,**任何情况下都不要打印它**(见 tools/setup_api.py 的同一条政策)。
+    """
+    spec = provider_spec(name)
+    for n in tuple(env_first) + tuple(spec["key_env"]):
+        v = os.environ.get(n, "").strip()
+        if v:
+            return v
+    for n in spec["key_json"]:
+        v = _secret_value("", n)
+        if v:
+            return v
+    return ""
 
 
 def _secrets_files() -> List[str]:
@@ -754,15 +818,8 @@ def router_client_from_env():
     provider = router_provider_name()
     if provider in LOCAL_ROUTER_PROVIDERS or not provider:
         return None, {}
-    spec = ROUTER_PROVIDERS.get(provider)
-    if spec is None:
-        raise ValueError("CASE01_ROUTER_PROVIDER 只认 {}/{}(local=故意用本地),"
-                         "收到:{}".format("/".join(sorted(ROUTER_PROVIDERS)),
-                                          "/".join(LOCAL_ROUTER_PROVIDERS), provider))
-    model = os.environ.get("CASE01_ROUTER_MODEL", "").strip() \
-        or _secret_value("", "router_model") or spec["model"]
-    base = os.environ.get("CASE01_ROUTER_BASE_URL", "").strip() \
-        or _secret_value("", "router_base_url") or spec["base"]
+    spec = provider_spec(provider)      # 不在名单里 ⇒ ValueError 并列名单
+    base, model = provider_endpoint(provider)
     try:
         timeout = float(os.environ.get("CASE01_ROUTER_TIMEOUT", "") or 180.0)
     except ValueError:
@@ -777,19 +834,9 @@ def router_client_from_env():
     if spec.get("needs_base") and not model:
         raise ValueError("Router provider={} 需要模型名"
                          "(这个后端没有有意义的默认模型名)".format(provider))
-    if provider == "openrouter":
-        key = _openrouter_key()          # 它有 env→case01/.secrets→引擎统一解析 三级回落
-    else:
-        key = ""
-        for name in spec["key_env"]:
-            key = os.environ.get(name, "").strip()
-            if key:
-                break
-        if not key:
-            for name in spec["key_json"]:
-                key = _secret_value("", name)
-                if key:
-                    break
+    # OpenRouter 的 key 走它自己那条更宽的回落(env → case01/.secrets.json → 引擎统一解析),
+    # 比表里的两个键名管得多;其他家按 provider_key 的次序。
+    key = _openrouter_key() if provider == "openrouter" else provider_key(provider)
     if not key:
         raise RuntimeError(
             "Router provider={} 但取不到 key(试过 env {} 与 .secrets.json 的 {})。"

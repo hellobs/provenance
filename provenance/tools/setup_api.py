@@ -104,14 +104,17 @@ def _merge_repo_secrets(patch: dict) -> str:
     return p
 
 
-def _env_overrides() -> list:
+def _env_overrides(skip=()) -> list:
     """此刻会**压过**本文件的环境变量(排障用,优先级最高)。
 
     为什么要单独报:跑批解析顺序是 env → `.secrets.json` → 表的默认值,所以在 shell 里
     留着一个 `CASE01_ROUTER_MODEL` 就会让"我明明改了文件"变成"改了不生效"。
+    `skip` 用来排除**本工具自己**临时设的那个(见 `_self_check`,不排除就会误导人)。
     """
+    skip = set(skip)
     return [n for n in ("CASE01_ROUTER_PROVIDER", "CASE01_ROUTER_BASE_URL",
-                        "CASE01_ROUTER_MODEL") if os.environ.get(n, "").strip()]
+                        "CASE01_ROUTER_MODEL")
+            if n not in skip and os.environ.get(n, "").strip()]
 
 
 def _configured_provider() -> str:
@@ -119,90 +122,124 @@ def _configured_provider() -> str:
     return router_provider_name()
 
 
-def _self_check() -> int:
+def _self_check(provider: str = "") -> int:
     """自检 = **走跑批用的同一份解析**,判据是"正文非空"而不是 HTTP 200。
 
     这里原来是另一条独立实现(`urllib` 直接 POST,`max_tokens=1` + "ping",回 200 就算过),
     它测不到真问题:推理端点把参数忽略掉照样 200,而思考链吃光预算时正文为空 ——
     Router 拿到空正文等于"拆不出问题"。当天(10-10)因此先出现"自检绿、跑批空",
     又出现"--check 不带 --router 就固定测 OpenRouter,而生效的其实是 DeepSeek"。
+
+    `provider` 非空时临时把 `CASE01_ROUTER_PROVIDER` 指过去再解析 —— 手册 §一 第 6 行的
+    "配谁就测谁"靠这个,而测的与跑批用的仍是**同一份代码**(不是第二套请求)。
     """
     from case01.agents.llm import (LOCAL_ROUTER_PROVIDERS, router_client_from_env,
                                    router_identity, router_provider_name)
-    eff = router_provider_name()
-    if not eff or eff in LOCAL_ROUTER_PROVIDERS:
-        print("当前没配外部 Router(router_provider={!r})⇒ 跑批会回落本地模型,"
-              "04 §五 要的是独立 API 模型。一条命令配外部后端:"
-              "python provenance/tools/setup_api.py --router deepseek --key <key>"
-              "(bigmodel/openrouter/vllm 同法;名单见 --show)".format(eff))
-        return 1
+    prev = os.environ.get("CASE01_ROUTER_PROVIDER")
+    named = bool(provider and provider not in LOCAL_ROUTER_PROVIDERS)
+    if named:
+        os.environ["CASE01_ROUTER_PROVIDER"] = provider
+    # 本工具自己临时指过去的那个不算"外部覆盖",否则等于自己吓自己
+    skip = ("CASE01_ROUTER_PROVIDER",) if named else ()
     try:
-        client, _ident = router_client_from_env()
-    except Exception as e:  # noqa: BLE001 —— 配置不全要原样说出来
-        print("自检结果:失败 ✗ 按当前配置造不出客户端:{}: {}".format(
-            type(e).__name__, str(e)[:200]))
-        return 1
-    if client is None:
-        print("自检结果:失败 ✗ router_client_from_env() 返回空(配置为空)。")
-        return 1
-    # 产物里的 `router.executed_by.provider` 是**按 host 算的** "api"/"local"(见
-    # `router_identity()`),而配置名(deepseek/bigmodel/…)只在 `router_provider` 这一层。
-    # 手册 §一 第 6 行认的是 `external_api`,所以两个都打,别让配置名替它背书。
-    host_based = router_identity(client)
-    print("测的是当前生效后端:{} @ {}  (router_provider={} ⇒ 产物里 external_api={})".format(
-        host_based.get("model"), host_based.get("host"), eff,
-        host_based.get("provider") == "api"))
-    ov = _env_overrides()
-    if ov:
-        print("[!] 这些环境变量会压过 .secrets.json:{}".format(",".join(ov)))
-    try:
-        out = client.chat([{"role": "user",
-                            "content": 'Reply with JSON only: {"ok": true}'}],
-                          temperature=0.1, max_tokens=64)
-    except Exception as e:  # noqa: BLE001
-        print("自检结果:失败 ✗ {}: {}".format(type(e).__name__, str(e)[:200]))
-        return 1
-    if not (out or "").strip():
-        print("自检结果:失败 ✗ 模型回空正文(思考链可能吃光了 max_tokens=64);"
-              "Router 遇到同样的情况时 `router.issues` 会是空的")
-        return 1
-    print("自检结果:可用 ✓ 正文 {} 字符 | identity={}".format(
-        len(out), json.dumps(dict(host_based, router_provider=eff), ensure_ascii=False)))
-    return 0
+        eff = router_provider_name()
+        if not eff or eff in LOCAL_ROUTER_PROVIDERS:
+            print("当前没配外部 Router(router_provider={!r})⇒ 跑批会回落本地模型,"
+                  "04 §五 要的是独立 API 模型。一条命令配外部后端:"
+                  "python provenance/tools/setup_api.py --router deepseek --key <key>"
+                  "(bigmodel/openrouter/vllm 同法;名单与优先级见 --show)".format(eff))
+            return 1
+        try:
+            client, _ident = router_client_from_env()
+        except Exception as e:  # noqa: BLE001 —— 配置不全要原样说出来
+            print("自检结果:失败 ✗ 按当前配置造不出客户端:{}: {}".format(
+                type(e).__name__, str(e)[:200]))
+            return 1
+        if client is None:
+            print("自检结果:失败 ✗ router_client_from_env() 返回空(配置为空)。")
+            return 1
+        # 产物里的 `router.executed_by.provider` 是**按 host 算的** "api"/"local"(见
+        # `router_identity()`),配置名(deepseek/bigmodel/…)只在 `router_provider` 这一层。
+        # 手册 §一 第 6 行认的是 `external_api`,所以两个都打,别让配置名替它背书。
+        host_based = router_identity(client)
+        print("{}:{} @ {}  (router_provider={} ⇒ 产物里 external_api={})".format(
+            "点名测的后端" if named else "测的是当前生效后端",
+            host_based.get("model"), host_based.get("host"), eff,
+            host_based.get("provider") == "api"))
+        if named and prev and prev != provider:
+            print("  (跑批用的仍是 .secrets.json/env 里那个 {};"
+                  "这句只是把本次自检指到 {})".format(prev, provider))
+        ov = _env_overrides(skip)
+        if ov:
+            print("[!] 这些环境变量会压过 .secrets.json:{}".format(",".join(ov)))
+        try:
+            out = client.chat([{"role": "user",
+                                "content": 'Reply with JSON only: {"ok": true}'}],
+                              temperature=0.1, max_tokens=64)
+        except Exception as e:  # noqa: BLE001
+            print("自检结果:失败 ✗ {}: {}".format(type(e).__name__, str(e)[:200]))
+            return 1
+        if not (out or "").strip():
+            print("自检结果:失败 ✗ 模型回空正文(思考链可能吃光了 max_tokens=64);"
+                  "Router 遇到同样的情况时 `router.issues` 会是空的")
+            return 1
+        print("自检结果:可用 ✓ 正文 {} 字符 | identity={}".format(
+            len(out), json.dumps(dict(host_based, router_provider=eff), ensure_ascii=False)))
+        return 0
+    finally:
+        if named:
+            if prev is None:
+                os.environ.pop("CASE01_ROUTER_PROVIDER", None)
+            else:
+                os.environ["CASE01_ROUTER_PROVIDER"] = prev
 
 
 def _show() -> int:
-    """现在配的是谁 —— **不联网**(自检是 `--check` 的事,这里只把三层取值摊开)。
+    """现在配的是谁 + **要给平台填的那张表** —— 全程不联网(联网自检是 `--check` 的事)。
 
     端点/模型是 env → .secrets.json → 表的默认值 三层按序取,所以这里**逐层列出**而不是
     只报赢家:这里再算一遍优先级就是第三份实现,而这张表的教训正是"两处各写一份会漂"。
     """
-    from case_engine.llm import openrouter_key, openrouter_source  # noqa: F401
+    from case_engine.llm import openrouter_source
     PROV = _providers()
     sec = _read_repo_secrets()
     eff = _configured_provider()
     print("Router 后端(router_provider):{}".format(
         eff or "(未配 ⇒ Router 回落本地,产物里是 local_fallback)"))
-    print("可配的后端:{};{}=故意用本地。一条命令配好 → "
-          "python provenance/tools/setup_api.py --router <名字> --key <key>".format(
-              "/".join(sorted(PROV)), LOCAL))
+    # 下面这块是给对接方看的"填哪几个字段"清单:逐家列 key 的 json 键名/环境变量名/
+    # 默认端点与模型。写这条的缘由:10-10 用户点明"这个接口到时候要对接平台,
+    # 平台需要去填写来接入 API" —— 名单在代码里而对接方只能读文档,那就必须打得出来。
+    print("\n可填的 Router 后端({} 个,**按演示优先级排**;{}=故意用本地,不接外部):"
+          .format(len(PROV), LOCAL))
+    for name, s in PROV.items():
+        print("  --router {} —— {}".format(name, s.get("role", "")))
+        print("     端点默认:{}".format(s["base"] or "(无默认 ⇒ 必须给 --base-url)"))
+        print("     模型默认:{}".format(s["model"] or "(无默认 ⇒ 必须给 --model)"))
+        print("     key 写进 .secrets.json:{}".format("/".join(s["key_json"])))
+        print("     key 也可用环境变量:{}".format("/".join(s["key_env"])))
+    print("     换端点/模型:--base-url/--model(落到 .secrets.json 的 "
+          "router_base_url/router_model),或 env CASE01_ROUTER_BASE_URL/_MODEL(压过文件)")
+    print("\n同一张表还服务 N3(Ethan 的台词):设 CASE01_ETHAN_PROVIDER=<上面任一名字> 即可,"
+          "端点/模型/key 照这套取;要逐项覆盖就用 CASE01_ETHAN_BASE_URL/_MODEL/_API_KEY"
+          "(它们优先级最高,且**不**读 CASE01_ROUTER_* 那几个 N7 专用覆盖项)。")
     spec = PROV.get(eff)
     if spec:
-        print("该后端取 key 的顺序:{}".format(
+        print("\n当前生效那个后端的三层取值:")
+        print("  取 key 的顺序:{}".format(
             " → ".join(list(spec["key_env"]) + list(spec["key_json"]))))
         for label, env_name, json_key, default in (
                 ("端点", "CASE01_ROUTER_BASE_URL", "router_base_url", spec["base"]),
                 ("模型", "CASE01_ROUTER_MODEL", "router_model", spec["model"])):
-            print("{}:env={} .secrets.json={} 默认={}".format(
+            print("  {}:env={} .secrets.json={} 默认={}".format(
                 label, os.environ.get(env_name, "").strip() or "-",
                 str(sec.get(json_key, "")).strip() or "-", default or "(无默认,必填)"))
     elif eff and eff != LOCAL:
         print("[!] router_provider={!r} 不在名单里 ⇒ 跑批会当场 ValueError、"
               "不静默回落本地(配错要看得见)。自检走不出这一步,先改回名单内的名字".format(eff))
+    print("\nkey 落盘情况(只看有没有值,绝不打印):")
     for name in sorted({n for s in PROV.values() for n in s["key_json"]}):
-        print("{}:{}(只看有没有值,不打印)".format(
-            name, "已配" if str(sec.get(name, "")).strip() else "未配"))
-    print("OpenRouter key 来源:{}".format(openrouter_source() or "(未配置)"))
+        print("  {}:{}".format(name, "已配" if str(sec.get(name, "")).strip() else "未配"))
+    print("  OpenRouter key 解析来源:{}".format(openrouter_source() or "(未配置)"))
     ov = _env_overrides()
     if ov:
         print("[!] 这些环境变量会压过 .secrets.json:{}".format(",".join(ov)))
@@ -228,11 +265,11 @@ def main(argv=None) -> int:
     PROV = _providers()
     ap = argparse.ArgumentParser(
         description="配置/自检外部 API key 与 Router 后端"
-                    "({})".format("/".join(sorted(PROV) + [LOCAL])))
+                    "({})".format("/".join(list(PROV) + [LOCAL])))
     ap.add_argument("--key", default="", help="API key(不填则交互输入;不回显)")
-    ap.add_argument("--router", default="", choices=sorted(PROV) + [LOCAL],
-                    help="把 N7(Router)配成哪个后端;不填=沿用当前生效的后端;"
-                         "配成 local 表示故意用本地")
+    ap.add_argument("--router", default="", choices=list(PROV) + [LOCAL],
+                    help="把 N7(Router)配成哪个后端(名单与优先级见 --show);"
+                         "不填=沿用当前生效的后端;配成 local 表示故意用本地")
     ap.add_argument("--base-url", default="",
                     help="端点(只配 vllm 时必须;其他后端给了就覆盖默认值)")
     ap.add_argument("--model", default="",
@@ -244,7 +281,7 @@ def main(argv=None) -> int:
     if args.show:
         return _show()
     if args.check:
-        return _self_check()
+        return _self_check(args.router)
 
     provider = _target_provider(args, PROV)
     if provider == LOCAL:
@@ -286,7 +323,7 @@ def main(argv=None) -> int:
         print("[!] 这些环境变量会压过刚写的 .secrets.json:{}".format(",".join(ov)))
 
     print("自检中(走跑批那份解析,一次最小真实调用)…")
-    rc = _self_check()
+    rc = _self_check(provider)
     if rc == 0:
         print("\n下一步:python provenance/live_switch.py --start case01   (或 --start case00)")
         print("跑批不用再设环境变量;要临时换后端:CASE01_ROUTER_PROVIDER=<名字>(env 优先)。")

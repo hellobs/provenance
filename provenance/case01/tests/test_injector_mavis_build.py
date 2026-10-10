@@ -194,6 +194,31 @@ def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
     assert "api(mini-1@" in bridge.ethan_backend
 
 
+def test_ethan_provider_name_reuses_the_same_backend_table(monkeypatch, tmp_path):
+    """点名 `CASE01_ETHAN_PROVIDER=deepseek` ⇒ 端点/模型/key 全从那张后端表取。
+
+    10-10 统一配置面:N7(Router)先成了表驱动,而 N3(Ethan)仍要人手抄
+    BASE_URL/MODEL/API_KEY 三行 —— 同一个后端在两处写法不同,对接方得记两套。
+    顺带钉住一条优先级:`CASE01_ROUTER_BASE_URL` 是**给 N7 的**对照开关,
+    不该决定 Ethan 的台词由谁写(那样"换了 Router"会悄悄换掉整个对话的模型)。
+    """
+    _install_stub_provider(monkeypatch)
+    bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    monkeypatch.setattr(type(bridge), "_remote_reachable",
+                        staticmethod(lambda *a, **k: True))
+    for n in ("CASE01_ETHAN_BASE_URL", "CASE01_ETHAN_MODEL", "CASE01_ETHAN_API_KEY",
+              "CASE01_ROUTER_MODEL", "DEEPSEEK_API_KEY", "CASE01_ROUTER_API_KEY"):
+        monkeypatch.delenv(n, raising=False)
+    monkeypatch.setenv("CASE01_ETHAN_PROVIDER", "deepseek")
+    monkeypatch.setenv("CASE01_ROUTER_BASE_URL", "http://127.0.0.1:9/v1")  # 只该管 N7
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ethan-table")
+    bridge._build_mavis()
+    llm = bridge.config["agents"][DEFAULT_ROLES[1]]["think"]["llm"]
+    assert llm["base_url"] == "https://api.deepseek.com/v1", llm
+    assert llm["model"] == "deepseek-flash", llm
+    assert llm["api_key"] == "sk-ethan-table"
+
+
 def test_ethan_external_unreachable_warns_but_still_external(monkeypatch, tmp_path, capsys):
     """探测不通 ⇒ **报警但仍用外部 provider**,绝不悄悄退回本地(2026-10-10 改)。
 

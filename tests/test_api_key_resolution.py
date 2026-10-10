@@ -112,6 +112,7 @@ def test_router_provider_list_has_exactly_one_source(monkeypatch):
     assert setup_api._providers() is L.ROUTER_PROVIDERS    # 同一对象,不是第二份拷贝
     for name, spec in L.ROUTER_PROVIDERS.items():
         assert spec["key_json"] and spec["client"] in ("openai", "vllm"), name
+        assert spec.get("role"), name          # --show 那份"给平台填的清单"要印定位
         if not spec.get("needs_base"):
             assert spec["base"] and spec["model"], name    # 有默认值才许不填端点
 

@@ -1046,9 +1046,31 @@ class MavisBridge:
           · 配全了但起面探测不通 ⇒ 报错停这一局,**不**退回本地;
           · 一个都没配 ⇒ 仍按"就是要本地"处理,但把实际后端写进 run_record,
             事后一眼能看出 Ethan 是谁写的。
+        两种写法(10-10 统一成一张后端表,见 `llm.ROUTER_PROVIDERS`):
+          · `CASE01_ETHAN_PROVIDER=deepseek|bigmodel|openrouter|vllm` —— 端点/模型/key
+            都按那张表取(`--show` 打得出来),要换的只有一家时不必再抄三行;
+            `CASE01_ETHAN_BASE_URL`/`_MODEL`/`_API_KEY` 仍可逐项覆盖,优先级最高。
+          · 只给那三个 `CASE01_ETHAN_*` 而不给 provider —— 老写法,行为不变。
         """
         base_url = os.environ.get("CASE01_ETHAN_BASE_URL", "").strip()
         model = os.environ.get("CASE01_ETHAN_MODEL", "").strip()
+        key = os.environ.get("CASE01_ETHAN_API_KEY", "").strip()
+        provider = os.environ.get("CASE01_ETHAN_PROVIDER", "").strip().lower()
+        if provider:
+            from .llm import LOCAL_ROUTER_PROVIDERS, provider_endpoint, provider_key
+            if provider in LOCAL_ROUTER_PROVIDERS:
+                # 显式点名"这次 Ethan 就要本地":与"没配"区分,但走的是同一条如实记录
+                self.ethan_backend = "local(CASE01_ETHAN_PROVIDER={})".format(provider)
+                return
+            # router_overrides=False:N7 那个 CASE01_ROUTER_BASE_URL 不该决定 Ethan 的台词
+            base_url, model = provider_endpoint(provider, base_url, model,
+                                                router_overrides=False)
+            key = key or provider_key(provider)
+            if not key:
+                raise RuntimeError(
+                    "CASE01_ETHAN_PROVIDER={} 但取不到 key:设 CASE01_ETHAN_API_KEY,"
+                    "或用 tools/setup_api.py --router {} --key <key> 把它写进 "
+                    ".secrets.json(已 gitignore;不打印 key)".format(provider, provider))
         if not (base_url or model):
             self.ethan_backend = "local(未配 CASE01_ETHAN_* ⇒ Ethan 走本地模型)"
             return
@@ -1056,7 +1078,8 @@ class MavisBridge:
             missing = "CASE01_ETHAN_MODEL" if model else "CASE01_ETHAN_BASE_URL"
             raise RuntimeError(
                 "Ethan 的外部 API 只配了一半(缺 {}):配漏了不等于选择本地。"
-                "要么两个都配齐,要么都不配。".format(missing))
+                "要么两个都配齐,要么都不配;或只点 CASE01_ETHAN_PROVIDER=<后端名>,"
+                "端点与模型名按那张表取。".format(missing))
         # 起面探测:**重试几次**;仍不通则**报警但继续**。
         # 为什么不再直接杀服务(2026-10-10 用户"为什么现在启动不了 5010 了"):
         # 一次探测失败就把整局连同 5010 一起关掉,等于"网络抖一下 → 整个平台打不开",
@@ -1075,7 +1098,7 @@ class MavisBridge:
             "provider": "openai",
             "model": model,
             "base_url": base_url,
-            "api_key": os.environ.get("CASE01_ETHAN_API_KEY", "").strip(),
+            "api_key": key,
         }
         self.ethan_backend = "api({}@{})".format(model, base_url)
 
