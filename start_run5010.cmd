@@ -18,6 +18,8 @@ rem  NOTE: keep this file ASCII-only. cmd.exe parses .cmd using the system ANSI
 rem  code page (GBK on zh-CN); non-ASCII text here breaks command parsing.
 rem ===========================================================================
 setlocal
+rem 2026-10-10:本地私密配置(Ethan 外部 API 等)在这里加载,密钥不进仓库。
+if exist "%~dp0provenance\case01.env.local" call "%~dp0provenance\case01.env.local"
 cd /d "%~dp0provenance"
 
 set PY=%~dp0provenance\.venv-live\Scripts\python.exe
