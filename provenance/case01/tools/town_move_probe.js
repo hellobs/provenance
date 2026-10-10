@@ -282,16 +282,15 @@ ok(covered.length === 0, '任何气泡都不许压住任何角色,实得:' + JSO
 ok(rectOverlap(bubbleRect('Investment AI'), bubbleRect('Ethan Lin')) === false,
    '两个气泡之间也不重叠');
 const ethB = bubbleRect('Ethan Lin'), aiB = bubbleRect('Investment AI');
-// 聊天次序:摆位策略改成"优先偏上方"之后,两个框可能是左右排,也可能是上下排
-// (各自都在本人正上方时)。两种摆法都要满足"先说的 Ethan 在前"。
-ok(ethB.x + ethB.w <= aiB.x || ethB.y + ethB.h <= aiB.y,
-   '先说的 Ethan 在前(要么整块在 AI 左边,要么整块在 AI 上边),实得 Ethan=' +
-   JSON.stringify(ethB) + ' AI=' + JSON.stringify(aiB));
+// 注:正常运行时**同一时刻只有一个框**(顺序打字机,换人时清掉上一位的字),
+// 这里是直接塞两个框的极端情形,只要求"两框不重叠 + 各自仍在本人附近"。
 // 摆位策略:优先"偏上方"(留在本人附近),不是一路抬到另一个人头上。
 const ethHome = charRect('Ethan Lin').x + charRect('Ethan Lin').w / 2;
 ok(Math.abs((ethB.x + ethB.w / 2) - ethHome) < 200,
    'Ethan 的气泡仍留在本人附近(未漂到 AI 头顶),实得气泡中线=' +
    (ethB.x + ethB.w / 2) + ' 本人中线=' + ethHome);
+ok(Math.abs((aiB.x + aiB.w / 2) - (charRect('Investment AI').x + 20)) < 200,
+   'AI 的气泡仍留在本人附近,实得气泡中线=' + (aiB.x + aiB.w / 2));
 
 // ============================================================
 // 回归:目标格在墙里时,不能"位置不动、腿一直走"

@@ -94,6 +94,13 @@
 				let item = bubble_queue[0];
 				if ((bubble_full[item.name] || "") !== item.text) { bubble_queue.shift(); continue; }
 				bubble_queue.shift();
+				// 同一时刻**只留当前发言人的框**:把其它角色屏幕上残留的字清掉。
+				// 两个人同时挂着框,框就得互相让位,而让位必然把某个框甩离它的主人
+				// (2026-10-10 用户截图:Investment AI 的框跑到画面右上角)。
+				// 顺序打字机之后"当前发言人"本来就只有一个,一人一句最贴近真实说话。
+				for (let k in pronunciatios) {
+					if (k !== item.name) pronunciatios[k].setText("");
+				}
 				bubble_active = item.name;
 				break;
 			}
@@ -783,22 +790,22 @@
 				new_sprite.body.y - 8,
 				"",
 				{
-					// 字体(2026-10-10 用户反馈"气泡框里面的字体不好"):原来 12px monospace,
-					// 中文落到等宽回退字体上又碎又糊。换成无衬线栈(Windows 上微软雅黑、
-					// macOS 上苹方),拉丁字符交给 Segoe UI;13px + 行距 3px 保证多行可读。
+					// 字体(2026-10-10 用户反馈"气泡框里面的字体不好"、随后又要求
+					// "字号可以再小一点点"):无衬线栈,拉丁交给 Segoe UI、中文落到
+					// 微软雅黑/苹方;12px + 限宽 112px —— 框窄一点,两个框才挤得下。
 					fontFamily: "'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif",
-					fontSize: "13px",
-					lineSpacing: 3,
+					fontSize: "12px",
+					lineSpacing: 2,
 					fill: "#000000",
 					// 背景用 rgba 自己带透明度,而不是给整个 Text 对象设 alpha ——
-					// 对象级 alpha 会连**文字**一起打七折,读起来发虚(也是"字体不好"观感的来源之一)。
+					// 对象级 alpha 会连**文字**一起打七折,读起来发虚。
 					backgroundColor: "rgba(255, 255, 204, 0.88)",
-					padding: { x: 5, y: 3 },
+					padding: { x: 4, y: 3 },
 					border:"solid",
 					borderRadius:"10px",
-					// 限宽 128px(13px 字号下约 9 个中文字/行),超出自动折行
+					// 限宽 112px(12px 字号下约 9 个中文字/行),超出自动折行
 					align: "left",
-					wordWrap: { width: 128, useAdvancedWrap: true },
+					wordWrap: { width: 112, useAdvancedWrap: true },
 				}
 			).setDepth(3);
 			// 锚点:水平**居中**、垂直**底部**(2026-10-09 用户要求"气泡一定要在人的上方")。
@@ -1204,16 +1211,16 @@
 				if (!hit) break;
 				let moved = false;
 				if (!triedSideways) {
-					// 刚好**整块错开**所需的左右位移(不是"刚好不再相交"——
-					// 两个框几乎重在一起时后者算出来是负数,会误判成"不用让"而直接上抬,
-					// 结果后说话的人反而压在上面)。撞的是"已摆好的气泡"时优先往右,
-					// 保住"先说的在左、后说的在右"的阅读次序。
+					// 让开所需的左右位移,取**更小的那一侧** —— 整块错开能保证不撞,
+					// 但两框只压掉一角时"往远的那侧让"会把气泡甩出老远
+					// (2026-10-10 用户截图:Investment AI 的框整个跑到画面右上角)。
+					// 一样大时优先往右,保住"先说的在左、后说的在右"的阅读次序。
 					let needR = (hit.box.x + hit.box.w) + BUBBLE_STACK_GAP - (cur.x - cur.w / 2);
 					let needL = (cur.x + cur.w / 2) - (hit.box.x - BUBBLE_STACK_GAP);
-					if (needR > 0.01 && (hit.kind === "bubble" || needL <= 0.01 || needR <= needL)) {
+					if (needR > 0.01 && (needL <= 0.01 || needR <= needL)) {
 						if (!firstHit(cur, cur.x + needR, cur.y)) { cur.x += needR; moved = true; }
 					}
-					if (!moved && needL > 0.01 && hit.kind !== "bubble") {
+					if (!moved && needL > 0.01) {
 						if (!firstHit(cur, cur.x - needL, cur.y)) { cur.x -= needL; moved = true; }
 					}
 					if (moved) triedSideways = true;

@@ -108,6 +108,8 @@ for (let i = 0; i < 40; i++) {
 ok(both === 0, '同一时刻不应有两句同时在打字,实得同增的 tick 数=' + both);
 ok(bDoneAt >= 0 && cStartAt > bDoneAt,
    'AI 那句要等 Ethan 念完才开口,实得 Ethan 念完于第 ' + bDoneAt + ' tick,AI 开口于第 ' + cStartAt + ' tick');
+ok(sandbox.pronunciatios['B']._t === '',
+   '换人开口时上一位的框要清空(同一时刻只留一个框),实得残留 ' + JSON.stringify(sandbox.pronunciatios['B']._t));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
