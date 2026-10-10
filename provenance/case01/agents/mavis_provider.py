@@ -67,6 +67,8 @@ class Case01SafeProvider:
         self.max_attempts = max(1, int(self.config.get("structured_attempts", 3) or 3))
         self.retry_delay = max(0.0, float(self.config.get("retry_delay", 1) or 0))
         self.enabled = True
+        # 端点不支持 response_format 而降级的次数(运行清单里要能查)
+        self.response_format_downgrades = 0
         self.summary = {"total": [0, 0, 0]}
         # 截断计数(finish_reason == "length"):截断的输出与完整输出长得一模一样,
         # 记进 summary 才会出现在 mavis 的角色日志/state 里,而不是只有天知道。
@@ -110,7 +112,14 @@ class Case01SafeProvider:
         index = 2 if result is None else 1
         self.summary["total"][index] += 1
         self.summary[caller][index] += 1
-        return failsafe if result is None else result
+        if result is None:
+            # 2026-10-10 用户要求"不允许静默处理":走到兜底值必须喊出来 ——
+            # 兜底值(如字符串"嗯")会被当成模型的话显示/入库,静默就是造假。
+            print("[case01.llm] !! 全部尝试失败,返回**兜底值**(不是模型说的):"
+                  " caller={} failsafe={!r} 累计={} 次".format(
+                      caller, failsafe, self.summary["total"][2]), flush=True)
+            return failsafe
+        return result
 
     def _complete(self, prompt, return_type, temperature=0.5,
                   caller="llm_normal", max_tokens=None, **_kwargs):
@@ -178,6 +187,23 @@ class Case01SafeProvider:
             json=body,
             timeout=self.timeout,
         )
+        # 2026-10-10:DeepSeek 等端点**不接受** `response_format={"type":"json_schema",...}`
+        # 这一族新格式,直接回 400 ⇒ 上层 3 次 attempt 全失败 ⇒ 落到 mavis 的
+        # failsafe("嗯"),看起来就像"模型不说话"。这里降级重试,而且**必须出声**:
+        # 端点能力差异不能悄悄吞掉。
+        if response.status_code == 400 and response_format:
+            print("[case01.llm] !! 端点拒绝 response_format={} (HTTP 400),"
+                  "降级为不带 response_format 重试一次。端点原文: {}".format(
+                      response_format.get("type"), (response.text or "")[:200]),
+                  flush=True)
+            self.response_format_downgrades += 1
+            body.pop("response_format", None)
+            response = requests.post(
+                self.base_url + "/chat/completions",
+                headers=headers,
+                json=body,
+                timeout=self.timeout,
+            )
         response.raise_for_status()
         data = response.json()
         choice = data["choices"][0]
