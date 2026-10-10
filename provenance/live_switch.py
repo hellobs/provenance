@@ -494,8 +494,11 @@ def start(case, args):
         child_env = dict(os.environ)
         child_env["PYTHONIOENCODING"] = "utf-8"
         child_env.setdefault("PYTHONUTF8", "1")
-        subprocess.Popen(cmd, cwd=HERE, stdout=fo, stderr=fe, env=child_env,
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), **kwargs)
+        # 留着句柄:_follow 要用它判断"服务是不是已经退出去了"
+        # (2026-10-10:原先丢弃返回值,于是服务崩了之后跟随循环会一直静静挂着)
+        child_proc = subprocess.Popen(
+            cmd, cwd=HERE, stdout=fo, stderr=fe, env=child_env,
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), **kwargs)
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
     if args.host not in ("127.0.0.1", "localhost", ""):
@@ -579,7 +582,7 @@ def start(case, args):
         # 这里默认跟读日志(像 tail -f);Ctrl+C 只停跟随,**不杀服务**。
         print("\n---- 跟随日志(Ctrl+C 停止跟随,服务继续跑)----")
         try:
-            _follow(log, err)
+            _follow(log, err, child_proc)
         except KeyboardInterrupt:
             print("\n[已停止跟随] 服务仍在跑:`python live_switch.py --stop {}`".format(case))
     return 0
@@ -609,8 +612,13 @@ def _highlight(chunk):
     return "".join(out)
 
 
-def _follow(log, err, interval=1.0):
-    """跟读实时面日志。文件还没生成就先等;被截断/轮转则重开。"""
+def _follow(log, err, child=None, interval=1.0):
+    """跟读实时面日志。文件还没生成就先等;被截断/轮转则重开。
+
+    `child` 是实时面那个子进程的句柄。**它退出时要说一句再收工** ——
+    否则服务崩了之后日志文件还在,这个循环会一直静静地挂着,窗口显示完错误文本
+    就再无动静,看的人不知道"是崩了还是在跑"(2026-10-10 用户要求补这个缺口)。
+    """
     import time as _t
     # 日志是 UTF-8,Windows 控制台默认 GBK —— 直接 write 会把中文打成乱码
     # (2026-10-10 用户贴的日志全是"�?)。先把 stdout 切到 UTF-8 并容错。
@@ -629,6 +637,23 @@ def _follow(log, err, interval=1.0):
             pass
     while True:
         _t.sleep(interval)
+        if child is not None and child.poll() is not None:
+            # 把可能还没读到的最后一段刷出来,再说"退出了",然后收工。
+            for path, fh in list(handles.items()):
+                try:
+                    fh.seek(pos[path])
+                    tail = fh.read()
+                    if tail:
+                        pos[path] = fh.tell()
+                        sys.stdout.write(_highlight(tail))
+                        sys.stdout.flush()
+                except Exception:  # noqa: BLE001
+                    pass
+            sys.stdout.write(_highlight(
+                "服务已退出(退出码 {}):原因见上面最后几行红色文字;"
+                "本局没能起来或已结束。\n".format(child.returncode)))
+            sys.stdout.flush()
+            return
         for path, fh in list(handles.items()):
             try:
                 fh.seek(pos[path])
