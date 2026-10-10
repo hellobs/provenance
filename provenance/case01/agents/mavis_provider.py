@@ -290,10 +290,11 @@ class Case01SafeProvider:
         # 只会让"输出被截断 → 解析失败 → 落兜底"这条路彻底走不通。
         # 历史:256 把 Structured 连续截断 3 次(poignancy_event 解析到空串);用户要求"那就搞大"。
         limits = {"structured": 4096, "conversation": 8192, "long": 8192, "default": 4096}
-        # ⚠ 2026-10-10 待办:实测日志里"输出被 max_tokens 截断 caller=llm_normal
-        # max_tokens=256" —— 对话正文被归到 structured 档(只有 256)。外部 API 默认开着
-        # reasoning 时 256 根本装不下,这也是"每句只剩一个字"的另一半原因。
-        # 抬档位会动到 7 条钉住旧值的测试,单独一次改,不在这次提交里夹带。
+        # 已收口(2026-10-10 当天两次抬档 8804250/19c881d):此前日志里
+        # "输出被 max_tokens 截断 caller=llm_normal max_tokens=256" —— 小镇的对话正文
+        # 走的是 caller 缺省值,拿的是旧 structured/default 档 256;外部 API 又默认开 reasoning,
+        # 256 装不下 ⇒ "每句只剩一个字"的另一半原因。抬到上面的档位后当天核对过记录根:
+        # 带"小镇 … 截断"警告的最后一条是 11:45,13:12 之后落的 23 条记录 `truncations` 全为 0。
         if isinstance(configured, dict):
             limits.update({k: int(v) for k, v in configured.items() if v is not None})
         if caller and caller != "llm_normal":
