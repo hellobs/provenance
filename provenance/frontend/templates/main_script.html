@@ -489,6 +489,17 @@
 			}
 		};
 		game = new Phaser.Game(config);
+		// 画布放大方式:从 `pixelated`(最近邻)改回 `auto`(平滑插值)。
+		// 为什么(2026-10-10 用户"还是糊,那就搞分辨率"):
+		// `pixelArt: true` 会给 canvas 打上 `image-rendering: pixelated`。在**有缩放
+		// 的显示器**上(Windows 常见 125%/150%)浏览器要把 864×768 的画布放大到物理
+		// 像素,最近邻会让 12px 的字被硬撑出断裂笔画 —— 那就是"糊"。
+		// 改成 auto 后浏览器用平滑插值放大:瓦片边缘会柔一点点(可接受),
+		// 但文字明显更清楚。配合下面 Text 的 setResolution(2) 一起用。
+		// 想在纯整数倍的屏幕上回到锐利像素画,把这一行去掉即可。
+		// 注意:这里设**没用** —— Phaser 在 boot 阶段(构造函数返回之后)会把
+		// `image-rendering: pixelated` 写上去,覆盖掉这一行。真正的设置点在
+		// 场景的 create() 里(那是 boot 之后),见 create 开头。
 		// 画布尺寸**跟着容器走**(2026-10-10 用户反复反馈"气泡里的字还是糊"):
 		// 画布的后备存储是创建时按容器宽度定的,而 5010 页面右边挂着"结果记录"卡片,
 		// 它加载/折叠/展开都会改容器宽度 ⇒ 画布被 CSS 拉伸 ⇒ 整张图(含文字)发虚。
@@ -954,6 +965,17 @@
 
 	// Create function
 	function create() {
+		// 画布放大方式:从 `pixelated`(最近邻)改回 `auto`(平滑插值)。
+		// 必须在这里设 —— Phaser 的 boot 晚于 `new Phaser.Game()`,在构造函数后面
+		// 设会被它的 `pixelArt` 覆盖掉(2026-10-10 实测:设完仍是 pixelated)。
+		// 为什么要改:有缩放的显示器(Windows 常见 125%/150%)上,浏览器要把
+		// 864×768 的画布放大到物理像素,最近邻会把 12px 的字撑出断裂笔画 = "糊"。
+		// auto 用平滑插值:瓦片边缘柔一点点,文字明显更清楚。
+		// 想回到锐利像素画,把这两行去掉即可。
+		try {
+			if (this.game && this.game.canvas) this.game.canvas.style.imageRendering = "auto";
+		} catch (e) { /* 拿不到 canvas 就维持 Phaser 默认 */ }
+
 		const map = this.make.tilemap({ key: "map" });
 
 		// Add tilesets and layers
