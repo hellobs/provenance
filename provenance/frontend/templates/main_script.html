@@ -133,13 +133,15 @@
 		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
 		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
 		// 正在打的那段已经显示出来了就留着不回退。
+		_preseedRooms();
 		var partner = _resolvePartner(name, bubble_explicit_partner);
 		if (partner) {
 			bubble_partner[name] = partner;
 			bubble_partner[partner] = name;
 		}
 		if (name) bubble_last_speaker = name;
-		var gkey = partner ? _bubbleGroupKey(name, partner) : name;
+		// 优先按**成员**找房(预置好的);找不到才按推断配对(多角色/新角色的兜底)。
+		var gkey = _roomOf(name) || (partner ? _bubbleGroupKey(name, partner) : name);
 		var grp = bubble_groups[gkey];
 		if (!grp) {
 			grp = _newRoom(gkey);
@@ -191,6 +193,81 @@
 	// 说话、各自显示自己的气泡。只有**同一房间内**才互斥(一个框)。
 	// 状态: active=正在念的人 / active_text=他那一段 / active_sp=身份戳 /
 	//       rest_acc,rest_need=念完后的停顿
+	// ---- 房间分配(2026-10-10 用户定的规则)----
+	//   角色 ≤ 3 人 ⇒ **全部放进同一间房**(一段对话,房内互斥、一次一个气泡);
+	//   角色 > 3 人 ⇒ 用 KNN 把彼此"会聊到"的角色归成 3 人一组,每组一间房,
+	//                   组与组之间并行。
+	// 为什么要预置而不是"看谁跟谁说话再推断":第一句话没有对话对象可配,推断会
+	// 先开一间单人房、第二句才配上对 ⇒ 变成两间房 ⇒ 同一段对话的两个人同屏显示
+	// (用户 2026-10-10 截图)。预置之后 setBubble 只查成员,不再猜。
+	var BUBBLE_ROOM_SIZE = 3;      // 每间房的人数上限(≤3 人时就是全部)
+	var bubble_seeded = false;
+
+	function _roomKey(names) {
+		return names.slice().sort().join("\u0001");
+	}
+
+	// 这段对话的"分组依据":同一段对话的人会挨得近,所以用**出生坐标**做特征。
+	// ⚠ 这是默认选择,不是定论 —— 换成"谁跟谁说过话"或角色关系都需要你确认。
+	function _knnGroups(names, k) {
+		var pos = (typeof persona_names !== "undefined") ? persona_names : {};
+		function feat(n) {
+			var p = pos[n];
+			if (!p) return [0, 0];
+			var c = p.center || p;
+			return [Number(c.x) || 0, Number(c.y) || 0];
+		}
+		function dist(a, b) {
+			var fa = feat(a), fb = feat(b);
+			var dx = fa[0] - fb[0], dy = fa[1] - fb[1];
+			return Math.sqrt(dx * dx + dy * dy);
+		}
+		var left = names.slice(), groups = [];
+		while (left.length > 0) {
+			// 取离当前种子最近的 k-1 个作为同伴 —— 这就是 KNN 的 k 近邻
+			var seed = left.shift();
+			var mates = left
+				.map(function (n) { return { n: n, d: dist(seed, n) }; })
+				.sort(function (a, b) { return a.d - b.d; })
+				.slice(0, k - 1)
+				.map(function (x) { return x.n; });
+			var grp = [seed].concat(mates);
+			grp.forEach(function (n) {
+				var i = left.indexOf(n);
+				if (i >= 0) left.splice(i, 1);
+			});
+			groups.push(grp);
+		}
+		return groups;
+	}
+
+	function _preseedRooms() {
+		if (bubble_seeded) return;
+		var names = (typeof persona_names !== "undefined") ? Object.keys(persona_names) : [];
+		if (names.length === 0) return;
+		bubble_seeded = true;
+		var groups = (names.length <= BUBBLE_ROOM_SIZE)
+			? [names]                                   // ≤3 人:全部同一间房
+			: _knnGroups(names, BUBBLE_ROOM_SIZE);     // >3 人:KNN 三三归类
+		for (var i = 0; i < groups.length; i++) {
+			var key = _roomKey(groups[i]);
+			if (!bubble_groups[key]) {
+				bubble_groups[key] = _newRoom(key);
+				bubble_groups[key].members = groups[i];
+				bubble_group_keys.push(key);
+			}
+		}
+	}
+
+	// 这个角色属于哪间房(按成员查,不猜)
+	function _roomOf(name) {
+		for (var i = 0; i < bubble_group_keys.length; i++) {
+			var g = bubble_groups[bubble_group_keys[i]];
+			if (g && g.members && g.members.indexOf(name) >= 0) return bubble_group_keys[i];
+		}
+		return "";
+	}
+
 	function _newRoom(key) {
 		return { key: key, lines: [], wait: 0,
 			active: "", active_text: "", active_sp: "",

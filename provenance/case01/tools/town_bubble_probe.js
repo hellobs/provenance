@@ -34,6 +34,8 @@ const sandbox = {
   console, Date, Math, JSON, Object, Array, String, Number,
   document: { getElementById: () => ({ innerHTML: '', style: {}, scrollTop: 0, scrollHeight: 0, textContent: '' }) },
   window: {}, setTimeout, clearTimeout,
+  // 场景角色及其出生坐标:预置房间按"≤3 人一间房 / >3 人 KNN 三三分组"用它。
+  persona_names: { Ethan: {x: 40, y: 60}, AI: {x: 46, y: 64}, C: {x: 300, y: 400} },
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
@@ -60,6 +62,7 @@ function resetBubbles() {
   sandbox.bubble_rr = 0;
   sandbox.bubble_shown = {}; sandbox.bubble_full = {}; sandbox.bubble_speaker = {};
   sandbox.bubble_spoken = {};
+  sandbox.bubble_seeded = false;
   sandbox.bubble_last_speaker = ''; sandbox.bubble_partner = {};
 }
 
@@ -157,6 +160,16 @@ sandbox.setBubble('B', 'Ethan Lin', '我再问一句。');
 ok(sandbox.bubble_group_keys.length === 1,
    '两人交替说话全程只应有一间房(单人房要被并入),实得 ' +
    sandbox.bubble_group_keys.length + ' 间: ' + JSON.stringify(sandbox.bubble_group_keys));
+
+// 4c3) **预置房间**(用户规则:≤3 人 ⇒ 全部同一间房;>3 人 ⇒ KNN 三三分组)
+//      场景里就 Ethan / AI / C 三个人 ⇒ 应当**只有一间房**,谁都别自己开单人间。
+resetBubbles();
+sandbox.setBubble('B', 'Ethan Lin', '第一句。');
+ok(sandbox.bubble_group_keys.length === 1,
+   '≤3 人时预置成**一间**房,实得 ' + sandbox.bubble_group_keys.length + ' 间');
+sandbox.setBubble('C', 'Investment AI', '第二句。');
+ok(sandbox.bubble_group_keys.length === 1,
+   '再来一个人也不该新增房间,实得 ' + sandbox.bubble_group_keys.length + ' 间');
 
 // 4d) **房间之间并行**:B×C 一个房、E×D 另一个房,两房应当**同时**在打字。
 //     (房内互斥、房间并行 —— 2026-10-10 用户定的语义)
