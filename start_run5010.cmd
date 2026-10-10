@@ -60,6 +60,12 @@ rem ---------------------------------------------------------------------------
 
 echo interpreter: %PY%
 echo mode: FULL RUN (branch decided by the AI's T0 answer)
+rem The produced record's seed fields come from SEED/RUN_ID below -- say what they will be,
+rem because an empty SEED silently means "no seed" while the runbook answers "seed was set".
+if "%SEED%"=="" echo [warn] SEED is empty -^> run.json gets manifest.seed=null and NO rng.json
+if "%RUN_ID%"=="" echo [note] RUN_ID is empty -^> every round mints a new name, no stable deep link
+if not "%SEED%"=="" echo seed: %SEED%
+if not "%RUN_ID%"=="" echo run-id: %RUN_ID%
 echo entry: http://127.0.0.1:5010/
 echo stop: close this window, or run: python live_switch.py --stop case01
 echo.
