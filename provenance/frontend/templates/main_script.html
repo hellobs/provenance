@@ -198,6 +198,8 @@
 	var bubble_rest_acc = 0;          // 一句念完后的停顿累计(ms)
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
 	var bubble_seq_counter = 0;
+	// 地图尺寸(create 里填):气泡要钳在画面内,否则站在边上时框会被画布裁掉一半
+	var map_bounds = { w: 0, h: 0 };
 	let anims_direction;
 	let pre_anims_direction;
 	let pre_anims_direction_dict = {};
@@ -762,6 +764,9 @@
 		const camera = this.cameras.main;
 		camera.startFollow(player);
 		camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+		// 记下地图尺寸:`layoutBubbles` 要用它把气泡钳在画面内(见那里的说明)
+		map_bounds.w = map.widthInPixels;
+		map_bounds.h = map.heightInPixels;
 		// When the whole map is visible (viewport >= map size), center it fixed;
 		// otherwise camera bounds clamp to top-left, shifting the view up/left
 		if (camera.width >= map.widthInPixels || camera.height >= map.heightInPixels) {
@@ -1157,6 +1162,20 @@
 		return hOverlap && vOverlap;
 	}
 
+	// 钳在画面内(2026-10-10 用户:"这个框也不应该超过画布啊"):角色走到地图边上时,
+	// 挂在头顶的框会有一半落到画布外被裁掉。map_bounds 为 0(未初始化)时不做处理。
+	function clampX(x, w) {
+		let hw = w / 2;
+		if (map_bounds.w <= 0) return x;
+		let lo = hw + 4, hi = Math.max(lo, map_bounds.w - hw - 4);
+		return Math.min(Math.max(x, lo), hi);
+	}
+	function clampY(bottom, h) {
+		if (map_bounds.h <= 0) return bottom;
+		let lo = h + 4, hi = Math.max(lo, map_bounds.h - 4);
+		return Math.min(Math.max(bottom, lo), hi);
+	}
+
 	function layoutBubbles() {
 		let names = Object.keys(personas);
 		// 角色的**绘制范围**(不是 hitbox):气泡盖住的是画出来的那个人。
@@ -1177,7 +1196,8 @@
 			t.x = chars[i].x + chars[i].w / 2;      // 基线:本人正上方,对准绘制中线
 			t.y = chars[i].y - BUBBLE_GAP;          // 底边贴住头顶
 			if (!t.text) continue;
-			bubbles.push({ name: names[i], x: t.x, y: t.y, w: t.width, h: t.height,
+			bubbles.push({ name: names[i], x: clampX(t.x, t.width), y: clampY(t.y, t.height),
+			               w: t.width, h: t.height,
 			               seq: bubble_seq[names[i]] || 0, box: null, kind: null });
 		}
 		// 从左到右 = 说话先后(用户:"注意聊天次序")。先说的先摆,后说的往后让。
@@ -1218,21 +1238,29 @@
 					let needR = (hit.box.x + hit.box.w) + BUBBLE_STACK_GAP - (cur.x - cur.w / 2);
 					let needL = (cur.x + cur.w / 2) - (hit.box.x - BUBBLE_STACK_GAP);
 					if (needR > 0.01 && (needL <= 0.01 || needR <= needL)) {
-						if (!firstHit(cur, cur.x + needR, cur.y)) { cur.x += needR; moved = true; }
+						let nx = clampX(cur.x + needR, cur.w);
+						if (Math.abs(nx - cur.x) > 0.01 && !firstHit(cur, nx, cur.y)) { cur.x = nx; moved = true; }
 					}
 					if (!moved && needL > 0.01) {
-						if (!firstHit(cur, cur.x - needL, cur.y)) { cur.x -= needL; moved = true; }
+						let nx = clampX(cur.x - needL, cur.w);
+						if (Math.abs(nx - cur.x) > 0.01 && !firstHit(cur, nx, cur.y)) { cur.x = nx; moved = true; }
 					}
 					if (moved) triedSideways = true;
 				}
-				if (!moved) cur.y = hit.box.y - BUBBLE_GAP;   // 左右都挪不开 → 抬到它上方
+				if (!moved) {
+					let ny = clampY(hit.box.y - BUBBLE_GAP, cur.h);
+					if (Math.abs(ny - cur.y) > 0.01) cur.y = ny;   // 左右与上抬都被画布边界卡死 ⇒ 就停在这
+				}
 			}
 			placed.push(cur);
 		}
-		// 写回
+		// 写回。位置在避让过程中就已经钳在画面内了(见下面的 clampX/clampY),
+		// 这里再钳一次兜底 —— 角色走到地图边上时,框必须整块留在画布里
+		// (2026-10-10 用户:"这个框也不应该超过画布啊")。
 		for (let i = 0; i < bubbles.length; i++) {
-			pronunciatios[bubbles[i].name].x = bubbles[i].x;
-			pronunciatios[bubbles[i].name].y = bubbles[i].y;
+			let t = pronunciatios[bubbles[i].name];
+			t.x = clampX(bubbles[i].x, t.width);
+			t.y = clampY(bubbles[i].y, t.height);
 		}
 	}
 
