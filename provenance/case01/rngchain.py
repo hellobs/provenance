@@ -158,7 +158,7 @@ def resolve_master(explicit=None):
         try:
             return int(text)
         except ValueError:
-            raise ValueError("种子必须是整数,收到:{!r}".format(raw))
+            raise ValueError("the seed must be an integer, got: {!r}".format(raw))
     return None
 
 
@@ -181,7 +181,7 @@ def apply_chain(master, run_id="", log=None, base_url="", probe=True):
     """
     say = log or (lambda msg: None)
     if master is None:
-        say("种子链未启用(没传 --seed / CASE01_SEED):保持默认非确定行为")
+        say("seed chain not enabled (no --seed / CASE01_SEED): keeping the default nondeterministic behaviour")
         return None
     world = derive_world_seed(master, run_id)
     random.seed(world)
@@ -194,7 +194,7 @@ def apply_chain(master, run_id="", log=None, base_url="", probe=True):
             "engine_rng": "seeded"}
     if probe:
         info["environment"] = probe_environment(base_url=base_url)
-    say("种子链已应用:{} master={} model={} world={} run_id={}".format(
+    say("seed chain applied: {} master={} model={} world={} run_id={}".format(
         RNG_SCHEME, master, master, world, run_id or "-"))
     return info
 
@@ -221,11 +221,11 @@ def write_side_record(dir_path, info, log=None):
             f.write("\n")
         os.replace(tmp, path)            # 同目录原子替换(跨盘 os.replace 会报错)
     except Exception as exc:             # 记不上要让人知道,但不能拖垮一局推演
-        say("[警告] rng.json 写入失败:{} —— 种子链参数只在上面的日志行里留痕".format(exc))
+        say("[warn] failed to write rng.json: {} -- the seed-chain parameters survive only in the log line above".format(exc))
         # 调用方没给 log 时也必须出声:静默丢掉留痕文件正是本仓最怕的那类失败
         # ("铁律:失败了必须有人知道" —— live/history.py)。
-        print("[警告] rng.json 写入失败({}):{} —— 种子链参数只在日志里留痕".format(
+        print("[warn] failed to write rng.json ({}): {} -- the seed-chain parameters survive only in the log".format(
             dir_path, exc), flush=True)
         return ""
-    say("种子链参数已留痕 -> {}".format(path))
+    say("seed-chain parameters recorded -> {}".format(path))
     return path

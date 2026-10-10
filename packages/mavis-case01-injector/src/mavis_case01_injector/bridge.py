@@ -430,7 +430,7 @@ class MavisBridge:
         for _name, _agent in (getattr(game, "agents", None) or {}).items():
             _llm = getattr(_agent, "_llm", None)
             if _llm is not None:
-                town["小镇 {}".format(_name)] = _llm
+                town["stock-face {}".format(_name)] = _llm
         meta = collect_run_meta(raw,
                                 judge_llm=self.judge_llm,
                                 backend_kind=self.backend_kind,
@@ -517,11 +517,11 @@ class MavisBridge:
     def _build_mavis(self) -> None:
         """构造 mavis 侧对象（懒加载,默认关闭时不 import mavisframework）。"""
         if not self.scenario_dir:
-            raise RuntimeError("dry_run=False 需要 --scenario-dir(含 mavis 场景配置的目录)")
+            raise RuntimeError("dry_run=False needs --scenario-dir (a directory holding the mavis scenario config)")
         scenario = os.path.abspath(self.scenario_dir)
         config_path = os.path.join(scenario, "config.json")
         if not os.path.exists(config_path):
-            raise RuntimeError("场景缺少 config.json: {}".format(config_path))
+            raise RuntimeError("the scenario has no config.json: {}".format(config_path))
 
         from mavisframework.config.loader import load_config
         from mavisframework.core.timer import Timer
@@ -606,7 +606,7 @@ class MavisBridge:
         if self.dry_run:
             return
         if self.simulator is None:
-            raise RuntimeError("mavis 尚未装配(_build_mavis 未执行)")
+            raise RuntimeError("mavis is not assembled yet (_build_mavis has not run)")
         self._node_state["id"] = node.node_id
         # 只释放本节点的事件:未释放事件不进入任何角色上下文
         self.simulator.story = [self._as_story_event(ev, node) for ev in node.events]
@@ -1087,9 +1087,9 @@ class MavisBridge:
             key = key or provider_key(provider)
             if not key:
                 raise RuntimeError(
-                    "CASE01_ETHAN_PROVIDER={} 但取不到 key:设 CASE01_ETHAN_API_KEY,"
-                    "或用 tools/setup_api.py --router {} --key <key> 把它写进 "
-                    ".secrets.json(已 gitignore;不打印 key)".format(provider, provider))
+                    "CASE01_ETHAN_PROVIDER={} is set but no key can be found: set CASE01_ETHAN_API_KEY,"
+                    " or write it into .secrets.json (gitignored; the key is never printed)"
+                    " with tools/setup_api.py --router {} --key <key>".format(provider, provider))
         if not (base_url or model):
             # 2026-10-10 用户拍板:**没配外部 API 就报错,不再静默走本地**。
             # 原来这里把"一个都没配"当成"就是要本地"、只记一行 `ethan_backend`,
@@ -1098,19 +1098,21 @@ class MavisBridge:
             # 要**故意**用本地,请显式点名:`CASE01_ETHAN_PROVIDER=<本地后端名>`
             # (那条分支在上面,会明确记成 local(...)) —— "没配" 与 "故意本地" 必须分开。
             raise RuntimeError(
-                "Ethan 没配外部 API:拒绝静默退回本地模型。\n"
-                "  配法(唯一入口):python provenance/tools/setup_api.py "
+                "Ethan has no external API configured: refusing to fall back to a local model.\n"
+                "  How to configure (the only entry point): python provenance/tools/setup_api.py "
                 "--router deepseek --key <key>\n"
-                "  它会写进仓库根 .secrets.json;再在 provenance/case01.local.cmd 里留一行\n"
-                "  set CASE01_ETHAN_PROVIDER=deepseek 即可。\n"
-                "  想故意用本地(演示会更差):显式设 CASE01_ETHAN_PROVIDER=<本地后端名>。\n"
-                "  可用后端清单:python provenance/tools/setup_api.py --show")
+                "  It writes into .secrets.json at the repository root; then keep one line in\n"
+                "  provenance/case01.local.cmd:  set CASE01_ETHAN_PROVIDER=deepseek\n"
+                "  To use a local model on purpose (the demo gets worse): set\n"
+                "  CASE01_ETHAN_PROVIDER=<local backend name> explicitly.\n"
+                "  Available backends: python provenance/tools/setup_api.py --show")
         if not (base_url and model):
             missing = "CASE01_ETHAN_MODEL" if model else "CASE01_ETHAN_BASE_URL"
             raise RuntimeError(
-                "Ethan 的外部 API 只配了一半(缺 {}):配漏了不等于选择本地。"
-                "要么两个都配齐,要么都不配;或只点 CASE01_ETHAN_PROVIDER=<后端名>,"
-                "端点与模型名按那张表取。".format(missing))
+                "Ethan's external API is only half configured ({} is missing): a missing value is not"
+                " the same as choosing local. Configure both, or neither; or set only"
+                " CASE01_ETHAN_PROVIDER=<backend name> and take the endpoint and model"
+                " from that table.".format(missing))
         # 起面探测:**重试几次**;仍不通则**报警但继续**。
         # 为什么不再直接杀服务(2026-10-10 用户"为什么现在启动不了 5010 了"):
         # 一次探测失败就把整局连同 5010 一起关掉,等于"网络抖一下 → 整个平台打不开",
@@ -1126,7 +1128,7 @@ class MavisBridge:
                     base_url)), flush=True)
         target = config.get("agents", {}).get(self.roles[1])
         if target is None:
-            raise RuntimeError("场景里找不到第二个角色,无法给它配外部 API")
+            raise RuntimeError("the second role is not in the scenario, so it cannot be given an external API")
         target.setdefault("think", {})["llm"] = {
             "provider": "openai",
             "model": model,

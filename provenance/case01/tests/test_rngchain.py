@@ -76,7 +76,7 @@ def test_非法种子立刻抛不静默(monkeypatch):
     try:
         rngchain.resolve_master(None)
     except ValueError as exc:
-        assert "整数" in str(exc), str(exc)
+        assert "integer" in str(exc), str(exc)
     else:
         raise AssertionError("非整数种子必须抛,不能当成'没设'")
 
@@ -151,4 +151,4 @@ def test_留痕失败时不抛只警告(tmp_path, capsys):
     bad = os.path.join(str(blocker), "sub")     # 祖先存在但是文件 → makedirs 必失败
     assert rngchain.write_side_record(bad, info) == ""
     out = capsys.readouterr().out
-    assert "警告" in out, out
+    assert "warn" in out, out
