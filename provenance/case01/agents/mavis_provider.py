@@ -317,6 +317,15 @@ class Case01SafeProvider:
             candidates.append(True)
         elif low in ("no", "false"):
             candidates.append(False)
+        # 裸数字串:'07'(起床 7 点)、'8'。实测模型对 int 字段常回**带前导零的字符串**,
+        # 而 ast.literal_eval("07") 因前导零直接语法错误 ⇒ 这条以前必解析失败,
+        # 一次都没成功过(wakeupResponse 实测 10/10 失败,每次落到兜底的"8 点起床")。
+        # 这里显式转 int(含前导零与空白);不是数字就交给后面的候选。
+        if low:
+            try:
+                candidates.append(int(low, 10))
+            except ValueError:
+                pass
         try:
             import ast as _ast
             candidates.append(_ast.literal_eval((stripped or raw).strip()))
