@@ -1056,8 +1056,11 @@ class MavisBridge:
         现在:
           · 只配了一半(BASE_URL / MODEL 其一)⇒ 报错停这一局(是配漏了,不是选择本地);
           · 配全了但起面探测不通 ⇒ 报错停这一局,**不**退回本地;
-          · 一个都没配 ⇒ 仍按"就是要本地"处理,但把实际后端写进 run_record,
-            事后一眼能看出 Ethan 是谁写的。
+          · 一个都没配 ⇒ **报错停这一局**(2026-10-10 用户拍板):不再静默走本地。
+            原来只记一行 `ethan_backend = local(...)`,但那行不显眼,新人很容易在没接
+            外部 API 的情况下跑起来、拿到本地 4B 模型的低质输出却以为看到的是演示效果。
+            要**故意**用本地,请显式点名 `CASE01_ETHAN_PROVIDER=local`(那条分支在上面),
+            "没配" 与 "故意本地" 必须分开。
         两种写法(10-10 统一成一张后端表,见 `llm.ROUTER_PROVIDERS`):
           · `CASE01_ETHAN_PROVIDER=deepseek|bigmodel|openrouter|vllm` —— 端点/模型/key
             都按那张表取(`--show` 打得出来),要换的只有一家时不必再抄三行;
@@ -1085,8 +1088,20 @@ class MavisBridge:
                     "或用 tools/setup_api.py --router {} --key <key> 把它写进 "
                     ".secrets.json(已 gitignore;不打印 key)".format(provider, provider))
         if not (base_url or model):
-            self.ethan_backend = "local(未配 CASE01_ETHAN_* ⇒ Ethan 走本地模型)"
-            return
+            # 2026-10-10 用户拍板:**没配外部 API 就报错,不再静默走本地**。
+            # 原来这里把"一个都没配"当成"就是要本地"、只记一行 `ethan_backend`,
+            # 但那行日志不显眼 —— 新人很容易在没接外部 API 的情况下跑起来,
+            # 得到的是本地 4B 模型的低质输出,却以为看到的是演示效果。
+            # 要**故意**用本地,请显式点名:`CASE01_ETHAN_PROVIDER=<本地后端名>`
+            # (那条分支在上面,会明确记成 local(...)) —— "没配" 与 "故意本地" 必须分开。
+            raise RuntimeError(
+                "Ethan 没配外部 API:拒绝静默退回本地模型。\n"
+                "  配法(唯一入口):python provenance/tools/setup_api.py "
+                "--router deepseek --key <key>\n"
+                "  它会写进仓库根 .secrets.json;再在 provenance/case01.local.cmd 里留一行\n"
+                "  set CASE01_ETHAN_PROVIDER=deepseek 即可。\n"
+                "  想故意用本地(演示会更差):显式设 CASE01_ETHAN_PROVIDER=<本地后端名>。\n"
+                "  可用后端清单:python provenance/tools/setup_api.py --show")
         if not (base_url and model):
             missing = "CASE01_ETHAN_MODEL" if model else "CASE01_ETHAN_BASE_URL"
             raise RuntimeError(

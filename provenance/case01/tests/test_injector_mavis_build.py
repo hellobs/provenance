@@ -45,6 +45,10 @@ def _bridge(dry_run=False, monkeypatch=None, tmp_path=None, **kw):
     monkeypatch.setenv("MAVIS_CHECKPOINTS_ROOT", str(tmp_path / "checkpoints"))
     monkeypatch.delenv("CASE01_ETHAN_BASE_URL", raising=False)
     monkeypatch.delenv("CASE01_ETHAN_MODEL", raising=False)
+    # 2026-10-10:"没配外部 API" 现在会**报错**,不再静默走本地(用户拍板)。
+    # 这些用例不测外部 API,所以**显式点名本地** —— 这正是新语义要求的:
+    # "没配" 与 "故意本地" 必须分开。用哪一个本地名都不发外部请求。
+    monkeypatch.setenv("CASE01_ETHAN_PROVIDER", "local")
     nodes = default_nodes("A", roles=list(DEFAULT_ROLES))
     bridge = MavisBridge(
         nodes=nodes, roles=DEFAULT_ROLES, scenario_dir=SCENARIO,
@@ -184,6 +188,8 @@ def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
     monkeypatch.setattr(type(bridge), "_remote_reachable",
                         staticmethod(lambda *a, **k: True))
     monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
+    # 本用例要验**外部**路径,清掉 helper 默认的"显式本地"
+    monkeypatch.delenv("CASE01_ETHAN_PROVIDER", raising=False)
     monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
     monkeypatch.setenv("CASE01_ETHAN_API_KEY", "sk-test")
     bridge._build_mavis()
@@ -241,6 +247,8 @@ def test_ethan_external_unreachable_warns_but_still_external(monkeypatch, tmp_pa
     monkeypatch.setattr(type(bridge), "_remote_reachable",
                         staticmethod(lambda *a, **k: False))
     monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
+    # 本用例要验**外部**路径,清掉 helper 默认的"显式本地"
+    monkeypatch.delenv("CASE01_ETHAN_PROVIDER", raising=False)
     monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
     bridge._build_mavis()
     out = capsys.readouterr().out
@@ -257,6 +265,8 @@ def test_ethan_external_half_configured_is_hard_failure(monkeypatch, tmp_path):
     _install_stub_provider(monkeypatch)
     bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
     monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
+    # 本用例要验**外部**路径,清掉 helper 默认的"显式本地"
+    monkeypatch.delenv("CASE01_ETHAN_PROVIDER", raising=False)
     monkeypatch.delenv("CASE01_ETHAN_MODEL", raising=False)
     with pytest.raises(RuntimeError):
         bridge._build_mavis()
