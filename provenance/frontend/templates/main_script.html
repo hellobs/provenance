@@ -122,7 +122,13 @@
 		// 原来这里无条件清零,而打字机读的正是 bubble_shown[name] ⇒ 同一角色又开口时,
 		// 正在打的那段被**从头重打一遍**,画面上就是"突然重复已说过的话"。
 		// 新段的进度由 tickBubbles 开段时自己清零,这里不用管。
-		if (bubble_active !== name) bubble_shown[name] = 0;
+		// 只有当这个角色**当前没在念**时才清零进度;他正在某个房间里念的话,
+		// 新台词不能让他从头重说一遍(见下方注释)。
+		var nameIsSpeaking = false;
+		for (var bk in bubble_groups) {
+			if (bubble_groups[bk] && bubble_groups[bk].active === name) { nameIsSpeaking = true; break; }
+		}
+		if (!nameIsSpeaking) bubble_shown[name] = 0;
 		// 排队:同一时刻**只念一段**,后来到的排到队尾(2026-10-10 用户:
 		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
 		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
@@ -136,7 +142,7 @@
 		var gkey = partner ? _bubbleGroupKey(name, partner) : name;
 		var grp = bubble_groups[gkey];
 		if (!grp) {
-			grp = { lines: [], wait: 0 };
+			grp = _newRoom(gkey);
 			bubble_groups[gkey] = grp;
 			bubble_group_keys.push(gkey);
 		}
@@ -164,81 +170,79 @@
 
 	// 打字机推进:每帧按经过时间吐字。**一次只推进队首那一句**,念完停一下再念下一句。
 	// (原来是把 `bubble_full` 里所有角色一起吐 ⇒ 两个人同时打字,不像在对话。)
+// 每个房间(=一段对话)一份说话状态。
+	// 为什么是"每房间"而不是全局一份(2026-10-10 用户定:"只是房间内部只能同时
+	// 一个人显示气泡")—— 房间之间是**并行**的:A×B 在聊时,C×D 那一对也要能同时
+	// 说话、各自显示自己的气泡。只有**同一房间内**才互斥(一个框)。
+	// 状态: active=正在念的人 / active_text=他那一段 / active_sp=身份戳 /
+	//       rest_acc,rest_need=念完后的停顿
+	function _newRoom(key) {
+		return { key: key, lines: [], wait: 0,
+			active: "", active_text: "", active_sp: "",
+			rest_acc: 0, rest_need: 0 };
+	}
+
+	function _startLine(g, item) {
+		// **只清同房间另一个人的框** —— 不同房间的气泡要能同时显示。
+		var partner = null;
+		for (var k in bubble_groups) {
+			if (bubble_groups[k] === g) {
+				var parts = k.split("\u0001");
+				partner = (parts[0] === item.name) ? parts[1] : parts[0];
+				break;
+			}
+		}
+		if (partner && pronunciatios[partner]) pronunciatios[partner].setText("");
+		// 新一段开始:**先清空气泡框**,下一 tick 再开始吐字
+		// (用户要求:"先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来")。
+		if (pronunciatios[item.name]) pronunciatios[item.name].setText("");
+		g.active = item.name;
+		g.active_text = item.text;
+		g.active_sp = item.sp;
+		bubble_full[item.name] = item.text;
+		bubble_shown[item.name] = 0;
+		g.rest_acc = 0;
+	}
+
 	function tickBubbles(delta) {
 		bubble_type_acc += (delta || 16.67);
 		if (bubble_type_acc < BUBBLE_TYPE_MS) return;
 		bubble_type_acc = 0;
-		if (!bubble_active) {
-			if (bubble_rest_acc < bubble_rest_need) return;   // 还在停顿(换气 / 段间留白)
-			// 取队首。那条若已被同一角色的更新台词顶掉(身份戳对不上),丢掉。
-			// 从**轮转指针**之后开始找第一条有货的对话组(2026-10-10 多角色铺路)。
-			// 只有一个组时轮转退化成原来的全局 FIFO ⇒ **2 角色下行为与之前完全一致**。
-			let item = null, gkey = "";
-			for (let n = 0; n < bubble_group_keys.length; n++) {
-				const idx = (bubble_rr + n) % bubble_group_keys.length;
-				const k = bubble_group_keys[idx];
-				const g = bubble_groups[k];
-				if (!g) continue;
-				// 队首若已被同一角色的新台词顶掉(身份戳对不上),丢掉。
+		// 逐房间推进 —— 房间之间并行,同一房间内一次只念一段。
+		for (var gi = 0; gi < bubble_group_keys.length; gi++) {
+			var g = bubble_groups[bubble_group_keys[gi]];
+			if (!g) continue;
+			if (!g.active) {
+				if (g.rest_acc < g.rest_need) continue;      // 还在停顿(换气 / 段间留白)
 				while (g.lines.length > 0 && (bubble_spoken[g.lines[0].name] || "") !== g.lines[0].sp) {
-					g.lines.shift();
+					g.lines.shift();                        // 已被新台词顶掉,丢掉
 				}
-				if (g.lines.length > 0) {
-					item = g.lines.shift();
-					gkey = k;
-					bubble_rr = (idx + 1) % bubble_group_keys.length;
-					break;
-				}
+				if (g.lines.length === 0) continue;
+				_startLine(g, g.lines.shift());
+				continue;                                   // 这一 tick 只开新段,下一 tick 才开始吐字
 			}
-			if (item) {
-				// 同一时刻**只留当前发言人的框**:把其它角色屏幕上残留的字清掉。
-				// 两个人同时挂着框,框就得互相让位,而让位必然把某个框甩离它的主人
-				// (2026-10-10 用户截图:Investment AI 的框跑到画面右上角)。
-				for (let k in pronunciatios) {
-					if (k !== item.name) pronunciatios[k].setText("");
+			var name = g.active;
+			// **正在念的这一段永不丢弃** —— 同一角色又开口、别人插话,都不打断它。
+			var full = g.active_text || "";
+			var shown = bubble_shown[name] || 0;
+			if (shown >= full.length) {
+				// 念完了:停够再念下一段。同一句话还有下一段时留 2 秒。
+				var nxt = g.lines.length ? g.lines[0] : null;
+				var sameUtterance = nxt && nxt.name === name && (bubble_spoken[name] || "") === nxt.sp;
+				g.rest_need = sameUtterance ? BUBBLE_CHUNK_HOLD_MS : BUBBLE_REST_MS;
+				g.rest_acc += BUBBLE_TYPE_MS;
+				if (g.rest_acc >= g.rest_need) {
+					g.active = ""; g.active_text = ""; g.active_sp = "";
+					g.rest_acc = 0; g.rest_need = 0;
 				}
-				// 新一段开始:**先清空气泡框**,下一 tick 再开始吐字(用户要求:
-				// "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来")。
-				pronunciatios[item.name].setText("");
-				bubble_active = item.name;
-				bubble_active_text = item.text;
-				bubble_active_sp = item.sp;
-				bubble_full[item.name] = item.text;
-				bubble_shown[item.name] = 0;
-				bubble_rest_acc = 0;
-
+				continue;
 			}
-			if (!bubble_active) return;
-			return;                      // 这一 tick 只开新段,下一 tick 才开始吐字
+			g.rest_acc = 0;
+			shown += 1;                                    // 每 TICK 吐一字
+			bubble_shown[name] = shown;
+			var head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
+			if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 		}
-		let name = bubble_active;
-		// **正在念的这一段永不丢弃**。同一角色又开口、或者别人插话,都不打断它 ——
-		// 2026-10-10 用户反馈:"AI Investor 的话还没说完就被 Ethan 新的话打断了"。
-		// 新来的台词一律**排到队尾**,于是顺序就是严格的 FIFO:没说完的先说完。
-		let full = bubble_active_text || "";
-		let shown = bubble_shown[name] || 0;
-		if (shown >= full.length) {
-			// 这段念完了:停够再叫下一段。**同一句话还有下一段**时留 2 秒
-			// (用户要求"先留着原本的两秒");换人说话只停 BUBBLE_REST_MS。
-			let nxt = null;
-			if (bubble_active_group) {
-				const g = bubble_groups[bubble_active_group];
-				nxt = g && g.lines.length ? g.lines[0] : null;
-			}
-			let sameUtterance = nxt && nxt.name === name && (bubble_spoken[name] || "") === nxt.sp;
-			bubble_rest_need = sameUtterance ? BUBBLE_CHUNK_HOLD_MS : BUBBLE_REST_MS;
-			bubble_rest_acc += BUBBLE_TYPE_MS;
-			if (bubble_rest_acc >= bubble_rest_need) {
-				bubble_active = ""; bubble_active_text = ""; bubble_active_sp = "";
-				bubble_rest_acc = 0; bubble_rest_need = 0;
-			}
-			return;
-		}
-		bubble_rest_acc = 0;
-		shown += 1;                              // 每 TICK 吐一字(速度由 BUBBLE_TYPE_MS 控)
-		bubble_shown[name] = shown;
-		let head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
-		if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 	}
 
 	// 直接把气泡内容设满(用于快照/回放的对齐,避免"回放时也在慢慢打字"造成混乱)
@@ -319,7 +323,6 @@
 	const BUBBLE_CHUNK_HOLD_MS = 2000; // 同一句话被字数上限切成多段时,段与段之间的留白
 	                                  // (2026-10-10 用户:"先留着原本的两秒,再清空气泡框接着说")
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
-	var bubble_active = "";           // 当前正在念的那句的说话人(一次只念一句)
 	// ---- 按"对话对"分组的队列(2026-10-10,为多角色铺路) ----
 	// 为什么分组:mavis 的对话是**两两**进行的,A×B 在聊时不该被 C×D 的积压拖死。
 	// 但**同一时刻只能有一个气泡可见**(两个框同屏就会互相让位,把框甩离主人)。
@@ -327,7 +330,6 @@
 	// 只有一个对话组时,轮转退化成原来的全局 FIFO ⇒ **行为与之前完全一致**。
 	var bubble_groups = {};           // key -> {lines: []}
 	var bubble_group_keys = [];       // 组的存在顺序(轮转用)
-	var bubble_rr = 0;                // 轮转指针
 	var bubble_partner = {};          // 角色 -> 它的对话对象
 	var bubble_last_speaker = "";     // 没有显式 listener 字段时的推断依据
 
@@ -343,11 +345,6 @@
 		return bubble_partner[name] || "";
 	}
 
-	var bubble_rest_acc = 0;          // 一段念完后的停顿累计(ms)
-	var bubble_rest_need = 0;          // 这次要停够多久才开下一段(换气 vs 段间 2 秒)
-	var bubble_active_text = "";       // 当前正在念的那一段的全文
-	var bubble_active_group = "";      // 当前这段属于哪段对话(分组队列用)
-	var bubble_active_sp = "";         // 当前那一段的身份戳(认"已被新台词顶掉")
 	var bubble_spoken = {};            // 角色 -> 他这一整段话的身份戳(认"被顶掉的旧段")
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
 	var bubble_seq_counter = 0;

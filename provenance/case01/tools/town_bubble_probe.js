@@ -58,9 +58,8 @@ function resetBubbles() {
   sandbox.bubble_group_keys.length = 0;
   for (const k in sandbox.bubble_groups) delete sandbox.bubble_groups[k];
   sandbox.bubble_rr = 0;
-  sandbox.bubble_active = ''; sandbox.bubble_active_text = '';
-  sandbox.bubble_active_sp = ''; sandbox.bubble_active_group = '';
-  sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+  sandbox.bubble_shown = {}; sandbox.bubble_full = {}; sandbox.bubble_speaker = {};
+  sandbox.bubble_spoken = {};
   sandbox.bubble_last_speaker = ''; sandbox.bubble_partner = {};
 }
 
@@ -148,6 +147,23 @@ ok(mseg.map((q) => q.text).join(' ').includes('$47.30')
    && mseg.map((q) => q.text).join(' ').includes('$48.05'),
    '两个价格都必须完整出现在某一段里');
 
+// 4d) **房间之间并行**:B×C 一个房、E×D 另一个房,两房应当**同时**在打字。
+//     (房内互斥、房间并行 —— 2026-10-10 用户定的语义)
+resetBubbles();
+sandbox.pronunciatios['E'] = mk(); sandbox.pronunciatios['D'] = mk();
+sandbox.setBubble('B', 'Ethan Lin', '一二三四五', 'C');
+sandbox.setBubble('E', '另一人甲', '六七八九十', 'D');
+let bothRooms = 0;
+for (let i = 0; i < 6; i++) {
+  sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67);
+  const bl = sandbox.pronunciatios['B']._t.length;
+  const el = sandbox.pronunciatios['E']._t.length;
+  if (bl > 1 && el > 1) bothRooms++;
+}
+ok(bothRooms >= 3, '两个房间应当并行推进(同一 tick 里两个框都在变长),实得同增 tick 数=' + bothRooms);
+const bRooms = sandbox.bubble_group_keys.length;
+ok(bRooms === 2, '两段对话应是两个独立房间,实得 ' + bRooms);
+
 // 5) 新句覆盖(没有正在念的段时,新句从头开始吐)
 resetBubbles();
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');
@@ -167,8 +183,10 @@ ok(sandbox.bubble_full['C'] === '发呆' && sandbox.bubble_shown['C'] === 2,
 //    开始打字机,这才拟真")。原来 `tickBubbles` 把所有角色一起吐 ⇒ 两人同时打字。
 // 前面的块留下了 active 段,这里先清干净,各块互不串味
 resetBubbles();
-sandbox.setBubble('B', 'Ethan Lin', '一二三四五');
-sandbox.setBubble('C', 'Investment AI', 'ABCDEFG');
+// 第四个参数 = 对话对象:把两人放进**同一个房间**。
+// 房内一次只念一句(互斥),房与房之间并行 —— 这是 2026-10-10 用户定的语义。
+sandbox.setBubble('B', 'Ethan Lin', '一二三四五', 'C');
+sandbox.setBubble('C', 'Investment AI', 'ABCDEFG', 'B');
 let both = 0, bDoneAt = -1, cStartAt = -1;
 let lastB = 0, lastC = 0;
 for (let i = 0; i < 40; i++) {
