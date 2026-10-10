@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """隔离验证实测:未释放事件在节点前"检索不到"(执行计划阶段 3 第 2 项)。
 
-做的事:跑一条真实的节点序列(默认 B 线全程),每个节点开始前对两个角色做两件事——
+做的事:跑一条真实的节点序列,每个节点开始前对两个角色做两件事——
   1. 快照记忆:列出此刻记忆里所有"剧情注入"条目(应为"已释放事件"的并集),
      并直接检查"后续节点的事件原文"有没有一条已经在记忆里(主判据,预期 0 条);
   2. 主动检索:用**后续所有节点**的事件原文当检索词去检索记忆,看返回的条目里
@@ -11,10 +11,15 @@
 
 `--full-pool` 为对抗模式:把整条时间线的事件全部塞进 simulator.story,只靠
 `case01_node` 条件放行当前节点。默认开启——隔离结论要在"池子里什么都有"的前提下
-才站得住。
+才站得住。池子按**当前**节点表逐节点重算,所以 T0 判定换时间线之后跟着换
+(不再拿一份跑前冻住的表当"全量")。
+
+分支**不由本工具指定**:2026-10-10 起预设分支已删,跑完 T0 由判定得出分支并换上
+那条时间线;`--branch`/`--timeline` 在 `case01.run` 与注入器 pipeline 上都不存在了,
+再传就是 unrecognized arguments。要哪条线只能多跑几条看判定落在哪。
 
 用法(在 provenance/provenance 下):
-    python -m case01.tools.isolation_probe --branch B --out <原始记录根>/isolation/probe-B.json(原 case01/runs_injector/ 已搬到 data/case01/raw)
+    python -m case01.tools.isolation_probe --out <原始记录根>/isolation/probe.json(原 case01/runs_injector/ 已搬到 data/case01/raw)
 """
 import argparse
 import json
@@ -46,7 +51,7 @@ class ProbeBridge(MavisBridge):
         if self.full_pool and not self.dry_run and self.simulator is not None:
             # 对抗模式:池子里放全量事件,释放完全交给 case01_node 条件
             self.simulator.story = [
-                self._as_story_event(ev, n) for n in self._all_nodes for ev in n.events]
+                self._as_story_event(ev, n) for n in self.nodes for ev in n.events]
 
     def external_state(self, name, step: int, sim_time: str, game) -> dict:
         # 该钩子在 _inject_story 之后触发 → 此刻记忆里应当已有本节点释放的事件
@@ -168,7 +173,6 @@ def summarise(probe: dict) -> dict:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="隔离验证实测(未释放事件检索不到)")
-    ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
     ap.add_argument("--roles", default=",".join(DEFAULT_ROLES))
     ap.add_argument("--scenario-dir", default="")
     ap.add_argument("--run-id", default="")
@@ -185,26 +189,28 @@ def main(argv=None):
         return 2
 
     scenario = args.scenario_dir or SCENARIO
-    all_nodes = default_nodes(args.branch, roles=list(roles))
-    nodes = all_nodes[:args.nodes] if args.nodes > 0 else all_nodes
+    # 判定前只有 T0 那一天(与起面/批路径同口径);截断交给 node_cap —— 它截的是
+    # 判定后换回来的那条完整时间线,自己先切节点表会在换线时被整段覆盖。
+    nodes = default_nodes("undetermined", roles=list(roles))
 
     bridge = ProbeBridge(
         nodes=nodes, roles=roles, scenario_dir=scenario,
-        run_id=args.run_id or "isolation-{}".format(args.branch),
-        dry_run=False, max_retries=args.max_retries, branch=args.branch,
+        run_id=args.run_id or "isolation-probe",
+        dry_run=False, max_retries=args.max_retries,
+        node_cap=max(0, int(args.nodes)),
         full_pool=not args.no_full_pool,
     )
-    bridge._all_nodes = all_nodes
     t0 = time.time()
     record = bridge.run()
     summary = summarise(bridge.probe)
 
     out = {
         "schema_version": "isolation-probe-0.1",
-        "branch": args.branch,
+        "branch": bridge.branch,
+        "branch_source": bridge.branch_source,
         "roles": list(roles),
         "full_pool": not args.no_full_pool,
-        "node_count": len(nodes),
+        "node_count": len(bridge.nodes),
         "elapsed_s": round(time.time() - t0, 1),
         "probe": bridge.probe,
         "summary": summary,

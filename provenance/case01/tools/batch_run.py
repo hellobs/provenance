@@ -22,7 +22,7 @@
     python -m case01.tools.batch_run --duration-min 180
 
     # 指定条数上限 / 只跑固定分支 / 换模型
-    python -m case01.tools.batch_run --max-runs 50 --timeline A --model qwen3:8b
+    python -m case01.tools.batch_run --max-runs 50 --model qwen3:8b
 
     # 快速自检(2 分钟内结束,看调度器本身有没有毛病)
     python -m case01.tools.batch_run --duration-min 2 --max-runs 4
@@ -315,8 +315,6 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
     env = _child_env(args_ns, seed)
 
     cmd = [args_ns.python, "-m", "case01.run", "--run-id", run_id]
-    if args_ns.timeline:
-        cmd += ["--timeline", args_ns.timeline]
     if args_ns.external_ethan:
         cmd += ["--external-ethan"]
 
@@ -325,7 +323,7 @@ def _one_run(args_ns, run_id: str, out_dir: str) -> Dict:
     # 以前只能回答"整批一个值",`--seed-base` 之后每条不同 —— 不记就等于
     # "这批 12 条各用了什么种子"在台账里查不回来(2026-10-06 加)。空串 = 这条没固定。
     rec = {"run_id": run_id, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
-           "cmd": " ".join(cmd), "attempt": 1, "timeline": args_ns.timeline or "auto",
+           "cmd": " ".join(cmd), "attempt": 1,
            "model_requested": args_ns.model or "(默认)",
            "seed": "" if seed is None else seed}
     log_path = os.path.join(out_dir, "{}.log".format(run_id))
@@ -423,7 +421,7 @@ def _summarize(out_dir: str, batch: str, stats: Dict, args_ns) -> Dict:
         "batch": batch,
         "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "settings": {
-            "model": args_ns.model, "timeline": args_ns.timeline or "auto",
+            "model": args_ns.model,
             "lanes": args_ns.lanes, "duration_min": args_ns.duration_min,
             "disable_thinking": bool(args_ns.disable_thinking),
             "python": args_ns.python,
@@ -479,9 +477,8 @@ def _summarize(out_dir: str, batch: str, stats: Dict, args_ns) -> Dict:
         "# 批量跑案例汇总 · {}".format(batch),
         "",
         "- 结束时间:{}".format(summary["finished_at"]),
-        "- 设置:模型 `{}` · 分支 `{}` · 并发 {} · 目标时长 {} 分钟".format(
-            args_ns.model, args_ns.timeline or "auto(LLM 判定)",
-            args_ns.lanes, args_ns.duration_min),
+        "- 设置:模型 `{}` · 并发 {} · 目标时长 {} 分钟".format(
+            args_ns.model, args_ns.lanes, args_ns.duration_min),
         "- 结果:成功 **{}** 条 / 失败 {} 条(台账 {} 行)".format(
             summary["counts"].get("ok", 0), summary["counts"].get("failed", 0),
             summary["counts"].get("ledger_rows", 0)),
@@ -534,8 +531,6 @@ def main(argv=None) -> int:
     ap.add_argument("--lanes", type=int, default=3, help="并发通道数(默认 3)")
     ap.add_argument("--model", default="qwen3:8b", help="CASE01_LLM_MODEL")
     ap.add_argument("--embed-model", default="", help="CASE01_EMBED_MODEL(缺省用环境)")
-    ap.add_argument("--timeline", choices=["A", "B", "C"], default="",
-                    help="强制分支;缺省全走 LLM 自动判定")
     ap.add_argument("--disable-thinking", action="store_true", default=True,
                     help="关 qwen3 hybrid 模型的思考(默认开:结构化任务不需要推理链)")
     ap.add_argument("--keep-thinking", dest="disable_thinking",
@@ -606,9 +601,8 @@ def main(argv=None) -> int:
         _seed_desc = str(args.seed)
     else:
         _seed_desc = "不固定"
-    _log("批次 {} 开始 · 目标 {} 分钟 · 并发 {} · 模型 {} · 分支 {} · 备任务 {} 条 · 种子 {}".format(
-        batch, args.duration_min, args.lanes, args.model,
-        args.timeline or "auto", planned, _seed_desc))
+    _log("批次 {} 开始 · 目标 {} 分钟 · 并发 {} · 模型 {} · 备任务 {} 条 · 种子 {}".format(
+        batch, args.duration_min, args.lanes, args.model, planned, _seed_desc))
     _log("台账目录: {}".format(out_dir))
 
     threads = [threading.Thread(target=_worker,

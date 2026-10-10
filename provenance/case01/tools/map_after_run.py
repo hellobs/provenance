@@ -27,7 +27,7 @@
 
 用法(在 `provenance/provenance` 下)
 ------------------------------------
-    python -m case01.tools.map_after_run --run-id <run_id> --branch B \
+    python -m case01.tools.map_after_run --run-id <run_id> \
         --raw data/case01/raw/<run_id>/raw.json --port 5010
 """
 import argparse
@@ -148,10 +148,9 @@ def wait_for_raw(raw: str, port: int, poll: float, stable: int, timeout: float) 
     return "timeout"
 
 
-def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> int:
+def run_mapping(run_id: str, raw: str, out: str, reflect: bool) -> int:
     cmd = [sys.executable, "-m", "case01.injector.pipeline",
-           "--branch", branch, "--run-id", run_id,
-           "--from-record", raw, "--out", out]
+           "--run-id", run_id, "--from-record", raw, "--out", out]
     if reflect:
         cmd.append("--reflect")
     log("映射命令: " + " ".join(cmd))
@@ -165,9 +164,9 @@ def run_mapping(run_id: str, branch: str, raw: str, out: str, reflect: bool) -> 
         log("映射 stderr(尾部 1500 字符):\n" + proc.stderr.strip()[-1500:])
     if proc.returncode != 0:
         log("[失败] 映射失败(exit={}, 耗时 {:.0f}s)。原始记录仍在:{}\n"
-            "  可手工重跑: python -m case01.injector.pipeline --branch {} --run-id {} "
+            "  可手工重跑: python -m case01.injector.pipeline --run-id {} "
             "--from-record {} --reflect --out {}".format(
-                proc.returncode, dt, raw, branch, run_id, raw, out))
+                proc.returncode, dt, raw, run_id, raw, out))
         return proc.returncode
     if not os.path.exists(out):
         log("[失败] 映射命令返回 0,但成品文件不存在:{}".format(out))
@@ -181,7 +180,6 @@ def main(argv=None) -> int:
     tolerant_stdout()
     ap = argparse.ArgumentParser(description="实跑跑完自动映射成成品记录")
     ap.add_argument("--run-id", required=True)
-    ap.add_argument("--branch", default="B", choices=["A", "B", "C"])
     ap.add_argument("--raw", required=True, help="实时面写出的原始记录路径")
     ap.add_argument("--out", default="", help="成品记录路径(默认仓根 data/case01/runs/<run_id>/run.json)")
     ap.add_argument("--port", type=int, default=5010, help="实时面端口(用于判断它是否还在)")
@@ -195,7 +193,7 @@ def main(argv=None) -> int:
 
     raw = os.path.abspath(args.raw)
     out = os.path.abspath(args.out) if args.out else os.path.join(RUNS_DIR, args.run_id, "run.json")
-    log("看护启动:run_id={} branch={}".format(args.run_id, args.branch))
+    log("看护启动:run_id={}".format(args.run_id))
     log("  等原始记录:{}".format(raw))
 
     state = wait_for_raw(raw, args.port, args.poll, args.stable, args.timeout)
@@ -209,7 +207,7 @@ def main(argv=None) -> int:
         return 3
 
     log("原始记录已就绪({} 字节),开始映射".format(_size(raw)))
-    return run_mapping(args.run_id, args.branch, raw, out, args.reflect)
+    return run_mapping(args.run_id, raw, out, args.reflect)
 
 
 if __name__ == "__main__":

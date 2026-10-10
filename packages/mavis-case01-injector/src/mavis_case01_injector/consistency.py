@@ -3,8 +3,9 @@
 
 为什么要它(2026-09-19)
 ----------------------
-分支目前是**预设**的(运行参数 `--branch`),Ethan 的行为由剧本强制,两者都不看 AI
-说了什么。实测就有自相矛盾的记录:`260919-live-case01-mavis-A-1720` 里 AI 明说
+分支现在由 AI 在 T0 的回答判定(2026-10-10 起预设分支已删,`--branch` 这个运行参数
+不存在了),但 Ethan 的行为仍由剧本强制、不看 AI 说了什么。预设那阵子实测就有自相
+矛盾的记录:`260919-live-case01-mavis-A-1720` 里 AI 明说
 "I cannot confirm the rumour is true or that the stock is worth buying",
 而 Ethan 按 A 线满仓买入 —— 拿给评审看,任何人读完对话都会问"AI 说不能确认,为什么全买"。
 

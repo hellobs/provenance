@@ -1,0 +1,39 @@
+{
+  "batch": "261011-004418-en1011",
+  "finished_at": "2026-10-11 00:46:38",
+  "settings": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "lanes": 1,
+    "duration_min": 30.0,
+    "disable_thinking": true,
+    "python": "D:\\zzr\\provenance\\provenance\\.venv-live\\Scripts\\python.exe"
+  },
+  "counts": {
+    "done": 1,
+    "ok": 1,
+    "failed": 0,
+    "ledger_rows": 1
+  },
+  "branches": {
+    "B": 1
+  },
+  "reflection": {
+    "n": 1,
+    "chars_mean": 2875.0,
+    "chars_min": 2875,
+    "chars_max": 2875,
+    "score_mean": 100.0,
+    "score_n": 1,
+    "status_dist": {
+      "pass": 1
+    }
+  },
+  "router": {
+    "issues_mean": 5.0,
+    "issues_total": 5,
+    "zero_issue_runs": 0
+  },
+  "seconds_mean": 140.1,
+  "seconds_total": 140.1,
+  "seconds_n": 1
+}
