@@ -95,7 +95,7 @@
 
 已可用：
 
-- 实时（小镇风格，推荐）：`python -m case01.vizkit.live_run --branch B --port 5010`
+- 实时（小镇风格，推荐）：`python -m case01.vizkit.live_run --port 5010`
   → 浏览器打开 `http://127.0.0.1:5010/`，运行过程中角色移动、对话气泡、状态面板**实时**出现。
   这就是原来的 Phaser 前端（`frontend/templates/index.html` + `main_script.html`），**前端零改动**。
   （`case01.vizkit.live_run` 是薄 CLI：roles / alias / scenario / 前端资源根由它传给 `mavis_vizkit` 的 live 插件。）
@@ -117,7 +117,7 @@
   `live_run` 注入（传给 `mavis_vizkit` 的 live/town 插件），插件不内置这份映射，不需要新增美术资源；
 - 服务未启动时事件进缓冲（`pending`），便于单测与无头运行，不丢语义。
 
-实测（2026-09-18，`--branch B --nodes 1`）：WS 客户端在运行过程中陆续收到
+实测（2026-09-18，`--nodes 1`）：WS 客户端在运行过程中陆续收到
 `ping@15.1s`、`chat_line@15.3/17.7/20.0s`、`agent@24.1/24.4s`、`time@24.4s`、`snapshot@24.4s`，
 随后每 5 秒 ping —— 属**实时**推送，不是跑完再回放。
 

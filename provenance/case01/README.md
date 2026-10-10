@@ -70,13 +70,13 @@ python -m case01.run --run-id my-run
 python -m case01.run --run-id my-run --external-ethan
 
 # 强制 Branch(A/B/C),便于对齐三线演示
-python -m case01.run --timeline A --run-id demo-a
+python -m case01.run --run-id demo-a
 
 # 不调 LLM(规则判定,测全链路)
 python -m case01.run --no-llm
 
 # 直接加载本地 HuggingFace 权重(无需 Ollama 服务)
-python -m case01.run --timeline A --run-id demo-a --local-hf \
+python -m case01.run --run-id demo-a --local-hf \
   --hf-chat-model /data/haozhe/agent/GTC/Qwen3-4B-Instruct-2507 \
   --hf-embed-model /data/haozhe/agent/GTC/Qwen3-Embedding-0.6B
 
@@ -118,9 +118,9 @@ Case01 当前路径的新运行固定使用英文角色指令、英文判定提�
 
 ```bash
 # dry-run(不加载 mavis,出 case01 兼容记录,CI 可用)
-python -m case01.injector.pipeline --branch B --dry-run --out runs_injector/B.json
+python -m case01.injector.pipeline --dry-run --out runs_injector/run.json
 # 真实运行 + 反思(Branch A/B/C;单次约 9–10 分钟,反思约 1.5 分钟)
-python -m case01.injector.pipeline --branch B --reflect --out runs_injector/B.json
+python -m case01.injector.pipeline --reflect --out runs_injector/run.json
 # 后处理已有记录(补事实层/接反思/Router)
 python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
 ```
@@ -137,7 +137,7 @@ python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
 
 ```bash
 # 实时可视化(小镇 Phaser 前端,端口 5010)
-python -m case01.vizkit.live_run --branch B --port 5010 --hold 1800 \
+python -m case01.vizkit.live_run --port 5010 --hold 1800 \
     --out case01\runs_injector\live-B\raw.json
 ```
 
