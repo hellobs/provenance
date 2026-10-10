@@ -101,6 +101,8 @@ class MavisBridge:
         # 空串 = 待判定;判定成功后恒为 "judge"(失败为 "judge-failed")。
         self.branch_source = ""
         self.judge_info: Dict[str, object] = {}
+        # Ethan 这一局实际用的后端(api(...) / local(...));写进 run_record,事后可查
+        self.ethan_backend = "unknown"
         self.finish_reason = ""
         self.use_case01_facts = bool(use_case01_facts)
         # 必须交互的节点:把两个角色钉到同一格并清空路径（mavis 要求同址且静止才可能对话）
@@ -398,7 +400,8 @@ class MavisBridge:
             return dict(cached[1])
         raw = {"branch": self.branch,
                "language": self.language,
-               "branch_source": self.branch_source, "judge_info": dict(self.judge_info),
+               "branch_source": self.branch_source,
+            "ethan_backend": self.ethan_backend, "judge_info": dict(self.judge_info),
                "mode": "dry-run" if self.dry_run else "mavis"}
         # 小镇这一局的对话/反思走的是挂在各 agent 上的 `Case01SafeProvider`,把它们
         # 一起交给清单:否则清单只看得见判定那一个客户端 —— 起面实测过两次后果:
@@ -432,6 +435,7 @@ class MavisBridge:
             # 分支从哪来:恒为 judge(由 T0 回答判定,01 §六 的设计原意)/ judge-failed。
             # **没有 preset** —— 2026-10-10 用户要求剔除全部预设分支的口子。
             "branch_source": self.branch_source,
+            "ethan_backend": self.ethan_backend,
             "judge_info": dict(self.judge_info),
             "finish_reason": self.finish_reason,
             # 调试跑标记(空串=正式跑);映射进成品记录的 debug 字段
@@ -997,20 +1001,61 @@ class MavisBridge:
         }
 
     def _apply_ethan_provider(self, config: dict) -> None:
-        """Ethan 走外部 API 时,从环境变量注入（密钥不进仓库、不进记录）。"""
+        """Ethan 走外部 API 时,从环境变量注入（密钥不进仓库、不进记录）。
+
+        **硬失败,绝不悄悄退回本地模型**(2026-10-10 用户要求)。以前这里是
+        "配置不全 ⇒ 直接 return",于是 Ethan 落回 mavis 的默认本地 provider ——
+        台词还是本地模型写的,但从产物上完全看不出来。
+        现在:
+          · 只配了一半(BASE_URL / MODEL 其一)⇒ 报错停这一局(是配漏了,不是选择本地);
+          · 配全了但起面探测不通 ⇒ 报错停这一局,**不**退回本地;
+          · 一个都没配 ⇒ 仍按"就是要本地"处理,但把实际后端写进 run_record,
+            事后一眼能看出 Ethan 是谁写的。
+        """
         base_url = os.environ.get("CASE01_ETHAN_BASE_URL", "").strip()
         model = os.environ.get("CASE01_ETHAN_MODEL", "").strip()
-        if not (base_url and model):
+        if not (base_url or model):
+            self.ethan_backend = "local(未配 CASE01_ETHAN_* ⇒ Ethan 走本地模型)"
             return
+        if not (base_url and model):
+            missing = "CASE01_ETHAN_MODEL" if model else "CASE01_ETHAN_BASE_URL"
+            raise RuntimeError(
+                "Ethan 的外部 API 只配了一半(缺 {}):配漏了不等于选择本地。"
+                "要么两个都配齐,要么都不配。".format(missing))
+        if not self._remote_reachable(base_url):
+            raise RuntimeError(
+                "Ethan 的外部 API({})起面探测不通:拒绝悄悄退回本地模型。".format(base_url))
         target = config.get("agents", {}).get(self.roles[1])
         if target is None:
-            return
+            raise RuntimeError("场景里找不到第二个角色,无法给它配外部 API")
         target.setdefault("think", {})["llm"] = {
             "provider": "openai",
             "model": model,
             "base_url": base_url,
             "api_key": os.environ.get("CASE01_ETHAN_API_KEY", "").strip(),
         }
+        self.ethan_backend = "api({}@{})".format(model, base_url)
+
+    @staticmethod
+    def _remote_reachable(base_url: str, timeout: float = 8.0) -> bool:
+        """起面**探测**外部 API 是否可达(不发真实请求,只连握手)。
+
+        为什么要在起面就探:Ethan 的台词是实验自变量,写它的模型必须可查。
+        放到第一次调用才发现连不上,那一局已经跑掉一大半了,只会留下半截记录。
+        """
+        import urllib.request
+        import urllib.error
+        url = base_url.rstrip("/") + "/models"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout):
+                return True
+        except urllib.error.HTTPError:
+            # 有响应也算"可达"(401/404 说明服务在,只是这个路径/密钥不对 —— 同样该硬失败,
+            # 但那属于"调不通",不是"连不上")
+            return True
+        except Exception:
+            return False
 
     def _apply_local_provider(self, config: dict) -> None:
         """Optionally switch the local backend; preserve scenario defaults otherwise."""

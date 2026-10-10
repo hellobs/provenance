@@ -179,6 +179,9 @@ def test_external_state_callback_returns_node_context(monkeypatch, tmp_path):
 def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
     _install_stub_provider(monkeypatch)
     bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    # 起面会**探测**外部 API 是否可达(2026-10-10 硬失败),单测里不能真去连网
+    monkeypatch.setattr(type(bridge), "_remote_reachable",
+                        staticmethod(lambda *a, **k: True))
     monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
     monkeypatch.setenv("CASE01_ETHAN_API_KEY", "sk-test")
@@ -188,6 +191,29 @@ def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
         "provider": "openai", "model": "mini-1",
         "base_url": "https://api.example.com/v1", "api_key": "sk-test",
     }
+    assert "api(mini-1@" in bridge.ethan_backend
+
+
+def test_ethan_external_unreachable_is_hard_failure(monkeypatch, tmp_path):
+    """配了外部 API 却连不通 ⇒ **报错停这一局**,绝不悄悄退回本地模型。"""
+    _install_stub_provider(monkeypatch)
+    bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    monkeypatch.setattr(type(bridge), "_remote_reachable",
+                        staticmethod(lambda *a, **k: False))
+    monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
+    with pytest.raises(RuntimeError):
+        bridge._build_mavis()
+
+
+def test_ethan_external_half_configured_is_hard_failure(monkeypatch, tmp_path):
+    """只配 BASE_URL 没配 MODEL ⇒ 报错(配漏了 ≠ 选择本地),不退回本地。"""
+    _install_stub_provider(monkeypatch)
+    bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.delenv("CASE01_ETHAN_MODEL", raising=False)
+    with pytest.raises(RuntimeError):
+        bridge._build_mavis()
 
 
 def test_stride_between_nodes(monkeypatch, tmp_path):

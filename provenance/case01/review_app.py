@@ -836,7 +836,7 @@ function auditExtra(x) {
 }
 
 // 只列**引擎侧**的交互留痕,与"审计"徽标同一口径(见 BADGE_ROWS 里的 audit 行)。
-// 事实层记账(release_event 单数 / set_branch)是 T0 一次性算出的世界事实,不经过引擎,
+// 事实层记账(单数的"释放事件"、以及分支判定那条)是 T0 一次性算出的世界事实,不经过引擎,
 // 2026-10-10 用户两次指出:"最一开始审计里面还是有脏东西"——开局 0 节点时它们就在,
 // 于是徽标写着 0、下面却列着行,看着像脏数据。开局列出的应当是空态。
 const ENGINE_AUDIT = new Set(["release_events", "interaction"]);
