@@ -98,10 +98,33 @@ ok(segs.slice(0, -1).every((q) => /[。！？.!?]$/.test(q.text)),
 ok(segs.every((q) => !/\s$/.test(q.text)),
    '段尾不留悬空空格(断点处的空白在切段时吃掉)');
 
-// 5) 新句覆盖,并从 0 重新吐
+// 4b) 同一角色又开口时,**正在念的那一段不能从头重打**
+//     (2026-10-10 用户:"说话说到一半突然来了属于它自己的新的一段话,他会突然打断,
+//      然后重复原来说的一般的话之后再继续往下说")
+sandbox.bubble_queue.length = 0;
+sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
+sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+sandbox.setBubble('B', 'Ethan Lin', '第一句话很长很长很长很长很长很长很长很长很长。');
+for (let i = 0; i < 6; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
+const beforeNew = sandbox.pronunciatios['B']._t;
+const shownBefore = sandbox.bubble_shown['B'];
+sandbox.setBubble('B', 'Ethan Lin', '这是同一个人新的一段话。');
+ok(sandbox.bubble_shown['B'] === shownBefore,
+   '新台词不得把正在念的那一段进度清零(否则会从头重复),实得 ' +
+   shownBefore + ' -> ' + sandbox.bubble_shown['B']);
+for (let i = 0; i < 3; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
+ok(sandbox.pronunciatios['B']._t.length > beforeNew.length
+   && sandbox.pronunciatios['B']._t.indexOf(beforeNew) === 0,
+   '新台词到达后,正在念的那一段应当**接着往下念**,实得 "' +
+   sandbox.pronunciatios['B']._t + '" 接在 "' + beforeNew + '" 之后');
+
+// 5) 新句覆盖(没有正在念的段时,新句从头开始吐)
+sandbox.bubble_queue.length = 0;
+sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
+sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');
 ok(sandbox.bubble_full['B'] === '新的一句' && sandbox.bubble_shown['B'] === 0,
-   '新句覆盖并从 0 开始');
+   '没有正在念的段时,新句从头开始吐');
 
 // 6) 有对话时,行动文本不抢镜
 sandbox.setActionBubble('B', '走动中');

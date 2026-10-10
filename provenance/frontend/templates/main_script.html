@@ -97,8 +97,15 @@
 		// 这一整段话的身份戳:队列里靠它认出"已被新台词顶掉的旧段",直接丢掉。
 		let sp = t.slice(0, 24) + "#" + segs.length;
 		bubble_spoken[name] = sp;
-		bubble_full[name] = segs[0];
-		bubble_shown[name] = 0;        // 从零开始吐
+		// bubble_full 记**整段话**(给 setActionBubble / flushBubble 判断"有没有对话");
+		// 真正在打的是哪一段由 tickBubbles 推进。
+		bubble_full[name] = t;
+		// ⚠ **正在念的那一段绝不重置进度**(2026-10-10 用户:"一个人说话说到一半突然来了
+		// 属于它自己的新的一段话,他会突然打断,然后重复原来说的一般的话之后再继续往下说")。
+		// 原来这里无条件清零,而打字机读的正是 bubble_shown[name] ⇒ 同一角色又开口时,
+		// 正在打的那段被**从头重打一遍**,画面上就是"突然重复已说过的话"。
+		// 新段的进度由 tickBubbles 开段时自己清零,这里不用管。
+		if (bubble_active !== name) bubble_shown[name] = 0;
 		// 排队:同一时刻**只念一段**,后来到的排到队尾(2026-10-10 用户:
 		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
 		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
