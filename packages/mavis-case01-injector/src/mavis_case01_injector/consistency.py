@@ -300,7 +300,7 @@ def judge_consistency(run_record: Dict, llm=None) -> Dict:
             "disagreement": disagreement, "quick_scan": quick, "stance": stance}
 
 
-def attach_consistency(record: Dict, branch_source: str = "preset", llm=None) -> Dict:
+def attach_consistency(record: Dict, branch_source: str = "", llm=None) -> Dict:
     """给记录盖上"分支从哪来 + AI 的 T0 立场是否与之一致"的戳(**不许静默**)。
 
     必须在**写盘之前**调用:这样文件里一定有这一节,而不是"看日志才知道"。

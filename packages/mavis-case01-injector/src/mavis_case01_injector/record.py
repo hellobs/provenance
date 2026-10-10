@@ -172,19 +172,17 @@ def to_case01_record(record: dict, branch: str = "",
             # (case01.world.timelines.BRANCH_TO_TIMELINE = {A:A, B:B, C:A})。
             # 与已冻结的旧引擎记录(demo-2/demo-3 的 branch_action.timeline 均为 A)一致。
             "timeline": _timeline_of(branch),
-            # 分支从哪来:preset(运行参数) / judge(由 T0 回答判定,01 §六 的设计原意)。
-            # **judge 模式下 T0 还没跑完时不要谎报 preset**:那时分支是兜底值、还没判,
-            # 面板会照着显示"实验设计预设 / 未判定",看着像 preset 跑(用户实测反馈)。
-            # 有 branch_mode 就按它说,判定结果为空时如实标成 pending。
-            "source": record.get("branch_source")
-            or ("judge" if record.get("branch_mode") == "judge" else "preset"),
-            "pending": bool(record.get("branch_mode") == "judge"
-                            and not record.get("branch_source")),
+            # 分支从哪来:judge(T0 回答判定,01 §六 的设计原意,也是唯一生产路径) /
+            # judge-failed(判不出,留人工复核) / 没留下判定结果。
+            # **2026-10-10 剔除预设分支后不许再兜底成 "preset"**:原先这条读的是
+            # `record["branch_mode"]`(预设时代的运行参数),那个键全仓已不存在,于是
+            # "没判出来"会被写成"我们预设的"——一件根本没有发生过、且当场可被证伪的事。
+            "source": record.get("branch_source") or "undetermined",
+            "pending": not record.get("branch_source"),
             "judge_info": dict(record.get("judge_info") or {}),
             "judge": ("llm(T0 回答判定)" if (record.get("branch_source") == "judge")
                       else ("judge(failed/manual review required)" if record.get("branch_source") == "judge-failed"
-                            else ("judge(待 T0 判定)" if record.get("branch_mode") == "judge"
-                                  else "preset(mavis 路径不调 LLM judge)"))),
+                            else "undetermined(这次没有留下判定结果)")),
             "c_plan": dict(c_plan or {}),
             "t0_rounds": int(t0_rounds or 0),
         },
