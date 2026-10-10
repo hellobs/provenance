@@ -287,7 +287,15 @@
       "n_issues": (rt.issues || []).length,
       "has_reflection": !!(rf.text)
     }));
-    if (body.summary) inner += sec("摘要", '<pre class="quote">' + esc(body.summary) + '</pre>');
+    // ⚠ 摘要可能是**对象**(不同 source 的 body 形状不同):原来直接 esc(body.summary),
+    // 而 esc 里是 String(x) ⇒ 对象变成字面量 "[object Object]"(用户 2026-10-10 截图)。
+    // 这里:字符串原样;对象/数组转**可读 JSON**(缩进两格)。宁可多显示一点内容,
+    // 也不要显示一句没用的占位符。
+    var _sum = body.summary;
+    if (_sum && typeof _sum !== "string") {
+      try { _sum = JSON.stringify(_sum, null, 2); } catch (e) { _sum = String(_sum); }
+    }
+    if (_sum) inner += sec("摘要", '<pre class="quote">' + esc(_sum) + '</pre>');
     if (rf.text) inner += sec("反思", '<pre class="quote">' + esc(rf.text) + '</pre>');
     // 对话 turns
     if (t.length) {
