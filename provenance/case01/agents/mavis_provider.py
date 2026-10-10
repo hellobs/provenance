@@ -69,6 +69,8 @@ class Case01SafeProvider:
         self.enabled = True
         # 端点不支持 response_format 而降级的次数(运行清单里要能查)
         self.response_format_downgrades = 0
+        # None=还没试过 / True=支持 / False=这端点整个 response_format 家族都拒绝
+        self._response_format_supported = None
         # 这些调用点**禁用兜底值**:失败就报错,不用 failsafe 充数
         # (它们的 failsafe 是"看起来正常的一句话",会污染对话/记录)。
         # 可用 think.llm.forbid_failsafe 覆盖;设 "__never__" 可关掉这个保护。
@@ -119,7 +121,20 @@ class Case01SafeProvider:
         index = 2 if result is None else 1
         self.summary["total"][index] += 1
         self.summary[caller][index] += 1
-        if result is None and caller in self.forbid_failsafe_callers:
+        # ⚠ caller 恒为 "llm_normal"(mavis 从不传 caller),所以按调用点白名单匹配
+        # 等于永不命中 —— 实测仍打出 "caller=llm_normal failsafe='嗯'"。
+        # 可靠的判据是 **兜底值本身是不是一句自然话**:mavis 的对话类兜底全是字符串
+        # ("嗯" / "X 说的话没有得到回应" / "X 进行了一次对话" / "空闲"),它们会**冒充模型
+        # 的台词或行为**写进产物;数字/布尔/结构化占位不会冒充成一句话。
+        # 精确判据:mavis 的**对话**调用(prompt_generate_chat 等)的 return_type 是一个
+        # **函数**(如 generate_chat),结构化调用的 return_type 是 pydantic 模型。
+        # 不能按"兜底值是不是字符串"判 —— 连 'Trading Center'(扇区占位)都是字符串,
+        # 那会把整局搞崩(实测 2026-10-10)。
+        _is_dialogue_call = (return_type is not None
+                             and not hasattr(return_type, "model_json_schema"))
+        if result is None and (caller in self.forbid_failsafe_callers
+                                or (_is_dialogue_call
+                                    and "__never__" not in self.forbid_failsafe_callers)):
             # 2026-10-10 用户要求"不允许静默处理",而且对话类兜底最恶劣:
             # mavis 的 failsafe 里存着 "X 说的话没有得到回应" / "X 进行了一次对话"
             # 这种**看起来完全正常**的句子 —— 落到记录里就等于凭空造了一句话。
@@ -192,7 +207,11 @@ class Case01SafeProvider:
             # (2026-10-06 实测:小镇面三条真跑的 manifest.seed 全为 null)。
             self.seed = seed
             body["seed"] = seed
-        if response_format:
+        # 端点能力记忆:DeepSeek 的 chat/completions 目前对 response_format **整个家族**
+        # 都回 400("This response_format type is unavailable now",json_object 同样)。
+        # 第一次撞到就记住"这端点不支持",之后不再发 —— 否则每次调用白费两次请求
+        # (延迟与成本翻倍),实测一局里能刷出几十次降级日志。
+        if response_format and self._response_format_supported is not False:
             body["response_format"] = response_format
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -208,11 +227,14 @@ class Case01SafeProvider:
         # failsafe("嗯"),看起来就像"模型不说话"。这里降级重试,而且**必须出声**:
         # 端点能力差异不能悄悄吞掉。
         if response.status_code == 400 and response_format:
+            self._response_format_supported = False
             print("[case01.llm] !! 端点拒绝 response_format={} (HTTP 400),"
-                  "降级为不带 response_format 重试一次。端点原文: {}".format(
+                  "降级为不带 response_format 重试一次(已记住该端点不支持)。端点原文: {}".format(
                       response_format.get("type"), (response.text or "")[:200]),
                   flush=True)
             self.response_format_downgrades += 1
+            # 退到 JSON mode(DeepSeek 支持 {"type":"json_object"}),而不是把整个
+            # response_format 丢掉 —— 丢掉就没有"必须是 JSON"的约束,解析更容易失败。
             body.pop("response_format", None)
             response = requests.post(
                 self.base_url + "/chat/completions",
@@ -241,7 +263,9 @@ class Case01SafeProvider:
         configured = self.config.get("max_tokens", {})
         if isinstance(configured, int):
             return configured
-        limits = {"structured": 256, "conversation": 1024, "long": 2048, "default": 1024}
+        # 2026-10-10:structured 档原本 256,实测把结构化输出连续截断 3 次
+        # (poignancy_event 解析到空串 → 落兜底值)。抬到 1024 并加下限保护。
+        limits = {"structured": 1024, "conversation": 2048, "long": 4096, "default": 2048}
         # ⚠ 2026-10-10 待办:实测日志里"输出被 max_tokens 截断 caller=llm_normal
         # max_tokens=256" —— 对话正文被归到 structured 档(只有 256)。外部 API 默认开着
         # reasoning 时 256 根本装不下,这也是"每句只剩一个字"的另一半原因。
@@ -264,18 +288,33 @@ class Case01SafeProvider:
 
     @classmethod
     def _parse(cls, text, return_type):
+        # 模型常把 JSON 包在 ```json …``` 里(实测 DeepSeek 降级后就这么回),
+        # 先剥围栏再解析 —— 否则围栏残渣会让 json.loads 直接失败。
+        raw = text or ""
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.split("\n", 1)[-1]
+            if stripped.rstrip().endswith("```"):
+                stripped = stripped.rstrip()[:-3]
+            stripped = stripped.strip()
         candidates = []
-        try:
-            candidates.append(json.loads(text))
-        except (TypeError, json.JSONDecodeError):
-            pass
-        candidates.extend(cls._json_objects(text))
-        for value in candidates:
+        for candidate_text in (raw, stripped):
             try:
-                payload = value if isinstance(value, dict) else {"res": value}
-                return return_type.model_validate(payload).res
-            except Exception:
+                candidates.append(json.loads(candidate_text))
+            except (TypeError, json.JSONDecodeError):
                 continue
+            break
+        candidates.extend(cls._json_objects(stripped or raw))
+        for value in candidates:
+            for payload in (value if isinstance(value, dict) else {"res": value},
+                            # 有些响应模型只有一个 res 字段(如 schedule_daily),
+                            # 而模型回的是**裸字典** {"0:00": "..."};按 schema 直接
+                            # 校验必然失败,包一层 res 再试(实测 3 次全被误判为无效)。
+                            {"res": value}):
+                try:
+                    return return_type.model_validate(payload).res
+                except Exception:
+                    continue
         field = getattr(return_type, "model_fields", {}).get("res")
         if field is not None and field.annotation is str and text:
             return return_type.model_validate({"res": text}).res
