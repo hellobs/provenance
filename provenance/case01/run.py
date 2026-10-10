@@ -127,7 +127,8 @@ def main():
         from case01.agents.llm import OpenRouterClient
         ethan_llm = OpenRouterClient()
         router_llm = OpenRouterClient()
-    # Router(N7)专用独立模型:CASE01_ROUTER_PROVIDER=bigmodel|openrouter|vllm。
+    # Router(N7)专用独立模型:CASE01_ROUTER_PROVIDER=deepseek|bigmodel|openrouter|vllm
+    # (名单与各自的默认端点/模型在注入器的 `ROUTER_PROVIDERS` 那张表里,`--show` 会打出来)。
     # 批子进程继承环境变量,所以 batch_run 不用改;没配就是 None(照今天行为回落,
     # 但落盘的 router.executed_by 会记 source="local_fallback")。
     reflect_router_llm = None

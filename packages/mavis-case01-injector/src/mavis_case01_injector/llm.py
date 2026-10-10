@@ -614,6 +614,51 @@ BIGMODEL_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 BIGMODEL_ROUTER_MODEL = "glm-4.7-flash"
 OPENROUTER_ROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 
+# N7(Router)能配哪些外部后端 —— **一张表,两个消费者**:`router_client_from_env()`(跑批/起面)
+# 与 `tools/setup_api.py`(配置与自检)都读这里,不再各写一份。
+# 为什么要有这张表(2026-10-10):演示主力换成 DeepSeek,可这里能用的名字只有
+# bigmodel/openrouter/vllm,于是它只能借 `vllm`(=自托管)那一路配 —— 敲的人以为自己在配
+# 自建端点;而 `setup_api.py` 另有一份表且和这里不同步,它的 `--check` 又不读
+# `router_provider`,所以闸门测的后端和跑批用的后端可以不是一个(当天就是这么发现的)。
+# 字段:
+#   base/model    默认端点与模型名。`CASE01_ROUTER_BASE_URL`/`_MODEL`(或 `.secrets.json` 的
+#                 `router_base_url`/`router_model`)对**所有** provider 通用,换模型不用改代码;
+#   key_env/key_json 取 key 的先后顺序(元组按序试,第一个非空算 —— 旧键名继续认,别逼人已配的机器重配);
+#   client        "openai"=OpenRouterClient(只聊天,不掺 embed)/ "vllm"=VLLMClient(自托管,embed 同模型);
+#   extra_body    显式"不许思考"的写法。拆问题是短 JSON 任务,开着推理会把正文挤出 max_tokens
+#                 ⇒ 端点回 HTTP 200 但正文为空,而空正文等于"拆不出问题"(当天实测:9753 字反思
+#                 喂 deepseek-flash、4096 预算全被 reasoning 吃掉 ⇒ `router.issues` 空)。
+#                 生效性判据是响应里 `reasoning_content`/`reasoning_tokens` 消失,**不是 HTTP 200**
+#                 (参数被忽略照样 200)。DeepSeek 认 `thinking`;vLLM/Qwen 认 `chat_template_kwargs`;
+#                 所以自托管那路两种一起发,各家只看懂自己那一个。OpenRouter 留空 = 没实测过,不猜。
+#   needs_base    没有有意义的默认端点(自托管)⇒ 不填就报错而不是猜。
+# 默认模型名取的是**这家端点当下真的服务什么**(2026-10-10 用配置里那份 key 打 /models:
+# 只有 `deepseek-flash` / `deepseek-v4-pro`)。别照公开文档写 `deepseek-chat` —— 那个名字
+# 在这把 key 上取不到,而"模型不存在"和"网络失败"在这条路上同形。
+ROUTER_PROVIDERS = {
+    "deepseek": {
+        "base": "https://api.deepseek.com/v1", "model": "deepseek-flash",
+        "key_env": ("DEEPSEEK_API_KEY", "CASE01_ROUTER_API_KEY"),
+        "key_json": ("deepseek_api_key", "router_api_key"),
+        "client": "openai",
+        "extra_body": {"thinking": {"type": "disabled"}}},
+    "bigmodel": {
+        "base": BIGMODEL_BASE_URL, "model": BIGMODEL_ROUTER_MODEL,
+        "key_env": ("BIGMODEL_API_KEY",), "key_json": ("bigmodel_api_key",),
+        "client": "openai",
+        "extra_body": {"thinking": {"type": "disabled"}}},
+    "openrouter": {
+        "base": "https://openrouter.ai/api/v1", "model": OPENROUTER_ROUTER_MODEL,
+        "key_env": ("OPENROUTER_API_KEY",), "key_json": ("openrouter_api_key",),
+        "client": "openai", "extra_body": None},
+    "vllm": {
+        "base": "", "model": "",
+        "key_env": ("CASE01_ROUTER_API_KEY",), "key_json": ("router_api_key",),
+        "client": "vllm", "needs_base": True,
+        "extra_body": {"chat_template_kwargs": {"enable_thinking": False},
+                       "thinking": {"type": "disabled"}}},
+}
+
 
 def _host_of(base: str) -> str:
     return str(base or "").split("//")[-1].split("/")[0]
@@ -699,71 +744,65 @@ def router_client_from_env():
 
     没配 provider ⇒ 返回 (None, {}),调用方照实回落本地并在产物里记
     `source="local_fallback"`(违规要看得见,不给静默兜底);显式配 `local` 记
-    `local_by_config`。
-    provider 取值:`bigmodel`(默认 `glm-4.7-flash`,key 走 `BIGMODEL_API_KEY`
-    或 `.secrets.json` 的 `bigmodel_api_key`)/ `openrouter`(沿用既有 key 解析)/
-    `vllm`(任何 OpenAI 兼容端点;`router_base_url`/`router_model` 也能写在
-    `.secrets.json`,所以一条 setup 命令就配得完自托管模型)。
-    覆盖项:`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、`CASE01_ROUTER_TIMEOUT`。
+    `local_by_config`。provider 的取值与各自的默认端点/模型/取 key 顺序都在
+    **`ROUTER_PROVIDERS` 这一张表**里(`deepseek` / `bigmodel` / `openrouter` / `vllm`),
+    本函数与 `tools/setup_api.py` 共用它 —— 以前是两处各写一份,于是 setup 的自检
+    能测到一个不存在的后端上去(10-10 就是这么发现的)。
+    覆盖项(对所有 provider 通用):`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、
+    `CASE01_ROUTER_TIMEOUT`(或 `.secrets.json` 的 `router_model`/`router_base_url`)。
     """
     provider = router_provider_name()
     if provider in LOCAL_ROUTER_PROVIDERS or not provider:
         return None, {}
+    spec = ROUTER_PROVIDERS.get(provider)
+    if spec is None:
+        raise ValueError("CASE01_ROUTER_PROVIDER 只认 {}/{}(local=故意用本地),"
+                         "收到:{}".format("/".join(sorted(ROUTER_PROVIDERS)),
+                                          "/".join(LOCAL_ROUTER_PROVIDERS), provider))
     model = os.environ.get("CASE01_ROUTER_MODEL", "").strip() \
-        or _secret_value("", "router_model")
+        or _secret_value("", "router_model") or spec["model"]
     base = os.environ.get("CASE01_ROUTER_BASE_URL", "").strip() \
-        or _secret_value("", "router_base_url")
+        or _secret_value("", "router_base_url") or spec["base"]
     try:
         timeout = float(os.environ.get("CASE01_ROUTER_TIMEOUT", "") or 180.0)
     except ValueError:
         raise ValueError("CASE01_ROUTER_TIMEOUT 要是一个数,收到:{!r}".format(
             os.environ.get("CASE01_ROUTER_TIMEOUT")))
-    if provider == "bigmodel":
-        key = _secret_value("BIGMODEL_API_KEY", "bigmodel_api_key")
-        if not key:
-            raise RuntimeError(
-                "Router provider=bigmodel 但取不到 key。一条命令配好:"
-                "`python provenance/tools/setup_api.py --router bigmodel --key <GLM key>`"
-                "(写进 .secrets.json,已 gitignore;不打印 key)")
-        client = OpenRouterClient(
-            model=model or BIGMODEL_ROUTER_MODEL, base_url=base or BIGMODEL_BASE_URL,
-            api_key=key, timeout=timeout,
-            # 拆问题是短 JSON 任务:开着 reasoning 会把正文挤出 max_tokens
-            # (与 branch_judge_eval 对 BigModel 的同一处置,2026-09-27 实测)
-            extra_body={"thinking": {"type": "disabled"}})
-    elif provider == "openrouter":
-        key = _openrouter_key()
-        if not key:
-            raise RuntimeError(
-                "Router provider=openrouter 但取不到 OPENROUTER_API_KEY。一条命令配好:"
-                "`python provenance/tools/setup_api.py --router openrouter --key sk-…`")
-        client = OpenRouterClient(model=model or OPENROUTER_ROUTER_MODEL,
-                                  base_url=base or "https://openrouter.ai/api/v1",
-                                  api_key=key, timeout=timeout)
-    elif provider == "vllm":
-        if not base:
-            raise ValueError(
-                "Router provider=vllm 需要端点。一条命令配好:"
-                "`python provenance/tools/setup_api.py --router vllm "
-                "--base-url http://…/v1 --model <名字> --key …`"
-                "(或设 CASE01_ROUTER_BASE_URL)")
-        if not model:
-            raise ValueError("CASE01_ROUTER_PROVIDER=vllm 需要 CASE01_ROUTER_MODEL"
-                            "(这个后端没有有意义的默认模型名)")
-        client = VLLMClient(base_url=base, chat_model=model,
-                            embed_model=model,
-                            api_key=_secret_value("CASE01_ROUTER_API_KEY",
-                                                  "router_api_key"),
-                            timeout=timeout,
-                            # 与 bigmodel 分支同一条政策(拆问题是短 JSON 任务,思考链会
-                            # 把正文挤出 max_tokens),2026-10-10 实测这条以前**没带上**:
-                            # Router 指向 DeepSeek 的推理档时,9753 字的反思正文喂进去,
-                            # 4096 预算全被 reasoning 吃掉 ⇒ 正文空 ⇒ 记录里 router 是空的,
-                            # 只剩一句 "Router 模型返回空内容"。写法用实测生效的那一个。
-                            extra_body={"thinking": {"type": "disabled"}})
+    if spec.get("needs_base") and not base:
+        raise ValueError(
+            "Router provider={} 需要端点(这一家没有有意义的默认值)。一条命令配好:"
+            "`python provenance/tools/setup_api.py --router {} "
+            "--base-url http://…/v1 --model <名字> --key …`(或设 CASE01_ROUTER_BASE_URL)"
+            .format(provider, provider))
+    if spec.get("needs_base") and not model:
+        raise ValueError("Router provider={} 需要模型名"
+                         "(这个后端没有有意义的默认模型名)".format(provider))
+    if provider == "openrouter":
+        key = _openrouter_key()          # 它有 env→case01/.secrets→引擎统一解析 三级回落
     else:
-        raise ValueError("CASE01_ROUTER_PROVIDER 只认 bigmodel/openrouter/vllm,"
-                         "收到:{}".format(provider))
+        key = ""
+        for name in spec["key_env"]:
+            key = os.environ.get(name, "").strip()
+            if key:
+                break
+        if not key:
+            for name in spec["key_json"]:
+                key = _secret_value("", name)
+                if key:
+                    break
+    if not key:
+        raise RuntimeError(
+            "Router provider={} 但取不到 key(试过 env {} 与 .secrets.json 的 {})。"
+            "一条命令配好:`python provenance/tools/setup_api.py --router {} --key <key>`"
+            "(写进 .secrets.json,已 gitignore;不打印 key)".format(
+                provider, "/".join(spec["key_env"]), "/".join(spec["key_json"]), provider))
+    extra = spec.get("extra_body")
+    if spec["client"] == "vllm":
+        client = VLLMClient(base_url=base, chat_model=model, embed_model=model,
+                            api_key=key, timeout=timeout, extra_body=extra)
+    else:
+        client = OpenRouterClient(model=model, base_url=base, api_key=key,
+                                  timeout=timeout, extra_body=extra)
     ident = router_identity(client)
     ident["provider"] = provider
     return client, ident

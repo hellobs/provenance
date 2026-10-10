@@ -94,9 +94,10 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     executed_by["external_api"] = executed_by.get("provider") == "api"
     if not executed_by["external_api"]:
         # 04 §五 没满足要说出口,不能只躺在产物字段里等人来查。
+        # 这句是给现场看的:名单不写死在这里(写死过一次,于是 DeepSeek 只能借 `vllm` 配)。
         print("[!] Router 不是独立 API 模型(source={}):配一条 "
-              "`python provenance/tools/setup_api.py --router bigmodel --key <key>` 再跑"
-              .format(source))
+              "`python provenance/tools/setup_api.py --router <后端名> --key <key>` 再跑"
+              "(名单与当前配置:`--show`;可用哪个:`--check`)".format(source))
     record["router"]["executed_by"] = executed_by
     print("[case01.pipeline] Router 后端={} {}@{}(与反思共用客户端={})".format(
         executed_by["source"], executed_by["model"], executed_by["host"] or "local",
