@@ -75,25 +75,8 @@ def test_status_block_carries_a_date():
             bad.append(os.path.relpath(p, _PKG).replace("\\", "/"))
     assert not bad, "状态块缺「最后核对」日期:\n" + "\n".join(bad[:20])
 
-
-def test_doc_index_lists_every_md():
-    idx = os.path.join(_PKG, "docs", "文档索引.md")
-    assert os.path.isfile(idx), "docs/文档索引.md 不存在(跑 tools/doc_audit.py --index)"
-    text = io.open(idx, encoding="utf-8").read()
-    missing = []
-    for p in _md_files():
-        rel = os.path.relpath(p, os.path.join(_PKG, "docs")).replace("\\", "/")
-        rel_pkg = os.path.relpath(p, _PKG).replace("\\", "/")
-        if rel_pkg == "docs/文档索引.md":
-            continue
-        # index 里的路径相对 docs/ 写(如 `../case01/README.md`)或相对仓库根,两种都认
-        if rel_pkg not in text and rel not in text:
-            missing.append(rel_pkg)
-    assert not missing, "这些 md 没被文档索引收录:\n" + "\n".join(missing[:20])
-
-
-def test_doc_index_flags_superseded_docs():
-    """索引必须显式标出"已被取代/历史存档"这类状态 —— 光有清单没有状态等于没体检。"""
-    text = io.open(os.path.join(_PKG, "docs", "文档索引.md"), encoding="utf-8").read()
-    for token in ("现行", "已被取代", "历史存档", "维护约定"):
-        assert token in text, token
+# 2026-10-10 用户要求 docs 下**只留 5 个 md**,"文档索引"随之删除 ⇒ 这两条
+#   - test_doc_index_lists_every_md(每份 md 都要在索引里出现过)
+#   - test_doc_index_flags_superseded_docs(索引必须标出"已被取代/历史存档")
+# 没有索引就没有可断言的对象,按"测试端也要删"的口径一并删掉。
+# 保留的 test_docs_have_status_block:那 5 份仍要有「最后核对」日期。

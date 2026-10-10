@@ -18,7 +18,7 @@
 >
 > Platform and engine are separated: [mavisframework](https://github.com/hellobs/mavis) is maintained and released independently (v1.3.4); this repo depends on it via `mavisframework>=1.2.0,<2.0.0` in `requirements.txt`. **Constraints never enter the prompt** — an expert edit only weights the *consequence feedback*, so the tendency converges only through later experience (lagged convergence = observable evidence of internalization).
 >
-> → [0\. Current state](#0-current-state) ｜ [7\. IVD Governance Platform](#7-ivd-governance-platform) ｜ [Expert tour](provenance/docs/专家导览_怎么看provenance.md)
+> → [0\. Current state](#0-current-state) ｜ [7\. IVD Governance Platform](#7-ivd-governance-platform) ｜ [Architecture & integration](provenance/docs/架构总览与对接指南.md)
 
 **Scope**
 
@@ -26,7 +26,7 @@
 |---|---|
 | Real-time simulation & visualization; 5010 as the single integration entry (live face + data face) IVD governance: constraint edits, tendency curves, intervention audit, three-layer explanation Pluggable expert interventions (`InterventionStrategy` registry) Read-only discovery surfaces: expert tour, platform contract, field reading guide Embed surfaces `/embed/*` (iframe, no CORS) | Turnkey support for any other business scenario (new scenario = a `cases/*/scenario.yaml` + an engine) Hardened security for public exposure (**no authentication**; loopback-only by default) A real market model (consequence feedback is a lightweight embedding-similarity stand-in) Final judgment on research conclusions (the AI only guarantees mechanical correctness) |
 
-**Handing over / integrating? Start with [provenance/docs/文档索引.md](provenance/docs/文档索引.md)** — it shows at a glance which documents are current and which are superseded. The single contract handed to a governance platform is [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md).
+**Handing over / integrating? Start with [provenance/docs/架构总览与对接指南.md](provenance/docs/架构总览与对接指南.md)** — it shows at a glance which documents are current and which are superseded. The single contract handed to a governance platform is [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md).
 
 ---
 
@@ -97,7 +97,7 @@ harness is `case01/tools/branch_judge_eval.py` (report:
 **Tests**: `python -m pytest tests` (outer) · `python -m pytest case01/tests case_engine/tests`
 · the `packages/mavis-vizkit` suite · the `../mavis` kernel suite.
 
-**Docs**: start at `provenance/docs/文档索引.md` (status index); the platform-facing contract is
+**Docs**: start at `provenance/docs/架构总览与对接指南.md`; the platform-facing contract is
 `provenance/docs/平台对接契约_5010唯一入口.md`.
 
 ## 1. Architecture
@@ -218,7 +218,7 @@ uv pip install -r requirements.txt pytest
 > --duration-min 180 --lanes 1 --model qwen3:8b`. Tests that need the missing data say which path they
 > want (e.g. `tests/test_metric_semantics.py` points at `data/case00/state`) —
 > feed it from your own runs, or drop the project-supplied demo package into
-> `data/case01/runs/` (see `provenance/docs/专家导览_怎么看provenance.md` — note it is
+> `data/case01/runs/` (see `provenance/docs/架构总览与对接指南.md` — note it is
 > under the **package** `provenance/docs/`, not the repo-root `handbook/`).
 >
 > **See a record before running anything:** this repo ships two tracked fixture records,
@@ -285,7 +285,7 @@ Open http://127.0.0.1:5010/ . Read-only faces: `python -m case00.serve --port 50
 `cd provenance/config_tool && python app.py` (8060). It discovers the co-located
 platform directory; no environment variables are needed in the standard layout.
 
-**Experts/reviewers** should read `provenance/docs/专家导览_怎么看provenance.md` first:
+**Experts/reviewers** should read `provenance/docs/架构总览与对接指南.md` first:
 conclusion boundaries, which faces exist only on the case01/case00 side, the two read-only
 data endpoints, how to read the fields, how to use the two manual-annotation tables, and a
 fifteen-minute walkthrough.
@@ -534,8 +534,7 @@ edit scenarios, delete roles and launch a run.
   of 5000+ artifacts and logs found no key material.
 
 Code locations: `live/netguard.py` (binding & allowlist policy), `tests/test_netguard.py`
-(behaviour assertions). Integration details: `provenance/docs/给平台侧_嵌入与数据接入.md`;
-health-check conclusions: `provenance/docs/0923_体检报告.md`.
+(behaviour assertions). Integration details: `provenance/docs/平台对接契约_5010唯一入口.md`.
 
 ## 13. Verification & delivery
 
@@ -551,7 +550,7 @@ python provenance/tools/verify_demo_sync.py --require-zip   # 3) bundle consiste
 `--require-zip` matters: without it a **missing** archive is reported as "not applicable", so
 deleting the zip would look like a pass. Repacking is one command
 (`python tools/make_demo_zip.py`, add `--dry-run` to just list the entries first); the ordered
-delivery checklist is `provenance/docs/冻结流程_打包装箱一页纸.md`.
+delivery checklist is `provenance/docs/10月15日演示_运行手册.md`.
 
 **What a clone does not contain.** `data/case01/runs/` and
 `data/case00/state/` are deliberately gitignored (large, and once committed by
@@ -559,7 +558,7 @@ accident), so this repository ships the **derived analysis**
 (`provenance/results/analysis/`, tracked) but **not the raw run records behind it**. Claims
 that need those records therefore cannot be recomputed from a fresh clone alone — that
 boundary, with the three reproducibility tiers, is written down in
-`provenance/docs/GTC研究边界声明.md` and `provenance/docs/复现说明_三档口径.md`.
+`provenance/docs/核验主张与证据说明书.md` and `provenance/docs/核验主张与证据说明书.md`.
 
 ## License
 

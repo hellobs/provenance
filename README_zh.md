@@ -19,7 +19,7 @@
 >
 > 平台与框架分离：[mavisframework](https://github.com/hellobs/mavis) 独立维护、独立发版（v1.3.4），本仓通过 `requirements.txt` 中的 `mavisframework>=1.2.0,<2.0.0` 依赖它。**制度约束不进提示词**——专家调整约束只加权*后果反馈*，倾向需经后续体验才逐步收敛（滞后收敛 = 内化发生的可观测证据）。
 >
-> → [0\. 现状速览](#0-现状速览) ｜ [7\. IVD 治理平台](#7-ivd-治理平台) ｜ [专家导览](provenance/docs/专家导览_怎么看provenance.md)
+> → [0\. 现状速览](#0-现状速览) ｜ [7\. IVD 治理平台](#7-ivd-治理平台) ｜ [专家导览](provenance/docs/架构总览与对接指南.md)
 
 **范围界定**
 
@@ -27,7 +27,7 @@
 |---|---|
 | 实时推演与可视化；5010 唯一对接入口（实时面 + 数据面） IVD 治理：约束编辑、倾向曲线、干预审计、三层解释 专家干预可插拔（`InterventionStrategy` 注册表） 只读发现面：专家导览、平台契约、字段读法 嵌入面 `/embed/*`（iframe 免 CORS） | 换业务场景的开箱即用（换场景 = 写 `cases/*/scenario.yaml` + 引擎） 对外服务的安全加固（**无鉴权**，默认只绑本机） 真实市场模型（后果反馈是 embedding 相似度的轻量替代） 研究结论的最终裁定（AI 只负责机械正确性） |
 
-**接手/对接请先读 [provenance/docs/文档索引.md](provenance/docs/文档索引.md)** —— 一眼看清哪些文档是现行口径、哪些已被取代。交给治理平台的唯一口径见 [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md)。
+**接手/对接请先读 [provenance/docs/架构总览与对接指南.md](provenance/docs/架构总览与对接指南.md)** —— 一眼看清哪些文档是现行口径、哪些已被取代。交给治理平台的唯一口径见 [平台对接契约_5010唯一入口.md](provenance/docs/平台对接契约_5010唯一入口.md)。
 
 ---
 
@@ -90,7 +90,7 @@
 - `5002` case01 只读契约 · `5003` case00 存档只读 · `5020` 分阶段像素场景
   · `8060` 配置工具（`5004` 多场景面板已退役 —— 仅评审面板调试用）
 
-**文档**：入口是 `provenance/docs/文档索引.md`（状态一览）；平台侧契约是
+**文档**：入口是 `provenance/docs/架构总览与对接指南.md`（状态一览）；平台侧契约是
 `provenance/docs/平台对接契约_5010唯一入口.md`。
 
 ## 1. 架构
@@ -195,7 +195,7 @@ uv pip install -r requirements.txt pytest
 > --lanes 3 --model qwen3:8b`。缺数据时测试会说明它要哪个路径
 > (例如 `tests/test_metric_semantics.py` 指向 `data/case00/state`)——
 > 用你自己跑出来的数据喂它,或把项目提供的 demo 包解压进 `data/case01/runs/`
-> (见 `provenance/docs/专家导览_怎么看provenance.md` —— 它在**包内** `provenance/docs/`,
+> (见 `provenance/docs/架构总览与对接指南.md` —— 它在**包内** `provenance/docs/`,
 > 不是仓根的 `handbook/`)。
 >
 > **一条命令都还没跑就想看到记录**:本仓入库了两条 fixture 记录,把读侧指过去即可
@@ -243,7 +243,7 @@ python live_switch.py --start case01        # 5010 是唯一实时入口(case00/
 `python -m case01.serve --port 5002`;配置工具在本仓 `provenance/config_tool`:
 `cd provenance/config_tool && python app.py`(8060),默认直接发现同仓平台目录,无需设环境变量。
 
-**专家/评审看结果**先读 `provenance/docs/专家导览_怎么看provenance.md`:
+**专家/评审看结果**先读 `provenance/docs/架构总览与对接指南.md`:
 结论边界、面归属(哪些页面只在 case01/case00 面)、两个只读数据口、字段读法、
 两张人工标注表怎么用,以及一份十五分钟走查。
 
@@ -412,7 +412,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
   没有密钥痕迹。路径穿越守卫见 `live/netguard.py` 与 mavis 的 `config_tool/_safe_agent_name()`。
 
 代码位置:`live/netguard.py`(绑定与白名单策略)、`tests/test_netguard.py`(行为断言)。
-对接细节见 `provenance/docs/给平台侧_嵌入与数据接入.md`,体检结论见 `provenance/docs/0923_体检报告.md`。
+对接细节见 `provenance/docs/平台对接契约_5010唯一入口.md`,体检结论见 `provenance/provenance/docs/核验主张与证据说明书.md`。
 
 ## 13. 校验与交付
 
@@ -427,13 +427,13 @@ python provenance/tools/verify_demo_sync.py --require-zip   # ③ 交付件一�
 
 `--require-zip` 是关键:不加它,**压缩包缺失**会被报成"不适用",于是"删掉包"看起来像通过。
 重打是一条命令(`python tools/make_demo_zip.py`,先加 `--dry-run` 可以只看条目);
-按顺序的交付清单在 `provenance/docs/冻结流程_打包装箱一页纸.md`。
+按顺序的交付清单在 `provenance/docs/10月15日演示_运行手册.md`。
 
 **克隆下来没有的东西**:`data/case01/runs/` 与 `data/case00/state/`
 是**故意 gitignore 的**(体积大,且曾经误提交过),所以本仓带的是**派生分析**
 (`provenance/results/analysis/`,已入库),**不含其背后的原始记录**。
 因此依赖原始记录的主张**无法只靠一次克隆复算** —— 这条边界连同"复现三档口径"写在
-`provenance/docs/GTC研究边界声明.md` 与 `provenance/docs/复现说明_三档口径.md` 里。
+`provenance/provenance/docs/核验主张与证据说明书.md` 里。
 
 ## 许可证
 
