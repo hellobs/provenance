@@ -18,7 +18,7 @@ rem  NOTE: keep this file ASCII-only. cmd.exe parses .cmd using the system ANSI
 rem  code page (GBK on zh-CN); non-ASCII text here breaks command parsing.
 rem ===========================================================================
 setlocal
-rem 2026-10-10:本地私密配置(Ethan 外部 API 等)在这里加载,密钥不进仓库。
+rem Local private config (external API keys etc.) lives in a gitignored .cmd; keys never enter the repo.
 if exist "%~dp0provenance\case01.local.cmd" call "%~dp0provenance\case01.local.cmd"
 cd /d "%~dp0provenance"
 
@@ -44,15 +44,17 @@ if not "%SEED%"==""   set EXTRA=%EXTRA% --seed %SEED%
 if not "%RUN_ID%"=="" set EXTRA=%EXTRA% --run-id %RUN_ID%
 
 rem --- config tool (mavis config_tool, port 8060) ---------------------------
-rem 5010 顶栏有"配置"链接指向 8060,但它是**独立进程**,没人起它就是死链。
-rem 这里顺手起一份(后台、日志重定向到文件);路径用相对定位,不写死盘符。
+rem The 5010 top nav links to 8060, but that is a SEPARATE process nobody starts,
+rem so the link is dead. Start it here (background, output redirected to a file).
+rem Path is relative on purpose -- do NOT hard-code a drive letter.
+rem NOTE: keep this block ASCII-only (see the header note about the ANSI code page).
 set CFG=%~dp0..\mavis\config_tool
 if exist "%CFG%\app.py" (
   if not exist "%TEMP%\dsh_srv" mkdir "%TEMP%\dsh_srv" 2>nul
   start "config_tool 8060" /min "%PY%" "%CFG%\app.py" > "%TEMP%\dsh_srv\config_tool.out" 2>&1
   echo config tool: http://127.0.0.1:8060/   (log: %TEMP%\dsh_srv\config_tool.out)
 ) else (
-  echo config tool: [skip] not found at %CFG%  (顶栏"配置"链接会点不开)
+  echo config tool: [skip] not found at %CFG%  (the top-nav link will not open)
 )
 rem ---------------------------------------------------------------------------
 
