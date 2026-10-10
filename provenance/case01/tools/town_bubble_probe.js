@@ -5,7 +5,7 @@
 //
 // 本脚本**不连浏览器**:把渲染好的小镇页 HTML 里的主 <script> 抽出来,
 // 在最小 DOM/Phaser 桩里真跑一遍,直接调 setBubble / tickBubbles / setActionBubble,
-// 断言**行为**(逐字吐字、吐满即停、超长截断、新句覆盖、行动文本不抢镜)。
+// 断言**行为**(逐字吐字、吐满即停、超长分段续说、换人清框、新句覆盖、行动文本不抢镜)。
 // 光查语法抓不到这些 —— 逻辑错了照样能过 `new Function`。
 //
 // 用法:node case01/tools/town_bubble_probe.js --page-file <渲染好的 index.html>
@@ -58,7 +58,12 @@ sandbox.pronunciatios['C'] = mk();
 sandbox.setBubble('B', 'Ethan Lin', '你好世界');
 ok(sandbox.bubble_full['B'] === '你好世界', 'setBubble 存全文');
 
-// 2) 逐字:每次强制吐一字
+// 2) 逐字:每次强制吐一字。
+//    第一拍只"开新段"(把框清空,用户要求"先留着原本的两秒,然后清空气泡框"),
+//    第二拍才开始吐第一个字。
+sandbox.bubble_type_acc = 999;
+sandbox.tickBubbles(16.67);
+ok(sandbox.pronunciatios['B']._t === '', '开段那一拍先把气泡清空(不接着上一段留字)');
 sandbox.bubble_type_acc = 999;
 sandbox.tickBubbles(16.67);
 ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你', '打字机第 1 字');
@@ -70,10 +75,15 @@ ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好', '打字机第 2 字')
 for (let i = 0; i < 10; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
 ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好世界', '吐满即停');
 
-// 4) 超长截断(上限值随需求会调,所以断言"确实截了 + 带省略号",不写死具体字数)
+// 4) 超长文本:**不丢弃**,切成多段排队接着说(2026-10-10 用户要求)
+//    "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来"
 sandbox.setBubble('B', 'Ethan Lin', 'x'.repeat(500));
-ok(sandbox.bubble_full['B'].length < 500 && /…$/.test(sandbox.bubble_full['B']),
-   '超长截断并以省略号收尾,实得长度 ' + sandbox.bubble_full['B'].length);
+const segs = sandbox.bubble_queue.filter((q) => q.name === 'B');
+ok(segs.length >= 4, '500 字应被切成多段排队,实得段数 ' + segs.length);
+const joined = segs.map((q) => q.text).join('');
+ok(joined === 'x'.repeat(500), '各段拼起来必须等于原文(一个字都不丢),实得 ' + joined.length + ' 字');
+ok(segs.slice(0, -1).every((q) => q.text.length === segs[0].text.length),
+   '除最后一段外每段都是满的上限长度,实得各段 ' + segs.map((q) => q.text.length).join('/'));
 
 // 5) 新句覆盖,并从 0 重新吐
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');
@@ -91,6 +101,10 @@ ok(sandbox.bubble_full['C'] === '发呆' && sandbox.bubble_shown['C'] === 2,
 
 // 8) 一次只念一句(2026-10-10 用户:"Ethan 打字机效果说完之后,AI Investor 才应该
 //    开始打字机,这才拟真")。原来 `tickBubbles` 把所有角色一起吐 ⇒ 两人同时打字。
+// 前面的块留下了 active 段,这里先清干净,各块互不串味
+sandbox.bubble_queue.length = 0;
+sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
+sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
 sandbox.setBubble('B', 'Ethan Lin', '一二三四五');
 sandbox.setBubble('C', 'Investment AI', 'ABCDEFG');
 let both = 0, bDoneAt = -1, cStartAt = -1;

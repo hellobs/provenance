@@ -53,21 +53,33 @@
 	function setBubble(name, speaker, text) {
 		if (!(name in pronunciatios)) return;
 		let t = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
-		if (t.length > BUBBLE_MAX_CHARS) t = t.slice(0, BUBBLE_MAX_CHARS) + "…";
-		bubble_full[name] = t;
+		if (!t) return;
 		bubble_speaker[name] = speaker || name;
-		bubble_shown[name] = 0;        // 从零开始吐
-		// 记下"这是第几句":两个气泡要左右分开时,按这个序号从左往右排,
-		// 于是**从左往右读就是聊天次序**(先说的靠左),不会看起来像顺序反了。
+		// 记下"这是第几句":气泡左右分开时按这个序号排,于是**从左往右读就是聊天次序**。
 		bubble_seq[name] = ++bubble_seq_counter;
-		// 排队:同一时刻**只念一句**,后来到的排到队尾(2026-10-10 用户:
-		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
-		// 同一个角色再次开口就**替换掉他在队列里的那一条**(而不是再排一条)——
-		// 连续多句时只念最新那句,免得队列越堆越长、最后念一句过时的话。
-		for (let i = 0; i < bubble_queue.length; i++) {
-			if (bubble_queue[i].name === name) { bubble_queue[i] = { name: name, text: t }; return; }
+		// **不丢弃超出的文本**(2026-10-10 用户要求"尽可能要把所有的 AI 聊天文字都显示")。
+		// 到字数上限就切成一段一段排队:前一段念完**先原样留 BUBBLE_CHUNK_HOLD_MS
+		// (2 秒)**,再清空气泡框接着说下一段 —— 说话有停顿,不是一口气全倒出来。
+		let segs = [];
+		for (let i = 0; i < t.length; i += BUBBLE_MAX_CHARS) {
+			segs.push(t.slice(i, i + BUBBLE_MAX_CHARS));
 		}
-		bubble_queue.push({ name: name, text: t });
+		if (segs.length === 0) segs.push(t);
+		// 这一整段话的身份戳:队列里靠它认出"已被新台词顶掉的旧段",直接丢掉。
+		let sp = t.slice(0, 24) + "#" + segs.length;
+		bubble_spoken[name] = sp;
+		bubble_full[name] = segs[0];
+		bubble_shown[name] = 0;        // 从零开始吐
+		// 排队:同一时刻**只念一段**,后来到的排到队尾(2026-10-10 用户:
+		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
+		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
+		// 正在打的那段已经显示出来了就留着不回退。
+		for (let i = bubble_queue.length - 1; i >= 0; i--) {
+			if (bubble_queue[i].name === name) bubble_queue.splice(i, 1);
+		}
+		for (let i = 0; i < segs.length; i++) {
+			bubble_queue.push({ name: name, text: segs[i], sp: sp, more: i < segs.length - 1 });
+		}
 	}
 
 	// 无对话内容时,回落到"行动文本"(保持旧观感,不至于让气泡空着)
@@ -90,30 +102,52 @@
 		if (bubble_type_acc < BUBBLE_TYPE_MS) return;
 		bubble_type_acc = 0;
 		if (!bubble_active) {
-			// 取队首。队首那条若已被同一角色的更新台词顶掉(bubble_full 对不上),跳过。
+			if (bubble_rest_acc < bubble_rest_need) return;   // 还在停顿(换气 / 段间留白)
+			// 取队首。那条若已被同一角色的更新台词顶掉(身份戳对不上),丢掉。
 			while (bubble_queue.length > 0) {
 				let item = bubble_queue[0];
-				if ((bubble_full[item.name] || "") !== item.text) { bubble_queue.shift(); continue; }
+				if ((bubble_spoken[item.name] || "") !== item.sp) { bubble_queue.shift(); continue; }
 				bubble_queue.shift();
 				// 同一时刻**只留当前发言人的框**:把其它角色屏幕上残留的字清掉。
 				// 两个人同时挂着框,框就得互相让位,而让位必然把某个框甩离它的主人
 				// (2026-10-10 用户截图:Investment AI 的框跑到画面右上角)。
-				// 顺序打字机之后"当前发言人"本来就只有一个,一人一句最贴近真实说话。
 				for (let k in pronunciatios) {
 					if (k !== item.name) pronunciatios[k].setText("");
 				}
+				// 新一段开始:**先清空气泡框**,下一 tick 再开始吐字(用户要求:
+				// "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来")。
+				pronunciatios[item.name].setText("");
 				bubble_active = item.name;
+				bubble_active_text = item.text;
+				bubble_active_sp = item.sp;
+				bubble_full[item.name] = item.text;
+				bubble_shown[item.name] = 0;
+				bubble_rest_acc = 0;
 				break;
 			}
 			if (!bubble_active) return;
+			return;                      // 这一 tick 只开新段,下一 tick 才开始吐字
 		}
 		let name = bubble_active;
-		let full = bubble_full[name] || "";
+		// 正在念的这段已经过期(同一角色又开口了):立刻放弃,别把旧话念完。
+		if ((bubble_spoken[name] || "") !== bubble_active_sp) {
+			bubble_active = ""; bubble_active_text = ""; bubble_active_sp = "";
+			bubble_rest_acc = 0; bubble_rest_need = 0;
+			return;
+		}
+		let full = bubble_active_text || "";
 		let shown = bubble_shown[name] || 0;
 		if (shown >= full.length) {
-			// 这句念完了:停 BUBBLE_REST_MS 再叫下一句(模拟真人说话的换气)
+			// 这段念完了:停够再叫下一段。**同一句话还有下一段**时留 2 秒
+			// (用户要求"先留着原本的两秒");换人说话只停 BUBBLE_REST_MS。
+			let nxt = bubble_queue[0];
+			let sameUtterance = nxt && nxt.name === name && (bubble_spoken[name] || "") === nxt.sp;
+			bubble_rest_need = sameUtterance ? BUBBLE_CHUNK_HOLD_MS : BUBBLE_REST_MS;
 			bubble_rest_acc += BUBBLE_TYPE_MS;
-			if (bubble_rest_acc >= BUBBLE_REST_MS) { bubble_active = ""; bubble_rest_acc = 0; }
+			if (bubble_rest_acc >= bubble_rest_need) {
+				bubble_active = ""; bubble_active_text = ""; bubble_active_sp = "";
+				bubble_rest_acc = 0; bubble_rest_need = 0;
+			}
 			return;
 		}
 		bubble_rest_acc = 0;
@@ -192,11 +226,17 @@
 	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
 	const BUBBLE_GAP = 6;             // 气泡底边与角色头顶的间隙(见 layoutBubbles)
 	const BUBBLE_STACK_GAP = 3;       // 相邻气泡之间的间隙(见 layoutBubbles)
-	const BUBBLE_REST_MS = 420;       // 一句念完到下一句开口之间的停顿(见 tickBubbles)
+	const BUBBLE_REST_MS = 420;       // 一段念完到**换人**开口之间的停顿(见 tickBubbles)
+	const BUBBLE_CHUNK_HOLD_MS = 2000; // 同一句话被字数上限切成多段时,段与段之间的留白
+	                                  // (2026-10-10 用户:"先留着原本的两秒,再清空气泡框接着说")
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
 	var bubble_queue = [];            // 待念的台词,按到达顺序 [{name, text}]
 	var bubble_active = "";           // 当前正在念的那句的说话人(一次只念一句)
-	var bubble_rest_acc = 0;          // 一句念完后的停顿累计(ms)
+	var bubble_rest_acc = 0;          // 一段念完后的停顿累计(ms)
+	var bubble_rest_need = 0;          // 这次要停够多久才开下一段(换气 vs 段间 2 秒)
+	var bubble_active_text = "";       // 当前正在念的那一段的全文
+	var bubble_active_sp = "";         // 当前那一段的身份戳(认"已被新台词顶掉")
+	var bubble_spoken = {};            // 角色 -> 他这一整段话的身份戳(认"被顶掉的旧段")
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
 	var bubble_seq_counter = 0;
 	// 地图尺寸(create 里填):气泡要钳在画面内,否则站在边上时框会被画布裁掉一半
