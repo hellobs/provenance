@@ -55,6 +55,21 @@
 	//   ① 上限附近(下限 = 上限的一半)找**句末标点** ⇒ 下一段正好是**一句话的开头**;
 	//   ② 找不到句号就找**空格** ⇒ 断在词与词之间;
 	//   ③ 实在没有(超长单词、整段没有空格的中文长句)才硬切,宁可少断也不劈词。
+	// 判断 rest[i] 是不是**句末标点**。
+	// ⚠ 2026-10-10 用户反馈"$47.30 被拆掉了":上一版把 `.` 无条件当句号,
+	// 于是价格 "$47.30" 从小数点处断开。所以:
+	//   · 前后都是数字(0.5 / $47.30)⇒ 是小数点,**不是**句号;
+	//   · 后面紧跟非空白(U.S. / v1.2 / e.g.)⇒ 更像缩写/小数点,也不算句末。
+	function _isSentenceEnd(rest, i) {
+		var ch = rest[i];
+		if ("。！？!?".indexOf(ch) >= 0) return true;
+		if (ch !== ".") return false;
+		var prev = rest[i - 1] || "", next = rest[i + 1] || "";
+		if (/[0-9]/.test(prev) && /[0-9]/.test(next)) return false;
+		if (next && !/\s/.test(next)) return false;
+		return true;
+	}
+
 	function _splitForBubble(t, limit) {
 		const SENT = /[。！？.!?]/;
 		let segs = [];
@@ -65,7 +80,7 @@
 			// ① 上限**之后**的下一个句末(2026-10-10 用户:"没说完的不要只是一个词,
 			//    至少也是一句话吧"):宁可这一段超出上限(换行会自己排高),也不切成半句话。
 			for (let i = limit - 1; i < rest.length; i++) {
-				if (SENT.test(rest[i])) { cut = i + 1; break; }
+				if (SENT.test(rest[i]) && _isSentenceEnd(rest, i)) { cut = i + 1; break; }
 			}
 			// ② 整段都没有句末 ⇒ 空格兜底(断在词间,仍然不劈开单词)
 			if (cut < 0) {

@@ -118,6 +118,19 @@ ok(sandbox.pronunciatios['B']._t.length > beforeNew.length
    '新台词到达后,正在念的那一段应当**接着往下念**,实得 "' +
    sandbox.pronunciatios['B']._t + '" 接在 "' + beforeNew + '" 之后');
 
+// 4c) 价格里的**小数点不是句号**(2026-10-10 用户反馈"$47.30 被拆掉了")
+sandbox.bubble_queue.length = 0;
+sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
+const MONEY = 'The closing price was $47.30 on Tuesday. It then moved to $48.05. ';
+sandbox.setBubble('B', 'Ethan Lin', MONEY.repeat(4));
+const mseg = sandbox.bubble_queue.filter((q) => q.name === 'B');
+ok(mseg.every((q) => !/\$\d+\.?$/.test(q.text)),
+   '任何一段都不能以 "$47." 这样半个价格收尾(小数点被当句号),实得各段末: ' +
+   mseg.map((q) => q.text.slice(-6)).join(' | '));
+ok(mseg.map((q) => q.text).join(' ').includes('$47.30')
+   && mseg.map((q) => q.text).join(' ').includes('$48.05'),
+   '两个价格都必须完整出现在某一段里');
+
 // 5) 新句覆盖(没有正在念的段时,新句从头开始吐)
 sandbox.bubble_queue.length = 0;
 sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
