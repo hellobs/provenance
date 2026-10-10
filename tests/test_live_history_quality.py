@@ -317,6 +317,11 @@ def test_pagination_and_unknown_params(monkeypatch):
     assert [r["run_id"] for r in page["runs"]] == [r["run_id"] for r in full["runs"][1:3]]
     only = _call(H.list_all_runs(_Req({}), include_questionable=True, source="review"))
     assert {r["source"] for r in only["runs"]} == {"review"} and only["total"] == 5
+    # `source` 的**取值**猜错也要能看出来(2026-10-10 实测:平台/我们自己都会先猜
+    # `?source=case01`,而它返回 0 条且毫无提示 —— 读成"case01 没有数据"就错了)
+    bad = _call(H.list_all_runs(_Req({}), include_questionable=True, source="case01"))
+    assert bad["total"] == 0 and bad["invalid_source"] == "case01", bad.get("invalid_source")
+    assert "source=review" in bad["invalid_source_note"], bad.get("invalid_source_note")
     warn = _call(H.list_all_runs(_Req({"quality": "ok", "foo": "1"})))
     assert warn["ignored_params"] == ["foo", "quality"], warn.get("ignored_params")
     assert "quality" in warn["ignored_note"]

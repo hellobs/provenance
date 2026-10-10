@@ -379,6 +379,10 @@ def _quality_of(rec: dict) -> dict:
 #                  但计入 excluded 并报明 run_id 与原因。
 _HIDDEN_QUALITY = ("questionable", "debug", "deprecated", "unreadable")
 
+# `/api/runs` 的 `source` 合法取值(与 `_brief_checkpoint`/`_brief_review`/
+# `_brief_compressed` 里写的 source 字段一一对应)。
+_SOURCE_VALUES = ("checkpoint", "review", "compressed")
+
 
 def expert_safe_record(rec: dict) -> dict:
     """从 case01 成品记录里挑出**可以给专家看**的部分(白名单)。
@@ -502,6 +506,9 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     `?limit=`/`?offset=`/`?source=review|checkpoint|compressed`;
     `count` 是本页条数,`total` 是过滤后总数。**不认识的参数不静默吞掉** ——
     回在 `ignored_params` 里,免得平台以为 `?quality=ok` 生效了。
+    `source` 的**取值**同样要认(2026-10-10):写了不在 `_SOURCE_VALUES` 里的值
+    (实测最容易猜错的是 `?source=case01`)照它过滤必然是 0 条,这种 0 会写进
+    `invalid_source` + `invalid_source_note`,不让平台读成"case01 没有数据"。
     """
     runs = []
     source_errors = []
@@ -571,8 +578,14 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     known = {"include_questionable", "limit", "offset", "source"}
     ignored = sorted({k for k in (request.query_params.keys() if request is not None else [])
                       if k not in known})
+    bad_source = ""
     if source:
         runs = [r for r in runs if str(r.get("source") or "") == source]
+        # `source` 的**取值**也要认(2026-10-10):以前只认参数名,于是平台敲一个很自然的
+        # 猜法 `?source=case01` 会拿到 count=0 —— 与本文件 `source_errors` 那条同族陷阱
+        # ("看到 0 条以为这个源没数据")。只要 case01 成品的是 `source=review`。
+        if source not in _SOURCE_VALUES:
+            bad_source = source
     total = len(runs)
     if offset > 0:
         runs = runs[offset:]
@@ -587,6 +600,12 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
     if ignored:
         body["ignored_params"] = ignored
         body["ignored_note"] = "这些参数本接口不认(没生效):{}".format(",".join(ignored))
+    if bad_source:
+        body["invalid_source"] = bad_source
+        body["invalid_source_note"] = (
+            "`source` 这个参数只认 {} —— 收到的 {!r} 不是其中之一,仍照它过滤,所以必然 0 条。"
+            "0 条不代表没有数据:只要 case01 成品记录,用 `?source=review`。".format(
+                "/".join(_SOURCE_VALUES), bad_source))
     if source_errors:
         # 数据源解析失败(如相对根配置)不是"没数据",必须显式报出 ——
         # 否则平台看到 count=0 会以为"这个源本来就空"(2026-10-05 M2 推广)。
