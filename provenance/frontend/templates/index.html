@@ -2,6 +2,18 @@
 
 {% block content %}
 <style>
+/* 自托管中文字体:Noto Sans SC(思源黑体同源),SIL OFL 1.1 —— 可自由使用/分发/商用。
+   为什么自托管:系统自带的「微软雅黑」著作权在北大方正,只授权 Windows 内显示与打印;
+   把用雅黑排版的画面导出成图片/视频对外发布属于越界(2026-10-10 查证)。
+   子集:ASCII + 常用标点 + CJK 统一表意文字全集 + 全角符号(用 pyftsubset 生成)。
+   生成命令见 provenance/frontend/static/fonts/README.txt。 */
+@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("/static/fonts/NotoSansSC-Medium-subset.woff") format("woff");
+}
 @keyframes storyFlash {
     0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
     50% { opacity: 0.4; transform: translateX(-50%) scale(1.04); }

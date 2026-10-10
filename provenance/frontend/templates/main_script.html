@@ -331,7 +331,8 @@
 			g.rest_acc = 0;
 			shown += 1;                                    // 每 TICK 吐一字
 			bubble_shown[name] = shown;
-			var head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
+			// 气泡里**不再重复写名字**(用户选 B):名字已经挂在角色脚下。
+			var head = "";
 			if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 		}
 	}
@@ -340,7 +341,7 @@
 	function flushBubble(name) {
 		let full = bubble_full[name] || "";
 		bubble_shown[name] = full.length;
-		let head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
+		let head = "";   // 同上:名字在脚下,气泡里不重复
 		if (pronunciatios[name]) pronunciatios[name].setText(head + full);
 	}
 
@@ -393,6 +394,7 @@
 
 	var personas = {};
 	var pronunciatios = {};
+	var nameplates = {};            // 角色脚下的名字牌(与气泡同族字体、小一号、低对比)
 	// 头顶气泡内容(2026-10-09):改为"直接显示聊天记录",并带打字机逐字效果。
 	// bubble_full[name] = 该角色当前这句的完整文本;bubble_shown[name] = 已显示到第几字。
 	// 逐字推进由 tickBubbles() 驱动(见场景 update),与移动/避让解耦。
@@ -404,6 +406,8 @@
 	                                  // 仍留上限,避免极端长文把气泡撑到镜头外)
 	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
 	const BUBBLE_GAP = 6;             // 气泡底边与角色头顶的间隙(见 layoutBubbles)
+	// 名字牌与角色脚底的间距(px)
+	const NAMEPLATE_GAP = 2;
 	const BUBBLE_STACK_GAP = 3;       // 相邻气泡之间的间隙(见 layoutBubbles)
 	// 气泡排版宽度(= wordWrap.width)。**摆位一律用它,不用 t.width**:
 	// 打字机逐字吐字时 t.width 每帧都在长(到上限为止),拿它算让位量的话,
@@ -965,6 +969,25 @@
 
 	// Create function
 	function create() {
+		// 自托管字体是**懒加载**的:`@font-face` 的 woff 要下载完才可用,而 Phaser 建 Text
+		// 时它很可能还没就位 —— 那时文字会用回退字体光栅化,而且**之后不会自动重画**
+		// (字形已经被烤进贴图了)。所以字体就绪后强制 `updateText()` 重画一遍。
+		// 2026-10-10:不这么做的话,自托管字体在首次加载时是"看不见效果"的。
+		try {
+			if (document.fonts && document.fonts.ready) {
+				document.fonts.ready.then(function () {
+					for (var _k in pronunciatios) {
+						var _t = pronunciatios[_k];
+						if (_t && typeof _t.updateText === "function") _t.updateText();
+					}
+					for (var _n in nameplates) {
+						var _p = nameplates[_n];
+						if (_p && typeof _p.updateText === "function") _p.updateText();
+					}
+				});
+			}
+		} catch (e) { /* 老浏览器没有 FontFaceSet 就跳过 */ }
+
 		// 画布放大方式:从 `pixelated`(最近邻)改回 `auto`(平滑插值)。
 		// 必须在这里设 —— Phaser 的 boot 晚于 `new Phaser.Game()`,在构造函数后面
 		// 设会被它的 `pixelArt` 覆盖掉(2026-10-10 实测:设完仍是 pixelated)。
@@ -1096,7 +1119,9 @@
 					// 字体(2026-10-10 用户反馈"气泡框里面的字体不好"、随后又要求
 					// "字号可以再小一点点"):无衬线栈,拉丁交给 Segoe UI、中文落到
 					// 微软雅黑/苹方;12px + 限宽 112px —— 框窄一点,两个框才挤得下。
-					fontFamily: "'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif",
+					// 自托管的 OFL 中文字体放首位;去掉「Microsoft YaHei」——
+					// 它的著作权在方正,只授权 Windows 内显示打印,导出成图/视频属越界。
+					fontFamily: "'Noto Sans SC', 'Segoe UI', 'PingFang SC', sans-serif",
 					fontSize: "12px",
 					lineSpacing: 2,
 					fill: "#000000",
@@ -1130,6 +1155,31 @@
 			// origin(0.5,1) ⇒ x 是气泡中线,y 是气泡底边;底边贴着角色头顶,
 			// 换行时新行往上长,气泡始终稳稳挂在角色正上方、不会往左偏。
 			pronunciatios[persona_name].setOrigin(0.5, 1);
+			// 脚下的**名字牌**(2026-10-10 用户定:脚下 / 小一点 / 降低对比)。
+			// 为什么脚下:气泡的锚点就在头顶上方,名字放头顶会跟气泡抢同一块地方。
+			// 为什么比气泡小一档、对比更低:气泡是"台词",名字牌是"标注" —— 同字号
+			// 同对比会让人把名字当成一句台词。字体**同族**保持统一。
+			// ⚠ 跟着角色移动,位置必须取整,否则每帧落在亚像素上又要重采样(会抖)。
+			nameplates[persona_name] = this.add.text(
+				new_sprite.body.x,
+				new_sprite.body.y,
+				persona_name,
+				{
+					fontFamily: "'Noto Sans SC', 'Segoe UI', 'PingFang SC', sans-serif",
+					fontSize: "10px",
+					fill: "#4a5568",
+					backgroundColor: "rgba(255,255,255,0.62)",
+					padding: { x: 3, y: 1 },
+					borderRadius: "6px",
+					align: "center",
+				}
+			).setDepth(2);
+			nameplates[persona_name].setOrigin(0.5, 0);   // 水平居中、垂直**顶部** ⇒ 挂在脚下
+			try {
+				if (nameplates[persona_name].setResolution) {
+					nameplates[persona_name].setResolution(Math.max(2, Math.ceil(window.devicePixelRatio || 1)));
+				}
+			} catch (e) { /* 老版本没有就维持原样 */ }
 			// 文字贴图单独切回 **LINEAR**(2026-10-10 用户反馈"字体有点糊")。
 			// 根因是整局开了 `pixelArt: true`(为的是瓦片地图不糊),它把文字贴图也按
 			// **最近邻**放大 —— 字是 canvas 用抗锯齿画好的一张位图,再被最近邻插值放大
@@ -1535,6 +1585,12 @@
 			// 同上:基线也算成整数像素,免得后面 clamp 完又落回小数。
 			t.x = Math.round(chars[i].x + chars[i].w / 2);   // 本人正上方,对准绘制中线
 			t.y = Math.round(chars[i].y - BUBBLE_GAP);       // 底边贴住头顶
+			// 名字牌挂在脚下:同样是整数像素,理由同气泡(角色每帧在动)。
+			var np = nameplates[names[i]];
+			if (np) {
+				np.x = Math.round(chars[i].x + chars[i].w / 2);
+				np.y = Math.round(chars[i].y + chars[i].h + NAMEPLATE_GAP);
+			}
 			if (!t.text) continue;
 			// w 用**排版宽度**而不是 t.width(见 BUBBLE_WRAP_W)。
 			bubbles.push({ name: names[i],
