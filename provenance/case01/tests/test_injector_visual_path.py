@@ -110,6 +110,27 @@ def test_same_coord_needs_no_path():
     assert not maze.calls
 
 
+def test_step_snapshot_reports_the_picture_not_the_engine():
+    """走不过去时,发给画面的快照必须是"人现在画在哪",不是引擎那个到不了的格子。
+
+    2026-10-10 用户报"Investment AI 在推演结束时突然瞬移":`_emit_agent` 会把人留在
+    原地(见 `test_unreachable_falls_back_but_logs`),而同一步的 `snapshot` 取自
+    记录侧 `_agent_trace`(引擎的目标格)⇒ 前端 applySnapshot 直接把人钉过去,
+    既截断走位又推翻"停在原地"。记录本身必须照旧记引擎位置。
+    """
+    maze = _FakeMaze(fail=True)
+    agents = {"Investment AI": _FakeAgent(maze), "Ethan Lin": _FakeAgent(maze)}
+    out = []
+    b = _bridge(agents, out)
+    held = list(b._last_visual_coord["Ethan Lin"])
+    b._viz_on_agent("Ethan Lin", {"coord": [3, 3], "path": []}, 1, "t")
+    b._viz_on_step({"step": 1, "time": "t"})
+
+    snap = [e for e in out if e.get("type") == "snapshot"][-1]
+    assert snap["agents"]["Ethan Lin"]["coord"] == held, "快照不许把人钉到走不到的格子"
+    assert b._agent_trace[1]["Ethan Lin"]["coord"] == [3, 3], "记录侧要如实记引擎的目标格"
+
+
 def test_real_maze_path_is_orthogonal(monkeypatch, tmp_path):
     """用真实场景的迷宫再验一次(不依赖假迷宫):两个角色初始格必须互相可达。
 

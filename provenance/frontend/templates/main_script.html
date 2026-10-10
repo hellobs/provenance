@@ -866,8 +866,15 @@
 		for (const name in agents) {
 			if (!(name in personas)) continue;
 			const a = agents[name];
-			personas[name].body.x = a.coord[0] * tile_width;
-			personas[name].body.y = a.coord[1] * tile_width;
+			// Coordinates are only placed when this persona has no queued walk left.
+			// A queued walk already ends on this same tile; writing x/y here would cut
+			// the walk short, which reads as a jump. Action text still updates below.
+			const queued = movement_target[name];
+			if (Array.isArray(a.coord) && a.coord.length >= 2
+				&& !(queued && queued.length > 0)) {
+				personas[name].body.x = a.coord[0] * tile_width;
+				personas[name].body.y = a.coord[1] * tile_width;
+			}
 			let act = (a.action || "").trim();
 			setActionBubble(name, act);
 			if (document.getElementById("agent_desc__" + name)) {

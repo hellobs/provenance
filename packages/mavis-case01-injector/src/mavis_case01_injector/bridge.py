@@ -863,8 +863,20 @@ class MavisBridge:
             # 每步补一份快照:实时前端可用它刷新全量状态,新连入的客户端也能立刻有画面
             trace = self._agent_trace.get(step) or {}
             if trace:
-                self._fanout.emit(snapshot_event(
-                    {name: dict(st) for name, st in trace.items()}, sim_time))
+                # ⚠ 快照里的坐标要说"画面在哪",不能说"引擎认为在哪"。
+                # `_agent_trace` 是记录侧,记的是引擎的目标格;而 `_emit_agent` 在
+                # BFS 无解时把角色**留在原地**(`_visual_path` 返回 None 那条,
+                # 2026-10-10 用户要求)。两边不一致时,前端 applySnapshot 会把角色
+                # 直接钉到目标格 —— 走位被截成一次瞬移,而且把"停在原地"的修复推翻。
+                # 记录本身不动(它要如实记引擎的位置),只改发给画面的这一份。
+                snap = {}
+                for name, st in trace.items():
+                    st = dict(st)
+                    held = self._last_visual_coord.get(name)
+                    if held and st.get("coord") and list(held) != list(st["coord"]):
+                        st["coord"] = list(held)
+                    snap[name] = st
+                self._fanout.emit(snapshot_event(snap, sim_time))
 
     def _viz_on_chat_line(self, speaker, text):
         if self._fanout is not None:
