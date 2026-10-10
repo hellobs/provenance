@@ -47,6 +47,17 @@ def _plugin_surface_available() -> bool:
         return False
 
 
+def _red_text(text):
+    """染成红色亮字;stdout 被重定向进日志文件时**不上色**(见 provider 侧同名函数)。"""
+    import sys as _sys
+    try:
+        if not _sys.stdout.isatty():
+            return text
+    except Exception:  # noqa: BLE001
+        return text
+    return "\x1b[1;31m" + text + "\x1b[0m"
+
+
 class MavisBridge:
     """节点序列 -> mavis 驱动 + 记录。"""
 
@@ -1053,9 +1064,10 @@ class MavisBridge:
         # ⚠ 底线不变:绝不悄悄退回本地模型 —— 探测不通照样注入外部 provider,
         # 调用失败会大声报错,不会换成 local。
         if not self._remote_reachable(base_url):
-            print("[case01] [warn] Ethan 的外部 API({})起面探测不通;"
-                  "仍然使用外部 provider(绝不退回本地),真实错误会在第一次调用时出现。"
-                  "若网络不通请检查本机出网/代理。".format(base_url), flush=True)
+            print(_red_text(
+                "[case01] [warn] Ethan 的外部 API({})起面探测不通;"
+                "仍然使用外部 provider(绝不退回本地),真实错误会在第一次调用时出现。"
+                "若网络不通请检查本机出网/代理。".format(base_url)), flush=True)
         target = config.get("agents", {}).get(self.roles[1])
         if target is None:
             raise RuntimeError("场景里找不到第二个角色,无法给它配外部 API")

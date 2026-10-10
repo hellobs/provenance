@@ -5,6 +5,7 @@ requiring changes to the upstream Mavis package. Both Ollama and vLLM use an
 OpenAI-compatible chat-completions endpoint here.
 """
 import json
+import sys
 import re
 import threading
 import time
@@ -28,6 +29,22 @@ _LONG_OUTPUT_TYPES = frozenset([
     "reflect_insightsResponse",  # 洞察列表
     "describe_eventResponse",    # 动作三元组列表
 ])
+
+
+def _red(text):
+    """把一行染成红色**亮**。
+
+    为什么只在真终端上色:provider 的 stdout 同时会被重定向进
+    `%TEMP%/dsh_srv/live_*.out`,无条件加颜色会把 ANSI 转义符**写进日志文件**,
+    之后 grep 日志就会被 \x1b[31m 污染。isatty() 为假(重定向/管道)就返回原文。
+    Windows 10/11 的 conhost 默认支持 VT;万一不支持,未开启时原样输出,不会花屏。
+    """
+    try:
+        if not sys.stdout.isatty():
+            return text
+    except Exception:  # noqa: BLE001 - 没有 isatty 的极端环境就当文件处理
+        return text
+    return "\x1b[1;31m" + text + "\x1b[0m"
 
 
 def _env_flag(name):
@@ -139,16 +156,18 @@ class Case01SafeProvider:
             # mavis 的 failsafe 里存着 "X 说的话没有得到回应" / "X 进行了一次对话"
             # 这种**看起来完全正常**的句子 —— 落到记录里就等于凭空造了一句话。
             # 宁缺毋造:这些调用点失败就让上层知道(对话轮空),不拿兜底值充数。
-            print("[case01.llm] !! 调用点 {} 命中兜底值,按宁缺毋造**拒绝返回**"
-                  "(不写进产物): failsafe={!r}".format(caller, failsafe), flush=True)
+            print(_red("[case01.llm] !! 调用点 {} 命中兜底值,按宁缺毋造**拒绝返回**"
+                       "(不写进产物): failsafe={!r}".format(caller, failsafe)),
+                  flush=True)
             raise RuntimeError(
                 "{} 调用失败且该调用点禁用兜底值(不静默造假)".format(caller))
         if result is None:
             # 2026-10-10 用户要求"不允许静默处理":走到兜底值必须喊出来 ——
             # 兜底值(如字符串"嗯")会被当成模型的话显示/入库,静默就是造假。
-            print("[case01.llm] !! 全部尝试失败,返回**兜底值**(不是模型说的):"
-                  " caller={} failsafe={!r} 累计={} 次".format(
-                      caller, failsafe, self.summary["total"][2]), flush=True)
+            print(_red("[case01.llm] !! 全部尝试失败,返回**兜底值**(不是模型说的):"
+                       " caller={} failsafe={!r} 累计={} 次".format(
+                           caller, failsafe, self.summary["total"][2])),
+                  flush=True)
             return failsafe
         return result
 
@@ -228,9 +247,11 @@ class Case01SafeProvider:
         # 端点能力差异不能悄悄吞掉。
         if response.status_code == 400 and response_format:
             self._response_format_supported = False
-            print("[case01.llm] !! 端点拒绝 response_format={} (HTTP 400),"
-                  "降级为不带 response_format 重试一次(已记住该端点不支持)。端点原文: {}".format(
-                      response_format.get("type"), (response.text or "")[:200]),
+            print(_red("[case01.llm] !! 端点拒绝 response_format={} (HTTP 400),"
+                       "降级为不带 response_format 重试一次(已记住该端点不支持)。"
+                       "端点原文: {}".format(
+                           response_format.get("type"),
+                           (response.text or "")[:200])),
                   flush=True)
             self.response_format_downgrades += 1
             # 退到 JSON mode(DeepSeek 支持 {"type":"json_object"}),而不是把整个
