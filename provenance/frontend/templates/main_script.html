@@ -155,12 +155,9 @@
 			return;                      // 这一 tick 只开新段,下一 tick 才开始吐字
 		}
 		let name = bubble_active;
-		// 正在念的这段已经过期(同一角色又开口了):立刻放弃,别把旧话念完。
-		if ((bubble_spoken[name] || "") !== bubble_active_sp) {
-			bubble_active = ""; bubble_active_text = ""; bubble_active_sp = "";
-			bubble_rest_acc = 0; bubble_rest_need = 0;
-			return;
-		}
+		// **正在念的这一段永不丢弃**。同一角色又开口、或者别人插话,都不打断它 ——
+		// 2026-10-10 用户反馈:"AI Investor 的话还没说完就被 Ethan 新的话打断了"。
+		// 新来的台词一律**排到队尾**,于是顺序就是严格的 FIFO:没说完的先说完。
 		let full = bubble_active_text || "";
 		let shown = bubble_shown[name] || 0;
 		if (shown >= full.length) {
