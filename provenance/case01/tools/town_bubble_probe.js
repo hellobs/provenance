@@ -81,7 +81,23 @@ sandbox.setBubble('B', 'Ethan Lin', 'x'.repeat(500));
 const segs = sandbox.bubble_queue.filter((q) => q.name === 'B');
 ok(segs.length >= 4, '500 字应被切成多段排队,实得段数 ' + segs.length);
 const joined = segs.map((q) => q.text).join('');
-ok(joined === 'x'.repeat(500), '各段拼起来必须等于原文(一个字都不丢),实得 ' + joined.length + ' 字');
+ok(joined.replace(/\s+/g, '') === 'x'.repeat(500),
+   '各段拼起来必须等于原文(一个字都不丢),实得 ' + joined.replace(/\s+/g, '').length + ' 字');
+// 断点必须在**句末标点**或**空格**上,绝不把一个单词劈开
+// (2026-10-10 用户截图出现过 "manu | facturer.")
+const en = 'The company officially confirmed validation talks. However no specific order value or contract has been announced. The market rumour of a one hundred twenty billion yuan order is not supported by evidence. ';
+sandbox.setBubble('B', 'Ethan Lin', en.repeat(3));
+const esegs = sandbox.bubble_queue.filter((q) => q.name === 'B');
+let bad = 0;
+for (let i = 1; i < esegs.length; i++) {
+  const prev = esegs[i - 1].text, cur = esegs[i].text;
+  const at = en.repeat(3).indexOf(prev) + prev.length;
+  if (!/[\s。！？.!?]/.test(en.repeat(3)[at - 1] || '')) bad++;
+}
+ok(bad === 0, '每段都断在空格或句末标点上(不劈开单词),实得劈开 ' + bad + ' 处');
+ok(esegs.slice(0, -1).every((q) => /[。！？.!?]$/.test(q.text)),
+   '有句子可断时应优先断在句末(下一段正好是句子开头),实得各段末字符 ' +
+   esegs.map((q) => q.text.slice(-1)).join(''));
 ok(segs.slice(0, -1).every((q) => q.text.length === segs[0].text.length),
    '除最后一段外每段都是满的上限长度,实得各段 ' + segs.map((q) => q.text.length).join('/'));
 

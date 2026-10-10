@@ -50,6 +50,35 @@
 	// 需求原文:"主角头上顶着那个要直接是聊天记录,要有打字机的效果"。
 	// 做法:不把气泡当成"行动摘要",而是把该角色刚说的一句放进气泡,逐字吐出。
 	// 一个角色连说多句时,后一句覆盖前一句(头顶只挂当前这句,不堆叠)。
+	// 按"句 → 词"找断点,**不要把一个单词劈开**(2026-10-10 用户截图:上一版按固定
+	// 字数硬切,出现了 "manu | facturer." 这种半个单词)。优先级:
+	//   ① 上限附近(下限 = 上限的一半)找**句末标点** ⇒ 下一段正好是**一句话的开头**;
+	//   ② 找不到句号就找**空格** ⇒ 断在词与词之间;
+	//   ③ 实在没有(超长单词、整段没有空格的中文长句)才硬切,宁可少断也不劈词。
+	function _splitForBubble(t, limit) {
+		const SENT = /[。！？.!?]/;
+		let segs = [];
+		let rest = t;
+		const lo = Math.floor(limit * 0.5);
+		while (rest.length > limit) {
+			let cut = -1;
+			for (let i = limit - 1; i >= lo; i--) {
+				if (SENT.test(rest[i])) { cut = i + 1; break; }   // 句末 → 下一段是句子开头
+			}
+			if (cut < 0) {
+				for (let i = limit - 1; i >= lo; i--) {
+					if (rest[i] === " ") { cut = i; break; }      // 空格 → 断在词间
+				}
+			}
+			if (cut < 0) cut = limit;                            // 兜底:硬切(不劈词的余地都没有)
+			let piece = rest.slice(0, cut).trim();
+			if (piece) segs.push(piece);
+			rest = rest.slice(cut).replace(/^\s+/, "");
+		}
+		if (rest.trim()) segs.push(rest.trim());
+		return segs;
+	}
+
 	function setBubble(name, speaker, text) {
 		if (!(name in pronunciatios)) return;
 		let t = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
@@ -60,10 +89,7 @@
 		// **不丢弃超出的文本**(2026-10-10 用户要求"尽可能要把所有的 AI 聊天文字都显示")。
 		// 到字数上限就切成一段一段排队:前一段念完**先原样留 BUBBLE_CHUNK_HOLD_MS
 		// (2 秒)**,再清空气泡框接着说下一段 —— 说话有停顿,不是一口气全倒出来。
-		let segs = [];
-		for (let i = 0; i < t.length; i += BUBBLE_MAX_CHARS) {
-			segs.push(t.slice(i, i + BUBBLE_MAX_CHARS));
-		}
+		let segs = _splitForBubble(t, BUBBLE_MAX_CHARS);
 		if (segs.length === 0) segs.push(t);
 		// 这一整段话的身份戳:队列里靠它认出"已被新台词顶掉的旧段",直接丢掉。
 		let sp = t.slice(0, 24) + "#" + segs.length;
