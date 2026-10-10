@@ -132,7 +132,9 @@ python -m case01.injector.pipeline --from-record <path> --fill-facts [--reflect]
 ```
 
 需要健康 Ollama(`qwen3:4b-instruct-2507-q4_K_M`);Ethan 可经
-`CASE01_ETHAN_BASE_URL` / `CASE01_ETHAN_MODEL` 环境变量走外部 API。
+`CASE01_ETHAN_BASE_URL` / `CASE01_ETHAN_MODEL` 环境变量走外部 API,
+也可以只点一个后端名 `CASE01_ETHAN_PROVIDER=deepseek|bigmodel|openrouter|vllm`
+—— 端点/模型/key 按 Router 用的**同一张表**取(名单见 `tools/setup_api.py --show`)。
 详细接口见 `case01/injector/README.md`。
 
 ## 实时可视化(mavis-vizkit 独立包)
