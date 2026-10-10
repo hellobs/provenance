@@ -405,7 +405,14 @@ def local_client_from_env(retries: int = 3, seed=None):
             embed_model=embed_model,
             api_key=os.environ.get("CASE01_LLM_API_KEY", "").strip(), retries=retries,
             seed=seed,
-            extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+            # 两种写法一起发(2026-10-10 实测):以前只发 `chat_template_kwargs`,
+            # 那是 vLLM/Qwen chat template 的口径,对**云端 OpenAI 兼容端点静默无效** ——
+            # 同一个提示打 DeepSeek:只发 chat_template_kwargs 时 reasoning 照旧 360 字符,
+            # 加 `thinking:{type:disabled}` 才是 reasoning_tokens 消失的那一个。
+            # 判据是响应里有没有 reasoning_content,不是 HTTP 200(参数被忽略也是 200)。
+            # 各家服务端只认自己那一个,另一个当没看见。
+            extra_body={"chat_template_kwargs": {"enable_thinking": False},
+                        "thinking": {"type": "disabled"}}
             if disable_thinking else None)
     raise ValueError("CASE01_LLM_PROVIDER must be ollama or vllm")
 
@@ -747,7 +754,13 @@ def router_client_from_env():
                             embed_model=model,
                             api_key=_secret_value("CASE01_ROUTER_API_KEY",
                                                   "router_api_key"),
-                            timeout=timeout)
+                            timeout=timeout,
+                            # 与 bigmodel 分支同一条政策(拆问题是短 JSON 任务,思考链会
+                            # 把正文挤出 max_tokens),2026-10-10 实测这条以前**没带上**:
+                            # Router 指向 DeepSeek 的推理档时,9753 字的反思正文喂进去,
+                            # 4096 预算全被 reasoning 吃掉 ⇒ 正文空 ⇒ 记录里 router 是空的,
+                            # 只剩一句 "Router 模型返回空内容"。写法用实测生效的那一个。
+                            extra_body={"thinking": {"type": "disabled"}})
     else:
         raise ValueError("CASE01_ROUTER_PROVIDER 只认 bigmodel/openrouter/vllm,"
                          "收到:{}".format(provider))
