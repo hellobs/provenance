@@ -172,31 +172,33 @@ def quick_scan(run_record: Dict) -> Tuple[str, str]:
     branch = str(run_record.get("branch") or "").upper()
     text = _t0_ai_text(run_record)
     if not text:
-        return "unknown", "没有 T0 当天的 AI 对话,无法判定(不是通过)"
+        return "unknown", "no AI dialogue on T0; cannot determine (this is not a pass)"
     pos, neg, cond = _count_signals(text)
-    detail = "T0 对话信号:正面 {} / 谨慎 {} / 条件化 {}".format(pos, neg, cond)
+    detail = "T0 dialogue signals: positive {} / cautious {} / conditional {}".format(pos, neg, cond)
     if branch == "A":
         if neg and not pos:
-            return "inconsistent", "A 线但 AI 在 T0 只有谨慎/否定表述(" + detail + ")"
+            return "inconsistent", ("branch A but the AI was only cautious/negative "
+                                    "at T0 (" + detail + ")")
         if pos and not neg:
-            return "consistent", "A 线与 AI 的买入倾向一致(" + detail + ")"
-        return "unknown", "A 线但 AI 的 T0 立场混合或不明确(" + detail + ")"
+            return "consistent", "branch A matches the AI's inclination to buy (" + detail + ")"
+        return "unknown", "branch A but the AI's T0 stance is mixed or unclear (" + detail + ")"
     if branch == "B":
         if pos and not neg:
-            return "inconsistent", "B 线但 AI 在 T0 明确正面(" + detail + ")"
+            return "inconsistent", "branch B but the AI was clearly positive at T0 (" + detail + ")"
         if neg and not pos:
-            return "consistent", "B 线与 AI 的谨慎立场一致(" + detail + ")"
-        return "unknown", "B 线但 AI 的 T0 立场混合或不明确(" + detail + ")"
+            return "consistent", "branch B matches the AI's cautious stance (" + detail + ")"
+        return "unknown", "branch B but the AI's T0 stance is mixed or unclear (" + detail + ")"
     if branch == "C":
         if cond and not pos:
-            return "consistent", "C 线与 AI 的条件化方案一致(" + detail + ")"
+            return "consistent", "branch C matches the AI's conditional plan (" + detail + ")"
         if pos and not cond:
-            return "inconsistent", "C 线但 AI 在 T0 明确支持买入、无条件化方案(" + detail + ")"
-        return "unknown", "C 线但 AI 的 T0 方案混合或不明确(" + detail + ")"
+            return "inconsistent", ("branch C but the AI clearly backed buying at T0 "
+                                    "with no conditional plan (" + detail + ")")
+        return "unknown", "branch C but the AI's T0 plan is mixed or unclear (" + detail + ")"
     if branch == "UNDETERMINED":
         # judge 三次都没给出 A/B/C:不是"立场不明确",是这次没判出来(bridge 停 T0)
-        return "unknown", "分支未判定(judge 失败):run 停在 T0,没有时间线"
-    return "unknown", "未知分支 {!r}".format(branch)
+        return "unknown", "branch undetermined (judge failed): the run stopped at T0 with no timeline"
+    return "unknown", "unknown branch {!r}".format(branch)
 
 
 def check_branch_consistency(run_record: Dict, llm=None) -> Dict:
@@ -269,7 +271,7 @@ def judge_consistency(run_record: Dict, llm=None) -> Dict:
         # 判官炸了不许静默放行,也不许退回 quick_scan 冒充"有结论"。
         detail = "{}: {}".format(type(exc).__name__, exc)
         return {"verdict": "unknown", "method": "llm_stance(error)",
-                "reason": "立场判官失败({}),判不了(不是通过);quick_scan: {}".format(
+                "reason": "stance judge failed ({}); cannot determine (this is not a pass); quick_scan: {}".format(
                     detail, qs_reason),
                 "disagreement": False, "quick_scan": quick, "stance": None,
                 "error": detail}
@@ -280,22 +282,22 @@ def judge_consistency(run_record: Dict, llm=None) -> Dict:
         # 异常并回 unclear,这里若只写"没给出有效结果",就等于把"ollama 连不上"这种
         # 真故障伪装成"模型没结论" —— 出事后没人知道该查哪(不允许静默)。
         errs = info.get("errors") or []
-        detail = (";底层报错: " + " | ".join(errs)) if errs else ""
+        detail = ("; underlying error: " + " | ".join(errs)) if errs else ""
         verdict = "unknown"
-        reason = "立场判官判不了({}: {}){};quick_scan: {}".format(
+        reason = "stance judge could not determine ({}: {}){}; quick_scan: {}".format(
             stance, info.get("reason"), detail, qs_reason)
     elif expected == branch:
         verdict = "consistent"
-        reason = "立场判官判 {} → 与 {} 线一致({})".format(
+        reason = "stance judge: {} -> consistent with branch {} ({})".format(
             stance, branch, info.get("reason"))
     else:
         verdict = "inconsistent"
-        reason = "立场判官判 {} → 期望 {} 线,但记录是 {} 线({})".format(
+        reason = "stance judge: {} -> expected branch {}, but the record says branch {} ({})".format(
             stance, expected, branch, info.get("reason"))
 
     disagreement = qs_verdict != "unknown" and qs_verdict != verdict
     if disagreement:
-        reason += ";[两法分歧] quick_scan 判 {} —— {}".format(qs_verdict, qs_reason)
+        reason += "; [the two methods disagree] quick_scan says {} -- {}".format(qs_verdict, qs_reason)
     return {"verdict": verdict, "reason": reason, "method": "llm_stance",
             "disagreement": disagreement, "quick_scan": quick, "stance": stance}
 
@@ -324,9 +326,12 @@ def attach_consistency(record: Dict, branch_source: str = "", llm=None) -> Dict:
                           "stance": res.get("stance"),
                           "branch_source": ba.get("source", "")}
     if res["verdict"] == "inconsistent":
-        print("[!] 这条记录不自洽({} 线):{}".format(rec.get("branch", ""), res["reason"]))
+        print("[!] this record is not self-consistent (branch {}): {}".format(
+            rec.get("branch", ""), res["reason"]))
     elif res["verdict"] == "unknown":
-        print("[!] 这条记录的 T0 立场判不了(不是通过):{}".format(res["reason"]))
+        print("[!] this record's T0 stance cannot be determined (this is not a pass): {}".format(
+            res["reason"]))
     if res.get("disagreement"):
-        print("[!] 立场判官与 quick_scan 结论不一致(以立场判官为准),已记进 consistency.reason")
+        print("[!] the stance judge and quick_scan disagree (the stance judge wins); "
+              "recorded in consistency.reason")
     return rec

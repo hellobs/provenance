@@ -7,7 +7,6 @@
        (2026-09-27 前端离线化;此前"本地+CDN 两条都加载"并非兜底,反而多一次外网请求) -->
   <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-theme.min.css">
-  <script src="/static/english_only.js"></script>
 </head>
 
 <body class="top-navigation" data-embed="{{ embed|default('') }}" data-chrome="{{ chrome|default('1') }}" style="background-color: white{% if not embed or embed in ("scene", "explore") %}; padding-top: 56px{% endif %}">

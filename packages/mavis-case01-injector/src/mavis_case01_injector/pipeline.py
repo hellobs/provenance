@@ -107,13 +107,14 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     # 算法与清单侧共用 `truncation_counts`(此前两边各写一份、两套文案,同一个
     # 记录里可能出现两条"截断"警告却数的是不同窗口的同一件事)。
     from mavis_case01_injector.manifest import truncation_counts
-    counts = truncation_counts({"反思": local, "路由": router})
+    counts = truncation_counts({"reflection": local, "router": router})
     truncated = sum(counts.values())
     if truncated:
         warnings = record.setdefault("manifest", {}).setdefault("manifest_warnings", [])
-        warnings.append("映射期反思/路由输出被 max_tokens 截断 {} 次({}):反思/路由可能不完整"
-                        .format(truncated, "、".join(
-                            "{} {} 次".format(k, v) for k, v in counts.items())))
+        warnings.append("reflection/router output was cut short by max_tokens {} time(s) "
+                        "during mapping ({}); reflection/router may be incomplete"
+                        .format(truncated, ", ".join(
+                            "{}: {} time(s)".format(k, v) for k, v in counts.items())))
         print("[!] reflection/router output was truncated {} time(s); "
               "recorded in manifest_warnings".format(truncated))
     # 这两个字段已补齐,从 gaps 里移除
@@ -224,13 +225,13 @@ def run_pipeline(scenario_dir: str = "", run_id: str = "",
             print("[!] reflection/router failed; the record is still written "
                   "but reflection/router stay empty: {}".format(msg))
             record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
-                "reflection/router 失败: " + msg)
+                "reflection/router failed: " + msg)
             gaps = [g for g in record.get("compat", {}).get("gaps", [])
                     if not g.startswith("reflection/router")]
             record.setdefault("compat", {})["gaps"] = gaps
             record["compat"]["reflection_attached"] = False
             record["compat"]["gaps"].append(
-                "reflection/router:生成失败({}),本条为不完整记录".format(msg))
+                "reflection/router: generation failed ({}); this record is incomplete".format(msg))
 
     # 一致性戳:在写盘之前盖(所以文件里一定有这一节,不是"看日志才知道")
     #
@@ -256,7 +257,8 @@ def run_pipeline(scenario_dir: str = "", run_id: str = "",
     if record["consistency"]["method"] == "quick_scan" and reflect and not dry_run:
         # 真跑却仍是 quick_scan = 调用方显式没给后端,这条事实必须留在记录上
         record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
-            "consistency: 立场判官未启用(本次未提供判官后端),verdict 来自关键词快筛")
+            "consistency: stance judge not enabled (no judge backend this run); "
+            "the verdict comes from the keyword quick scan")
         print("[!] consistency used quick_scan (no stance-judge backend this run); "
               "recorded in manifest_warnings")
     if require_consistent and record["consistency"]["verdict"] != "consistent":

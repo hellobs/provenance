@@ -198,7 +198,7 @@ def test_failed_reflection_is_excluded_and_reason_visible(monkeypatch, tmp_path)
     assert ex["fx-reflection-error"]["quality"] == "questionable"
     why = ex["fx-reflection-error"].get("reason", "")
     # 失败原因在前、一致性原因附后;两个事实都不能丢
-    assert "TimeoutError" in why and "一致性" in why, why
+    assert "TimeoutError" in why and "consistency" in why, why
     # 给平台的行里不许混进占位文本
     assert all("(反思生成失败)" not in json.dumps(r, ensure_ascii=False)
                for r in dflt["runs"])

@@ -564,7 +564,8 @@ def run_case01(llm=None, run_id="", no_llm=False,
         # 与注入器路径同一句留痕(pipeline 在 quick_scan 时写 manifest_warnings):
         # 只 print 过一次就消失的降级,平台侧读不到,而"判官没上班"正是评审要看的。
         rec.data["manifest"].setdefault("manifest_warnings", []).append(
-            "consistency: 立场判官未启用(本次未提供判官后端),verdict 来自关键词快筛")
+            "consistency: stance judge not enabled (no judge backend this run); "
+            "the verdict comes from the keyword quick scan")
     p = rec.save()
     log("recorded -> " + p)
     return rec

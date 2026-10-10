@@ -279,10 +279,10 @@ def _reflection_failed(rec: dict) -> str:
         return ""
     q = ref.get("quality")
     if isinstance(q, dict) and q.get("status") == "error":
-        return str(q.get("error") or "反思生成失败(quality.status=error)")
+        return str(q.get("error") or "reflection generation failed (quality.status=error)")
     text = str(ref.get("text") or "").strip()
     if text in ("(反思生成失败)", "(失败)"):
-        return "反思生成失败(旧版失败占位,无 quality 块)"
+        return "reflection generation failed (legacy failure placeholder, no quality block)"
     return ""
 
 
@@ -372,7 +372,7 @@ def quality_of(rec: dict) -> dict:
     # 一致性原因附在后面,两个事实都不丢。
     reason = cs.get("reason", "")
     if ref_fail:
-        reason = ref_fail + (" | 一致性: " + reason if reason else "")
+        reason = ref_fail + (" | consistency: " + reason if reason else "")
     return {"quality": q, "consistency": verdict or "unverified",
             "branch_source": source, "reason": reason,
             "debug": rec.get("debug", ""),

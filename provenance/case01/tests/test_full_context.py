@@ -228,7 +228,7 @@ class TestNoExperimentMetaInExpertText:
         q = quality_of(rec)
         assert q["quality"] == "questionable", q
         # 失败原因透出在前,一致性原因附后(两个事实都不丢)
-        assert "TimeoutError" in q["reason"] and "一致性" in q["reason"]
+        assert "TimeoutError" in q["reason"] and "consistency" in q["reason"]
 
     def test_legacy_failure_placeholder_text_is_questionable(self):
         """旧版(2026-10-03 前)失败占位没有 quality 块,只剩一句文本 —— 也要兜住。"""

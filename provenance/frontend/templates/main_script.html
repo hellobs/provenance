@@ -1,5 +1,4 @@
 <script type="text/javascript">
-	if (window.enforceEnglishPhaser) window.enforceEnglishPhaser();
 	// Initialize variables from Flask context
 	let step = {{ step|tojson }};
 	let step_size = {{ sec_per_step|tojson }} * 1000; // Convert to milliseconds

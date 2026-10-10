@@ -23,7 +23,7 @@ def _rec(branch, ai_text, date="2026-08-27", start="2026-08-27", extra_turns=())
 def test_a_cautious_is_inconsistent():
     rec = _rec("A", "I cannot confirm the rumour is true or that the stock is worth buying.")
     verdict, reason = quick_scan(rec)
-    assert verdict == "inconsistent" and "A 线" in reason
+    assert verdict == "inconsistent" and "branch A" in reason
 
 
 def test_b_positive_is_inconsistent():
@@ -92,7 +92,7 @@ def test_only_t0_day_is_used_not_the_first_ai_turn():
     }
     assert _t0_ai_text(rec) == ""
     verdict, reason = quick_scan(rec)
-    assert verdict == "unknown" and "没有 T0" in reason
+    assert verdict == "unknown" and "no AI dialogue on T0" in reason
 
 
 def test_signal_counting():
@@ -125,7 +125,7 @@ def test_no_t0_dialogue_reports_unknown_not_pass():
                                  "turns": [{"speaker": "ai", "date": "2026-09-15",
                                             "text": "final feedback"}]}, llm=None)
     assert r["consistent"] is None and r["verdict"] == "unknown"
-    assert "没有 T0" in r["reason"]
+    assert "no AI dialogue on T0" in r["reason"]
 
 
 def test_no_llm_available_keeps_unknown():

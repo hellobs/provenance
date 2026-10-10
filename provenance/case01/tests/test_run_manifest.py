@@ -293,7 +293,7 @@ def test_truncations_count_every_client_the_run_used():
                                         llms={"对话 llm": other}))
     assert m["truncations"] == 7, "别的客户端的截断也要算进总数"
     w = [x for x in m["manifest_warnings"] if "truncations=" in x][0]
-    assert "判定 2 次" in w and "对话 llm 5 次" in w, w
+    assert "judge: 2 time(s)" in w and "对话 llm: 5 time(s)" in w, w
     assert "truncation_detail" not in m, "归因只进 warnings,不新增清单键"
 
 

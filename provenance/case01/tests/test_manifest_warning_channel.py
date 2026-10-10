@@ -165,7 +165,7 @@ def test_a_no_llm_run_shows_up_as_noted_in_the_review_index(tmp_path, monkeypatc
     row = lh._brief_review("warn-e2e")
     assert "error" not in row, row
     assert row["manifest_status"] == "noted", row
-    assert any("立场判官未启用" in w for w in row["manifest_warnings"]), row
+    assert any("stance judge not enabled" in w for w in row["manifest_warnings"]), row
     # 警告不参与判定:把同一份记录的警告清空,quality 必须一个字都不变
     no_warn = dict(rec)
     no_warn["manifest"] = {"manifest_warnings": []}

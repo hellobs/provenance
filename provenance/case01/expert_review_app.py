@@ -1171,7 +1171,6 @@ function send() {
   });
 }
 </script>
-<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 

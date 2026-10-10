@@ -197,7 +197,7 @@ def test_disagreement_is_surfaced_in_reason():
     assert out["quick_scan"]["verdict"] == "inconsistent", out["quick_scan"]
     assert out["verdict"] == "consistent", "立场判官是主判据,verdict 跟它"
     assert out["disagreement"] is True, "分歧要被标记出来"
-    assert "分歧" in out["reason"], out["reason"]
+    assert "disagree" in out["reason"], out["reason"]
     assert "quick_scan" in out["reason"], out["reason"]
 
 

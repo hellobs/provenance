@@ -801,6 +801,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from live.english_output import install_english_output
-    install_english_output()
     sys.exit(main())

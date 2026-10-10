@@ -88,16 +88,17 @@ DEFAULT_JUDGE_MODEL = "qwen3:4b-instruct-2507-q4_K_M"   # OllamaClient 的默认
 # 兜底就是本地 OllamaClient —— 与其把 judge 写成 "unknown",不如照实记成
 # "local + 默认模型",并在 judge_backend_reason 里写明这是默认假设、不是探测结果。
 _DEFAULT_BACKEND_KIND = "local"
-_DEFAULT_BACKEND_REASON = "未给 judge_llm,按真跑路径的兜底后端(本地 OllamaClient)记录"
+_DEFAULT_BACKEND_REASON = ("no judge_llm given; recorded as the production-path "
+                           "fallback backend (local OllamaClient)")
 
 # 提示词版本(12 位 sha256)用到的字面量,全部从模块里现取,不在这里复制正文。
 _JUDGE_PROMPT_ATTR = "JUDGE_PROMPT"
 _PLAN_PROMPT_ATTR = "PLAN_PROMPT"
 
-_REASON_UNKNOWN_COMMIT = "git rev-parse 取不到 HEAD,且 .git/HEAD 不可读"
-_REASON_FINANCIAL_ABSENT = "资料目录不存在:{}"
-_REASON_PROMPT_UNREADABLE = "读不到提示词({}):{}"
-_REASON_NO_CLIENT = "未给 judge_llm,无法从客户端探测"
+_REASON_UNKNOWN_COMMIT = "git rev-parse could not read HEAD and .git/HEAD is unreadable"
+_REASON_FINANCIAL_ABSENT = "data directory does not exist: {}"
+_REASON_PROMPT_UNREADABLE = "cannot read the prompt ({}): {}"
+_REASON_NO_CLIENT = "no judge_llm given; cannot probe it from the client"
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -215,7 +216,7 @@ def detect_git_commit(repo_root: str = "") -> Dict[str, str]:
     root = repo_root or _repo_root()
     if not root:
         return {"git_commit": "unknown", "git_commit_source": "",
-                "reason": _REASON_UNKNOWN_COMMIT + "(.git 目录没找到)"}
+                "reason": _REASON_UNKNOWN_COMMIT + " (no .git directory found)"}
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -224,11 +225,11 @@ def detect_git_commit(repo_root: str = "") -> Dict[str, str]:
         if out.returncode == 0 and _HEX40.match(sha.lower()):
             return {"git_commit": sha, "git_commit_source": "git rev-parse HEAD",
                     "reason": ""}
-        reason = "git rev-parse 退出码 {}: {}".format(
+        reason = "git rev-parse exit code {}: {}".format(
             out.returncode,
             (out.stderr or b"").decode("utf-8", "replace").strip()[:200])
     except (OSError, subprocess.SubprocessError) as e:
-        reason = "git 不可用({})".format(e)
+        reason = "git unavailable ({})".format(e)
     # 回退:直接读 .git,并把回退这件事写进 reason 之外的一栏
     sha = _commit_from_git_dir(root)
     if sha:
@@ -301,7 +302,8 @@ def detect_backend_kind(client: Any) -> Tuple[str, str, str]:
     kind = _BACKEND_BY_CLASSNAME.get(cls_name, "")
     if kind:
         return kind, "class {}".format(cls_name), ""
-    return "unknown", "", "判不出后端类型(类名 {} 不在已知表,也没声明 backend_kind)".format(
+    return "unknown", "", ("cannot determine the backend type (class name {} is not in "
+                           "the known table and no backend_kind was declared)").format(
         cls_name)
 
 
@@ -400,7 +402,7 @@ def _detail_text(counts: Dict[str, int]) -> str:
     """把 {标签: 次数} 拼成一句人话(空则空串)。"""
     if not counts:
         return ""
-    return "(" + "、".join("{} {} 次".format(k, v) for k, v in counts.items()) + ")"
+    return "(" + ", ".join("{}: {} time(s)".format(k, v) for k, v in counts.items()) + ")"
 
 
 def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
@@ -420,7 +422,7 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     单一来源:raw 里已经带了 `manifest_meta` 时**直接沿用**(那是最贴近真实调用点
     的一份:桥自己记的判定后端),不再让映射器重新猜一遍。
     """
-    clients: Dict[str, Any] = {"判定": judge_llm}
+    clients: Dict[str, Any] = {"judge": judge_llm}
     clients.update(llms or {})
     counts = truncation_counts(clients)
     raw = raw if isinstance(raw, dict) else {}
@@ -457,9 +459,9 @@ def collect_run_meta(raw: Optional[dict] = None, branch: str = "",
     why = ""
     if backend_kind:
         kind = str(backend_kind).strip().lower()
-        why = "由调用方显式指定"
+        why = "explicitly specified by the caller"
         if kind not in _BACKEND_KINDS:
-            kind, why = "unknown", "调用方给的 backend_kind={!r} 不合法".format(backend_kind)
+            kind, why = "unknown", "the caller's backend_kind={!r} is not valid".format(backend_kind)
     elif judge_llm is None:
         # 没给客户端 ≠ 后端未知:真跑路径的兜底就是本地 Ollama(见 _DEFAULT_BACKEND_REASON)。
         kind, why = _DEFAULT_BACKEND_KIND, _DEFAULT_BACKEND_REASON
@@ -508,7 +510,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     # --- git ---
     if git_commit:
         commit = git_commit
-        commit_source = "由调用方传入"
+        commit_source = "supplied by the caller"
         if commit == "unknown":
             warnings.append("git_commit=unknown:" + _REASON_UNKNOWN_COMMIT)
     else:
@@ -569,7 +571,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     # (`world/branch.py` 模块常量),不依赖 scenario 文件。
     judge_prompt_version = prompts.get("branch_judge") or None
     if not judge_prompt_version:
-        warnings.append("judge_prompt_version=null:读不到 case01.world.branch.{}".format(
+        warnings.append("judge_prompt_version=null: cannot read case01.world.branch.{}".format(
             _JUDGE_PROMPT_ATTR))
 
     # --- 反思/路由温度(与调用处同一常量) ---
@@ -580,7 +582,7 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         ROUTER_TEMPERATURE = _refl.ROUTER_TEMPERATURE
     except Exception as e:                      # noqa: BLE001
         REFLECTION_TEMPERATURE = ROUTER_TEMPERATURE = None
-        warnings.append("temperature.reflection/router=null:读不到 case01.reflection 常量:{}"
+        warnings.append("temperature.reflection/router=null: cannot read the case01.reflection constants: {}"
                         .format(e))
     temp = dict(meta.get("temperature") or {})
     temp["reflection"] = REFLECTION_TEMPERATURE
@@ -589,7 +591,8 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     judge_kind = str(meta.get("judge", "") or "")
     if judge_kind not in _BACKEND_KINDS:
         warnings.append("judge={!r}:{}".format(judge_kind,
-                                               meta.get("judge_backend_reason", "判不出后端")))
+                                               meta.get("judge_backend_reason",
+                                                        "cannot determine the backend")))
     # 截断计数:此前只活在 lane 日志/一次 print 里,清单读不到(2026-10-05 体检 §七)。
     # 非零才进 warnings —— 0 是常态,不占位。
     truncations = int(meta.get("truncations") or 0)
@@ -597,8 +600,9 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
         # 前缀 `truncations=N` 是读侧与测试认的形态;括号里补"哪几处各几次",
         # 否则一个光秃秃的总数没法定位是判定的输出短了还是对话被压了。
         warnings.append(
-            "truncations={}{}:本次有 {} 条输出被 max_tokens 截断(截断文本与完整文本"
-            "外观一致,引用其内容前需人工核对)".format(
+            "truncations={}{}: {} output(s) were cut short by max_tokens this run "
+            "(truncated text looks just like complete text; verify by hand before "
+            "quoting it)".format(
                 truncations, _detail_text(meta.get("truncation_detail") or {}),
                 truncations))
 
@@ -628,8 +632,9 @@ def build_manifest(run_meta: Optional[dict] = None, scenario_path: str = "",
     if not temp.get("judge") and temp.get("judge") != 0:
         warnings.append(
             "temperature.judge=null:{}".format(
-                "后端是 rules,规则判定没有采样温度" if judge_kind == "rules"
-                else "判不出判定温度"))
+                "the backend is rules; a rule-based decision has no sampling temperature"
+                if judge_kind == "rules"
+                else "cannot determine the judge temperature"))
         manifest["manifest_warnings"] = warnings
     return manifest
 

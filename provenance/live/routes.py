@@ -72,9 +72,10 @@ templates = Jinja2Templates(directory=os.path.join(state.BASE_DIR, "frontend/tem
 # 顶栏外部工具链接(与 live/history.py 同口径):mavis 的 config_tool,独立进程,默认 8060
 import os as _os  # noqa: E402
 templates.env.globals["extra_nav_links"] = [
-    {"label": "配置工具 ↗", "url": _os.environ.get("MAVIS_CONFIG_TOOL_URL",
-                                                  "http://127.0.0.1:8060/"),
-     "title": "mavis 的角色/场景配置工具(独立进程;地址用 MAVIS_CONFIG_TOOL_URL 覆盖)"},
+    {"label": "Config tool ↗", "url": _os.environ.get("MAVIS_CONFIG_TOOL_URL",
+                                                      "http://127.0.0.1:8060/"),
+     "title": "mavis role/scenario configuration tool (separate process; override the "
+              "address with MAVIS_CONFIG_TOOL_URL)"},
 ]
 
 

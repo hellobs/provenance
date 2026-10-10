@@ -180,9 +180,9 @@ def to_case01_record(record: dict, branch: str = "",
             "source": record.get("branch_source") or "undetermined",
             "pending": not record.get("branch_source"),
             "judge_info": dict(record.get("judge_info") or {}),
-            "judge": ("llm(T0 回答判定)" if (record.get("branch_source") == "judge")
+            "judge": ("llm(decided from the T0 answer)" if (record.get("branch_source") == "judge")
                       else ("judge(failed/manual review required)" if record.get("branch_source") == "judge-failed"
-                            else "undetermined(这次没有留下判定结果)")),
+                            else "undetermined(no decision was recorded this run)")),
             "c_plan": dict(c_plan or {}),
             "t0_rounds": int(t0_rounds or 0),
         },

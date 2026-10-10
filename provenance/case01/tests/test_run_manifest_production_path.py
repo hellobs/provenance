@@ -97,7 +97,7 @@ def test_quick_scan_fallback_leaves_a_trace_in_the_manifest(tmp_path, monkeypatc
     _rec, saved = _run(tmp_path, monkeypatch, "m-qs")
     assert saved["consistency"]["method"] == "quick_scan", saved["consistency"]
     ws = saved["manifest"]["manifest_warnings"]
-    assert any("立场判官未启用" in w for w in ws), ws
+    assert any("stance judge not enabled" in w for w in ws), ws
 
 
 def test_api_backend_records_api(tmp_path, monkeypatch):

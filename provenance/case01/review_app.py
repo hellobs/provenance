@@ -1076,7 +1076,6 @@ async function boot() {
 }
 boot();
 </script>
-<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 
@@ -1171,7 +1170,6 @@ Array.prototype.forEach.call(document.querySelectorAll("button[data-tab]"), func
   b.onclick = function () { send({ type: "mavis:set-tab", tab: b.dataset.tab }); };
 });
 </script>
-<script src="/static/english_only.js"></script>
 </body>
 </html>"""
 
