@@ -19,7 +19,8 @@ EVENT_TYPES = ("init", "time", "agent", "chat_line", "story", "snapshot")
 
 def _default_on_error(name: str, exc: BaseException) -> None:
     """插件级故障的默认去处:记一行警告。**不允许静默**。"""
-    log.warning("可视化插件 %s 出错(已隔离,不影响引擎):%s", name, exc, exc_info=True)
+    log.warning("visualizer %s failed (isolated; the engine is unaffected): %s",
+                name, exc, exc_info=True)
 
 
 class Visualizer:
@@ -50,7 +51,7 @@ def names() -> List[str]:
 
 def create(name: str, **kwargs) -> Visualizer:
     if name not in _REGISTRY:
-        raise KeyError("未知可视化插件 '{}';已注册: {}".format(name, names()))
+        raise KeyError("unknown visualizer '{}'; registered: {}".format(name, names()))
     return _REGISTRY[name](**kwargs)
 
 

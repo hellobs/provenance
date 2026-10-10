@@ -95,11 +95,11 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
     if not executed_by["external_api"]:
         # 04 §五 没满足要说出口,不能只躺在产物字段里等人来查。
         # 这句是给现场看的:名单不写死在这里(写死过一次,于是 DeepSeek 只能借 `vllm` 配)。
-        print("[!] Router 不是独立 API 模型(source={}):配一条 "
-              "`python provenance/tools/setup_api.py --router <后端名> --key <key>` 再跑"
-              "(名单与当前配置:`--show`;可用哪个:`--check`)".format(source))
+        print("[!] Router is not a separate API model (source={}): run "
+              "`python provenance/tools/setup_api.py --router <backend> --key <key>` first "
+              "(current config and roster: `--show`; which ones work: `--check`)".format(source))
     record["router"]["executed_by"] = executed_by
-    print("[case01.pipeline] Router 后端={} {}@{}(与反思共用客户端={})".format(
+    print("[case01.pipeline] Router backend={} {}@{} (shares client with reflection={})".format(
         executed_by["source"], executed_by["model"], executed_by["host"] or "local",
         not executed_by["separate_client_from_reflection"]))
     # 截断不许静默:反思/路由的答案被 max_tokens 截断时,记录本身要带这一条
@@ -114,7 +114,8 @@ def _attach_reflection(record: dict, llm=None, router_llm=None,
         warnings.append("映射期反思/路由输出被 max_tokens 截断 {} 次({}):反思/路由可能不完整"
                         .format(truncated, "、".join(
                             "{} {} 次".format(k, v) for k, v in counts.items())))
-        print("[!] 反思/路由有 {} 次输出被截断,已记进 manifest_warnings".format(truncated))
+        print("[!] reflection/router output was truncated {} time(s); "
+              "recorded in manifest_warnings".format(truncated))
     # 这两个字段已补齐,从 gaps 里移除
     gaps = [g for g in record.get("compat", {}).get("gaps", [])
             if not g.startswith("reflection/router")]
@@ -220,7 +221,8 @@ def run_pipeline(scenario_dir: str = "", run_id: str = "",
                                reflection_mod=reflection_mod, language=language)
         except Exception as exc:  # noqa: BLE001 —— 留痕后继续写盘,不静默、不白跑
             msg = "{}: {}".format(type(exc).__name__, exc)
-            print("[!] 反思/Router 挂了,记录照写但 reflection/router 留空:{}".format(msg))
+            print("[!] reflection/router failed; the record is still written "
+                  "but reflection/router stay empty: {}".format(msg))
             record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
                 "reflection/router 失败: " + msg)
             gaps = [g for g in record.get("compat", {}).get("gaps", [])
@@ -247,18 +249,21 @@ def run_pipeline(scenario_dir: str = "", run_id: str = "",
         try:
             judge_llm = local_client_from_env()
         except Exception as exc:  # noqa: BLE001 —— 建不出 client 要说出来,不是当没这回事
-            print("[!] 立场判官的本地后端建不出来,本条一致性明着退回 quick_scan:{}"
+            print("[!] cannot build a local backend for the stance judge; "
+                  "consistency for this record explicitly falls back to quick_scan: {}"
                   .format(exc))
     record = _attach_consistency(record, branch_source=branch_source, llm=judge_llm)
     if record["consistency"]["method"] == "quick_scan" and reflect and not dry_run:
         # 真跑却仍是 quick_scan = 调用方显式没给后端,这条事实必须留在记录上
         record.setdefault("manifest", {}).setdefault("manifest_warnings", []).append(
             "consistency: 立场判官未启用(本次未提供判官后端),verdict 来自关键词快筛")
-        print("[!] 一致性走的是 quick_scan(本次没给立场判官后端),已记进 manifest_warnings")
+        print("[!] consistency used quick_scan (no stance-judge backend this run); "
+              "recorded in manifest_warnings")
     if require_consistent and record["consistency"]["verdict"] != "consistent":
         # opt-in 的"落盘闸门":只有调用方明确要求时才拦(默认不拦,免得静默丢弃样本;
         # 而且"丢弃重跑"会引入筛选偏差 —— 只保留恰好同意 preset 的运行)
-        print("[!] --require-consistent:这条记录不一致/判不了,**不写盘**:{}"
+        print("[!] --require-consistent: this record is inconsistent/undeterminable, "
+              "**not written**: {}"
               .format(record["consistency"]["reason"]))
         return record
 
@@ -284,7 +289,7 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
         rec = json.load(f)
     text = (rec.get("reflection") or {}).get("text") or ""
     if not text:
-        print("这条记录没有反思正文,不重跑 Router:", path)
+        print("this record has no reflection text; not re-running the Router:", path)
         return rec
     # 走 local_client_from_env() 而不是无参 OllamaClient():
     # 后者吃签名默认模型(4b)并**绕过** CASE01_LLM_MODEL / CASE01_LLM_SEED,
@@ -308,7 +313,7 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
     executed_by["separate_client_from_reflection"] = router is not local
     executed_by["external_api"] = executed_by.get("provider") == "api"
     rec["router"]["executed_by"] = executed_by
-    print("[case01.pipeline] 本次重跑 Router 后端={} {}@{}".format(
+    print("[case01.pipeline] this re-run used Router backend={} {}@{}".format(
         source, executed_by["model"], executed_by["host"] or "local"))
 
     def complete(issues):
@@ -316,7 +321,7 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
                    if (i.get("risk_note") or "").strip() and (i.get("field") or "").strip())
 
     new = rec["router"]["issues"]
-    print("Router 重跑: {} 条 → {} 条;字段齐全的 issue: {} → {}".format(
+    print("Router re-run: {} issue(s) -> {} issue(s); fully-specified issues: {} -> {}".format(
         len(old), len(new), complete(old), complete(new)))
     for i in new:
         print("   [{}] field={!r} risk={!r} style={} summary={}".format(
@@ -328,7 +333,7 @@ def rerun_router_only(path: str, router_llm=None, external_router: bool = False,
         # 原样原子写回:半截 JSON 会把**已有的**成品记录毁掉,比不写还糟。
         # 记录里已有的 manifest 段保持不动(它记的是原始那次运行,不是这次重跑)。
         write_json_atomic(path, rec)
-        print("已写回:", path)
+        print("written back:", path)
     return rec
 
 
@@ -363,7 +368,7 @@ def main():
 
     roles = tuple(r.strip() for r in args.roles.split(",") if r.strip())
     if len(roles) != 2:
-        print("--roles 需要正好两个角色名")
+        print("--roles takes exactly two role names")
         sys.exit(2)
 
     raw = None

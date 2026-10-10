@@ -592,7 +592,8 @@ def start(case, args):
 # (不是终端),所以染色只能做在"跟随日志读出来再写控制台"这一环
 # (2026-10-10 用户要求"报错那行染红")。
 _HOT = re.compile(
-    r"(运行失败|服务已退出|Traceback \(most recent call last\)|"
+    r"(运行失败|服务已退出|Run failed|Service exited|"
+    r"Traceback \(most recent call last\)|"
     r"\[case01\.llm\] !!|\[case01\] \[warn\]|\[FAIL\]|\bERROR\b)")
 
 
@@ -650,8 +651,8 @@ def _follow(log, err, child=None, interval=1.0):
                 except Exception:  # noqa: BLE001
                     pass
             sys.stdout.write(_highlight(
-                "服务已退出(退出码 {}):原因见上面最后几行红色文字;"
-                "本局没能起来或已结束。\n".format(child.returncode)))
+                "Service exited (return code {}): see the last few red lines above; "
+                "this run either failed to start or has finished.\n".format(child.returncode)))
             sys.stdout.flush()
             return
         for path, fh in list(handles.items()):

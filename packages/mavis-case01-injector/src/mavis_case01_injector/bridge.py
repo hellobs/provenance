@@ -384,7 +384,7 @@ class MavisBridge:
             self._node_facts[t0_node.node_id] = {"state": facts.state_snapshot()}
             self._world_audit = facts.audit()
             rec["world_state"] = facts.state_snapshot()
-        self._warn("judge: T0 判定为 {} 线({});后续按 Timeline {} 跑".format(
+        self._warn("judge: T0 resolved to branch {} ({}); continuing on Timeline {}".format(
             detected, self.judge_info["reason"], "B" if detected == "B" else "A"))
         return detected
 
@@ -447,7 +447,7 @@ class MavisBridge:
         meta["failsafe_by_caller"] = _fs
         meta["failsafe_total"] = sum(_fs.values())
         if _fs:
-            msg = ("本次运行有 {} 次调用落到兜底值(不是模型说的): {}".format(
+            msg = ("This run had {} call(s) fall back to a failsafe value (not model output): {}".format(
                 meta["failsafe_total"],
                 ", ".join("{}={}".format(k, v) for k, v in sorted(_fs.items()))))
             meta.setdefault("warnings", []).append(msg)
@@ -700,7 +700,7 @@ class MavisBridge:
         instances = [create(v) if isinstance(v, str) else v for v in visualizers]
 
         def _on_error(name, exc):
-            msg = "可视化插件 {} 出错(已隔离): {}: {}".format(
+            msg = "visualizer {} failed (isolated): {}: {}".format(
                 name, type(exc).__name__, exc)
             game = getattr(self, "game", None)
             if game is not None and getattr(game, "logger", None) is not None:
@@ -736,7 +736,8 @@ class MavisBridge:
             return {k: list(v) for k, v in
                     scenario_coords(self.scenario_dir, self.roles).items()}
         except Exception as e:  # noqa: BLE001 - 拿不到就退化成"第一段走直线",但留痕
-            print("[case01] 初始坐标取不到,第一段移动可能仍是直线: {}".format(e), flush=True)
+            print("[case01] initial coordinates unavailable; the first move "
+                  "may still be a straight line: {}".format(e), flush=True)
             return {}
 
     def _blocked_by_agents(self, name: str) -> set:
@@ -804,7 +805,7 @@ class MavisBridge:
             if key not in self._visual_path_warned and self.game is not None:
                 self._visual_path_warned.add(key)
                 self.game.logger.warning(
-                    "visual path: {} 从 {} 到 {} 无解(BFS 绕不开),停在原地".format(
+                    "visual path: {} from {} to {} has no route (BFS cannot avoid blockers); staying in place".format(
                         name, list(src), list(dst)))
             return None
         except Exception as e:  # noqa: BLE001 - 画不出来不该打断推演,但要说一声
@@ -946,10 +947,12 @@ class MavisBridge:
                     self._node_facts[node.node_id] = {"state": self.facts.state_snapshot()}
                 rec["c_plan"] = plan
                 self._c_plan = plan
-                self._warn("C 方案来自文件 {} (source=manual)".format(self.c_plan_file))
+                self._warn("branch C plan loaded from file {} (source=manual)".format(
+                    self.c_plan_file))
                 return
             except Exception as e:  # noqa: BLE001 - 读不了就退回解析,但要说出来
-                self._warn("c_plan_file 读不了({}),回退到解析 T0 回答".format(e))
+                self._warn("cannot read c_plan_file ({}); falling back to "
+                           "parsing the T0 answer".format(e))
         ai_answer = self._extract_role_answer(rec, self.roles[0])
         if ai_answer and self.facts is not None:
             from mavis_case01_injector.world.branch import ConditionPlanParser
@@ -1116,9 +1119,11 @@ class MavisBridge:
         # 调用失败会大声报错,不会换成 local。
         if not self._remote_reachable(base_url):
             print(_red_text(
-                "[case01] [warn] Ethan 的外部 API({})起面探测不通;"
-                "仍然使用外部 provider(绝不退回本地),真实错误会在第一次调用时出现。"
-                "若网络不通请检查本机出网/代理。".format(base_url)), flush=True)
+                "[case01] [warn] Ethan's external API ({}) is not reachable at startup; "
+                "still using the external provider (never falling back to local). "
+                "The real error will surface on the first call. "
+                "If the network is down, check this machine's egress/proxy.".format(
+                    base_url)), flush=True)
         target = config.get("agents", {}).get(self.roles[1])
         if target is None:
             raise RuntimeError("场景里找不到第二个角色,无法给它配外部 API")

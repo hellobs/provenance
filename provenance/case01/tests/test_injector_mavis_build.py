@@ -252,7 +252,7 @@ def test_ethan_external_unreachable_warns_but_still_external(monkeypatch, tmp_pa
     monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
     bridge._build_mavis()
     out = capsys.readouterr().out
-    assert "探测不通" in out and "绝不退回本地" in out, out[:300]
+    assert "not reachable at startup" in out and "never falling back to local" in out, out[:300]
     # 关键:仍然是外部 provider,不是本地
     ethan_cfg = bridge.config["agents"][DEFAULT_ROLES[1]]
     assert ethan_cfg["think"]["llm"]["provider"] == "openai"
