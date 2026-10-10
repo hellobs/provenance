@@ -947,6 +947,19 @@ function startWatch() {
   }, 5000);
 }
 
+// 下拉框里那条"实时"只在页面加载时建一次,而进度是每 2 秒变的 ⇒ 不跟着更新的话,
+// 状态行写着 7/7、下拉框还停在页面刚打开时的 0/2(用户 2026-10-10 截图)。
+// 只改那一行 option 的文字,不重建整个 select(重建会丢掉当前选中与滚动位置)。
+function syncLiveOption() {
+  const sel = document.getElementById("pick");
+  if (!sel) return;
+  const opt = sel.querySelector('option[value="__live__"]');
+  if (!opt) return;
+  if (!LIVE_META) { opt.textContent = "● 实时"; return; }
+  opt.textContent = `● 实时 ｜ ${LIVE_META.run_id}`
+    + `（${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点）`;
+}
+
 async function loadLive(first) {
   let d;
   try {
@@ -973,6 +986,7 @@ async function loadLive(first) {
     return;
   }
   LIVE_META = { run_id: d.run_id, done_nodes: d.done_nodes, total_nodes: d.total_nodes };
+  syncLiveOption();
   const rec = d.record || {};
   rec.branch_summary = rec.branch_summary || "";
   DATA = rec;
