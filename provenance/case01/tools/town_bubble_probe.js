@@ -89,5 +89,25 @@ sandbox.setActionBubble('C', '发呆');
 ok(sandbox.bubble_full['C'] === '发呆' && sandbox.bubble_shown['C'] === 2,
    '无对话时行动文本占位且直接全显');
 
+// 8) 一次只念一句(2026-10-10 用户:"Ethan 打字机效果说完之后,AI Investor 才应该
+//    开始打字机,这才拟真")。原来 `tickBubbles` 把所有角色一起吐 ⇒ 两人同时打字。
+sandbox.setBubble('B', 'Ethan Lin', '一二三四五');
+sandbox.setBubble('C', 'Investment AI', 'ABCDEFG');
+let both = 0, bDoneAt = -1, cStartAt = -1;
+let lastB = 0, lastC = 0;
+for (let i = 0; i < 40; i++) {
+  sandbox.bubble_type_acc = 999;
+  sandbox.tickBubbles(16.67);
+  const bLen = sandbox.pronunciatios['B']._t.length, cLen = sandbox.pronunciatios['C']._t.length;
+  // 念完的句子**保留**在气泡里,所以"有文字"不等于"正在打字";要看长度是否在增长
+  if (bLen > lastB && cLen > lastC) both++;
+  lastB = bLen; lastC = cLen;
+  if (bDoneAt < 0 && sandbox.pronunciatios['B']._t.indexOf('一二三四五') > 0) bDoneAt = i;
+  if (cStartAt < 0 && cLen > 0) cStartAt = i;
+}
+ok(both === 0, '同一时刻不应有两句同时在打字,实得同增的 tick 数=' + both);
+ok(bDoneAt >= 0 && cStartAt > bDoneAt,
+   'AI 那句要等 Ethan 念完才开口,实得 Ethan 念完于第 ' + bDoneAt + ' tick,AI 开口于第 ' + cStartAt + ' tick');
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

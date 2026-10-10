@@ -11,6 +11,7 @@
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -83,7 +84,10 @@ def test_bubble_shows_chat_with_typewriter(index_html, tmp_path):
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0, out
-    assert "8 passed, 0 failed" in out, out
+    # 只看"零失败 + 至少跑了这么多条";不写死精确条数,免得每加一条断言都要改这里。
+    m = re.search(r"(\d+) passed, 0 failed", out)
+    assert m, out
+    assert int(m.group(1)) >= 10, out
 
 
 def test_page_script_defines_bubble_helpers(index_html):

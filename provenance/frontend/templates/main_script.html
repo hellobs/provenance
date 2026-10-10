@@ -59,6 +59,14 @@
 		// 记下"这是第几句":两个气泡要左右分开时,按这个序号从左往右排,
 		// 于是**从左往右读就是聊天次序**(先说的靠左),不会看起来像顺序反了。
 		bubble_seq[name] = ++bubble_seq_counter;
+		// 排队:同一时刻**只念一句**,后来到的排到队尾(2026-10-10 用户:
+		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
+		// 同一个角色再次开口就**替换掉他在队列里的那一条**(而不是再排一条)——
+		// 连续多句时只念最新那句,免得队列越堆越长、最后念一句过时的话。
+		for (let i = 0; i < bubble_queue.length; i++) {
+			if (bubble_queue[i].name === name) { bubble_queue[i] = { name: name, text: t }; return; }
+		}
+		bubble_queue.push({ name: name, text: t });
 	}
 
 	// 无对话内容时,回落到"行动文本"(保持旧观感,不至于让气泡空着)
@@ -74,21 +82,37 @@
 		}
 	}
 
-	// 打字机推进:每帧按经过时间吐字。由场景 update 调用(与移动同一循环)。
+	// 打字机推进:每帧按经过时间吐字。**一次只推进队首那一句**,念完停一下再念下一句。
+	// (原来是把 `bubble_full` 里所有角色一起吐 ⇒ 两个人同时打字,不像在对话。)
 	function tickBubbles(delta) {
 		bubble_type_acc += (delta || 16.67);
-		let per = BUBBLE_TYPE_MS;
-		if (bubble_type_acc < per) return;
+		if (bubble_type_acc < BUBBLE_TYPE_MS) return;
 		bubble_type_acc = 0;
-		for (let name in bubble_full) {
-			let full = bubble_full[name] || "";
-			let shown = bubble_shown[name] || 0;
-			if (shown >= full.length) continue;
-			shown += 1;                              // 每 TICK 吐一字(速度由 BUBBLE_TYPE_MS 控)
-			bubble_shown[name] = shown;
-			let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
-			if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
+		if (!bubble_active) {
+			// 取队首。队首那条若已被同一角色的更新台词顶掉(bubble_full 对不上),跳过。
+			while (bubble_queue.length > 0) {
+				let item = bubble_queue[0];
+				if ((bubble_full[item.name] || "") !== item.text) { bubble_queue.shift(); continue; }
+				bubble_queue.shift();
+				bubble_active = item.name;
+				break;
+			}
+			if (!bubble_active) return;
 		}
+		let name = bubble_active;
+		let full = bubble_full[name] || "";
+		let shown = bubble_shown[name] || 0;
+		if (shown >= full.length) {
+			// 这句念完了:停 BUBBLE_REST_MS 再叫下一句(模拟真人说话的换气)
+			bubble_rest_acc += BUBBLE_TYPE_MS;
+			if (bubble_rest_acc >= BUBBLE_REST_MS) { bubble_active = ""; bubble_rest_acc = 0; }
+			return;
+		}
+		bubble_rest_acc = 0;
+		shown += 1;                              // 每 TICK 吐一字(速度由 BUBBLE_TYPE_MS 控)
+		bubble_shown[name] = shown;
+		let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
+		if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 	}
 
 	// 直接把气泡内容设满(用于快照/回放的对齐,避免"回放时也在慢慢打字"造成混乱)
@@ -160,7 +184,11 @@
 	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
 	const BUBBLE_GAP = 6;             // 气泡底边与角色头顶的间隙(见 layoutBubbles)
 	const BUBBLE_STACK_GAP = 3;       // 相邻气泡之间的间隙(见 layoutBubbles)
+	const BUBBLE_REST_MS = 420;       // 一句念完到下一句开口之间的停顿(见 tickBubbles)
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
+	var bubble_queue = [];            // 待念的台词,按到达顺序 [{name, text}]
+	var bubble_active = "";           // 当前正在念的那句的说话人(一次只念一句)
+	var bubble_rest_acc = 0;          // 一句念完后的停顿累计(ms)
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
 	var bubble_seq_counter = 0;
 	let anims_direction;
