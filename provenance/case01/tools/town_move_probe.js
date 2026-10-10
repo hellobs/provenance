@@ -100,7 +100,7 @@ let pass = 0, fail = 0;
 const ok = (cond, msg) => { (cond ? pass++ : fail++); console.log((cond ? 'PASS ' : 'FAIL ') + msg); };
 
 function setup(names) {
-  run('personas = {}; pronunciatios = {}; movement_target = {}; pre_anims_direction_dict = {};');
+  run('personas = {}; pronunciatios = {}; movement_target = {}; pre_anims_direction_dict = {}; bubble_seq = {}; bubble_seq_counter = 0;');
   for (const n of names) {
     sandbox.personas[n] = mkSprite(n);
     sandbox.personas[n].body.x = 0;
@@ -113,11 +113,13 @@ function setup(names) {
 }
 
 // 给某个角色挂一句气泡(只设尺寸与文本 —— 真实页面里这两个由 Phaser Text 量出来)
-function bubbleBox(name, w, h) {
+// seq = 说话序号,决定两个气泡左右摆放的先后(先说的靠左)
+function bubbleBox(name, w, h, seq) {
   const t = sandbox.pronunciatios[name];
   t.width = w;
   t.height = h;
   t.text = 'x';
+  if (seq != null) sandbox.bubble_seq[name] = seq;
 }
 
 const charRect = (n) => {
@@ -215,14 +217,42 @@ ok(Math.hypot(aiP[0] - ethP[0], aiP[1] - ethP[1]) > 20,
    '同格的两人应被错开、不叠在同一像素,实得间距 ' + Math.hypot(aiP[0] - ethP[0], aiP[1] - ethP[1]).toFixed(1));
 
 // ============================================================
+// 相向而行:一个朝对方走、对方也朝它走(用户反馈"反向的撞,
+// 导致有个人一直要在原地或者反过来走路")
+// ============================================================
+setup(['Investment AI', 'Ethan Lin']);
+place('Investment AI', 4, 5);
+place('Ethan Lin', 9, 5);
+run('moveAgent("Investment AI", [11,5], "act", "loc", "", [[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5]]);');
+run('moveAgent("Ethan Lin", [2,5], "act", "loc", "", [[9,5],[8,5],[7,5],[6,5],[5,5],[4,5],[3,5],[2,5]]);');
+// 记录两人的 x 轨迹,看有没有出现"净位移为负"(反着走)
+const trail = { 'Investment AI': [], 'Ethan Lin': [] };
+for (let f = 0; f < 700; f++) {
+  run('update(0, 16.67);');
+  if (f % 25 === 0) {
+    trail['Investment AI'].push(sandbox.personas['Investment AI'].body.x);
+    trail['Ethan Lin'].push(sandbox.personas['Ethan Lin'].body.x);
+  }
+}
+const mono = (arr, sign) => arr.every((v, i) => i === 0 || sign * (v - arr[i - 1]) >= -0.001);
+ok(mono(trail['Investment AI'], +1),
+   '向右走的 Investment AI 不应被推得反着走,轨迹 ' + JSON.stringify(trail['Investment AI']));
+ok(mono(trail['Ethan Lin'], -1),
+   '向左走的 Ethan 不应被推得反着走,轨迹 ' + JSON.stringify(trail['Ethan Lin']));
+ok(near(pos('Investment AI'), [352, 160], 34) && near(pos('Ethan Lin'), [64, 160], 34),
+   '相向而行后两人仍各自到达目标,实得 AI=' + JSON.stringify(pos('Investment AI')) +
+   ' Ethan=' + JSON.stringify(pos('Ethan Lin')));
+ok(!walking('Investment AI') && !walking('Ethan Lin'), '相向而行结束后两人都 idle');
+
+// ============================================================
 // 气泡必须挂在角色**正上方**(2026-10-09 用户硬性要求)
 // 锚点 origin(0.5,1):(x,y) 是气泡底边中点 ⇒ x 该对准角色绘制范围的中线,y 该在顶边之上。
 // ============================================================
 setup(['Investment AI', 'Ethan Lin']);
 place('Investment AI', 10, 6);
 place('Ethan Lin', 10, 9);
-bubbleBox('Investment AI', 128, 66);
-bubbleBox('Ethan Lin', 134, 42);
+bubbleBox('Investment AI', 128, 66, 2);
+bubbleBox('Ethan Lin', 134, 42, 1);
 tick(1);
 const aiBody = sandbox.personas['Investment AI'].body;
 const aiBub = sandbox.pronunciatios['Investment AI'];
@@ -231,14 +261,15 @@ ok(Math.abs(aiBub.x - (aiBody.x + 20)) < 0.01,
 ok(aiBub.y <= aiBody.y, '气泡在角色上方(y 是底边),实得 y=' + aiBub.y + ' body.y=' + aiBody.y);
 
 // ============================================================
-// "不要遮挡人":两个人上下相邻站着时,气泡最容易盖住**另一个人**
-// 实测(真实页面):下方角色的气泡占 y 188~230,正好压住上方角色 204~244。
+// "不要遮挡人" + "两个框左右撇开"(2026-10-10 用户反馈)
+// 两个人上下相邻站着、同时都在说话时:两个气泡必须左右分开,
+// 而且**先说的靠左**(Ethan 先问、AI 后答 ⇒ 从左往右读就是聊天次序)。
 // ============================================================
 setup(['Investment AI', 'Ethan Lin']);
 place('Investment AI', 10, 6);   // 上
 place('Ethan Lin', 10, 7);       // 下(只差一格)
-bubbleBox('Investment AI', 128, 66);
-bubbleBox('Ethan Lin', 134, 42);
+bubbleBox('Investment AI', 128, 66, 2);   // AI 后说
+bubbleBox('Ethan Lin', 134, 42, 1);       // Ethan 先说
 tick(1);
 let covered = [];
 for (const b of ['Investment AI', 'Ethan Lin']) {
@@ -249,10 +280,13 @@ for (const b of ['Investment AI', 'Ethan Lin']) {
 ok(covered.length === 0, '任何气泡都不许压住任何角色,实得:' + JSON.stringify(covered));
 ok(rectOverlap(bubbleRect('Investment AI'), bubbleRect('Ethan Lin')) === false,
    '两个气泡之间也不重叠');
-const ethBub = bubbleRect('Ethan Lin');
-ok(ethBub.y + ethBub.h <= charRect('Investment AI').y,
-   '下方角色的气泡被整体抬到上方角色头顶之上,实得气泡底边=' + ethBub.y +
-   ',上方角色顶边=' + charRect('Investment AI').y + '(越靠上越小)');
+const ethB = bubbleRect('Ethan Lin'), aiB = bubbleRect('Investment AI');
+ok(ethB.x + ethB.w <= aiB.x,
+   '先说的 Ethan 气泡在左、后说的 AI 气泡在右,实得 Ethan 右缘=' + (ethB.x + ethB.w) +
+   ' AI 左缘=' + aiB.x);
+ok(ethB.y + ethB.h <= charRect('Investment AI').y && aiB.y + aiB.h <= charRect('Investment AI').y,
+   '左右分开后两个气泡都仍在两人头顶之上(不压任何人),实得 Ethan 底=' +
+   (ethB.y + ethB.h) + ' AI 底=' + (aiB.y + aiB.h) + ' 角色顶=' + charRect('Investment AI').y);
 
 // ============================================================
 // 回归:目标格在墙里时,不能"位置不动、腿一直走"
