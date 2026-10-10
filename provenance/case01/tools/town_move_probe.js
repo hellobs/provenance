@@ -101,7 +101,7 @@ let pass = 0, fail = 0;
 const ok = (cond, msg) => { (cond ? pass++ : fail++); console.log((cond ? 'PASS ' : 'FAIL ') + msg); };
 
 function setup(names) {
-  run('personas = {}; pronunciatios = {}; movement_target = {}; pre_anims_direction_dict = {}; bubble_seq = {}; bubble_seq_counter = 0;');
+  run('personas = {}; pronunciatios = {}; movement_target = {}; move_axis = {}; pre_anims_direction_dict = {}; bubble_seq = {}; bubble_seq_counter = 0;');
   for (const n of names) {
     sandbox.personas[n] = mkSprite(n);
     sandbox.personas[n].body.x = 0;
@@ -302,6 +302,38 @@ run('moveAgent("AI Advisor", [9,5], "act", "loc", "", [[6,5],[7,5],[8,5],[9,5]])
 tick(200);
 ok(near(pos('AI Advisor'), [160, 160], 34), '撞墙时应停在墙前,实得 ' + JSON.stringify(pos('AI Advisor')));
 ok(!walking('AI Advisor'), '撞墙走不动时不应继续播走路动画(原地踏步)');
+
+// ============================================================
+// 必须"横着、竖着"沿格子走(2026-10-10 用户:"出现有非横竖方向的移动,从而出现晃动")
+// 判据:一格之内**不得来回换轴**。原来每帧重算 `|dx| >= |dy|`,两轴都非零时逐帧翻转,
+// 画出来是 0.8px 的斜线 + 抖动。这里数"换轴次数",与路点数比。
+// ============================================================
+setup(['AI Advisor']);
+run('colLayer = { width: 27, height: 24, getTileAt: function () { return { collide: false }; } };');
+// 故意放在**非网格**位置(模拟被避让推离过),目标要同时变 x 和 y
+sandbox.personas['AI Advisor'].body.x = 5 * 32 + 11;
+sandbox.personas['AI Advisor'].body.y = 5 * 32 + 7;
+const p0 = pos('AI Advisor');
+run('moveAgent("AI Advisor", [9,8], "act", "loc", "", [[9,5],[9,6],[9,7],[9,8]]);');
+let px = p0[0], py = p0[1], lastAxis = '', switches = 0, diagonal = 0;
+for (let f = 0; f < 900; f++) {
+  run('update(0, 16.67);');
+  const q = pos('AI Advisor');
+  const mx = q[0] - px, my = q[1] - py;
+  if (mx !== 0 || my !== 0) {
+    // 到达那一帧会把两轴同时吸附到格角(亚像素,不可见),容一次
+    if (mx !== 0 && my !== 0 && (Math.abs(mx) > 0.8 || Math.abs(my) > 0.8)) diagonal++;
+    const a = mx !== 0 ? 'x' : 'y';
+    if (lastAxis && a !== lastAxis) switches++;
+    lastAxis = a;
+  }
+  px = q[0]; py = q[1];
+}
+ok(diagonal <= 1, '不得出现可见的斜向移动(两轴同时变化且超过一步),实得 ' + diagonal + ' 帧');
+ok(near(pos('AI Advisor'), [288, 256], 34), '仍应走到 [9,8],实得 ' + JSON.stringify(pos('AI Advisor')));
+// 4 个 waypoint ⇒ 换轴次数应当只有"每格最多一次"的量级;旧逻辑是逐帧翻转(几十次)
+ok(switches <= 8, '4 格的路径换轴次数应 <=8(每格最多换一次),实得 ' + switches +
+   '(逐帧重算轴的旧逻辑会到几十次,画出来就是抖动)');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

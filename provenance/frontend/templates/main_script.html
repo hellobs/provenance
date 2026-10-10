@@ -18,6 +18,7 @@
 	let FRONTEND_VERSION = "v11-idle";   // frontend version (cache-busting)
 	let move_speed = 1.0;             // pixels/frame (60fps) ≈ 1.9 tiles/s, walking feel
 	let movement_target = {};         // agent -> waypoint queue (pixels)
+	let move_axis = {};               // agent -> 当前这一格正在走的那一轴("x"/"y"),走完才换
 
 	// ---- 碰撞消费:场景是带 Collisions 图层的,移动必须撞墙即止,否则角色会直线穿墙 ----
 	// colLayer 在 create() 阶段挂载;tileWall 判断"某像素点所在 tile 是否不可通行"。
@@ -1022,6 +1023,7 @@
 				curr_persona.body.x = target[0];
 				curr_persona.body.y = target[1];
 				waypoints.shift();
+				move_axis[curr_persona_name] = "";    // 下一格重新选轴
 				if (waypoints.length === 0) {
 					delete movement_target[curr_persona_name];
 					// path finished: stop walking animation
@@ -1033,37 +1035,37 @@
 					curr_persona.anims.stop();
 				}
 			} else {
-				// ---轴对齐:一次只推进一个轴。先横(把 x 走齐到 target[0]),再竖(把 y 走齐)---
-				// 这样每个 waypoint 之间的运动是"先平移一行、再竖移一格"的直角折线,
-				// 视觉上完全横平竖直(4 向格走);且每轴推进只检测该轴方向的碰撞点,不斜插。
+				// ---轴对齐:一次只推进一个轴,**这一轴走完才换轴** ---
+				// 2026-10-10 用户:"之前出现有非横竖方向的移动,从而出现晃动!
+				// 你确认一下一定要横着,竖着沿着格子走"。
+				// 原来每帧重算 `|dx| >= |dy|`:两个轴都非零时(角色被推离过网格、
+				// 或接着上一段没走完的路径),比较结果会逐帧翻转 ⇒ 一帧横一帧竖交替,
+				// 画出来就是一条 0.8px 的斜线加抖动。现在把选定的轴**记下来**,
+				// 走到该轴对齐(target 那一维齐了)才换另一轴 ⇒ 严格"先横一段再竖一段"。
 				let cx = curr_persona.body.x + 15;   // hitbox 中心 (body 30x40, offset 0,0)
 				let cy = curr_persona.body.y + 20;
 				let move_x = Math.abs(dx) > 0 ? (dx > 0 ? 1 : -1) : 0;
 				let move_y = Math.abs(dy) > 0 ? (dy > 0 ? 1 : -1) : 0;
-				// 先走主导轴:横向未齐则优先横向;横齐后再纵向
-				let axis_first_x = Math.abs(dx) >= Math.abs(dy);
+				let axis = move_axis[curr_persona_name] || "";
+				if (axis === "x" && Math.abs(dx) <= step_px) axis = "y";        // 横齐了才换竖
+				else if (axis === "y" && Math.abs(dy) <= step_px) axis = "x";   // 竖齐了才换横
+				else if (!axis) axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+				move_axis[curr_persona_name] = axis;
 				// 记录**这一帧真正移动的轴**(2026-10-09 修"头朝前却往后走"):
-				// 方向必须由实际位移的轴决定,不能按 dx/dy 猜 —— 目标在斜上方时
-				// 这一帧可能只动了纵轴,若还按 dx 判成横向,画面就是"头朝左、人往下走"。
+				// 方向必须由实际位移的轴决定,不能按 dx/dy 猜。
 				let moved_axis = "";   // "" | "x" | "y"
-				if (axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
+				if (axis === "x" && move_x !== 0 && Math.abs(dx) >= step_px &&
 				    !tileWall(cx + move_x * step_px, cy) &&
 				    !otherOnTile(curr_persona_name, Math.floor((cx + move_x * step_px) / tile_width),
 				                                Math.floor(cy / tile_width))) {
 					curr_persona.body.x += move_x * step_px;
 					moved_axis = "x";
-				} else if (move_y !== 0 && Math.abs(dy) >= step_px &&
+				} else if (axis === "y" && move_y !== 0 && Math.abs(dy) >= step_px &&
 				           !tileWall(cx, cy + move_y * step_px) &&
 				           !otherOnTile(curr_persona_name, Math.floor(cx / tile_width),
 				                               Math.floor((cy + move_y * step_px) / tile_width))) {
 					curr_persona.body.y += move_y * step_px;
 					moved_axis = "y";
-				} else if (!axis_first_x && move_x !== 0 && Math.abs(dx) >= step_px &&
-				           !tileWall(cx + move_x * step_px, cy) &&
-				           !otherOnTile(curr_persona_name, Math.floor((cx + move_x * step_px) / tile_width),
-				                                       Math.floor(cy / tile_width))) {
-					curr_persona.body.x += move_x * step_px;
-					moved_axis = "x";
 				}
 
 				// walking animation:朝向 = 本帧实际移动的轴(没动就保持上一帧朝向)
