@@ -74,10 +74,10 @@ def test_overview_renders_every_branch_source_label(tmp_path):
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0, out
     assert "概览 · 分支来源标签" in out, out
-    for piece in ("source=preset → 实验设计预设",
-                  "source=judge → 由 AI 回答判定",
-                  "source=judge-failed → 判定失败",
-                  "source=rules → 规则判定",
-                  "source=unknown → 来源未记录",
-                  "source=weird-x → 未记录(原值可见)"):
+    for piece in ("source=preset → experiment preset",
+                  "source=judge → decided by the AI's answer",
+                  "source=judge-failed → judge failed",
+                  "source=rules → rule-based",
+                  "source=unknown → source not recorded",
+                  "source=weird-x → not recorded(原值可见)"):
         assert piece in out, out

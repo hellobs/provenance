@@ -13,7 +13,7 @@
 面板的路由放在一个 `APIRouter` 里,由 case01 的实时面(5010,
 `case01/vizkit/live_run.py`)**include 进同一个 FastAPI 应用**,于是:
 
-- 5010 页面的右栏里多一张"结果记录"卡片(与 Chat Log 同款:
+- 5010 页面的右栏里多一张"Result records"卡片(与 Chat Log 同款:
   可折叠、可单独打开) —— 小镇(过程)与九块(结果)在**一个界面**里,小镇照旧实时动;
 - 不再需要单独占一个端口的 5004 面板服务(已退役,`--port` 仍可单独跑,仅供排障)。
 
@@ -110,12 +110,12 @@ def set_live_provider(provider, run_id="", total_nodes=0):
     # 传 callable 则每次读取现算,分母跟着实际计划走。
     _LIVE["total_nodes"] = total_nodes if callable(total_nodes) else int(total_nodes or 0)
     if run_id:
-        set_current_run(run_id, "实跑跑完会自动映射成成品记录")
+        set_current_run(run_id, "the live run is mapped into a finished record automatically when it completes")
     return _LIVE["run_id"]
 
 
 def clear_live():
-    """实跑结束/进程退出时收干净,别让面板一直显示一个已经不动的"实时"。"""
+    """实跑结束/进程退出时收干净,别让面板一直显示一个已经不动的"live"。"""
     _LIVE["provider"] = None
     _LIVE["run_id"] = ""
     _LIVE["total_nodes"] = 0
@@ -150,7 +150,7 @@ def _brief(run_id, safe=False):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as exc:  # noqa: BLE001
-        return {"run_id": run_id, "error": "读 run.json 失败: {}".format(exc)}
+        return {"run_id": run_id, "error": "failed to read run.json: {}".format(exc)}
     router = data.get("router") or {}
     # branch_summary 在 run.json 里**并不存在**——它是服务端推导的一句话。
     # 用 5002 契约(serve.py -> full_context._branch_summary)的同一个函数,两边口径就不会分叉。
@@ -247,7 +247,7 @@ def live_record(safe: int = 0):
         raw = provider()
     except Exception as exc:  # noqa: BLE001 - 取不到也要让面板拿到原因,不能空着
         return JSONResponse({"ok": False, "live": True, "run_id": _LIVE["run_id"],
-                             "errors": ["取实时记录失败: {}: {}".format(
+                             "errors": ["failed to fetch the live record: {}: {}".format(
                                  type(exc).__name__, exc)]})
     from .injector.record import to_case01_record
     rec = to_case01_record(raw, branch=raw.get("branch", ""),
@@ -269,7 +269,7 @@ def live_record(safe: int = 0):
     else:
         from live.history import expert_safe_record  # 契约层是白名单唯一实现处
         rec = expert_safe_record(rec)
-        rec["live"] = True          # 面板靠它标"● 实时",不属于实验元信息
+        rec["live"] = True          # 面板靠它标"● live",不属于实验元信息
     done_nodes = len(raw.get("nodes") or [])
     # 分母是**无参可调用**就现算(判定后计划会变长);是 int 就直接用。
     _tn = _LIVE["total_nodes"]
@@ -291,7 +291,7 @@ def get_run(run_id: str, safe: int = 0):
     """
     # 白名单校验:run_id 只能来自已发现的 run,杜绝路径穿越
     if run_id not in _discover_runs():
-        return JSONResponse({"ok": False, "errors": ["没有这个 run: {}".format(run_id)]},
+        return JSONResponse({"ok": False, "errors": ["no such run: {}".format(run_id)]},
                             status_code=404)
     with open(os.path.join(_runs_dir(), run_id, "run.json"), "r", encoding="utf-8") as f:
         rec = json.load(f)
@@ -312,18 +312,18 @@ def get_run(run_id: str, safe: int = 0):
 #   第十五轮补:页签可用性用 AVAILABLE_TABS(安全模式去掉实验相关页签),
 #   深链与宿主消息都按它判断 —— 以前那句守卫写在读 WANT_TAB 之前是死代码,
 #   于是 /embed/review?tab=injector 会把主区域渲染成导航里根本没有的那一块。
-#   2026-10-08 补 paneOverview 里那两行(!SAFE 分支的"Investment AI 提示形态"与
+#   2026-10-08 补 paneOverview 里那两行(!SAFE 分支的"Investment AI prompt form"与
 #   "Router 后端"):它们是 #54/#55 拍板要落进产物的**实验条件**,平台侧会当场问
 #   (04 §五 要求 Router 是独立 API 模型;#55 问带没带来源可信度清单)。此前字段
 #   在 run.json 里、页面上却没有,于是只能回去翻 analysis.json。按契约这类实验条件
 #   不进专家视图,所以只在内部面渲染。指纹那行**按 _sha8 后缀取**而不是点名键名:
 #   `ai_system_prompt_sha8` 今天改名为 `ai_system_template_sha8`(哈希对象是模板而非
 #   发出去的正文),点名旧键会让 10-08 那批记录显示成"没有",而真相是"键名不同"。
-#   同一次还修了"引擎记录"那一格与"节点 / 注入器"那行:以前没有注入器段就一律写
-#   "旧引擎",于是今天**批量跑**出来的记录(case01.tools.batch_run → orchestrator,
+#   同一次还修了"engine record"那一格与"nodes / injector"那行:以前没有注入器段就一律写
+#   "legacy engine",于是今天**批量跑**出来的记录(case01.tools.batch_run → orchestrator,
 #   名字以 batch- 开头)被标成历史遗留。内部面按 run_id 前缀说清是哪一种;专家面只换成
 #   不带机制词的"批量运行",既不再谎称旧引擎,也不多发一个实验词。
-#   2026-10-08 晚(#71):"Investment AI 提示形态"那行的**空值成因有两种**,以前一句
+#   2026-10-08 晚(#71):"Investment AI prompt form"那行的**空值成因有两种**,以前一句
 #   "跑在字段落地之前"把它们糊在一起,于是小镇面当天产的那条也被读成旧记录:
 #     · 代 —— 批路径(case01-run)在 10-08 之前的记录确实没有这个键;
 #     · 路 —— 小镇面(mavis 注入器映射)的 Investment AI 台词由镇内引擎的 agent 写,
@@ -361,7 +361,7 @@ _PAGE = r"""<!DOCTYPE html>
 <style>
   /* 中性配色:深色页头(原来是墨绿 #1d3a2f)已去掉,改成浅色页头 + 单一蓝色强调色。
      理由:这块面板要嵌进治理平台/小镇界面,深色大面积色块既不协调也难与别家风格共存;
-     中性底 + 一个强调色,别人接手时改 --accent 一处即可。绿色只保留在"风险低"徽标上。 */
+     中性底 + 一个强调色,别人接手时改 --accent 一处即可。绿色只保留在"low risk"徽标上。 */
   :root { --ink:#1f2937; --mut:#6b7280; --line:#e5e7eb; --line-soft:#f1f3f5;
           --bg:#f6f7f9; --card:#fff; --accent:#2563eb; --accent-soft:#eef4ff;
           --low:#0f9d58; --mid:#c77700; --high:#d93025; }
@@ -380,7 +380,7 @@ _PAGE = r"""<!DOCTYPE html>
                 border:1px solid #a8cfe8; border-radius:8px; padding:5px 10px; background:#f0f7fd; }
   .expertlink:hover { background:#e1f0fb; }
   /* 嵌入面里不给这条跨页链接:它在宿主 iframe 里整页跳走,宿主收不到任何消息就把
-     "结果记录"卡片换成专家面板,且没有回来的路(2026-10-09 实测)。平台要专家面
+     "Result records"卡片换成专家面板,且没有回来的路(2026-10-09 实测)。平台要专家面
      自己放进自己的导航;要看就给 /review 全页面的这条链接。 */
   body.embed .expertlink { display:none; }
   header .meta { font-size:12px; color:var(--mut); margin-left:auto; min-width:0;
@@ -460,7 +460,7 @@ _PAGE = r"""<!DOCTYPE html>
        两个坑都要显式覆盖:
        1) `body.embed nav { flex:0 0 132px }` 的特异性比 `nav` 高 —— 竖排容器里
           flex-basis 管的是**高度**,于是导航被撑成 132px 高、按钮再沿交叉轴拉伸
-          ("太胖"就是这么来的)。所以要写成 `body.embed nav` 同特异性、且在后面。
+          ("too heavy"就是这么来的)。所以要写成 `body.embed nav` 同特异性、且在后面。
        2) 拉伸之后每颗药丸都跟着变高 —— 必须 `align-items:flex-start` 让按钮回到自然高度。 */
     nav, body.embed nav {
       position:static; flex:0 0 auto; align-items:flex-start;
@@ -506,7 +506,7 @@ const TABS = [
                                                                           "Nodes and released events"],
   // 审计徽标只数**引擎侧**的交互留痕(release_events / interaction);
   // 不数事实层记账(随 T0 一次算出的那几条流水)——后者在进度还是 0/7 时就已存在,
-  // 显示成徽标会让人误以为"没开始就出了审计"(2026-10-09 用户两次追问)。
+  // 显示成徽标会让人误以为"audit exists before the run started"(2026-10-09 用户两次追问)。
   // 事实层的条目在审计页签里照常列出。
   ["audit",      "Audit",     d => (d.audit || []).filter(
                                 x => x.action === "release_events" || x.action === "interaction"
@@ -516,10 +516,10 @@ const TABS = [
 let DATA = null, TAB = "overview";
 // 记录 → 引擎归属:靠近端拿到的清单里每条都带 engine(索引字段)。
 // 为什么不用记录里的分段判断:专家视图会把这些分段剥掉,那时 mavis 记录会被误标成
-// "旧引擎 · 对照记录"(2026-09-24 实测踩到)。
+// "legacy engine · reference record"(2026-09-24 实测踩到)。
 const ENGINE_OF = {};
 let LIVE_HINT = "";   // 当前实跑尚无成品记录时的一句话提示(见 boot())
-// 实时同步(用户要"小镇与结果同步看全程"):有实跑时下拉里多一条"● 正在跑",
+// 实时同步(用户要"watch the whole run live alongside the results"):有实跑时下拉里多一条"● running",
 // 选中它就按 2 秒拉 /api/review/live 刷新九块;跑完映射出成品记录后自动切过去。
 const LIVE_ID = "__live__";
 let LIVE_META = null;   // {run_id, done_nodes, total_nodes}
@@ -538,11 +538,11 @@ let IGNORED_LIVE = "";
 const Q = new URLSearchParams(location.search);
 const EMBED = Q.get("embed") === "1" || location.pathname.indexOf("/embed/") === 0;
 if (EMBED) { document.body.classList.add("embed"); }
-// 安全模式:嵌入面(/embed/review)按专家视图渲染,SAFE 由"是不是嵌入面"决定,
+// 安全模式:嵌入面(/embed/review)按专家视图渲染,SAFE 由"whether this is an embed view"决定,
 // 可用 ?safe=0/1 显式覆盖(排障用)。为什么这么定见 Python 侧 _PAGE 上方的说明。
 const SAFE = Q.has("safe") ? (Q.get("safe") === "1") : EMBED;
-const SAFE_HIDDEN_ROWS = ["branch", "判定方式", "分支来源", "T0 立场一致性"];
-if (SAFE) { document.title = "GTC Case 01 · 结果记录"; }
+const SAFE_HIDDEN_ROWS = ["branch", "Decision method", "Branch source", "T0 stance consistency"];
+if (SAFE) { document.title = "GTC Case 01 · Result records"; }
 // 安全模式下这个页签不给(原因见 Python 侧说明)。
 const WANT_RUN = Q.get("run") || "";
 const WANT_TAB = Q.get("tab") || "";
@@ -550,11 +550,11 @@ const WANT_TAB = Q.get("tab") || "";
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;");
-// 字段缺值时给一个看得见的破折号:空着渲染出来是"有标签、没内容",
-// 读的人分不清是"这条记录没这个值"还是"面板坏了"。
+// 字段缺值时给一个看得见的破折号:空着渲染出来是"label present, content missing",
+// 读的人分不清是"this record has no such value"还是"panel broken"。
 const dashv = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
 // **本面实际可用的页签** = 导航渲染用的同一份口径。
-// 以前这里用未过滤的 TABS 判断,于是深链指到"本面不提供的页签"时,主区域会渲染出
+// 以前这里用未过滤的 TABS 判断,于是深链指到"tabs this view does not serve"时,主区域会渲染出
 // 导航里根本没有的那一块(2026-09-25 第十五轮体检:那句守卫写在读 WANT_TAB 之前,是死代码)。
 const AVAILABLE_TABS = TABS.filter(t => !SAFE || t[0] !== "injector");
 // 深链参数没对上时的**可见**提示:嵌进来的人会以为看的就是自己要的那条,不能静默回落。
@@ -562,8 +562,8 @@ let PARAM_NOTE = "";
 if (WANT_TAB && AVAILABLE_TABS.some(t => t[0] === WANT_TAB)) { TAB = WANT_TAB; }
 else if (WANT_TAB) {
   PARAM_NOTE = (SAFE && WANT_TAB === "injector")
-    ? `<div class="note">嵌入面没有该页签(专家视图不含实验元信息),已用默认页签。</div>`
-    : `<div class="note">深链页签 tab=${esc(WANT_TAB)} 不存在,已用默认页签。</div>`;
+    ? `<div class="note">The embed view does not serve that tab (the expert view carries no experiment metadata); the default tab is used.</div>`
+    : `<div class="note">Deep-linked tab=${esc(WANT_TAB)} does not exist; the default tab is used.</div>`;
 }
 
 // ---- 与宿主(平台侧治理平台)的通信 ----
@@ -588,7 +588,7 @@ window.addEventListener("message", (ev) => {
     if (has) { sel.value = m.run_id; IGNORED_LIVE = ""; MAPPED_NOTE = ""; pick(m.run_id); }
     else {
       PARAM_NOTE = `<div class="note" style="color:#d93025;border-color:#fecaca">` +
-        `宿主指定的 run 不存在:${esc(m.run_id)}</div>`;
+        `the run the host asked for does not exist: ${esc(m.run_id)}</div>`;
       LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
       render();
     }
@@ -598,7 +598,7 @@ window.addEventListener("message", (ev) => {
     else {
       // 宿主点的这个页签在本面不可用(例如嵌入面上要那个实验相关页签、或写错的 id):
       // **说出来**,别让宿主以为切过去了(以前是静默忽略,页面上什么都不显示)。
-      PARAM_NOTE = `<div class="note">宿主指定的页签 ${esc(m.tab)} 在本面不可用,已保持当前页签。</div>`;
+      PARAM_NOTE = `<div class="note">The tab the host asked for (${esc(m.tab)}) is not served on this face; the current tab is kept.</div>`;
     }
     render();
   }
@@ -620,8 +620,8 @@ function renderNav() {
 }
 
 function paneOverview(d) {
-  // 旧引擎记录(archive d41cdec)缺若干分段。以前这里无条件读它们,于是把"没有这一段"
-  // 渲染成 mode= · schema= 与"节点 0 个"——那是谎报。现在按分段的实际有无渲染,
+  // 旧引擎记录(archive d41cdec)缺若干分段。以前这里无条件读它们,于是把"this section is absent"
+  // 渲染成 mode= · schema= 与"0 nodes"——那是谎报。现在按分段的实际有无渲染,
   // 并明说旧引擎缺哪一段。
   const hasInj = ("injector" in d) || ENGINE_OF[d.run_id] === "mavis";
   const s = d.summary || {}, inj = d.injector || {}, ba = d.branch_action || {}, cp = d.compat || {};
@@ -631,82 +631,82 @@ function paneOverview(d) {
   const allEvents = nodes.reduce((a, n) => a + ((n.events || []).length), 0);
   const dash = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
   const cs = d.consistency || {};
-  const badge = { consistent: ["一致", "low"], inconsistent: ["不一致", "high"],
-                  unknown: ["判不了", "medium"] }[cs.verdict];
+  const badge = { consistent: ["consistent", "low"], inconsistent: ["inconsistent", "high"],
+                  unknown: ["undeterminable", "medium"] }[cs.verdict];
   // 各取值的说明必须列全(2026-10-03 补):以前只认两种,其余落到 "—",
-  // 和"压根没这个字段"长得一模一样,看面板的人分不清。
+  // 和"field absent entirely"长得一模一样,看面板的人分不清。
   // 注释保持中性 —— 维护说明写在 Python 侧,机制名不许进专家面源码(棘轮测试钉着)。
   const BRANCH_SOURCE_LABEL = {
-    preset: '<span class="chip">实验设计预设</span> 不是由 AI 的 T0 回答判定',
-    judge: '<span class="chip k">由 AI 回答判定</span>',
-    "judge-failed": '<span class="chip warn">judge 判定失败</span> 判官未给出 A/B/C',
-    rules: '<span class="chip">规则判定</span> 未用 LLM 判官',
-    unknown: '<span class="chip warn">来源未记录</span> 回填时判不出来',
+    preset: '<span class="chip">experiment preset</span> not decided by the AI\'s T0 answer',
+    judge: '<span class="chip k">decided by the AI\'s answer</span>',
+    "judge-failed": '<span class="chip warn">judge failed</span> the judge gave no A/B/C',
+    rules: '<span class="chip">rule-based</span> no LLM judge used',
+    unknown: '<span class="chip warn">source not recorded</span> undeterminable at backfill time',
   };
   const rows = [
     ["run_id", esc(d.run_id)],
-    ["引擎记录", hasInj
+    ["engine record", hasInj
       ? '<span class="chip k">mavis</span>'
       : (/^batch-/.test(d.run_id || "")
-          ? (SAFE ? '<span class="chip">批量运行</span>'
-                  : '<span class="chip">批路径</span> 这条不经小镇注入器那一站')
-          : '<span class="chip">旧引擎</span>')],
+          ? (SAFE ? '<span class="chip">batch run</span>'
+                  : '<span class="chip">batch path</span> this one skips the stock fact-injection stage')
+          : '<span class="chip">legacy engine</span>')],
     ["branch", `<span class="chip k">${esc(d.branch)}</span> ${esc(d.branch_summary || "")}`],
-    ["日期区间（模拟剧情）", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
-    ["判定方式", dash(ba.judge)],
-    ["分支来源", ba.pending
-      ? '<span class="chip">judge(待 T0 判定)</span> 本次由 AI 的 T0 回答决定,现在还没跑到'
+    ["Date range (simulated story)", `<span class="num">${dash(d.start_date)} → ${dash(d.end_date)}</span>`],
+    ["Decision method", dash(ba.judge)],
+    ["Branch source", ba.pending
+      ? '<span class="chip">judge (pending T0)</span> decided by the AI\'s T0 answer; the run has not got there yet'
       // 标签是**写死的可信 HTML 片段**,不能整体 esc —— 否则 <span> 会变成页面上
       // 可见的 "&lt;span&gt;" 文本(2026-10-03 实测踩过);只有 fallback 里的原值要转义。
       : (BRANCH_SOURCE_LABEL[ba.source]
-         || `<span class="chip warn">未记录(${esc(ba.source || "空")})</span>`)],
-    ["T0 立场一致性", badge
+         || `<span class="chip warn">not recorded (${esc(ba.source || "empty")})</span>`)],
+    ["T0 stance consistency", badge
       ? `<span class="badge ${badge[1]}">${badge[0]}</span> <span class="m">${esc(cs.reason || "")}</span>`
-      : '<span class="chip">未校验</span>'],
+      : '<span class="chip">unverified</span>'],
   ].filter(([k]) => !SAFE || SAFE_HIDDEN_ROWS.indexOf(k) < 0);
   if (hasInj && !SAFE) {
-    rows.push(["注入器", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · 角色 ${esc((inj.roles || []).join(" / ")) || "—"}`]);
-    rows.push(["节点", `<span class="num">${dash(s.node_count)} 个（释放事件 ${released} 条 / 事件定义 ${allEvents} 条）</span>`]);
-    rows.push(["交互", `<span class="num">interaction_started ${dash(s.interaction_started)} · 重试 ${dash(s.retries)} · 耗时 ${dash(s.elapsed_s)} 秒</span>`]);
+    rows.push(["injection", `mode=${dash(inj.mode)} · schema=${dash(inj.schema_version)} · roles ${esc((inj.roles || []).join(" / ")) || "—"}`]);
+    rows.push(["nodes", `<span class="num">${dash(s.node_count)} node(s) (released events ${released} / event definitions ${allEvents})</span>`]);
+    rows.push(["interactions", `<span class="num">interaction_started ${dash(s.interaction_started)} · retries ${dash(s.retries)} · elapsed ${dash(s.elapsed_s)} s</span>`]);
   } else if (!SAFE) {
-    rows.push(["节点 / 注入器", /^batch-/.test(d.run_id || "")
-      ? '这条是<b>批量跑</b>的产物(不经小镇注入器那一站)⇒ 记录里没有注入器段与节点统计；不是"0 个节点"'
-      : '该记录早于 mavis 路径，<b>没有 <code>injector</code> 与 <code>summary</code> 段</b>；不是"0 个节点"']);
+    rows.push(["nodes / injection", /^batch-/.test(d.run_id || "")
+      ? 'this one is a <b>batch run</b> artifact (it skips the stock fact-injection stage) ⇒ the record has no injection section or node stats; that is not "0 nodes"'
+      : 'this record predates the mavis path and <b>has no <code>injector</code> or <code>summary</code> section</b>; that is not "0 nodes"']);
   }
   if (!SAFE) {
     const pf = d.prompt_flags || {}, rb = (d.router || {}).executed_by || {};
     const sha = Object.keys(pf).filter(k => /_sha8$/.test(k))
                   .map(k => `${esc(k)} ${esc(pf[k])}`).join(" · ");
-    rows.push(["Investment AI 提示形态", Object.keys(pf).length
+    rows.push(["Investment AI prompt form", Object.keys(pf).length
       ? (pf.ai_reasoning_hint
-          ? '<span class="chip k">带来源可信度清单</span>'
-          : '<span class="chip">不带来源可信度清单</span>')
-        + (sha ? ` <span class="m">模板指纹 ${sha}</span>` : "")
+          ? '<span class="chip k">with source-credibility list</span>'
+          : '<span class="chip">without source-credibility list</span>')
+        + (sha ? ` <span class="m">template fingerprint ${sha}</span>` : "")
       : (hasInj
-          ? '<span class="chip">不适用</span> 这条由小镇面产出:镇内 Investment AI 的台词不经那份模板 ⇒ 这个开关在它身上没有对应物'
-          : '<span class="chip warn">未记录</span> 该条跑在提示形态记入产物之前(2026-10-08 起新记录才带)')]);
-    rows.push(["Router 后端（04 §五 要独立 API）", rb.source
+          ? '<span class="chip">n/a</span> produced by the stock face: the in-town Investment AI\'s lines do not go through that template ⇒ this switch has no counterpart for it'
+          : '<span class="chip warn">not recorded</span> this run predates prompt-form recording (only records from 2026-10-08 carry it)')]);
+    rows.push(["Router backend (04 §5 requires a separate API)", rb.source
       ? `${esc(rb.source)} · ${dash(rb.model)}`
-        + ("external_api" in rb ? ` · 外部 API ${rb.external_api ? "是" : "否"}` : "")
+        + ("external_api" in rb ? ` · external API ${rb.external_api ? "Yes" : "No"}` : "")
         + (rb.separate_client_from_reflection === false
-            ? ' <span class="chip warn">与反思共用同一个客户端</span>' : "")
-      : '<span class="chip warn">未记录</span> 该条跑在 Router 后端记入产物之前']);
+            ? ' <span class="chip warn">shares the same client as reflection</span>' : "")
+      : '<span class="chip warn">not recorded</span> this run predates Router-backend recording']);
   }
   if ("compat" in d) {
-    rows.push(["记录完整度", `compat.level=${dash(cp.level)} · 缺键 ${((cp.missing_keys || []).length)} 个 · 反思已附 ${esc(cp.reflection_attached)}`]);
+    rows.push(["Record completeness", `compat.level=${dash(cp.level)} · missing keys ${((cp.missing_keys || []).length)} · reflection attached ${esc(cp.reflection_attached)}`]);
   }
   return `
-  <div class="card"><h2>这一次运行</h2>
+  <div class="card"><h2>This run</h2>
     <div class="kv">${rows.map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join("")}</div>
   </div>
-  <div class="card"><h2>最终反馈（${esc(fb.date || "")}）</h2>
-    <div class="m"><b>咨询者</b></div><div class="t">${esc(fb.ethan)}</div>
+  <div class="card"><h2>Final feedback (${esc(fb.date || "")})</h2>
+    <div class="m"><b>Asker</b></div><div class="t">${esc(fb.ethan)}</div>
     <div class="m" style="margin-top:10px"><b>Investment AI</b></div><div class="t">${esc(fb.ai)}</div>
   </div>` + (nodes.length ? `
-  <div class="card"><h2>各节点释放量</h2>
+  <div class="card"><h2>Released per node</h2>
     ${nodes.map(n => {
       const rel = (n.released_events || []).length, tot = (n.events || []).length || 1;
-      return `<div style="margin-bottom:8px"><div class="m num">${esc(n.node_id)} · ${esc(n.date)} · step ${esc(n.step)} —— 释放 ${rel}/${tot}</div>
+      return `<div style="margin-bottom:8px"><div class="m num">${esc(n.node_id)} · ${esc(n.date)} · step ${esc(n.step)} — released ${rel}/${tot}</div>
         <div class="bar"><i style="width:${Math.round(rel / tot * 100)}%"></i></div></div>`;
     }).join("")}
   </div>` : "");
@@ -714,8 +714,8 @@ function paneOverview(d) {
 
 function paneTurns(d) {
   const t = d.turns || [];
-  if (!t.length) return '<div class="card"><div class="empty">无对话</div></div>';
-  const who = s => /ai|invest/i.test(s) ? "AI" : "咨询者";
+  if (!t.length) return '<div class="card"><div class="empty">no dialogue</div></div>';
+  const who = s => /ai|invest/i.test(s) ? "AI" : "Enquirer";
   return t.map(x => `<div class="card">
     <div class="m"><b>${esc(who(x.speaker || ""))}</b> · ${esc(x.speaker)} · ${esc(x.date)}</div>
     <div class="t">${dashv(x.text)}</div></div>`).join("");
@@ -727,7 +727,7 @@ function paneRetrievals(d) {
   //   旧引擎对照:  {current_date, query, hits:[{id,score,source,type,time,title}], source_stats}
   // 之前只读 mavis 那一套,旧记录的命中明细(hits/source_stats)被整个丢掉。
   const r = d.retrievals || [];
-  if (!r.length) return '<div class="card"><div class="empty">无检索</div></div>';
+  if (!r.length) return '<div class="card"><div class="empty">no retrievals</div></div>';
   const dash = v => (v === undefined || v === null || v === "") ? "—" : esc(v);
   return r.map((x, i) => {
     const date = x.date || x.current_date || "";
@@ -738,26 +738,26 @@ function paneRetrievals(d) {
     if (Array.isArray(x.injected)) {
       body = x.injected.length
         ? x.injected.map(f => `<div style="margin-bottom:6px"><span class="chip k">${esc(f.kind)}</span> <span class="t">${esc(f.summary)}</span>${f.source ? ` <span class="chip">${esc(f.source)}</span>` : ""}</div>`).join("")
-        : '<div class="m">该日 <b>未注入任何事实</b>（injected 为空——这是记录内容，不是面板读不到）</div>';
+        : '<div class="m">that day <b>injected no facts</b> (injected is empty - that is record content, not a panel read failure)</div>';
     } else if (Array.isArray(x.hits)) {
       const st = x.source_stats || {};
-      body = `<div class="m">旧引擎形态：命中 ${x.hits.length} 条 · 来源 ${dash(st.n_sources)} 个 · 其中二手 ${dash(st.second_hand_count)} 条</div>
-        <table><thead><tr><th>时间</th><th>来源</th><th>类型</th><th>标题</th><th>相关分</th></tr></thead>
+      body = `<div class="m">legacy engine shape: ${x.hits.length} hit(s) · ${dash(st.n_sources)} source(s) · ${dash(st.second_hand_count)} second-hand</div>
+        <table><thead><tr><th>Time</th><th>Source</th><th>Type</th><th>Title</th><th>Relevance</th></tr></thead>
         <tbody>${x.hits.map(h => `<tr><td class="num">${esc(h.time)}</td><td>${esc(h.source)}</td>
           <td>${esc(h.type)}</td><td>${esc(h.title)}</td><td class="num">${esc(h.score)}</td></tr>`).join("")}</tbody></table>`;
     } else {
-      body = '<div class="m">该记录未存检索明细</div>';
+      body = '<div class="m">this record stores no retrieval detail</div>';
     }
     return `<div class="card">
       <div class="m">${head.join(" · ")}</div>
-      <div class="t"><b>查询：</b>${dashv(x.query)}</div>
+      <div class="t"><b>Query: </b>${dashv(x.query)}</div>
       <div style="margin-top:8px">${body}</div></div>`;
   }).join("");
 }
 
 function paneEvents(d) {
   const e = d.events || [];
-  if (!e.length) return '<div class="card"><div class="empty">无事件</div></div>';
+  if (!e.length) return '<div class="card"><div class="empty">no events</div></div>';
   return `<div class="card"><div class="tl">${e.map(x => `<div class="row">
     <div class="m"><span class="chip k">${esc(x.kind)}</span> ${esc(x.date)}</div>
     <div class="t">${esc(x.summary)}</div></div>`).join("")}</div></div>`;
@@ -765,16 +765,16 @@ function paneEvents(d) {
 
 function paneStates(d) {
   const h = d.state_history || [];
-  if (!h.length) return '<div class="card"><div class="empty">无状态历史</div></div>';
-  // 空数值渲染成 "—" 而不是留白:留白看着像面板坏了,实际是"那天没有这个值"。
+  if (!h.length) return '<div class="card"><div class="empty">no state history</div></div>';
+  // 空数值渲染成 "—" 而不是留白:留白看着像面板坏了,实际是"no such value on that day"。
   const cell = v => (v === undefined || v === null || v === "") ? '<span style="color:#bbb">—</span>' : esc(v);
   return `<div class="card"><table><thead><tr>
-    <th>日期</th><th>现金(元)</th><th>持 HCM</th><th>仓位</th><th>买入价</th><th>卖出价</th><th>已退出</th>
+    <th>Date</th><th>Cash (CNY)</th><th>Holds HCM</th><th>Position</th><th>Entry price</th><th>Exit price</th><th>Exited</th>
   </tr></thead><tbody>${h.map(x => { const s = x.state || {}; return `<tr>
     <td class="num">${cell(s.date || x.date)}</td><td class="num">${cell(s.cash_rmb)}</td>
-    <td>${s.hcm_shares ? "是" : "否"}</td><td class="num">${cell(s.held_fraction)}</td>
+    <td>${s.hcm_shares ? "Yes" : "No"}</td><td class="num">${cell(s.held_fraction)}</td>
     <td class="num">${cell(s.entry_price_usd)}</td><td class="num">${cell(s.exit_price_usd)}</td>
-    <td>${s.exited ? "是" : "否"}</td></tr>`; }).join("")}</tbody></table></div>`;
+    <td>${s.exited ? "Yes" : "No"}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 
 function paneReflection(d) {
@@ -782,11 +782,11 @@ function paneReflection(d) {
   if (!r.text) {
     // 实时看全程时,反思本来就要等运行结束才有材料——一句短的说明就够(用户嫌长句子是废话)。
     return '<div class="card"><div class="empty">' +
-      (d.live ? "跑完后才有" : "无反思文本") + '</div></div>';
+      (d.live ? "only after the run finishes" : "no reflection text") + '</div></div>';
   }
-  return `<div class="card"><div class="m">反思文本 · ${r.text.length} 字</div>
+  return `<div class="card"><div class="m">Reflection text · ${r.text.length} char(s)</div>
     <div class="t">${esc(r.text)}</div>
-    <details><summary>展开交给模型的原始材料（${(r.material || "").length} 字）</summary>
+    <details><summary>Show the raw material handed to the model (${(r.material || "").length} char(s))</summary>
       <pre>${esc(r.material)}</pre></details></div>`;
 }
 
@@ -800,29 +800,29 @@ function paneRouter(d) {
   const r = d.router || {}, iss = r.issues || [];
   let raw = r.raw; try { raw = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) {}
   if (!iss.length && d.live) {
-    return '<div class="card"><div class="empty">跑完后才有</div></div>';
+    return '<div class="card"><div class="empty">only after the run finishes</div></div>';
   }
   const styleTag = x => (x.style === "question")
-    ? '<span class="chip" style="background:#fde68a;color:#92400e" title="模型写成了疑问句,不是行为/判断">仍是疑问句</span>'
+    ? '<span class="chip" style="background:#fde68a;color:#92400e" title="the model wrote a question, not an action or judgment">still a question</span>'
     : '';
   return (iss.length ? iss.map(x => `<div class="card">
       <div class="m"><b>${esc(x.id)}</b> ${riskBadge(x.risk)} <span class="chip">${esc(x.field)}</span>${styleTag(x)}</div>
       <div class="t">${esc(x.summary)}</div>
-      ${x.risk_note ? `<div class="m" style="margin-top:8px">风险 / 错在哪</div><div class="t">${esc(x.risk_note)}</div>` : ""}
-      <div class="m" style="margin-top:8px">分流理由</div><div class="t">${dashv(x.routing_reason)}</div>
-    </div>`).join("") : '<div class="card"><div class="empty">无分流问题</div></div>')
-    + `<div class="card"><details><summary>展开模型原始输出（注意：这里 risk 是首字母大写，上面徽标用的是归一化后的小写）</summary>
+      ${x.risk_note ? `<div class="m" style="margin-top:8px">Risk / what is wrong</div><div class="t">${esc(x.risk_note)}</div>` : ""}
+      <div class="m" style="margin-top:8px">Routing reason</div><div class="t">${dashv(x.routing_reason)}</div>
+    </div>`).join("") : '<div class="card"><div class="empty">no routed issues</div></div>')
+    + `<div class="card"><details><summary>Show the model's raw output (note: risk is capitalised here, the badge above uses the normalised lowercase form)</summary>
        <pre>${esc(raw)}</pre></details></div>`;
 }
 
 function paneInjector(d) {
   const inj = d.injector || {}, nodes = inj.nodes || [];
-  if (!nodes.length) return '<div class="card"><div class="empty">无注入器记录</div></div>';
+  if (!nodes.length) return '<div class="card"><div class="empty">no injection record</div></div>';
   return nodes.map(n => `<div class="card">
     <div class="m"><b>${esc(n.node_id)}</b> · ${esc(n.date)} · step ${esc(n.step)}
-      · 释放 ${(n.released_events || []).length} / 定义 ${(n.events || []).length}</div>
+      · released ${(n.released_events || []).length} / defined ${(n.events || []).length}</div>
     <div class="chips">${(n.released_events || []).map(id => `<span class="chip k">${esc(id)}</span>`).join("")}</div>
-    <table><thead><tr><th>id</th><th>时间</th><th>类型</th><th>重要性</th><th>对象</th><th>内容</th></tr></thead>
+    <table><thead><tr><th>id</th><th>Time</th><th>Type</th><th>Importance</th><th>Targets</th><th>Content</th></tr></thead>
     <tbody>${(n.events || []).map(e => `<tr>
       <td class="num">${esc(e.id)}</td><td class="num">${esc(e.time)}</td><td>${esc(e.event_type)}</td>
       <td class="num">${esc(e.importance)}</td><td>${esc((e.targets || []).join(", "))}</td>
@@ -836,19 +836,19 @@ function auditExtra(x) {
   const parts = Object.keys(x).filter(k => !skip[k]).map(k => {
     const v = x[k];
     let txt;
-    if (v === true) txt = "是";
-    else if (v === false) txt = "否";
-    else if (v === null || v === undefined) txt = "空";
+    if (v === true) txt = "Yes";
+    else if (v === false) txt = "No";
+    else if (v === null || v === undefined) txt = "empty";
     else if (typeof v === "object") txt = JSON.stringify(v);
     else txt = String(v);
     return k + "=" + txt;
   });
-  return parts.length ? parts.join(" · ") : "(这条没有再带其他字段)";
+  return parts.length ? parts.join(" · ") : "(this one carries no further fields)";
 }
 
-// 只列**引擎侧**的交互留痕,与"审计"徽标同一口径(见 BADGE_ROWS 里的 audit 行)。
-// 事实层记账(单数的"释放事件"、以及分支判定那条)是 T0 一次性算出的世界事实,不经过引擎,
-// 2026-10-10 用户两次指出:"最一开始审计里面还是有脏东西"——开局 0 节点时它们就在,
+// 只列**引擎侧**的交互留痕,与"audit"徽标同一口径(见 BADGE_ROWS 里的 audit 行)。
+// 事实层记账(单数的"released events"、以及分支判定那条)是 T0 一次性算出的世界事实,不经过引擎,
+// 2026-10-10 用户两次指出:"the audit still had dirty entries at first"——开局 0 节点时它们就在,
 // 于是徽标写着 0、下面却列着行,看着像脏数据。开局列出的应当是空态。
 const ENGINE_AUDIT = new Set(["release_events", "interaction"]);
 
@@ -857,12 +857,12 @@ function paneAudit(d) {
   const a = all.filter((x) => ENGINE_AUDIT.has(x.action));
   if (!a.length) {
     const facts = all.length
-      ? '<div class="empty">本局还没有引擎侧交互留痕(释放事件 / 交互);' +
-        all.length + ' 条事实层记账(公告/媒体/价格/分支判定)不计入审计徽标。</div>'
-      : '<div class="empty">无审计记录</div>';
+      ? '<div class="empty">this run has no engine-side interaction trace yet (released events / interactions);' +
+        all.length + ' fact-layer bookkeeping entries (announcement/media/price/timeline decision) do not count toward the audit badge.</div>'
+      : '<div class="empty">no audit record</div>';
     return '<div class="card">' + facts + '</div>';
   }
-  return `<div class="card"><table><thead><tr><th>时间</th><th>动作</th><th>类型</th><th>摘要</th></tr></thead>
+  return `<div class="card"><table><thead><tr><th>Time</th><th>Action</th><th>Kind</th><th>Summary</th></tr></thead>
     <tbody>${a.map(x => `<tr><td class="num">${esc(x.t)}</td><td>${esc(x.action)}</td>
       <td>${esc(x.kind || "—")}</td><td>${esc(x.summary || auditExtra(x))}</td></tr>`).join("")}</tbody></table></div>`;
 }
@@ -878,33 +878,33 @@ function render() {
   const y = sc ? sc.scrollTop : 0;
   document.getElementById("main").innerHTML = LIVE_HINT + (DATA
     ? PANES[TAB](DATA)
-    : '<div class="card"><div class="empty">选择一次运行</div></div>');
+    : '<div class="card"><div class="empty">pick a run</div></div>');
   if (sc) sc.scrollTop = y;
-  // 宿主(平台侧)对"现在展示哪条、哪个页签"知情:每次重渲染同步一次(选中/切页签都会走到这)。
+  // 宿主(平台侧)对"which record and tab is on screen now"知情:每次重渲染同步一次(选中/切页签都会走到这)。
   notifyHost("run-selected", { run_id: (DATA || {}).run_id || "", tab: TAB,
                                live: !!((DATA || {}).live) });
   if (DATA) {
     const s = DATA.summary || {};
     const isMavis = ("injector" in DATA) || ENGINE_OF[DATA.run_id] === "mavis";
     // 引擎只用两个字,不加括注(用户嫌啰嗦)。
-    const eng = isMavis ? "mavis" : "旧引擎";
+    const eng = isMavis ? "mavis" : "legacy engine";
     const bl = String(DATA.branch_summary || "").split(/[,，/]/)[0].trim();
-    const tail = isMavis ? `${s.node_count ?? "—"} 节点 · ${s.elapsed_s ?? "—"} 秒` : "对照记录";
+    const tail = isMavis ? `${s.node_count ?? "—"} node(s) · ${s.elapsed_s ?? "—"} s` : "reference record";
     if (DATA.live) {
-      // 实时:把"跑到哪了"写在头上(**不允许静默**)。
-      const prog = LIVE_META ? `${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点` : "";
+      // 实时:把"where the run is at"写在头上(**不允许静默**)。
+      const prog = LIVE_META ? `${LIVE_META.done_nodes}/${LIVE_META.total_nodes} nodes` : "";
       document.getElementById("hmeta").innerHTML =
-        `<span style="color:#0f9d58;font-weight:600">● 实时</span> ${esc(DATA.run_id)} · ` +
-        (SAFE ? "" : `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · `) +
-        `${esc(prog)}　` +
+        `<span style="color:#0f9d58;font-weight:600">● live</span> ${esc(DATA.run_id)} · ` +
+        (SAFE ? "" : `Timeline ${esc(DATA.branch)}${bl ? " (" + esc(bl) + ")" : ""} · `) +
+        `${esc(prog)} ` +
         (SAFE ? "" : `<a href="/review?run=${encodeURIComponent(DATA.run_id)}" ` +
-          `target="_blank">单独看这条 ↗</a>`);
+          `target="_blank">open this record ↗</a>`);
       return;
     }
     document.getElementById("hmeta").innerHTML =
       `${esc(DATA.run_id)} · ${esc(eng)} · ` +
-      (SAFE ? "" : `${esc(DATA.branch)} 线${bl ? "（" + esc(bl) + "）" : ""} · `) + `${tail}　` +
-      (SAFE ? "" : `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">原始 JSON ↗</a>`);
+      (SAFE ? "" : `Timeline ${esc(DATA.branch)}${bl ? " (" + esc(bl) + ")" : ""} · `) + `${tail} ` +
+      (SAFE ? "" : `<a href="/api/review/run/${encodeURIComponent(DATA.run_id)}" target="_blank">raw JSON ↗</a>`);
   }
 }
 
@@ -916,7 +916,7 @@ async function pick(id) {
   render();
 }
 
-// "去专家审核 →"要带上"我现在在看哪条",否则对面是个凭空的面板、返回时也回不到这条
+// "go to expert review →"要带上"which record I am looking at",否则对面是个凭空的面板、返回时也回不到这条
 // (2026-10-09:返回链接原来写死 /review,记不住来源)。嵌入面下这条链接被 CSS 隐藏,
 // 因为整页跳转会换掉宿主 iframe 的内容且没有回来的路。
 // 用 getElementById 而不是 querySelector:本仓的运行期自查工具(review_panel_probe.js)
@@ -930,8 +930,8 @@ function syncExpertLink(id) {
 // ---- 实时记录:小镇在动,这里每 2 秒跟着长 ----
 function stopLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
 
-// 看门狗:没在看实时的时候,也每 5 秒问一次"有没有新的一局开始了"。
-// 为什么要它:用户点了"重开一局"之后,新 run_id 的实时记录会出现在 /api/review/live,
+// 看门狗:没在看实时的时候,也每 5 秒问一次"whether a new run has started"。
+// 为什么要它:用户点了"Restart a run"之后,新 run_id 的实时记录会出现在 /api/review/live,
 // 而面板这时正停在上一局的成品记录上、已经停止轮询 —— 不主动看就会一直显示旧的那条。
 function startWatch() {
   if (liveTimer) return;
@@ -940,14 +940,14 @@ function startWatch() {
       const d = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json();
       if (d && d.ok && d.live && d.run_id && d.run_id !== IGNORED_LIVE
           && (!DATA || DATA.run_id !== d.run_id)) {
-        MAPPED_NOTE = `<div class="note ok">新的一局已开始(${esc(d.run_id)}),已切到实时。</div>`;
+        MAPPED_NOTE = `<div class="note ok">A new run has started (${esc(d.run_id)}); switched to live.</div>`;
         await boot();
       }
     } catch (e) { /* 网络抖动忽略,下一次再问 */ }
   }, 5000);
 }
 
-// 下拉框里那条"实时"只在页面加载时建一次,而进度是每 2 秒变的 ⇒ 不跟着更新的话,
+// 下拉框里那条"live"只在页面加载时建一次,而进度是每 2 秒变的 ⇒ 不跟着更新的话,
 // 状态行写着 7/7、下拉框还停在页面刚打开时的 0/2(用户 2026-10-10 截图)。
 // 只改那一行 option 的文字,不重建整个 select(重建会丢掉当前选中与滚动位置)。
 function syncLiveOption() {
@@ -955,9 +955,9 @@ function syncLiveOption() {
   if (!sel) return;
   const opt = sel.querySelector('option[value="__live__"]');
   if (!opt) return;
-  if (!LIVE_META) { opt.textContent = "● 实时"; return; }
-  opt.textContent = `● 实时 ｜ ${LIVE_META.run_id}`
-    + `（${LIVE_META.done_nodes}/${LIVE_META.total_nodes} 节点）`;
+  if (!LIVE_META) { opt.textContent = "● live"; return; }
+  opt.textContent = `● live | ${LIVE_META.run_id}`
+    + ` (${LIVE_META.done_nodes}/${LIVE_META.total_nodes} nodes)`;
 }
 
 async function loadLive(first) {
@@ -965,13 +965,13 @@ async function loadLive(first) {
   try {
     d = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json();
   } catch (e) {
-    document.getElementById("hmeta").innerHTML = `<span style="color:#d93025">实时记录取不到(${esc(e.message)})</span>`;
+    document.getElementById("hmeta").innerHTML = `<span style="color:#d93025">live record unavailable (${esc(e.message)})</span>`;
     stopLive();
     return;
   }
   if (!d.ok) {
     document.getElementById("hmeta").innerHTML =
-      `<span style="color:#d93025">实时记录取不到:${esc((d.errors || []).join(";"))}</span>`;
+      `<span style="color:#d93025">live record unavailable: ${esc((d.errors || []).join(";"))}</span>`;
     return;
   }
   if (!d.live) {
@@ -979,8 +979,8 @@ async function loadLive(first) {
     stopLive();
     LIVE_META = null;
     if (d.mapped) {
-      // 映射刚跑完(面板自动从"实时"切到成品):**明确说一声**,别让人莫名其妙换了内容。
-      MAPPED_NOTE = `<div class="note ok">成品记录已生成(含反思与问题分流),已切到这一条。</div>`;
+      // 映射刚跑完(面板自动从"live"切到成品):**明确说一声**,别让人莫名其妙换了内容。
+      MAPPED_NOTE = `<div class="note ok">The finished record is ready (with reflection and routed issues); switched to it.</div>`;
     }
     await boot();
     return;
@@ -1004,33 +1004,33 @@ async function boot() {
   (d.runs || []).forEach(x => { if (x.engine) { ENGINE_OF[x.run_id] = x.engine; } });
   // 嵌入视图滤掉了质检不合格的记录 —— **说出来**,别让人以为记录就这么多。
   if (SAFE && d.hidden_count) {
-    MAPPED_NOTE = `<div class="note">嵌入视图已隐藏 ${d.hidden_count} 条质检不合格的记录` +
-      `(questionable / debug);完整清单见 /api/runs?include_questionable=1。</div>`;
+    MAPPED_NOTE = `<div class="note">The embed view hides ${d.hidden_count} record(s) that fail the quality gate` +
+      `(questionable / debug); the full list is at /api/runs?include_questionable=1.</div>`;
   }
-  // 正在实跑时,下拉最上面先给一条"● 正在跑" —— 用户要的就是小镇与结果同步看全程。
+  // 正在实跑时,下拉最上面先给一条"● running" —— 用户要的就是小镇与结果同步看全程。
   let live = { live: false };
   try { live = await (await fetch("/api/review/live" + (SAFE ? "?safe=1" : ""))).json(); } catch (e) { live = { live: false }; }
   // 正在实跑、但还没有成品记录时,面板上明确写出来(**不允许静默**):
-  // 否则人对着旧记录看,会以为"这条实跑的结果丢了"。
+  // 否则人对着旧记录看,会以为"this live run's result is lost"。
   const cur = String(d.current_run_id || "").trim();
   const curInList = cur && (d.runs || []).some(x => x.run_id === cur);
   LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
   if (!LIVE_HINT && cur && !curInList && !live.live) {
-    LIVE_HINT = `<div class="note">实跑 <code>${esc(cur)}</code> 尚未生成成品记录(跑完自动出现)。</div>`;
+    LIVE_HINT = `<div class="note">The live run <code>${esc(cur)}</code> has no finished record yet (it appears when the run completes).</div>`;
   }
   const sel = document.getElementById("pick");
-  // 下拉就是一条条记录:**不要分组标题**(用户说过那种分组标题是"奇怪的无用的话";
+  // 下拉就是一条条记录:**不要分组标题**(用户说过那种分组标题是"odd useless text";
   // 测试 test_dropdown_has_no_group_titles 会盯住页面里不出现分组元素)。
-  // 标签只保留短形式"哪条线(含义) ｜ run_id"。
+  // 标签只保留短形式"which line (meaning) | run_id"。
   const BRANCH_ORDER = { A: 0, B: 1, C: 2 };
   const ENG_ORDER = { mavis: 0, legacy: 1 };
   const shortBranch = x => String(x.branch_summary || "").split(/[,，/]/)[0].trim();
-  // 安全模式下标签只写 run_id,别显示"? 线 · —"(既难看,又暗示存在分组概念)。
+  // 安全模式下标签只写 run_id,别显示"? line · —"(既难看,又暗示存在分组概念)。
   const optLabel = x => SAFE ? String(x.run_id)
-    : `${x.branch || "?"} 线 · ${shortBranch(x) || "—"} ｜ ${x.run_id}`;
+    : `Timeline ${x.branch || "?"} · ${shortBranch(x) || "—"} | ${x.run_id}`;
   const optHtml = x => `<option value="${esc(x.run_id)}">${esc(optLabel(x))}</option>`;
   const liveOpt = live.live
-    ? `<option value="${LIVE_ID}">● 实时 ｜ ${esc(live.run_id)}（${live.done_nodes}/${live.total_nodes} 节点）</option>`
+    ? `<option value="${LIVE_ID}">● live | ${esc(live.run_id)} (${live.done_nodes}/${live.total_nodes} nodes)</option>`
     : "";
   const sorted = d.runs.slice().sort((a, b) =>
     ((ENG_ORDER[a.engine] ?? 9) - (ENG_ORDER[b.engine] ?? 9)) ||
@@ -1048,7 +1048,7 @@ async function boot() {
     MAPPED_NOTE = "";
     pick(sel.value);
   };
-  // 有实跑就默认看实时(用户要"同步看全程");否则落在 mavis 记录上,
+  // 有实跑就默认看实时(用户要"watch the whole run live");否则落在 mavis 记录上,
   // 不要落在旧引擎对照记录上——那条一打开就缺好几段,最像坏了。
   // ?run= 显式指定的优先(嵌入方深链某条记录时用)。
   if (WANT_RUN) {
@@ -1059,10 +1059,10 @@ async function boot() {
     const hid = (d.hidden || []).find(x => x.run_id === WANT_RUN);
     PARAM_NOTE = hid
       ? `<div class="note" style="color:#b45309;border-color:#fcd9a0">` +
-        `深链指定的 run 被质检门排除(quality=${esc(hid.quality)}),默认视图不列它;` +
-        `要看它请取 /api/runs?include_questionable=1 这条全量清单。下面是回落的记录。</div>`
+        `the deep-linked run is excluded by the quality gate (quality=${esc(hid.quality)}) and is not listed in the default view;` +
+        `to see it, fetch the full list at /api/runs?include_questionable=1. The fallback record is shown below.</div>`
       : `<div class="note" style="color:#d93025;border-color:#fecaca">` +
-        `深链指定的 run 不存在:${esc(WANT_RUN)};下面是回落的记录。</div>`;
+        `the deep-linked run does not exist: ${esc(WANT_RUN)}; the fallback record is shown below.</div>`;
     LIVE_HINT = PARAM_NOTE + MAPPED_NOTE;
   }
   if (live.live) { sel.value = LIVE_ID; await loadLive(true); return; }
@@ -1070,7 +1070,7 @@ async function boot() {
   if (first) { sel.value = first.run_id; await pick(first.run_id); startWatch(); }
   else {
     document.getElementById("main").innerHTML =
-      '<div class="card"><div class="empty">还没有成品记录;跑一次实跑就会实时长出来，跑完自动归档。</div></div>';
+      '<div class="card"><div class="empty">no finished records yet; run one live run and they grow in real time, archived automatically when done.</div></div>';
     startWatch();
   }
 }
@@ -1081,7 +1081,7 @@ boot();
 
 
 # 两窗一页(`/combined`)已随"只维护一个界面"退役:5010 页面右栏自带
-# "结果记录"卡片(与 Chat Log 同款),平台要结果只引 `/embed/review`,
+# "Result records"卡片(与 Chat Log 同款),平台要结果只引 `/embed/review`,
 # 要看"过程+结果"就引 5010 首页本身。
 
 
@@ -1200,7 +1200,7 @@ def attach_to(target, current_run_id="", note=""):
 
 def build_app():
     """独立跑法(排障/单测用):`python -m case01.review_app --port 5004`。"""
-    a = FastAPI(title="GTC Case 01 · 成品记录审阅")
+    a = FastAPI(title="GTC Case 01 · Result record review")
     a.include_router(router)
     from .expert_review_app import router as expert_router
     a.include_router(expert_router)
@@ -1217,9 +1217,9 @@ app = build_app()
 
 
 def main():
-    ap = argparse.ArgumentParser(description="case01 成品记录审阅面板(独立跑法)")
+    ap = argparse.ArgumentParser(description="case01 result-record review panel (standalone mode)")
     ap.add_argument("--port", type=int, default=5004,
-                    help="默认 5004;现在正常用法是挂在实时面 5010 上(见模块 docstring)")
+                    help="default 5004; the normal way now is to attach it to the stock face on 5010 (see the module docstring)")
     ap.add_argument("--host", default="127.0.0.1")
     args = ap.parse_args()
     import uvicorn

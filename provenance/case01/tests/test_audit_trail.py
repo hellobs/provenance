@@ -119,7 +119,7 @@ class AuditTrailCase(unittest.TestCase):
         body = self.c.get("/api/expert/audit-trail?run_id=" + RUN_ID).json()
         ev = self.events(body)
         self.assertFalse(self.chain(body)["final_verdict"])
-        self.assertIn("判定不了", ev["final_verdict"]["result"])
+        self.assertIn("cannot be determined", ev["final_verdict"]["result"])
         self.assertIs(ev["final_verdict"].get("has_data"), False)
 
     # ---- 二、只合并不推断:数据来自哪个产物要能对上 ----------------------
@@ -130,7 +130,7 @@ class AuditTrailCase(unittest.TestCase):
         self.assertEqual(body["n_events"], len(body["events"]))
         ev = self.events(body)
         # 三个来源各出一条:记录 run.json / 标记台账
-        self.assertIn("反思正文", ev["reflection"]["result"])
+        self.assertIn("reflection text", ev["reflection"]["result"])
         self.assertEqual(ev["router"]["detail"]["n_issues"], 1)
         self.assertIn("issue-1:E1", ev["expert_review"]["result"])
         self.assertEqual(ev["router"]["detail"]["executed_by"]["model"], "qwen3:8b")

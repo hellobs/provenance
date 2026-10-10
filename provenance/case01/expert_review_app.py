@@ -14,13 +14,13 @@
 
 路由清单(挂在 case01 实时面 5010 上,由 `review_app.attach_to` 一并 include):
 
-- `/review/expert`  面板页(全页版式,带大标题与"← 回到只读面")
+- `/review/expert`  面板页(全页版式,带大标题与"← back to the read-only view")
 - `/embed/expert`   **嵌入版式**:同一份 HTML,前端按 `/embed/` 路径(或 `?embed=1`)切
                     `body.embed` —— 去掉大标题与本页自己的返回链接(2026-10-09 补;
-                    此前它只是别名,嵌进宿主 iframe 后点"← 回到只读面"会整页跳走、
+                    此前它只是别名,嵌进宿主 iframe 后点"← back to the read-only view"会整页跳走、
                     回不到原记录,见 `review_app` 的 `body.embed .expertlink{display:none}`)。
 - 深链参数:`?run=<run_id>` 进来直接定位那条记录的第一条任务(只读面点过来时带上);
-                    `?from=review|embed` 决定"← 回到只读面"指回哪一面的原记录。
+                    `?from=review|embed` 决定"← back to the read-only view"指回哪一面的原记录。
 - `/api/expert/queue`   待审任务队列(由交接包的 task_candidates 展开;除最近若干条外,
                     「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)强制进队列并按状态排序,见 `_recent_runs`)
 - `/api/expert/read`    单条记录的专家安全全文(正文 + 自然语言 Full Context)
@@ -109,9 +109,11 @@ def _recent_runs(limit: int, must_include=()):
     return picked, scanned, len(by_run)
 
 
-COUNTING_RULE = ("一份意见 = 一个 review.expert_ref 在该任务上的最新版本,且 origin 是 expert"
-                 "(缺省按 expert 算);不计数的情形在 excluded 里报数(缺任务坐标 / "
-                 "来源显式非专家 / 被同主体新版本取代),理由见服务端 `_opinion_tally`")
+COUNTING_RULE = ("one opinion = the latest version of one review.expert_ref on that task,"
+                 " with origin=expert (a missing origin counts as expert); the cases that"
+                 " are not counted are reported in excluded (missing task coordinates /"
+                 " origin explicitly non-expert / superseded by a newer version from the"
+                 " same subject); see `_opinion_tally` on the server for the reasoning")
 
 
 def _opinion_tally(marks):
@@ -208,7 +210,7 @@ def expert_queue(limit: int = 10):
                 # anchor:意见要落在原文哪几句上。构造偏好对时必填,见映射页 §三·补 ①。
                 "anchor": {"sentence_ids": c["evidence_sentence_ids"],
                            "quote": c["evidence_quote"]},
-                # 05 §一:任务未点开也要能看见"当前审核状态";05 §六:池状态。
+                # 05 §一:任务未点开也要能看见"current review status";05 §六:池状态。
                 "n_opinions": n,
                 "review_state": _review_state(n, len(verdicts_by_task.get(k, ()))),
                 "state_rank": _state_rank(n, len(verdicts_by_task.get(k, ()))),
@@ -230,8 +232,9 @@ def expert_queue(limit: int = 10):
             "window": {"limit": limit, "max_runs": MAX_QUEUE_RUNS},
             "total_review_records": total_runs,
             "records_not_scanned": max(0, total_runs - scanned),
-            "n_tasks_scope": "n_tasks/n_manual_triage/n_blocked 都是本次扫描窗口内的数,"
-                             "不是全库待审总量;要总量看 total_review_records 与 records_not_scanned",
+            "n_tasks_scope": "n_tasks/n_manual_triage/n_blocked are counts inside this scan window,"
+                             " not the whole pending backlog; for totals read"
+                             " total_review_records and records_not_scanned",
             "n_manual_triage": len(triage), "n_blocked": len(blocked),
             "tasks": tasks, "manual_triage": triage, "blocked": blocked,
             "verdict_words": sorted(VERDICT_ALIAS),
@@ -240,17 +243,23 @@ def expert_queue(limit: int = 10):
             # 要能知道是"不算"而不是"没落盘"(三类原因都在 excluded 里)。
             "opinions_counted": tally["opinions_counted"], "excluded": tally["excluded"],
             "counting_rule": COUNTING_RULE,
-            "note": "队列只到「建单候选」为止;分配两位专家、计票、争议轮由平台侧负责。"
-                    "⚠ **n_tasks 是窗口数不是总量**:本次只读 min(limit, MAX_QUEUE_RUNS) 条记录"
-                    "(外加凡有人评过的),没读到的条数写在 records_not_scanned 里 —— "
-                    "把 n_tasks 当「全库待审」显示会把一百多条说成几十条。"
-                    "除最近 limit 条外,凡「已经有人评过」的记录(等第二份 / 已评满 / 争议轮)"
-                    "都强制进队列(不受 mtime 窗口影响);tasks 按 state_rank 排:Disputed > "
-                    "争议轮 > 等第二份 > 待领取 > 首轮已齐 —— 已齐的列在队尾但不隐藏(面板不接单,"
-                    "要不要过滤由平台按 state_rank 决定)。"
-                    "n_opinions 是「几位主体已交」而不是「盘上有几行」:" + COUNTING_RULE + "。"
-                    "review_state 是给统筹看的状态词,不含任何一份意见的结论或文本;"
-                    "pool 来自上次 lora_prep --export 的产物(generated_at 标明新鲜度),不是实时真值"}
+            "note": "The queue stops at 'candidates for opening a task'; assigning the two experts,"
+                    " tallying and the dispute round are the platform's job."
+                    " WARNING: **n_tasks is a window count, not a total** - this call reads only"
+                    " min(limit, MAX_QUEUE_RUNS) records (plus every record somebody has already"
+                    " reviewed); how many were not read is in records_not_scanned. Showing n_tasks"
+                    " as 'the whole pending backlog' would turn 100+ records into a few dozen."
+                    " Apart from the most recent limit records, every record that already has a"
+                    " review (waiting for a second / both in / disputed) is forced into the queue"
+                    " (unaffected by the mtime window); tasks are ordered by state_rank: Disputed >"
+                    " escalation > needs_second > unclaimed > complete - completed ones sit at the"
+                    " tail but are not hidden (this panel does not claim tasks; whether to filter"
+                    " them is the platform's call, by state_rank)."
+                    " n_opinions is 'how many subjects have submitted', not 'how many rows are on"
+                    " disk': " + COUNTING_RULE + "."
+                    " review_state is a status word for the coordinator and carries no verdict or"
+                    " text from any opinion; pool comes from the last lora_prep --export artifact"
+                    " (generated_at tells you how fresh it is), it is not live truth"}
 
 
 @router.get("/api/expert/read")
@@ -260,16 +269,16 @@ def expert_read(run_id: str):
     from .review_export import build_review_package
 
     if not run_id or "/" in run_id or ".." in run_id:
-        return JSONResponse({"ok": False, "errors": ["run_id 非法"]}, status_code=400)
+        return JSONResponse({"ok": False, "errors": ["invalid run_id"]}, status_code=400)
     path = os.path.join(_runs_dir(), run_id, "run.json")
     if not os.path.isfile(path):
-        return JSONResponse({"ok": False, "errors": ["记录不存在"]}, status_code=404)
+        return JSONResponse({"ok": False, "errors": ["no such record"]}, status_code=404)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     pkg = build_review_package(data, run_id)
     if pkg["blocked_reasons"]:
         return JSONResponse({"ok": False, "blocked": pkg["blocked_reasons"],
-                             "errors": ["该记录当前不可审(交接包 blocked)"]},
+                             "errors": ["this record cannot be reviewed right now (the handover package is blocked)"]},
                             status_code=409)
     ref = (data.get("reflection") or {}).get("text") or ""
     return {"ok": True, "run_id": run_id, "reflection_text": ref,
@@ -281,15 +290,19 @@ def expert_read(run_id: str):
 # 训练侧实现细节 —— 专家看不懂(实测:截图里那句红字被当成报错)。这里只做**展示层**
 # 翻译,判据本身仍在 live/reflections.mark_gate_errors 一处,不在这儿重判一遍。
 GATE_WORDS = {
-    "verdict=correct 不应带纠正文本(训练侧会把这段文本当标准答案);"
-    "请清空文本,或改判 partial/incorrect":
-        "选了「认可(approve)」就不要写文本 —— 认可的意思是这段反思原样进训练集。"
-        "想改它请改选「建议修改(edit)」或「不成立(reject)」",
-    "incorrect/partial 必须填写纠正文本":
-        "「建议修改(edit)」和「不成立(reject)」必须写下你的文本,否则这条意见没有内容可留",
-    "缺少 agent/text": "被审的这条记录里没有反思正文,没什么可判的",
-    "verdict 必须是 correct/incorrect/partial 之一":
-        "结论字段不认识(approve / edit / reject 三选一)",
+    "verdict=correct must not carry correction text (the training side would"
+    " treat that text as the reference answer); clear the text, or change the"
+    " verdict to partial/incorrect":
+        "If you picked approve, leave the text empty - approve means this reflection"
+        " goes into the training set exactly as it is. To change it, pick edit or"
+        " reject instead.",
+    "incorrect/partial requires correction text":
+        "edit and reject both need your text, otherwise this opinion has nothing"
+        " to record.",
+    "missing agent/text":
+        "The record under review has no reflection text, so there is nothing to judge.",
+    "verdict must be one of correct/incorrect/partial":
+        "Unrecognised verdict field (pick one of approve / edit / reject).",
 }
 
 
@@ -339,29 +352,29 @@ async def expert_decision(request: Request):
 
     if word not in VERDICT_ALIAS:
         return JSONResponse({"ok": False, "errors": [
-            "结论字段不认识:只能是 approve / edit / reject 三个之一"]},
+            "unrecognised verdict field: it must be one of approve / edit / reject"]},
             status_code=400)
     if not run_id or "/" in run_id or ".." in run_id:
-        return JSONResponse({"ok": False, "errors": ["记录号(run_id)缺失或不合法"]},
+        return JSONResponse({"ok": False, "errors": ["the record id (run_id) is missing or invalid"]},
                             status_code=400)
     if not issue_id or not category:
-        return JSONResponse({"ok": False, "errors": ["要指明你判的是哪条问题、哪个专业"]},
+        return JSONResponse({"ok": False, "errors": ["say which issue and which discipline you are judging"]},
                             status_code=400)
     if len(text) > MAX_TEXT_CHARS:
-        return JSONResponse({"ok": False, "errors": ["文本过长(超过 20 万字),请分段"]},
+        return JSONResponse({"ok": False, "errors": ["text too long (over 200,000 characters); please split it"]},
                             status_code=400)
 
     # 被审记录:正文与主体一律从**磁盘上的记录**取,不接受调用方传入
     from .review_app import _runs_dir
     path = os.path.join(_runs_dir(), run_id, "run.json")
     if not os.path.isfile(path):
-        return JSONResponse({"ok": False, "errors": ["找不到这条记录(可能刚被移走)"]},
+        return JSONResponse({"ok": False, "errors": ["cannot find this record (it may have just been moved away)"]},
                             status_code=404)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     thought = (data.get("reflection") or {}).get("text") or ""
     if not thought.strip():
-        return JSONResponse({"ok": False, "errors": ["这条记录里没有反思正文,没什么可判的"]},
+        return JSONResponse({"ok": False, "errors": ["this record has no reflection text, so there is nothing to judge"]},
                             status_code=409)
     agent = _ai_speaker(data)
 
@@ -443,12 +456,13 @@ def _training_effect(verdict: str, correction: str, thought: str, anchor: dict) 
                                "context": {}})
     sft_errs = validate_sample(built["sample"])
     dpo = built.get("dpo") or {}
-    dpo_errs = validate_dpo(dpo) if dpo else ["该结论不生成偏好对"]
-    return {"sft_output_is": "原始反思" if verdict == "correct" else "专家文本",
+    dpo_errs = validate_dpo(dpo) if dpo else ["this verdict produces no preference pair"]
+    return {"sft_output_is": "the original reflection" if verdict == "correct" else "the expert's text",
             "sft_errors": sft_errs, "dpo_errors": dpo_errs,
             "anchor_required": not bool((anchor or {}).get("sentence_ids")),
-            "note": "rejected 的文本是「核心逻辑为何不成立」,不是已定稿的改写;"
-                    "训练侧要不要把它当 chosen 属于研究侧待拍,见映射页 §三·补"}
+            "note": "the text of a rejected verdict is 'why the core reasoning does not hold',"
+                    " not a finished rewrite; whether the training side treats it as chosen"
+                    " is an open research-side question, see the mapping page, section 3"}
 
 
 def _pool_rows() -> tuple:
@@ -480,11 +494,11 @@ def _pool_state(by_task: dict, run_id: str, issue_id: str, category: str) -> dic
     key = "|".join([run_id, issue_id, category])
     rows = by_task.get(key) or []
     if not rows:
-        return {"state": "最近一次导出里没有这条任务", "n_rows": 0}
+        return {"state": "this task is not in the latest export", "n_rows": 0}
     sft = sum(1 for r in rows if r.get("sft_in"))
     dpo = sum(1 for r in rows if r.get("dpo_in"))
     errs = sorted({e for r in rows for e in (r.get("errors") or [])})
-    return {"state": "进 SFT {} 份 / 进偏好对 {} 份".format(sft, dpo),
+    return {"state": "in SFT {} / in preference pairs {}".format(sft, dpo),
             "n_rows": len(rows), "rejected_reasons": errs}
 
 
@@ -507,13 +521,13 @@ def _pool_state(by_task: dict, run_id: str, issue_id: str, category: str) -> dic
 # - 5010 面无鉴权,`expert_ref` 同机部署下都是 `peer:127.0.0.1`,所以"谁审的"最多到
 #   连接方地址,不是真人身份(与 `_opinion_tally` 同一条现状说明)。
 AUDIT_CHAIN_STEPS = (
-    ("reflection", "Reflection 生成"),
-    ("router", "Router 分类与路由"),
-    ("assignment", "专家分配"),
-    ("expert_review", "专家审核 / 修改"),
-    ("conflict", "冲突追加审核"),
-    ("final_verdict", "最终审核结果"),
-    ("training_pool", "进入训练材料池"),
+    ("reflection", "Reflection generated"),
+    ("router", "Router classification and routing"),
+    ("assignment", "Expert assignment"),
+    ("expert_review", "Expert review / edit"),
+    ("conflict", "Additional conflict review"),
+    ("final_verdict", "Final review outcome"),
+    ("training_pool", "Into the training material pool"),
 )
 
 
@@ -526,16 +540,16 @@ def _audit_reflection(data: dict, run_id: str) -> list:
     if text.strip():
         events.append({
             "step": "reflection", "at": created or None,
-            "who": str((data.get("manifest") or {}).get("judge_model") or "本地模型"),
-            "action": "生成 Reflection",
-            "result": "反思正文 {} 字".format(len(text)),
+            "who": str((data.get("manifest") or {}).get("judge_model") or "local model"),
+            "action": "Reflection generated",
+            "result": "reflection text {} char(s)".format(len(text)),
             "detail": {"quality": (ref.get("quality") or {}).get("status"),
                        "chars": len(text)},
         })
     else:
         events.append({"step": "reflection", "at": None, "who": None,
-                       "action": "生成 Reflection", "result": "记录里没有反思正文",
-                       "missing": "记录缺 reflection.text", "has_data": False})
+                       "action": "Reflection generated", "result": "the record has no reflection text",
+                       "missing": "the record has no reflection.text", "has_data": False})
     return events
 
 
@@ -545,20 +559,20 @@ def _audit_router(data: dict) -> list:
     issues = ro.get("issues") or []
     if not issues and not ro.get("raw"):
         return [{"step": "router", "at": None, "who": None,
-                 "action": "Router 分类与路由", "result": "记录里没有 Router 产物",
-                 "missing": "记录缺 router.issues", "has_data": False}]
+                 "action": "Router classification and routing", "result": "the record has no Router artifact",
+                 "missing": "the record has no router.issues", "has_data": False}]
     eb = ro.get("executed_by") or {}
     cats = {}
     for i in issues:
-        c = str(i.get("expert_category_id") or "(未标)")
+        c = str(i.get("expert_category_id") or "(unlabelled)")
         cats[c] = cats.get(c, 0) + 1
     return [{
         "step": "router", "at": None,
         "who": "{} {}@{}".format(eb.get("source") or "?", eb.get("model") or "?",
                                  eb.get("host") or "local") if eb else None,
-        "action": "Router 分类与路由",
-        "result": "拆出 {} 条问题:{}".format(
-            len(issues), "、".join("{}×{}".format(k, v) for k, v in sorted(cats.items())) or "无"),
+        "action": "Router classification and routing",
+        "result": "{} issue(s) split out: {}".format(
+            len(issues), ", ".join("{}x{}".format(k, v) for k, v in sorted(cats.items())) or "none"),
         "detail": {"n_issues": len(issues), "by_category": cats,
                    "executed_by": eb or None,
                    "expert_pool_version": ro.get("expert_pool_version") or None},
@@ -573,7 +587,7 @@ def _audit_platform_gap(step: str, label: str, why: str) -> dict:
     显示成了绿的,`sample8b15-009` 实测暴露)。
     """
     return {"step": step, "at": None, "who": None, "action": label,
-            "result": "由平台侧负责", "platform_side": True, "has_data": False, "note": why}
+            "result": "the platform side owns this", "platform_side": True, "has_data": False, "note": why}
 
 
 def _audit_expert_events(marks: list, run_id: str) -> list:
@@ -603,11 +617,11 @@ def _audit_expert_events(marks: list, run_id: str) -> list:
             "step": "expert_review",
             "at": m.get("marked_at") or m.get("marked_time") or None,
             "who": str(m.get("operator") or "unattributed"),
-            "action": "提交意见",
+            "action": "opinion submitted",
             "has_data": True,
             "result": "{}:{} {}".format(
-                rv.get("issue_id") or "(无坐标)",
-                rv.get("expert_category_id") or "(未标专业)",
+                rv.get("issue_id") or "(no coordinates)",
+                rv.get("expert_category_id") or "(no discipline)",
                 VERDICT_REVERSE.get(verdict, verdict)),
             "detail": {
                 "issue_id": rv.get("issue_id"),
@@ -640,16 +654,16 @@ def _audit_pool_events(run_id: str) -> list:
         # 没进池 = 这条 Run 的池状态**未知**(报告可能是旧的、或这条 Run 从没导出过),
         # 不是"没进池"这个结论 —— 所以 has_data=False,chain 上显示未覆盖。
         return [{"step": "training_pool", "at": None, "who": None,
-                 "action": "进入训练材料池",
-                 "result": "最近一次导出里没有这条 Run 的任务",
+                 "action": "Into the training material pool",
+                 "result": "no task of this run is in the latest export",
                  "detail": {"report_generated_at": generated}, "has_data": False,
-                 "note": "报告只在跑 lora_prep --export 时重写,可能是还没导出过"}]
+                 "note": "the report is only rewritten when lora_prep --export runs; it may never have been exported"}]
     sft = sum(1 for r in rows if r.get("sft_in"))
     dpo = sum(1 for r in rows if r.get("dpo_in"))
     ev = {
         "step": "training_pool", "at": generated, "who": "lora_prep --export",
-        "action": "进入训练材料池",
-        "result": "{} 条任务:SFT {} 份 / 偏好对 {} 份".format(len(rows), sft, dpo),
+        "action": "Into the training material pool",
+        "result": "{} task(s): SFT {} / preference pairs {}".format(len(rows), sft, dpo),
         "detail": {"report_generated_at": generated, "n_tasks": len(rows),
                    "sft_in": sft, "dpo_in": dpo,
                    "rejected_reasons": sorted({e for r in rows
@@ -677,12 +691,12 @@ def expert_audit_trail(run_id: str = ""):
 
     run_id = str(run_id or "").strip()
     if not run_id or "/" in run_id or ".." in run_id:
-        return JSONResponse({"ok": False, "errors": ["run_id 非法"]}, status_code=400)
+        return JSONResponse({"ok": False, "errors": ["invalid run_id"]}, status_code=400)
 
     from .review_app import _runs_dir
     path = os.path.join(_runs_dir(), run_id, "run.json")
     if not os.path.isfile(path):
-        return JSONResponse({"ok": False, "errors": ["记录不存在"]}, status_code=404)
+        return JSONResponse({"ok": False, "errors": ["no such record"]}, status_code=404)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -690,9 +704,10 @@ def expert_audit_trail(run_id: str = ""):
     events += _audit_reflection(data, run_id)
     events += _audit_router(data)
     events.append(_audit_platform_gap(
-        "assignment", "专家分配",
-        "分配由平台侧执行(本平台只到「建单候选」为止,见 /api/expert/queue 的 note);"
-        "平台写回标记之后才能看到结果"))
+        "assignment", "Expert assignment",
+        "assignment is executed by the platform (this side stops at 'candidates for"
+        " opening a task', see the note on /api/expert/queue); the result only"
+        " becomes visible after the platform writes the marks back"))
     events += _audit_expert_events(load_marks(), run_id)
 
     # 冲突:从产物只能看出"同任务多份结论不一致",看不出平台有没有真开争议轮
@@ -704,17 +719,20 @@ def expert_audit_trail(run_id: str = ""):
     if disputed:
         events.append({
             "step": "conflict", "at": None, "who": None,
-            "action": "冲突追加审核",
-            "result": "{} 条任务两份结论互斥 → 需追加未参与前一轮的专家".format(len(disputed)),
+            "action": "Additional conflict review",
+            "result": "{} task(s) carry two mutually exclusive verdicts -> experts who did not sit in"
+                         " the previous round must be added".format(len(disputed)),
             "detail": {"disputed_tasks": ["|".join(k) for k in disputed]},
-            "undecidable": "是否真的开了争议轮、追加了谁 —— 平台侧负责,产物里看不到",
+            "undecidable": "whether a dispute round was really opened, and who was added - the platform side"
+                            " owns this, it cannot be seen in the artifacts",
         })
     else:
         events.append({"step": "conflict", "at": None, "who": None,
-                       "action": "冲突追加审核",
-                       "result": "判定不了:当前不足两份互斥意见",
-                       "undecidable": "冲突要两份结论互斥才能判;不足两份时"
-                                      "「没有冲突」与「还没审」在产物里长得一样",
+                       "action": "Additional conflict review",
+                       "result": "cannot be determined: fewer than two mutually exclusive opinions right now",
+                       "undecidable": "a conflict can only be judged from two mutually exclusive verdicts;"
+                                      " with fewer than two, 'no conflict' and 'not reviewed"
+                                      " yet' look identical in the artifacts",
                        "has_data": False})
 
     n_tasks = len(set(
@@ -724,17 +742,19 @@ def expert_audit_trail(run_id: str = ""):
     decided = tally["opinions_counted"]
     fv = {
         "step": "final_verdict", "at": None, "who": None,
-        "action": "最终审核结果",
-        "result": "已收 {} 份计票意见,涉及 {} 条任务".format(decided, n_tasks),
+        "action": "Final review outcome",
+        "result": "{} counted opinion(s) received, covering {} task(s)".format(decided, n_tasks),
         "detail": {"opinions_counted": decided, "n_tasks_with_marks": n_tasks,
                    "excluded": tally["excluded"]},
-        "note": "多数裁决与最终定稿由平台侧负责;这里只报**已写回的**意见数",
+        "note": "majority voting and the final sign-off belong to the platform side; this only"
+              " reports how many opinions have been written back",
     }
     if decided == 0:
         # 一份计票意见都没有时,"最终结果"是**推不出来**的,不能显示成"0 份"就算数
-        fv["result"] = "判定不了:还没有写回的计票意见"
+        fv["result"] = "cannot be determined: no counted opinion has been written back yet"
         fv["has_data"] = False
-        fv["undecidable"] = "产品里没有任何 origin=expert 的意见写回,谈不上最终结果"
+        fv["undecidable"] = ("no origin=expert opinion has been written back into the"
+                             " artifacts, so there is no final outcome to speak of")
     events.append(fv)
     events += _audit_pool_events(run_id)
 
@@ -763,31 +783,36 @@ def expert_audit_trail(run_id: str = ""):
         "events": events,
         "n_events": len(events),
         "boundaries": {
-            "what_this_shows": "本平台产物里**能看到的**那几段:Reflection 生成、Router 分类、"
-                              "专家提交的每一份意见、任务是否进训练材料池",
-            "what_this_cannot_show": "专家分配/争议轮/多数裁决在平台侧执行,产物里推不出来 —— "
-                                     "这几步如实标 platform_side,不编造时间与责任人",
-            "who_note": "5010 面无鉴权,operator 是服务端观测到的连接方地址(同机即 "
-                        "peer:127.0.0.1),不是真人身份",
+            "what_this_shows": "the parts that **can be seen** in this side's artifacts:"
+                              " Reflection generation, Router classification, every opinion"
+                              " an expert submitted, and whether a task entered the training"
+                              " material pool",
+            "what_this_cannot_show": "expert assignment / the dispute round / majority voting are"
+                                     " executed on the platform side and cannot be derived from"
+                                     " the artifacts - those steps are honestly marked"
+                                     " platform_side, with no invented time or owner",
+            "who_note": "the 5010 face has no authentication, so operator is the peer address"
+                        " observed by the server (peer:127.0.0.1 on the same machine),"
+                        " not a real person's identity",
         },
     }
 
 
 def _review_state(n: int, n_distinct_verdicts: int) -> str:
-    """任务级审核状态(0904doc 05 §一 要求队列显示"当前审核状态")。
+    """任务级审核状态(0904doc 05 §一 要求队列显示"current review status")。
 
     `n` = 该任务上**不同主体**的当前意见数(折算规则与理由见 `_opinion_tally`)。
     只给状态,不给结论分布 —— 首轮两份意见互不可见(《补充规范》§3)。这里能说的
     上限是"两份一致/不一致",这正是 04 §八.3 判定 Disputed 所需的最小信息。
     """
     if n == 0:
-        return "待领取(0 份意见)"
+        return "unclaimed (0 opinions)"
     if n == 1:
-        return "首轮进行中(1/2 份)"
+        return "first round in progress (1/2)"
     if n == 2:
-        return ("首轮齐·两份结论一致" if n_distinct_verdicts <= 1
-                else "首轮齐·两份互斥 → Disputed,需追加 3 位")
-    return "争议轮(累计 {} 份)".format(n)
+        return ("first round complete - the two verdicts agree" if n_distinct_verdicts <= 1
+                else "first round complete - the two verdicts conflict -> Disputed, 3 more experts needed")
+    return "dispute round ({} opinions in total)".format(n)
 
 
 # 队列排序档(数字小的排前面)。为什么按状态而不是按时间:04 §八 的活儿分三种
@@ -823,7 +848,7 @@ def expert_marks():
     by_category = {}
     for m in marks:
         rv = m.get("review") if isinstance(m.get("review"), dict) else {}
-        cat = rv.get("expert_category_id") or "(未标专业)"
+        cat = rv.get("expert_category_id") or "(no discipline)"
         by_category[cat] = by_category.get(cat, 0) + 1
     by_task, verdicts_by_task = tally["by_task"], tally["verdicts_by_task"]
     disputed = sum(1 for k, v in by_task.items()
@@ -838,7 +863,7 @@ def expert_marks():
                                     key=lambda kv: (-kv[1], kv[0]))[:20],
         "tasks_with_two_or_more": sum(1 for v in by_task.values() if v >= 2),
         "tasks_disputed": disputed,
-        "visibility": "本接口只给条数;结论与文本不在响应里"}
+        "visibility": "this endpoint only returns counts; verdicts and text are not in the response"}
 
 
 _EXPERT_PAGE = r"""<!DOCTYPE html>
@@ -898,7 +923,7 @@ _EXPERT_PAGE = r"""<!DOCTYPE html>
   .task .st b { color: #cf222e; }
   /* 嵌入版式:与 review_app 的 `body.embed` 同一套判定(`/embed/` 路径或 ?embed=1`)。
      去掉大标题与本页自己的返回链接 —— 在宿主 iframe 里它们是多余的,而且那个
-     "← 回到只读面"会整页跳走(2026-10-09 修:以前嵌进去就没有回来的路)。 */
+     "← back to the read-only view"会整页跳走(2026-10-09 修:以前嵌进去就没有回来的路)。 */
   body.embed { background:#fff; }
   body.embed header { padding:9px 12px; }
   body.embed header h1 { display:none; }
@@ -959,7 +984,7 @@ if (EMBED) { document.body.classList.add("embed"); }
 (function () {
   var a = document.getElementById("backlink");
   if (!a) return;
-  var target = "/review", label = "← 回到只读面(看记录)";
+  var target = "/review", label = "← back to the read-only view (records)";
   if (FROM === "embed") { target = "/embed/review"; }
   if (WANT_RUN) { target += (target.indexOf("?") >= 0 ? "&" : "?") + "run=" + encodeURIComponent(WANT_RUN); }
   a.href = target;
@@ -970,19 +995,19 @@ function api(u, o) { return fetch(u, o).then(function (r) { return r.json(); });
 function countsLine(m) {
   if (!m) return "";
   var ex = m.excluded || {}, why = [];
-  if (ex.no_coordinates) why.push(ex.no_coordinates + " 行没有任务坐标");
-  if (ex.non_expert_origin) why.push(ex.non_expert_origin + " 行来源不是专家(自测/模拟)");
-  if (ex.superseded) why.push(ex.superseded + " 行是被新版本取代的旧版");
-  return " · 盘上标记 " + m.total + " 行,计为意见 " + m.opinions_counted +
-    " 份(按提交主体折,同一主体的修订只算一份),其中 " + m.tasks_with_two_or_more +
-    " 个任务已集齐两位" + (why.length ? (";不计入:" + why.join("、")) : "");
+  if (ex.no_coordinates) why.push(ex.no_coordinates + " row(s) without task coordinates");
+  if (ex.non_expert_origin) why.push(ex.non_expert_origin + " row(s) whose origin is not an expert (self-test/simulated)");
+  if (ex.superseded) why.push(ex.superseded + " row(s) superseded by a newer version");
+  return " · on-disk marks " + m.total + " row(s), counted as opinions " + m.opinions_counted +
+    " submission(s) (folded by submitter; revisions by the same submitter count once), of which " + m.tasks_with_two_or_more +
+    " task(s) already have both reviewers" + (why.length ? ("; not counted:" + why.join("、")) : "");
 }
 
 var TASKS = [], RISK_ORDER = { high: 0, medium: 1, low: 2 }, POOL_AT = "";
 
 api("/api/expert/queue?limit=10").then(function (q) {
-  POOL_AT = q.pool_generated_at ? ("(上次导出 " + q.pool_generated_at + ")")
-                               : "(还没有导出产物)";
+  POOL_AT = q.pool_generated_at ? ("(last export " + q.pool_generated_at + ")")
+                               : "(no export artifact yet)";
   TASKS = q.tasks.slice().sort(function (a, b) {
     // 服务端已经按同一式子排过(见 expert_queue 末尾),这里只是重渲染时的稳定性兜底
     var s = (a.state_rank == null ? 9 : a.state_rank) - (b.state_rank == null ? 9 : b.state_rank);
@@ -991,15 +1016,15 @@ api("/api/expert/queue?limit=10").then(function (q) {
     return r !== 0 ? r : (a.run_id < b.run_id ? -1 : 1);
   });
   document.getElementById("summary").textContent =
-    "本次扫描 " + q.n_runs_scanned + "/" + q.total_review_records +
-    " 条记录,展开可建单任务 " + q.n_tasks + " 条" +
-    (q.records_not_scanned ? "(还有 " + q.records_not_scanned + " 条记录没扫到)" : "(已扫完)") +
-    " · 人工分流 " + q.n_manual_triage +
-    " 条 · 不可审 " + q.n_blocked + " 条";
+    "this scan covered " + q.n_runs_scanned + "/" + q.total_review_records +
+    " record(s); expand to create review tasks " + q.n_tasks + " items" +
+    (q.records_not_scanned ? "(another " + q.records_not_scanned + " record(s) not scanned)" : "(fully scanned)") +
+    " · manual triage " + q.n_manual_triage +
+    " item(s) · not reviewable " + q.n_blocked + " items";
   if (!q.tasks.length) {
     document.getElementById("queue").innerHTML =
-      "<div class='task err'>队列为空:扫过的这些记录里没有「问题+专业」的建单候选" +
-      "(看上面的人工分流与不可审计数)。</div>";
+      "<div class='task err'>queue is empty: none of the scanned records offers an 'issue + specialty' task candidate" +
+      "(see the manual-triage and not-reviewable counts above).</div>";
   }
   drawQueue();
   document.getElementById("risk").onchange = drawQueue;
@@ -1016,8 +1041,8 @@ api("/api/expert/queue?limit=10").then(function (q) {
     } else {
       var box = document.getElementById("queue");
       box.insertAdjacentHTML("afterbegin",
-        "<div class='task err'>指定记录 " + esc(WANT_RUN) +
-        " 不在本次扫描窗口内(队列按 mtime 只扫最近若干条),下面列出的是窗口内的任务。</div>");
+        "<div class='task err'>the requested record " + esc(WANT_RUN) +
+        " is outside this scan window (the queue only scans the most recent records by mtime); the tasks listed below are inside the window.</div>");
     }
   }
   return api("/api/expert/marks");
@@ -1039,15 +1064,15 @@ function drawQueue() {
     d.innerHTML = "<div><span class='risktag risk-" + esc(t.risk) + "'>" + esc(t.risk) +
                   "</span> " + esc(t.summary) + "</div><div class='s'>" +
       esc(t.expert_category_id) + " · " + esc(t.run_id) + " / " + esc(t.issue_id) +
-      // 05 §一:未点开也要显示"当前审核状态";05 §四:Disputed 要看得出来
-                  "</div><div class='s st'>状态:" + (
+      // 05 §一:未点开也要显示"current review status";05 §四:Disputed 要看得出来
+                  "</div><div class='s st'>status:" + (
       String(t.review_state || "?").indexOf("Disputed") >= 0
         ? "<b>" + esc(t.review_state) + "</b>" : esc(t.review_state || "?")) + "</div>";
     d.onclick = function () { pick(t, d); };
     box.appendChild(d);
   });
   if (!box.children.length) {
-    box.innerHTML = "<div class='task s'>这一档没有任务,换「全部」看看。</div>";
+    box.innerHTML = "<div class='task s'>no tasks in this bucket; try 'all'.</div>";
   }
 }
 
@@ -1064,17 +1089,17 @@ function pick(t, node) {
     if (!r.ok) { document.getElementById("body").innerHTML =
       "<span class='err'>" + esc((r.errors || []).join("; ")) + "</span>";
       // 这两个占位符不能停在"…":读不到正文是终态,不是还在加载
-      if (chars) chars.textContent = "—(没读到正文)";
+      if (chars) chars.textContent = "— (body not read)";
       if (anch) anch.textContent = "—"; return; }
     FULL = r.reflection_text;
-    document.getElementById("chars").textContent = r.reflection_chars + " 字";
+    document.getElementById("chars").textContent = r.reflection_chars + " chars";
     // 默认不给整篇反思:《HCI 增量需求》§二"默认展示该专家需要审核的具体问题,
     // 而不是整篇 Reflection"。整篇与 Full Context 都放在点了之后才出现。
     document.getElementById("body").innerHTML =
-      "<div class='meta'>正文按 05 §二 默认收起:下面两个按钮按需展开(全文 " +
-      r.reflection_chars + " 字)。</div>" +
-      "<button id='reflbtn'>读整篇反思原文</button>" +
-      "<button id='ctxbtn'>展开自然语言 Full Context</button>" +
+      "<div class='meta'>the body is collapsed by default per 05 §2: the two buttons below expand it on demand (full text " +
+      r.reflection_chars + " chars).</div>" +
+      "<button id='reflbtn'>read the full reflection</button>" +
+      "<button id='ctxbtn'>expand the natural-language Full Context</button>" +
       "<pre id='refl' style='display:none'></pre><pre id='ctx' style='display:none'></pre>";
     document.getElementById("reflbtn").onclick = function () {
       document.getElementById("refl").textContent = FULL;
@@ -1086,7 +1111,7 @@ function pick(t, node) {
     };
     // 专家改文落在哪几句:面板把 anchor 原样带回去,平台侧才需要它(见映射页 §三·补 ①)
     document.getElementById("anch").textContent =
-      (t.anchor.sentence_ids || []).join(", ") || "(交接包没给句子定位)";
+      (t.anchor.sentence_ids || []).join(", ") || "(the handover bundle gave no sentence anchors)";
   });
 }
 
@@ -1094,34 +1119,34 @@ function renderForm() {
   var t = TASK, w = document.getElementById("work");
   var pl = t.pool || {};
   w.innerHTML =
-    "<h2>问题 " + esc(t.issue_id) + " · 专业 " + esc(t.expert_category_id) + "</h2>" +
+    "<h2>Issue " + esc(t.issue_id) + " · specialty " + esc(t.expert_category_id) + "</h2>" +
     "<div>" + esc(t.summary) + "</div>" +
-    "<div class='meta'>路由理由:" + esc(t.routing_reason) + "</div>" +
+    "<div class='meta'>routing reason:" + esc(t.routing_reason) + "</div>" +
     "<div class='quote'>" + esc(t.evidence_quote) + "</div>" +
-    "<div class='meta'>审核状态:" + esc(t.review_state || "?") +
-      " · 训练材料池:" + esc(pl.state || "?") + POOL_AT + "</div>" +
-    "<div class='meta'>反思正文:<span id='chars'>…</span> · 你负责的原文定位 <code id='anch'>…</code></div>" +
-    "<div id='body'><div class='meta'>正文加载中…</div></div>" +
-    "<h3>你的结论(必填)</h3>" +
+    "<div class='meta'>review status:" + esc(t.review_state || "?") +
+      " · training-material pool:" + esc(pl.state || "?") + POOL_AT + "</div>" +
+    "<div class='meta'>reflection body:<span id='chars'>…</span> · the source sentences you own <code id='anch'>…</code></div>" +
+    "<div id='body'><div class='meta'>loading body…</div></div>" +
+    "<h3>Your verdict (required)</h3>" +
     "<div>" +
-      "<button data-v='approve'>认可(approve)</button>" +
-      "<button data-v='edit'>建议修改(edit)</button>" +
-      "<button data-v='reject'>不成立(reject)</button>" +
+      "<button data-v='approve'>approve</button>" +
+      "<button data-v='edit'>suggest edits (edit)</button>" +
+      "<button data-v='reject'>reject</button>" +
       "<span class='meta' id='vw'></span>" +
     "</div>" +
-    "<h3 id='th'>文本(先在上方选一个结论)</h3>" +
-    "<textarea id='text' disabled placeholder='选完结论这里才解锁'></textarea>" +
-    "<div class='warn' id='seg' style='display:none'>只写<b>你负责的这几句</b>的改文就对了:"
-      + "《HCI 增量需求》§二明确 Edit「仅修改自己负责的问题 / 反思片段,不直接重写整篇 Reflection」。"
-      + "<br>但要提前说清后果:导出侧现在还<b>不会</b>把片段合回整篇,所以这份改文会进审核材料、"
-      + "<b>暂时进不了偏好对</b>(量纲门)。这是导出侧的待办,不是你写错了,也不需要你改成整篇。</div>" +
-    "<h3>为什么这么判(选填,不影响训练集)</h3>" +
-    "<input type='text' id='reason' placeholder='一句理由即可;审核材料里会保留'>" +
+    "<h3 id='th'>Text (pick a verdict above first)</h3>" +
+    "<textarea id='text' disabled placeholder='unlocks once you pick a verdict'></textarea>" +
+    "<div class='warn' id='seg' style='display:none'>just write the revised wording for <b>the sentences you own</b>:"
+      + "HCI incremental requirements §2 states that Edit means 'only modify the issue / reflection fragment you own; do not rewrite the whole Reflection'."
+      + "<br>but be clear about the consequence: the export side does <b>not</b> merge fragments back into the full text yet, so this revision enters the review material"
+      + " and <b>not yet into preference pairs</b> (dimension gate). That is an export-side TODO, not your mistake, and you do not need to rewrite the whole piece.</div>" +
+    "<h3>Why (optional; does not affect the training set)</h3>" +
+    "<input type='text' id='reason' placeholder='one sentence is enough; kept in the review material'>" +
     "<div style='margin-top:10px'>" +
-      "<button id='send' style='background:#1f883d;color:#fff'>提交这份意见</button>" +
+      "<button id='send' style='background:#1f883d;color:#fff'>submit this opinion</button>" +
       "<span class='meta' id='res'></span>" +
     "</div>" +
-    "<div class='meta'>提交主体由服务端记录(你填不了它);同一任务再提交会追加为第二版,旧版保留。</div>";
+    "<div class='meta'>the submitter is recorded server-side (you cannot set it); submitting again on the same task appends a second version and keeps the old one.</div>";
   Array.prototype.forEach.call(w.querySelectorAll("button[data-v]"), function (b) {
     b.onclick = function () {
       Array.prototype.forEach.call(w.querySelectorAll("button[data-v]"), function (n) { n.classList.remove("sel"); });
@@ -1129,22 +1154,22 @@ function renderForm() {
       t._v = b.dataset.v;
       var box = document.getElementById("text"), th = document.getElementById("th");
       var seg = document.getElementById("seg");
-      // approve 时把文本框**锁住并清空**:实测过"切回认可、文本框只是隐藏、值还在"
+      // approve 时把文本框**锁住并清空**:实测过"switching back to approve only hides the textbox; the value stays"
       // 会撞上门(那条门是对的),但让专家撞见自己的残留输入是界面该负责的事。
       if (b.dataset.v === "approve") {
         box.value = ""; box.disabled = true;
-        th.textContent = "文本(认可不需要写:这段反思原样进训练集)";
+        th.textContent = "Text (not needed for approve: this reflection enters the training set as-is)";
         seg.style.display = "none";
       } else {
         box.disabled = false;
-        th.textContent = b.dataset.v === "edit" ? "你建议的改文(只改你负责的片段,必填)"
-                                               : "为什么这条不成立(必填)";
+        th.textContent = b.dataset.v === "edit" ? "Your suggested revision (only the fragment you own; required)"
+                                               : "Why this does not hold (required)";
         box.placeholder = b.dataset.v === "edit"
-          ? "照上面「原文定位」那几句改就行,不用重写整篇反思"
-          : "写清核心逻辑哪里错(这段文字进审核材料,不当标准答案)";
+          ? "just revise the sentences listed under 'source anchors' above; no need to rewrite the whole reflection"
+          : "say clearly where the core logic goes wrong (this text enters the review material, not as ground truth)";
         seg.style.display = b.dataset.v === "edit" ? "block" : "none";
       }
-      document.getElementById("vw").textContent = "已选:" + b.textContent;
+      document.getElementById("vw").textContent = "selected:" + b.textContent;
     };
   });
   document.getElementById("send").onclick = send;
@@ -1152,19 +1177,19 @@ function renderForm() {
 
 function send() {
   var t = TASK, res = document.getElementById("res");
-  if (!t._v) { res.innerHTML = "<span class='err'>先选一个结论</span>"; return; }
+  if (!t._v) { res.innerHTML = "<span class='err'>pick a verdict first</span>"; return; }
   var body = { run_id: t.run_id, issue_id: t.issue_id, expert_category_id: t.expert_category_id,
                verdict: t._v, text: document.getElementById("text").value,
                reason: document.getElementById("reason").value, anchor: t.anchor };
-  res.textContent = "提交中…";
+  res.textContent = "submitting…";
   api("/api/expert/decision", { method: "POST", headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify(body) }).then(function (r) {
     if (!r.ok) { res.innerHTML = "<span class='err'>" + esc((r.errors || []).join("; ")) + "</span>"; return; }
     var e = r.training_effect || {};
-    res.innerHTML = "<span class='ok'>已写入第 " + r.mark.review.version + " 版</span>" +
-      "<div class='meta'>训练侧取文:" + esc(e.sft_output_is || "?") +
-      " · SFT 门问题 " + (e.sft_errors || []).length +
-      " · 偏好对问题 " + esc((e.dpo_errors || []).join("; ")) + "</div>";
+    res.innerHTML = "<span class='ok'>saved as version " + r.mark.review.version + "</span>" +
+      "<div class='meta'>training-side text source:" + esc(e.sft_output_is || "?") +
+      " · SFT-gate issue " + (e.sft_errors || []).length +
+      " · preference-pair issue " + esc((e.dpo_errors || []).join("; ")) + "</div>";
     api("/api/expert/marks").then(function (m) {
       document.getElementById("counts").textContent = countsLine(m);
     });
@@ -1183,6 +1208,6 @@ def expert_index():
 @router.get("/embed/expert", response_class=HTMLResponse)
 def expert_embed():
     """`/review/expert` 的嵌入版式:同一份 HTML,前端按 `/embed/` 路径(或 `?embed=1`)
-    切到 `body.embed` —— 去掉大标题与本页自己的"← 回到只读面"链接(2026-10-09 补;
+    切到 `body.embed` —— 去掉大标题与本页自己的"← back to the read-only view"链接(2026-10-09 补;
     以前这里只是别名,嵌进宿主 iframe 后那个返回链接会整页跳走、回不到原记录)。"""
     return HTMLResponse(_EXPERT_PAGE)

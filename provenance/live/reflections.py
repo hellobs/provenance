@@ -92,18 +92,19 @@ def mark_gate_errors(agent: str, text: str, verdict: str,
     """
     errs = []
     if not agent or not text:
-        errs.append("缺少 agent/text")
+        errs.append("missing agent/text")
     if verdict not in VALID_VERDICTS:
-        errs.append("verdict 必须是 correct/incorrect/partial 之一")
+        errs.append("verdict must be one of correct/incorrect/partial")
     if verdict in ("incorrect", "partial") and not correction:
-        errs.append("incorrect/partial 必须填写纠正文本")
+        errs.append("incorrect/partial requires correction text")
     # 反向也要拦(2026-10-07):correct 却带着文本,历史写法会让训练侧把那段文本当
     # 标准答案(output = correction if correction else thought),等于用一条"判定
     # 正确"的记录教模型"其实该改"。面板切回复"正确"时文本框只是隐藏、值还在,
     # 所以这条是真实可达路径,不是假想输入。
     if verdict == "correct" and correction:
-        errs.append("verdict=correct 不应带纠正文本(训练侧会把这段文本当标准答案);"
-                    "请清空文本,或改判 partial/incorrect")
+        errs.append("verdict=correct must not carry correction text (the training side"
+                    " would treat that text as the reference answer); clear the text,"
+                    " or change the verdict to partial/incorrect")
     return errs
 
 

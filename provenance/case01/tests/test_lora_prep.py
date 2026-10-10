@@ -233,7 +233,7 @@ class TestHTTPRoundTrip(unittest.TestCase):
                 assert r.status_code == 200, r.text
                 body = r.json()
                 assert body.get("ok") is False, body
-                assert any("纠正文本" in e for e in body.get("errors") or []), body
+                assert any("correction text" in e for e in body.get("errors") or []), body
                 assert not os.path.exists(refl.MARKS_PATH), "被拒的标记仍写了盘"
             finally:
                 refl.MARKS_PATH = old_marks

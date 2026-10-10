@@ -97,7 +97,7 @@ class TestFanout:
         errors = []
         fanout = Fanout([ConsoleVisualizer()], on_error=lambda n, e: errors.append(str(e)))
         fanout.emit({"type": "nonsense"})
-        assert errors and "未知事件类型" in errors[0]
+        assert errors and "unknown event type" in errors[0]
 
 
 class TestTownPlugin:

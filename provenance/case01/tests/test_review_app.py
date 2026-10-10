@@ -195,23 +195,23 @@ def test_dropdown_has_no_group_titles():
     assert "optgroup" not in html
     assert "正在跑的这一次" not in html
     assert "mavis 新架构（成品三线）" not in html
-    assert "● 实时 ｜" in html, "实时那条仍要在(运行时由 /api/review/live 决定显不显示)"
+    assert "● live |" in html, "实时那条仍要在(运行时由 /api/review/live 决定显不显示)"
 
 
 def test_router_pane_shows_risk_note_and_question_flag():
     """问题分流那一块:风险单独一段,"仍是疑问句"要显式标出来(不许静默)。"""
     html = _client().get("/review").text
-    assert "风险 / 错在哪" in html
-    assert "仍是疑问句" in html
+    assert "Risk / what is wrong" in html
+    assert "still a question" in html
 
 
 def test_overview_shows_branch_source_and_consistency():
     """概览必须显示"分支来源"与"T0 立场一致性"(预设分支的坑,不能让看的人自己发现)。"""
     html = _client().get("/review").text
-    assert "分支来源" in html and "实验设计预设" in html
-    assert "T0 立场一致性" in html
+    assert "Branch source" in html and "experiment preset" in html
+    assert "T0 stance consistency" in html
     # 旧记录没有这两个字段时显示"未校验"/"—",不能报错
-    assert "未校验" in html
+    assert "unverified" in html
 
 
 def test_no_filler_phrases_in_the_panel():
@@ -219,13 +219,13 @@ def test_no_filler_phrases_in_the_panel():
     html = _client().get("/review").text
     assert "反思/问题分流跑完才有" not in html
     assert "那时才有反思与问题分流" not in html
-    assert "跑完后才有" in html, "空状态仍需一句极短说明(不许静默留白)"
+    assert "only after the run finishes" in html, "空状态仍需一句极短说明(不许静默留白)"
 
 
 def test_end_of_run_notifications_are_wired():
     """用户明确要求"推演结束后要有提示":小镇页有结束横幅,面板有"已生成"绿条。"""
     page = _client().get("/review").text
-    assert "成品记录已生成(含反思与问题分流),已切到这一条" in page
+    assert "The finished record is ready (with reflection and routed issues); switched to it." in page
     assert "note ok" in page
     # 小镇页(index.html + main_script.html)那一侧由 test_vizkit_live 里查:
     # showDoneBanner / #done-banner
@@ -234,7 +234,7 @@ def test_end_of_run_notifications_are_wired():
 def test_live_mode_is_wired_into_the_page():
     """页面里要有实时那条下拉项与轮询(用户要"小镇与结果同步看全程")。"""
     html = _client().get("/review").text
-    for piece in ("/api/review/live", "loadLive", "__live__", "● 实时"):
+    for piece in ("/api/review/live", "loadLive", "__live__", "● live"):
         assert piece in html, piece
 
 
@@ -416,7 +416,7 @@ def test_embed_review_has_protocol_and_deeplink_failure_states():
     """嵌入面:双向协议 + 深链失败态文案(2026-09-23:不许静默回落到另一条记录)。"""
     page = _client().get("/embed/review").text
     for kw in ("mavis-case01-review", "mavis:select-run", "mavis:set-tab",
-               "深链指定的 run 不存在", "深链页签"):
+               "the deep-linked run does not exist", "Deep-linked tab="):
         assert kw in page, kw
 
 

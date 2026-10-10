@@ -99,7 +99,7 @@ class ExpertPanelCase(unittest.TestCase):
         bad = self.c.post("/api/expert/decision",
                           json=self.payload(verdict="correct"))
         self.assertEqual(bad.status_code, 400)
-        self.assertIn("结论字段不认识", bad.json()["errors"][0])
+        self.assertIn("unrecognised verdict field", bad.json()["errors"][0])
 
     def test_approve_with_text_hits_the_same_gate_as_the_mark_endpoint(self):
         """两个口共用 `mark_gate_errors`,所以对同一份输入给同一个结论。
@@ -109,7 +109,7 @@ class ExpertPanelCase(unittest.TestCase):
         r = self.c.post("/api/expert/decision",
                         json=self.payload(text="顺手写的一句改文"))
         self.assertEqual(r.status_code, 400, r.text)
-        self.assertIn("就不要写文本", r.json()["errors"][0])
+        self.assertIn("leave the text empty", r.json()["errors"][0])
         self.assertFalse(os.path.exists(os.path.join(self.td, "reflection_marks.json")),
                          "被拒的意见不该留下半个文件")
 
@@ -146,7 +146,7 @@ class ExpertPanelCase(unittest.TestCase):
         body = json.dumps(self.c.get("/api/expert/marks").json(), ensure_ascii=False)
         for leak in ("核心逻辑不成立", REFL[:12], "incorrect", "reject"):
             self.assertNotIn(leak, body, "计数接口漏出了意见内容:{}".format(leak))
-        self.assertIn("只给条数", body)
+        self.assertIn("only returns counts", body)
 
     def test_panel_opinion_reaches_the_training_export(self):
         """面板写的意见经 lora_prep 导出真的成对(SFT + DPO),不只是写进文件。"""

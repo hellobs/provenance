@@ -79,7 +79,7 @@ class TestFanout:
         errors = []
         fanout = Fanout([ConsoleVisualizer()], on_error=lambda n, e: errors.append(str(e)))
         fanout.emit({"type": "nonsense"})
-        assert errors and "未知事件类型" in errors[0]
+        assert errors and "unknown event type" in errors[0]
 
     def test_default_on_error_logs_instead_of_silence(self, caplog):
         """默认(不传 on_error)必须留痕:插件炸了不能既没输出也没日志。"""

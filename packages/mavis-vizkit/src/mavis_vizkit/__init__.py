@@ -67,7 +67,7 @@ class Fanout:
     def emit(self, event: dict) -> None:
         etype = event.get("type")
         if etype not in EVENT_TYPES:
-            self.on_error("fanout", ValueError("未知事件类型: {}".format(etype)))
+            self.on_error("fanout", ValueError("unknown event type: {}".format(etype)))
             return
         for v in self.visualizers:
             try:

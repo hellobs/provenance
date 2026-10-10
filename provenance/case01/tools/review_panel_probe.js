@@ -151,13 +151,13 @@ process.on('unhandledRejection', (e) => {
   const checks = [
     { name: '专家面 ?tab=injector 不许渲染注入器面板',
       opts: { search: '?tab=injector', pathname: '/embed/review' },
-      want: '嵌入面没有该页签', forbid: '无注入器记录' },
+      want: 'The embed view does not serve that tab', forbid: 'no injection record' },
     { name: '专家面 ?tab=nope 要有黄条说明',
       opts: { search: '?tab=nope', pathname: '/embed/review' },
-      want: '不存在', forbid: '' },
+      want: 'does not exist', forbid: '' },
     { name: '内部面 ?tab=states 正常切换',
       opts: { search: '?tab=states', pathname: '/review' },
-      want: '', forbid: '深链页签' },
+      want: '', forbid: 'Deep-linked tab=' },
   ];
   console.log('\n-- 深链页签行为 --');
   for (const c of checks) {
@@ -168,7 +168,7 @@ process.on('unhandledRejection', (e) => {
     const problems = [];
     if (c.want && !r.main.includes(c.want)) problems.push('缺少说明:' + c.want);
     if (c.forbid && r.main.includes(c.forbid)) problems.push('不该出现:' + c.forbid);
-    if (c.opts.pathname.startsWith('/embed/') && r.nav.includes('注入器')) problems.push('导航里有注入器页签');
+    if (c.opts.pathname.startsWith('/embed/') && r.nav.includes('Injector')) problems.push('导航里有注入器页签');
     if (problems.length) { console.log(`  FAIL ${c.name}: ${problems.join('; ')}`); bad++; }
     else { console.log(`  ok   ${c.name}`); }
   }
@@ -183,11 +183,11 @@ process.on('unhandledRejection', (e) => {
     vm.runInNewContext(m[1] + '\n;globalThis.__to = { PANES };', sb);
     const ov = sb.__to.PANES.overview;
     const labelCases = [
-      ['preset', '实验设计预设'],
-      ['judge', '由 AI 回答判定'],
-      ['judge-failed', '判定失败'],
-      ['rules', '规则判定'],
-      ['unknown', '来源未记录'],
+      ['preset', 'experiment preset'],
+      ['judge', "decided by the AI's answer"],
+      ['judge-failed', 'judge failed'],
+      ['rules', 'rule-based'],
+      ['unknown', 'source not recorded'],
     ];
     for (const [source, label] of labelCases) {
       let out = '', err = '';
@@ -205,8 +205,8 @@ process.on('unhandledRejection', (e) => {
     let weird = '', werr = '';
     try { weird = String(ov({ run_id: 'probe-src', branch_action: { source: 'weird-x' } })); }
     catch (e) { werr = e.message; }
-    if (!werr && weird.includes('未记录(weird-x)') && !weird.includes('&lt;')) {
-      console.log('  ok   source=weird-x → 未记录(原值可见)');
+    if (!werr && weird.includes('not recorded (weird-x)') && !weird.includes('&lt;')) {
+      console.log('  ok   source=weird-x → not recorded(原值可见)');
     } else {
       console.log(`  FAIL source=weird-x: 未知取值没有可见地报出(${werr || '文案/转义不对'})`);
       bad++;
@@ -215,8 +215,8 @@ process.on('unhandledRejection', (e) => {
     let pend = '', perr = '';
     try { pend = String(ov({ run_id: 'probe-src', branch_action: { pending: true } })); }
     catch (e) { perr = e.message; }
-    if (!perr && pend.includes('judge(待 T0 判定)') && !pend.includes('&lt;')) {
-      console.log('  ok   pending=true → 待 T0 判定');
+    if (!perr && pend.includes('judge (pending T0)') && !pend.includes('&lt;')) {
+      console.log('  ok   pending=true → judge (pending T0)');
     } else {
       console.log(`  FAIL pending=true: ${perr || '口径变了'}`);
       bad++;
