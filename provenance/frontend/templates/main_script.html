@@ -1122,7 +1122,11 @@
 					// 自托管的 OFL 中文字体放首位;去掉「Microsoft YaHei」——
 					// 它的著作权在方正,只授权 Windows 内显示打印,导出成图/视频属越界。
 					fontFamily: "'Noto Sans SC', 'Segoe UI', 'PingFang SC', sans-serif",
-					fontSize: "12px",
+					// 12 → 11px(2026-10-10 用户"先降字号吧")。框宽固定 132px,字变小 ⇒
+					// 每行装得下更多字 ⇒ "最后一个词放不下被整词推到下一行"的次数减少,
+					// 行尾空白随之变小。**只动字号,框宽/行距先不动** —— 一次只改一个变量,
+					// 才好判断是哪一项起作用。
+					fontSize: "11px",
 					lineSpacing: 2,
 					fill: "#000000",
 					// 背景用 rgba 自己带透明度,而不是给整个 Text 对象设 alpha ——
