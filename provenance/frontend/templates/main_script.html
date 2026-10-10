@@ -332,7 +332,9 @@
 			shown += 1;                                    // 每 TICK 吐一字
 			bubble_shown[name] = shown;
 			// 气泡里**不再重复写名字**(用户选 B):名字已经挂在角色脚下。
-			var head = "";
+			// **保留"名字："前缀**(2026-10-10 用户改主意):两个 agent 挨得很近时,
+			// 脚下的名字牌会挤在一起分不清谁是谁,气泡里带名字才一眼看清谁在说话。
+			var head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
 			if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 		}
 	}
@@ -341,7 +343,8 @@
 	function flushBubble(name) {
 		let full = bubble_full[name] || "";
 		bubble_shown[name] = full.length;
-		let head = "";   // 同上:名字在脚下,气泡里不重复
+		// 同上:气泡里保留"名字："前缀(挨近时靠它分辨谁在说话)。
+		let head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
 		if (pronunciatios[name]) pronunciatios[name].setText(head + full);
 	}
 

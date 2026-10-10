@@ -88,14 +88,14 @@ sandbox.tickBubbles(16.67);
 ok(sandbox.pronunciatios['B']._t === '', '开段那一拍先把气泡清空(不接着上一段留字)');
 sandbox.bubble_type_acc = 999;
 sandbox.tickBubbles(16.67);
-ok(sandbox.pronunciatios['B']._t === '你', '打字机第 1 字(气泡里不再带"名字："前缀)');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你', '打字机第 1 字(气泡带"名字："前缀)');
 sandbox.bubble_type_acc = 999;
 sandbox.tickBubbles(16.67);
-ok(sandbox.pronunciatios['B']._t === '你好', '打字机第 2 字');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你好', '打字机第 2 字');
 
 // 3) 吐满即停
 for (let i = 0; i < 10; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
-ok(sandbox.pronunciatios['B']._t === '你好世界', '吐满即停');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你好世界', '吐满即停');
 
 // 4) 超长文本:**不丢弃**,切成多段排队接着说(2026-10-10 用户要求)
 //    "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来"
@@ -220,7 +220,7 @@ for (let i = 0; i < 40; i++) {
   // 念完的句子**保留**在气泡里,所以"有文字"不等于"正在打字";要看长度是否在增长
   if (bLen > lastB && cLen > lastC) both++;
   lastB = bLen; lastC = cLen;
-  if (bDoneAt < 0 && sandbox.pronunciatios['B']._t.indexOf('一二三四五') >= 0) bDoneAt = i;
+  if (bDoneAt < 0 && sandbox.pronunciatios['B']._t.indexOf('一二三四五') > 0) bDoneAt = i;
   if (cStartAt < 0 && cLen > 0) cStartAt = i;
 }
 ok(both === 0, '同一时刻不应有两句同时在打字,实得同增的 tick 数=' + both);
