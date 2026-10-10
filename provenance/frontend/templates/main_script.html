@@ -395,7 +395,13 @@
 	}
 	// ================= 推演结束的醒目提示 =================	// 用户明确要求:"要保证推演结束后有提示"。状态块那行小字不够醒目,
 	// 所以结束(含出错/中断)时给一条居中大横幅;成品记录还在生成也一起说清楚。
+	// 2026-10-10 用户要求:先不要那个红色(出错)与绿色(推演结束)横幅。
+	// 顶部横幅是 DOM 覆盖层(不是 Phaser 画的),原来在结束时糊在画面正中,
+	// 挡着小镇。改成一个开关,想恢复把 SHOW_DONE_BANNER 改回 true 即可。
+	const SHOW_DONE_BANNER = false;
+
 	function showDoneBanner(reason, extra) {
+		if (!SHOW_DONE_BANNER) return;
 		var b = document.getElementById("done-banner");
 		var text, color;
 		if (String(reason).indexOf("error") === 0) {
