@@ -56,6 +56,9 @@
 		bubble_full[name] = t;
 		bubble_speaker[name] = speaker || name;
 		bubble_shown[name] = 0;        // 从零开始吐
+		// 记下"这是第几句":两个气泡要左右分开时,按这个序号从左往右排,
+		// 于是**从左往右读就是聊天次序**(先说的靠左),不会看起来像顺序反了。
+		bubble_seq[name] = ++bubble_seq_counter;
 	}
 
 	// 无对话内容时,回落到"行动文本"(保持旧观感,不至于让气泡空着)
@@ -158,6 +161,8 @@
 	const BUBBLE_GAP = 6;             // 气泡底边与角色头顶的间隙(见 layoutBubbles)
 	const BUBBLE_STACK_GAP = 3;       // 相邻气泡之间的间隙(见 layoutBubbles)
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
+	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
+	var bubble_seq_counter = 0;
 	let anims_direction;
 	let pre_anims_direction;
 	let pre_anims_direction_dict = {};
@@ -750,16 +755,20 @@
 				new_sprite.body.y - 8,
 				"",
 				{
-					// 字号 12px(2026-10-09 用户反馈"极其拥挤"):14px 时两角色靠近,
-					// 气泡横向各 180px 必然糊在一起。降到 12px + 限宽 128px,
-					// 同一块屏能容下两个人的气泡而不打架。
-					font: "12px monospace",
+					// 字体(2026-10-10 用户反馈"气泡框里面的字体不好"):原来 12px monospace,
+					// 中文落到等宽回退字体上又碎又糊。换成无衬线栈(Windows 上微软雅黑、
+					// macOS 上苹方),拉丁字符交给 Segoe UI;13px + 行距 3px 保证多行可读。
+					fontFamily: "'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif",
+					fontSize: "13px",
+					lineSpacing: 3,
 					fill: "#000000",
-					backgroundColor: "#ffffcc",
-					padding: { x: 4, y: 3 },
+					// 背景用 rgba 自己带透明度,而不是给整个 Text 对象设 alpha ——
+					// 对象级 alpha 会连**文字**一起打七折,读起来发虚(也是"字体不好"观感的来源之一)。
+					backgroundColor: "rgba(255, 255, 204, 0.88)",
+					padding: { x: 5, y: 3 },
 					border:"solid",
 					borderRadius:"10px",
-					// 限宽 128px(12px 字号下约 10 个中文字/行),超出自动折行
+					// 限宽 128px(13px 字号下约 9 个中文字/行),超出自动折行
 					align: "left",
 					wordWrap: { width: 128, useAdvancedWrap: true },
 				}
@@ -768,7 +777,7 @@
 			// origin(0.5,1) ⇒ x 是气泡中线,y 是气泡底边;底边贴着角色头顶,
 			// 换行时新行往上长,气泡始终稳稳挂在角色正上方、不会往左偏。
 			pronunciatios[persona_name].setOrigin(0.5, 1);
-			pronunciatios[persona_name].alpha = 0.7;
+			// 透明度已移进 backgroundColor(见上):对象本身保持不透明,文字才是清晰的。
 
 			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
 			// (宿主(如平台侧治理平台)可通过 window.addEventListener("message") 接收,
@@ -1022,12 +1031,15 @@
 		// ---- agent 间分离:hitbox 重叠时,把其中一个沿最短轴推开,避免两角色叠在同一格 ----
 		// (persona body 30x40;两角色中心到中心的最小水平/垂直避让,只推"没被墙挡住"的方向)
 		//
-		// 谁让位(2026-10-09 修):**没在走的那个让在走的那个**。
-		// 原来固定推数组里靠前的那一个,而它可能恰恰是正在走的人 —— 于是他每前进一步
-		// (0.8px)都会被"推离"按重叠量原样推回去,位置纹丝不动、走路动画却每帧都在播。
-		// 用户看到的就是"有走路但被前面的人挡住,一直在同一个地方走"。让停住的那个让路,
-		// 行走的人才能走到目标格;停住的人没有目标可争,被推走后是稳定的。
-		// 两人都在走、或都停着时,保持原来的"靠前的先让"。
+		// 谁让位(2026-10-10 修):**没在走的那个让在走的那个**,而且**两个都在走时谁也不推**。
+		// 原来固定推数组里靠前的那一个 —— 它若正在走,每帧 0.8px 的前进会被推离**原样推回**
+		// (净位移 0、位置不动而走路动画照播);若推离幅度比步长大(两人一前一后隔 1~2 格
+		// 同向走同一格时正是如此),净位移变负 ⇒ **人物反过来走**。这两种正是用户反馈的
+		// "有走路但被前面的人挡住,一直在同一个地方走"。让停住的那个让路就没有这个问题:
+		// 它没有目标可争,被推走后是稳定的;两个都在走就都别推,让各自走到自己的目标。
+		// 两人都在走或都停着时,仍按原来的"靠前的先让"。
+		const SEP_STEP_MAX = 8;   // 让位每帧最多挪 8px:远大于行走步长(0.8px),保证一定让得开;
+		                          // 又不至于在到位那一帧"啪"地弹开一整格(实测很扎眼)
 		for (let a = 0; a < agents.length; a++) {
 			let A = personas[agents[a]];
 			for (let b = a + 1; b < agents.length; b++) {
@@ -1039,17 +1051,20 @@
 				if (overX > 0 && overY > 0) {
 					let qa = movement_target[agents[a]], qb = movement_target[agents[b]];
 					let aMoving = !!(qa && qa.length), bMoving = !!(qb && qb.length);
-					let push_A = !(aMoving && !bMoving);      // a 在走、b 停着 → 推 b,其余推 a
+					if (aMoving && bMoving) continue;      // 两个都在走 → 谁也别推
+					let push_A = !aMoving;                 // 谁在走就推另一个;都不走推靠前的
 					let pushee = push_A ? A : B;
 					let anchor = push_A ? B : A;
-					// 选择要分离的轴:重叠侵入更小者优先推开(最少位移)
+					// 选择要分离的轴:重叠侵入更小者优先推开(最少位移);每帧上限 SEP_STEP_MAX
 					if (overX <= overY) {
-						let sx = pushee.body.x < anchor.body.x ? -overX : overX;
+						let step = Math.min(overX, SEP_STEP_MAX);
+						let sx = pushee.body.x < anchor.body.x ? -step : step;
 						let nx = pushee.body.x + sx;
 						if (!tileWall(nx + 15, pushee.body.y + 20)) pushee.body.x = nx;
 						else { let nx2 = pushee.body.x - sx; if (!tileWall(nx2 + 15, pushee.body.y + 20)) pushee.body.x = nx2; }
 					} else {
-						let sy = pushee.body.y < anchor.body.y ? -overY : overY;
+						let step = Math.min(overY, SEP_STEP_MAX);
+						let sy = pushee.body.y < anchor.body.y ? -step : step;
 						let ny = pushee.body.y + sy;
 						if (!tileWall(pushee.body.x + 15, ny + 20)) pushee.body.y = ny;
 						else { let ny2 = pushee.body.y - sy; if (!tileWall(pushee.body.x + 15, ny2 + 20)) pushee.body.y = ny2; }
@@ -1066,15 +1081,13 @@
 
 	// ---- 气泡定位 + 避让(独立函数:模拟结束后也要跑,见 update 里的调用) ----
 	// 锚点 origin(0.5,1):(x, y) 是气泡**底边中点**;包围盒 = [x-w/2, x+w/2] × [y-h, y]。
-	// 三条约束(2026-10-09 用户要求"气泡框一定要在人的上面,不要遮挡人"):
+	// 三条约束(2026-10-09/10 用户要求"气泡框一定要在人的上面,不要遮挡人"):
 	//   1) 底边贴在自己头顶之上(留 BUBBLE_GAP);
 	//   2) **不得压住任何一个角色**。两个人挨着站时,下面那位的对话气泡会正好盖住
 	//      上面那个人的身子 —— 实测:下方角色气泡占 y 188~230,压住上方角色 204~244,
 	//      画面上就是"气泡挡住了一个人"。所以避让对象不只是气泡,还包括所有角色的绘制范围;
-	//   3) 气泡之间不重叠(往上叠)。
-	// 做法:自下而上逐个摆;每个气泡从"贴住自己头顶"开始,只要压到谁就抬到谁上方去,
-	// 抬完**重新量一遍**(可能又压到更高的那个)。抬起只减小 y、不改变尺寸,
-	// 所以每轮 y 严格变小 ⇒ 有限步内必然收敛,不会来回抖。
+	//   3) 气泡之间不重叠。两个都在头顶就撞上时**先左右分开**(按说话先后从左到右排),
+	//      分不开才往上叠(见下面 ①②)。
 	// (BUBBLE_GAP / BUBBLE_STACK_GAP 两个常量与其它气泡常量放在一起,见文件上方。)
 
 	// 相交判定:气泡用"底边中点 + 宽高",角色/另一气泡用普通左上角矩形。
@@ -1100,9 +1113,29 @@
 			t.x = chars[i].x + chars[i].w / 2;      // 正上方:对准角色**绘制**的中线
 			t.y = chars[i].y - BUBBLE_GAP;          // 底边贴住头顶
 			if (!t.text) continue;
-			bubbles.push({ name: names[i], x: t.x, y: t.y, w: t.width, h: t.height });
+			bubbles.push({ name: names[i], x: t.x, y: t.y, w: t.width, h: t.height,
+			               seq: bubble_seq[names[i]] || 0 });
 		}
-		// 自下而上摆:最靠下的先钉住,上面的往上让
+		// ---- ① 左右分开(2026-10-10 用户反馈"这两个框就不会左右撇开吗")----
+		// 两个人上下相邻时,两个气泡都居中在角色头顶,只能靠上下堆叠解决 ——
+		// 画面上就成了"一个人头顶两段话",而且下面那段必然压到上面那个人。
+		// 这里改成:**只有真的撞上了才左右分开**,各让一半。
+		// 排序用"说话序号"而不是位置:先说的靠左、后说的靠右 ⇒ **从左往右读
+		// 就是聊天次序**(用户要求"Ethan 说完之后 AI 才说,注意聊天次序")。
+		let byTalk = bubbles.slice().sort((a, b) => (a.seq || 1e9) - (b.seq || 1e9) || a.x - b.x);
+		for (let i = 1; i < byTalk.length; i++) {
+			let prev = byTalk[i - 1], cur = byTalk[i];
+			// 只在"上下也压着"的时候才需要分开;各自头顶上方互不重叠就保持原位
+			if (cur.y <= prev.y - prev.h || cur.y - cur.h >= prev.y) continue;
+			let need = (prev.w + cur.w) / 2 + BUBBLE_STACK_GAP - (cur.x - prev.x);
+			if (need > 0) {
+				prev.x -= need / 2;
+				cur.x += need / 2;
+			}
+		}
+		// ---- ② 上下避让:压到角色就抬上去 ----
+		// 自下而上摆(最靠下的先钉住);抬起只减小 y、不改尺寸 ⇒ 每轮严格变小,
+		// 有限步内收敛,不会来回抖。
 		bubbles.sort((a, b) => b.y - a.y || a.x - b.x);
 		for (let i = 0; i < bubbles.length; i++) {
 			let cur = bubbles[i];
@@ -1125,7 +1158,11 @@
 				}
 				if (!lifted) break;
 			}
-			pronunciatios[cur.name].y = cur.y;
+		}
+		// 写回(x 在 ① 里改过,y 在 ② 里改过)
+		for (let i = 0; i < bubbles.length; i++) {
+			pronunciatios[bubbles[i].name].x = bubbles[i].x;
+			pronunciatios[bubbles[i].name].y = bubbles[i].y;
 		}
 	}
 
