@@ -581,6 +581,13 @@ def start(case, args):
 def _follow(log, err, interval=1.0):
     """跟读实时面日志。文件还没生成就先等;被截断/轮转则重开。"""
     import time as _t
+    # 日志是 UTF-8,Windows 控制台默认 GBK —— 直接 write 会把中文打成乱码
+    # (2026-10-10 用户贴的日志全是"�?)。先把 stdout 切到 UTF-8 并容错。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 - 老 Python/被重定向时跳过即可
+            pass
     handles, pos = {}, {}
     for path in (log, err):
         try:
