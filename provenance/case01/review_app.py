@@ -104,7 +104,11 @@ def set_live_provider(provider, run_id="", total_nodes=0):
     """
     _LIVE["provider"] = provider
     _LIVE["run_id"] = run_id or ""
-    _LIVE["total_nodes"] = int(total_nodes or 0)
+    # total_nodes 允许是**无参可调用对象** —— 判定前只排 T0 那天(1~2 个节点),
+    # 判定后桥才把完整时间线换上;把 `len(nodes)` 冻成 int 会让分母停在判定前的值,
+    # 面板就出现"5/2 节点"这种分子>分母(2026-10-10 用户截图)。
+    # 传 callable 则每次读取现算,分母跟着实际计划走。
+    _LIVE["total_nodes"] = total_nodes if callable(total_nodes) else int(total_nodes or 0)
     if run_id:
         set_current_run(run_id, "实跑跑完会自动映射成成品记录")
     return _LIVE["run_id"]
@@ -267,7 +271,10 @@ def live_record(safe: int = 0):
         rec = expert_safe_record(rec)
         rec["live"] = True          # 面板靠它标"● 实时",不属于实验元信息
     done_nodes = len(raw.get("nodes") or [])
-    total = _LIVE["total_nodes"] or done_nodes
+    # 分母是**无参可调用**就现算(判定后计划会变长);是 int 就直接用。
+    _tn = _LIVE["total_nodes"]
+    total = int(_tn() or 0) if callable(_tn) else int(_tn or 0)
+    total = total or done_nodes
     return JSONResponse({"ok": True, "live": True, "run_id": rec.get("run_id", ""),
                          "done_nodes": done_nodes, "total_nodes": total,
                          "record": rec})

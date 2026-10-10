@@ -354,8 +354,11 @@ def main(argv=None):
             # 实时结果:面板每 2 秒来取一次"到目前为止的记录",用的映射与成品记录同一套,
             # 于是小镇一边动、右栏的对话/检索/事件/状态/审计一边长出来(用户要的"同步看全程")。
             # 跑完不立刻撤:成品记录还要等自动映射(~1-2 分钟),这期间面板继续显示完整过程。
+            # 分母用**当前实际计划**的长度:判定前是 T0 那天(1~2 个),判定后桥把
+            # 完整时间线换上,这里每次读取现算 —— 否则面板会显示"5/2 节点"
+            # (分子是实际跑出来的,分母是判定前的旧计划)。
             set_live_provider(lambda: bridge.run_record(), run_id=run_id,
-                              total_nodes=len(nodes))
+                              total_nodes=lambda: len(getattr(bridge, "nodes", []) or []))
             try:
                 record = bridge.run()
                 # 分支是 T0 跑完才判出来的,这里打的就是真实分支。

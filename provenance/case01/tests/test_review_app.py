@@ -494,3 +494,28 @@ def test_safe_live_view_is_also_stripped(monkeypatch):
     assert rec.get("live") is True, "面板靠 live 标'● 实时',这个不能剥掉"
     inner = c.get("/api/review/live").json()["record"]
     assert "injector" in inner, "内部面看实时仍要全量"
+
+
+def test_live_total_nodes_follows_the_current_plan():
+    """分母跟着**当前计划**走,不冻在判定前的 1~2 个。
+
+    用户 2026-10-10 截图"5/2 节点":剔预设分支后判定前只排 T0 那天(2 个),
+    判定后桥换上完整时间线(7 个),而分母停在 2 ⇒ 分子大于分母。
+    """
+    from case01 import review_app
+    from fastapi.testclient import TestClient
+    client = TestClient(review_app.app)
+    plan = {"n": 2}
+
+    # 判定前:计划只有 T0 那天 ⇒ 0/2
+    review_app.set_live_provider(lambda: _fake_raw(nodes_done=0), run_id="r-plan",
+                                 total_nodes=lambda: plan["n"])
+    r = client.get("/api/review/live").json()
+    assert (r["done_nodes"], r["total_nodes"]) == (0, 2), r
+
+    # 判定落地、计划换成长的那条 ⇒ 分母跟着变 7,就是 5/7(不是 5/2)
+    plan["n"] = 7
+    review_app.set_live_provider(lambda: _fake_raw(nodes_done=5), run_id="r-plan",
+                                 total_nodes=lambda: plan["n"])
+    r2 = client.get("/api/review/live").json()
+    assert (r2["done_nodes"], r2["total_nodes"]) == (5, 7), r2
