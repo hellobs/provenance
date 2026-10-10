@@ -1089,6 +1089,21 @@
 					wordWrap: { width: 132, useAdvancedWrap: true },   // = BUBBLE_WRAP_W
 				}
 			).setDepth(3);
+			// 文字按**设备像素比**光栅化。2026-10-10 用户第 4 次反馈"字还是太糊",
+			// 用无头浏览器量出来:贴图是 12px 画的,而显示器有缩放(Windows 常见
+			// 125%/150%),浏览器要把整块 canvas 从 864×768 放大到物理像素;canvas
+			// 又被 pixelArt 标成 `image-rendering: pixelated` ⇒ **最近邻**放大,
+			// 12px 的字被硬撑成 15px,笔画断裂(就是截图上那种糊)。
+			// ⚠ 之前我给贴图设 LINEAR 是错的方向:那是 WebGL 的采样开关,而字是
+			// canvas 画好的位图 —— 采样救不了"源分辨率不够"。
+			// 解法:让 Phaser 用 2× 分辨率画这张贴图(12px 按 24px 光栅化)。
+			// 取 max(2, dpr):DPR=1 的机器也拿 2×,只会更清、不会更差。
+			try {
+				const _tres = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
+				if (pronunciatios[persona_name].setResolution) {
+					pronunciatios[persona_name].setResolution(_tres);
+				}
+			} catch (e) { /* 老版本没有 setResolution 就维持原样 */ }
 			// 锚点:水平**居中**、垂直**底部**(2026-10-09 用户要求"气泡一定要在人的上方")。
 			// origin(0.5,1) ⇒ x 是气泡中线,y 是气泡底边;底边贴着角色头顶,
 			// 换行时新行往上长,气泡始终稳稳挂在角色正上方、不会往左偏。
