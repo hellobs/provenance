@@ -468,6 +468,9 @@ def _parse_router_json(text: str, expert_pool: dict = None,
                               or it.get("primary_expert", "")).strip().upper()
         # 2026-10-05:模型常把「规范名 + 括号里的 ID」写成一体(实测
         # `市场与交易风险（E4）`、`信息处理机制（UNMATCHED）`),全角括号也出现过。
+        # ⚠ 2026-10-10:专家分类池已改英文(见 expert_pool.json),模型现在实际输出的是
+        # `Market & Trading Risk (E4)` 这一类 —— 下面那条正则是**按位置**剥尾部括号,
+        # 与名字是什么语言无关,所以规则不变,只把示例换成当前真实会遇到的形态。
         # 拆出来分别再试一次 —— 否则这种"答对了但格式多一层"的输出会被判 unmatched。
         _m = re.search(r"[（(]\s*([A-Za-z]+\d*|UNMATCHED)\s*[)）]\s*$", raw_field)
         if _m:
