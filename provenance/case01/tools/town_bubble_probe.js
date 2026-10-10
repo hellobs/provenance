@@ -66,14 +66,14 @@ sandbox.tickBubbles(16.67);
 ok(sandbox.pronunciatios['B']._t === '', '开段那一拍先把气泡清空(不接着上一段留字)');
 sandbox.bubble_type_acc = 999;
 sandbox.tickBubbles(16.67);
-ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你', '打字机第 1 字');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你', '打字机第 1 字');
 sandbox.bubble_type_acc = 999;
 sandbox.tickBubbles(16.67);
-ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好', '打字机第 2 字');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你好', '打字机第 2 字');
 
 // 3) 吐满即停
 for (let i = 0; i < 10; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
-ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好世界', '吐满即停');
+ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：\n你好世界', '吐满即停');
 
 // 4) 超长文本:**不丢弃**,切成多段排队接着说(2026-10-10 用户要求)
 //    "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来"

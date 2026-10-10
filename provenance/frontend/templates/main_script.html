@@ -186,7 +186,7 @@
 		bubble_rest_acc = 0;
 		shown += 1;                              // 每 TICK 吐一字(速度由 BUBBLE_TYPE_MS 控)
 		bubble_shown[name] = shown;
-		let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
+		let head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
 		if (pronunciatios[name]) pronunciatios[name].setText(head + full.slice(0, shown));
 	}
 
@@ -194,7 +194,7 @@
 	function flushBubble(name) {
 		let full = bubble_full[name] || "";
 		bubble_shown[name] = full.length;
-		let head = bubble_speaker[name] ? bubble_speaker[name] + "：" : "";
+		let head = bubble_speaker[name] ? bubble_speaker[name] + "：\n" : "";
 		if (pronunciatios[name]) pronunciatios[name].setText(head + full);
 	}
 
@@ -254,7 +254,7 @@
 	var bubble_shown = {};            // name -> 已显示的字数
 	var bubble_speaker = {};          // name -> 说话人(用于着色)
 	var bubble_last_action = {};      // name -> 兜底行动文本(无对话时显示)
-	const BUBBLE_MAX_CHARS = 140;     // 气泡上限(2026-10-09:字体调小+换行后放宽,尽量把话显示完;
+	const BUBBLE_MAX_CHARS = 160;     // 气泡上限(2026-10-09:字体调小+换行后放宽,尽量把话显示完;
 	                                  // 仍留上限,避免极端长文把气泡撑到镜头外)
 	const BUBBLE_TYPE_MS = 45;        // 打字机速度:每字毫秒
 	const BUBBLE_GAP = 6;             // 气泡底边与角色头顶的间隙(见 layoutBubbles)
@@ -882,9 +882,9 @@
 					padding: { x: 4, y: 3 },
 					border:"solid",
 					borderRadius:"10px",
-					// 限宽 112px(12px 字号下约 9 个中文字/行),超出自动折行
+					// 限宽 132px(用户要求"再宽一点点";12px 字号下约 11 个中文字/行),超出自动折行
 					align: "left",
-					wordWrap: { width: 112, useAdvancedWrap: true },
+					wordWrap: { width: 132, useAdvancedWrap: true },
 				}
 			).setDepth(3);
 			// 锚点:水平**居中**、垂直**底部**(2026-10-09 用户要求"气泡一定要在人的上方")。
