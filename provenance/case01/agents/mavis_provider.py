@@ -307,6 +307,21 @@ class Case01SafeProvider:
             except (TypeError, json.JSONDecodeError):
                 continue
             break
+        # 去掉 response_format 之后(端点不支持),模型会按提示词里的例子回**裸词或
+        # Python 字面量**,不再是 JSON。实测三类:
+        #   'Yes' / 'No'            → 布尔判定(generate_chat_check_repeat / decide_chat_terminate)
+        #   [("Open the AI chat", 5), ...] → **Python 元组列表**(schedule_decompose)
+        # 所以再加两条安全兜底:裸词转布尔、ast.literal_eval 读 Python 字面量。
+        low = (stripped or raw).strip().lower()
+        if low in ("yes", "true"):
+            candidates.append(True)
+        elif low in ("no", "false"):
+            candidates.append(False)
+        try:
+            import ast as _ast
+            candidates.append(_ast.literal_eval((stripped or raw).strip()))
+        except Exception:
+            pass
         candidates.extend(cls._json_objects(stripped or raw))
         for value in candidates:
             for payload in (value if isinstance(value, dict) else {"res": value},
