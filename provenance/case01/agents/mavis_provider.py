@@ -30,6 +30,12 @@ _LONG_OUTPUT_TYPES = frozenset([
 ])
 
 
+def _env_flag(name):
+    """环境变量开关:非空且不是 0/false 即视为开。"""
+    import os
+    return str(os.environ.get(name, "") or "").strip().lower() not in ("", "0", "false", "no")
+
+
 def _env_seed():
     """现读种子链的 env(`CASE01_LLM_SEED`);没设或非法都返回 None(=不下发 seed)。"""
     import os
@@ -137,6 +143,12 @@ class Case01SafeProvider:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        # 外部 API 默认开着 reasoning(DeepSeek 系实测:reasoning_tokens≈279、还会继续烧),
+        # 而下面的 max_tokens 对"对话正文"只给到几百 —— reasoning 一烧,正文就被砍成
+        # 一个字(2026-10-10 实测:外部 API 下该角色每句只剩"嗯")。
+        # 与 mavis 侧 OpenAIProvider 同一开关(MAVIS_LLM_DISABLE_THINKING),语义一致。
+        if _env_flag("MAVIS_LLM_DISABLE_THINKING"):
+            body["thinking"] = {"type": "disabled"}
         # 种子链:显式设过 CASE01_SEED/CASE01_LLM_SEED 才下发 —— 不传就是今天的
         # 非确定路径。此前 agent 台词根本不带 seed(`--seed` 只钉住了判定/反思/路由),
         # 所以"一个种子"覆盖不到小镇;这一行把它接上。
@@ -182,6 +194,10 @@ class Case01SafeProvider:
         if isinstance(configured, int):
             return configured
         limits = {"structured": 256, "conversation": 1024, "long": 2048, "default": 1024}
+        # ⚠ 2026-10-10 待办:实测日志里"输出被 max_tokens 截断 caller=llm_normal
+        # max_tokens=256" —— 对话正文被归到 structured 档(只有 256)。外部 API 默认开着
+        # reasoning 时 256 根本装不下,这也是"每句只剩一个字"的另一半原因。
+        # 抬档位会动到 7 条钉住旧值的测试,单独一次改,不在这次提交里夹带。
         if isinstance(configured, dict):
             limits.update({k: int(v) for k, v in configured.items() if v is not None})
         if caller and caller != "llm_normal":
