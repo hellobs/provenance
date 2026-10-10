@@ -1532,8 +1532,9 @@
 			// (padding + borderRadius),于是开局每个角色头顶都挂着一枚空黄条
 			// (2026-10-10 用户反馈"文字为空的时候,不应该有显示")。
 			t.setVisible(!!t.text);
-			t.x = chars[i].x + chars[i].w / 2;      // 基线:本人正上方,对准绘制中线
-			t.y = chars[i].y - BUBBLE_GAP;          // 底边贴住头顶
+			// 同上:基线也算成整数像素,免得后面 clamp 完又落回小数。
+			t.x = Math.round(chars[i].x + chars[i].w / 2);   // 本人正上方,对准绘制中线
+			t.y = Math.round(chars[i].y - BUBBLE_GAP);       // 底边贴住头顶
 			if (!t.text) continue;
 			// w 用**排版宽度**而不是 t.width(见 BUBBLE_WRAP_W)。
 			bubbles.push({ name: names[i],
@@ -1600,8 +1601,11 @@
 		// (2026-10-10 用户:"这个框也不应该超过画布啊")。
 		for (let i = 0; i < bubbles.length; i++) {
 			let t = pronunciatios[bubbles[i].name];
-			t.x = clampX(bubbles[i].x, t.width);
-			t.y = clampY(bubbles[i].y, t.height);
+			// **落到整数像素**(2026-10-10):角色每帧移动 0.8、气泡宽度也是小数,
+			// 于是 t.x/t.y 几乎总是小数 ⇒ 文字贴图每帧都被画在亚像素位置上、要重采样
+			// 一次,又是一层糊。取整后同一位置就稳定落在像素格上。
+			t.x = Math.round(clampX(bubbles[i].x, t.width));
+			t.y = Math.round(clampY(bubbles[i].y, t.height));
 		}
 	}
 
