@@ -153,17 +153,56 @@ def main(argv=None) -> int:
     model = args.model or os.environ.get("CASE01_ROUTER_MODEL", "") or spec["model"]
 
     if args.check:
-        # 自检用**当前生效**的配置(env → .secrets.json),不写文件
+        # 自检**必须走跑批用的同一份解析**(env → .secrets.json 的 router_provider/
+        # router_base_url/router_model),不能用 `--router` 的字面值类推。
+        # 以前 `--check` 不带 `--router` 就固定测 OpenRouter,于是出现过两种假象:
+        #   · 实际配的是 vllm/DeepSeek,自检报 OpenRouter 的 403(键额度),看着像"配置坏了";
+        #   · 反过来 `--router bigmodel --check` 绿了,跑批用的却是另一个后端 ⇒ 假绿。
+        # 手册 §一 第 6 行拿这句当演示闸门,所以它必须"测的就是 Will-Run 用的那个"。
         if provider == "local":
             print("router_provider=local:这次不测外部端点(现场演示用本地)。")
             return 0
-        from case01.agents.llm import _secret_value, _openrouter_key
-        key = (_openrouter_key() if provider == "openrouter"
-               else _secret_value(spec["key_env"], spec["key_json"]))
-        if not key:
-            print("取不到 key。配一条:python provenance/tools/setup_api.py "
-                  "--router {} --key <key>".format(provider))
+        from case01.agents.llm import (router_client_from_env, router_identity,
+                                       LOCAL_ROUTER_PROVIDERS)
+        from case01.agents.llm import router_provider_name
+        eff = router_provider_name()
+        if not eff or eff in LOCAL_ROUTER_PROVIDERS:
+            print("当前没配外部 Router(router_provider={!r})⇒ 跑批会回落本地模型,"
+                  "04 §五 要的是独立 API 模型。配一条:"
+                  "python provenance/tools/setup_api.py --router bigmodel --key <key>"
+                  "(或 --router vllm --base-url … --model … --key …)".format(eff))
             return 1
+        if args.router and args.router != eff:
+            print("注意:你点了 --router {},但当前**生效**的是 {};"
+                  "下面测的是生效那个(跑批用的就是它)。".format(args.router, eff))
+        try:
+            client, _ident = router_client_from_env()
+        except Exception as e:  # noqa: BLE001 —— 配置不全要原样说出来
+            print("自检结果:失败 ✗ 按当前配置造不出客户端:{}: {}".format(
+                type(e).__name__, str(e)[:200]))
+            return 1
+        if client is None:
+            print("自检结果:失败 ✗ router_client_from_env() 返回空(配置为空)。")
+            return 1
+        ident = router_identity(client)
+        print("测的是当前生效后端:{} @ {}({})".format(
+            ident.get("model"), ident.get("host"), ident.get("provider")))
+        # 判据是**正文非空**,不是 HTTP 200:推理端点被忽略参数/思考吃光预算时
+        # 照样 200、content 为空,而 Router 拿到空正文就等于拆不出问题。
+        try:
+            out = client.chat([{"role": "user",
+                                "content": 'Reply with JSON only: {"ok": true}'}],
+                               temperature=0.1, max_tokens=64)
+        except Exception as e:  # noqa: BLE001
+            print("自检结果:失败 ✗ {}: {}".format(type(e).__name__, str(e)[:200]))
+            return 1
+        if not (out or "").strip():
+            print("自检结果:失败 ✗ 模型回空正文(思考链可能吃光了 max_tokens=64);"
+                  "Router 遇到同样的情况时 `router.issues` 会是空的")
+            return 1
+        print("自检结果:可用 ✓ 正文 {} 字符 | identity={}".format(
+            len(out), json.dumps(ident, ensure_ascii=False)))
+        return 0
     else:
         key = args.key.strip()
         if provider != "local" and not key:
