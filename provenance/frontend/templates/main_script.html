@@ -145,6 +145,21 @@
 			grp = _newRoom(gkey);
 			bubble_groups[gkey] = grp;
 			bubble_group_keys.push(gkey);
+			// ⚠ 2026-10-10 用户截图:同一个房间两个人同时说话。原因是**第一句话没有
+			// 对话对象可配**(last_speaker 还是空),它自己开了一间只含自己的房;
+			// 第二句才配上对 ⇒ 变成两间房 ⇒ 并行显示两句。
+			// 修法:配出成对房间时,把"只含其中一人"的旧房间**并进来**。
+			for (var mk = bubble_group_keys.length - 1; mk >= 0; mk--) {
+				var oldKey = bubble_group_keys[mk];
+				if (oldKey === gkey) continue;
+				if (oldKey !== name && oldKey !== partner) continue;
+				var old = bubble_groups[oldKey];
+				if (old && old.lines.length > 0) {
+					grp.lines = old.lines.concat(grp.lines);   // 旧的在前面(先说的)
+				}
+				delete bubble_groups[oldKey];
+				bubble_group_keys.splice(mk, 1);
+			}
 		}
 		// 同一角色**还没轮到**的旧段作废(已被新台词取代)。
 		for (var gi = grp.lines.length - 1; gi >= 0; gi--) {

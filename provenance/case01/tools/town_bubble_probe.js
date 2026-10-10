@@ -147,6 +147,17 @@ ok(mseg.map((q) => q.text).join(' ').includes('$47.30')
    && mseg.map((q) => q.text).join(' ').includes('$48.05'),
    '两个价格都必须完整出现在某一段里');
 
+// 4c2) 回归:第一句没有对话对象可配,会自己开一间单人房;第二句才配上对。
+//      两间房 ⇒ 同一段对话的两个人同时显示(用户 2026-10-10 截图)。
+//      期望:配出成对房间时把单人房并进去 ⇒ **全程只有一间房**。
+resetBubbles();
+sandbox.setBubble('B', 'Ethan Lin', '我先开口。');
+sandbox.setBubble('C', 'Investment AI', '你问我答。');
+sandbox.setBubble('B', 'Ethan Lin', '我再问一句。');
+ok(sandbox.bubble_group_keys.length === 1,
+   '两人交替说话全程只应有一间房(单人房要被并入),实得 ' +
+   sandbox.bubble_group_keys.length + ' 间: ' + JSON.stringify(sandbox.bubble_group_keys));
+
 // 4d) **房间之间并行**:B×C 一个房、E×D 另一个房,两房应当**同时**在打字。
 //     (房内互斥、房间并行 —— 2026-10-10 用户定的语义)
 resetBubbles();
