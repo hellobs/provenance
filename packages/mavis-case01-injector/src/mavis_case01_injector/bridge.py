@@ -1046,9 +1046,16 @@ class MavisBridge:
             raise RuntimeError(
                 "Ethan 的外部 API 只配了一半(缺 {}):配漏了不等于选择本地。"
                 "要么两个都配齐,要么都不配。".format(missing))
+        # 起面探测:**重试几次**;仍不通则**报警但继续**。
+        # 为什么不再直接杀服务(2026-10-10 用户"为什么现在启动不了 5010 了"):
+        # 一次探测失败就把整局连同 5010 一起关掉,等于"网络抖一下 → 整个平台打不开",
+        # 代价远大于收益。真正的错误信息由**第一次真实调用**给出(比我的探测准)。
+        # ⚠ 底线不变:绝不悄悄退回本地模型 —— 探测不通照样注入外部 provider,
+        # 调用失败会大声报错,不会换成 local。
         if not self._remote_reachable(base_url):
-            raise RuntimeError(
-                "Ethan 的外部 API({})起面探测不通:拒绝悄悄退回本地模型。".format(base_url))
+            print("[case01] [warn] Ethan 的外部 API({})起面探测不通;"
+                  "仍然使用外部 provider(绝不退回本地),真实错误会在第一次调用时出现。"
+                  "若网络不通请检查本机出网/代理。".format(base_url), flush=True)
         target = config.get("agents", {}).get(self.roles[1])
         if target is None:
             raise RuntimeError("场景里找不到第二个角色,无法给它配外部 API")
@@ -1061,7 +1068,7 @@ class MavisBridge:
         self.ethan_backend = "api({}@{})".format(model, base_url)
 
     @staticmethod
-    def _remote_reachable(base_url: str, timeout: float = 8.0) -> bool:
+    def _remote_reachable(base_url: str, timeout: float = 8.0, retries: int = 3) -> bool:
         """起面**探测**外部 API 是否可达(不发真实请求,只连握手)。
 
         为什么要在起面就探:Ethan 的台词是实验自变量,写它的模型必须可查。
@@ -1071,15 +1078,19 @@ class MavisBridge:
         import urllib.error
         url = base_url.rstrip("/") + "/models"
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout):
-                return True
-        except urllib.error.HTTPError:
+        import time as _t
+        for attempt in range(1, max(1, retries) + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout):
+                    return True
+            except urllib.error.HTTPError:
             # 有响应也算"可达"(401/404 说明服务在,只是这个路径/密钥不对 —— 同样该硬失败,
             # 但那属于"调不通",不是"连不上")
-            return True
-        except Exception:
-            return False
+                return True
+            except Exception:
+                if attempt < max(1, retries):
+                    _t.sleep(2.0)      # 网络抖动是常见的,别一次就判死刑
+        return False
 
     def _apply_local_provider(self, config: dict) -> None:
         """Optionally switch the local backend; preserve scenario defaults otherwise."""

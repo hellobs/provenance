@@ -265,7 +265,10 @@ class Case01SafeProvider:
             return configured
         # 2026-10-10:structured 档原本 256,实测把结构化输出连续截断 3 次
         # (poignancy_event 解析到空串 → 落兜底值)。抬到 1024 并加下限保护。
-        limits = {"structured": 1024, "conversation": 2048, "long": 4096, "default": 2048}
+        # max_tokens 是**上限**不是目标,给足不会多花钱(用多少发多少),
+        # 只会让"输出被截断 → 解析失败 → 落兜底"这条路彻底走不通。
+        # 历史:256 把 Structured 连续截断 3 次(poignancy_event 解析到空串);用户要求"那就搞大"。
+        limits = {"structured": 4096, "conversation": 8192, "long": 8192, "default": 4096}
         # ⚠ 2026-10-10 待办:实测日志里"输出被 max_tokens 截断 caller=llm_normal
         # max_tokens=256" —— 对话正文被归到 structured 档(只有 256)。外部 API 默认开着
         # reasoning 时 256 根本装不下,这也是"每句只剩一个字"的另一半原因。

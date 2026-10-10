@@ -3,8 +3,7 @@
 2026-09-23 补的两条是**回归**:原来的分档只看 `caller`,而 mavis 的
 `Agent.completion` 从不传 caller(`Result` 只有 prompt/callback/failsafe/return_type
 四个键)→ 镇内每次调用都拿最小档 token,而 AI 的 T0 回答实测 536 汉字。
-2026-10-10:各档整体上调(structured 256→1024 / conversation 2048→4096 /
-long 4096)—— 256 那档实测把结构化输出连续截断 3 次(poignancy_event 解析到
+2026-10-10:各档整体上调(structured 256→4096 / conversation 2048→8192)—— 256 那档实测把结构化输出连续截断 3 次(poignancy_event 解析到
 空串 → 落兜底值),证据见当次运行日志"输出被 max_tokens 截断 … max_tokens=256"。
 原来的 `test_long_calls_are_bounded` 是**自己手工传了 caller** 才通过的,
 所以它绿着,线上照样截断 —— 这里改成按 mavis 的真实调用形状断言。
@@ -57,7 +56,7 @@ def test_invalid_integer_output_retries_then_uses_failsafe(monkeypatch):
     monkeypatch.setattr(provider, "_chat", fake_chat)
     assert provider.completion(
         "wake up", return_type=IntResponse, failsafe=8, caller="wake_up") == 8
-    assert calls == [1024, 1024, 1024]
+    assert calls == [4096, 4096, 4096]
 
 
 def test_numeric_string_is_coerced(monkeypatch):
@@ -81,7 +80,7 @@ def test_long_calls_are_bounded(monkeypatch):
     monkeypatch.setattr(provider, "_chat", fake_chat)
     provider.completion(
         "schedule", return_type=IntResponse, failsafe=8, caller="schedule_daily")
-    assert seen == [4096]
+    assert seen == [8192]
 
 
 # --------------------------------------------------------------- 回归:mavis 调用形状
@@ -98,16 +97,16 @@ def test_mavis_call_shape_gets_a_usable_limit(monkeypatch):
     monkeypatch.setattr(provider, "_chat", fake_chat)
     provider.completion("说点什么", return_type=generate_chat, failsafe="嗯")
     provider.completion("随便聊", return_type=TextResponse, failsafe="嗯")
-    assert seen == [("llm_normal", 4096), ("llm_normal", 2048)], seen
+    assert seen == [("llm_normal", 8192), ("llm_normal", 8192)], seen
 
 
 def test_limits_are_keyed_on_the_return_type():
     """分档看 `return_type` —— 它才是 mavis 真正传得出来的信号。"""
     provider = _provider()
-    assert provider._token_limit("llm_normal", generate_chat) == 4096
-    assert provider._token_limit("llm_normal", schedule_dailyResponse) == 4096
-    assert provider._token_limit("llm_normal", TextResponse) == 2048
-    assert provider._token_limit("llm_normal", IntResponse) == 1024
+    assert provider._token_limit("llm_normal", generate_chat) == 8192
+    assert provider._token_limit("llm_normal", schedule_dailyResponse) == 8192
+    assert provider._token_limit("llm_normal", TextResponse) == 8192
+    assert provider._token_limit("llm_normal", IntResponse) == 4096
 
 
 def test_small_answers_stay_small(monkeypatch):
@@ -119,7 +118,7 @@ def test_small_answers_stay_small(monkeypatch):
         lambda messages, temperature, response_format, max_tokens, caller="llm_normal":
         seen.append(max_tokens) or '{"res": 3}')
     provider.completion("打分", return_type=IntResponse, failsafe=1)
-    assert seen == [1024]
+    assert seen == [4096]
 
 
 def test_config_override_wins(monkeypatch):
@@ -170,9 +169,9 @@ def test_truncation_is_counted_and_loud(monkeypatch, capfd):
     _patch_post(monkeypatch, "length", content='{"res": "半句话')
     provider.completion("说点什么", return_type=TextResponse, failsafe="嗯")
     assert provider.truncations == 1
-    assert provider.last_truncation == {"caller": "llm_normal", "max_tokens": 2048}
+    assert provider.last_truncation == {"caller": "llm_normal", "max_tokens": 8192}
     out = capfd.readouterr().out
-    assert "截断" in out and "max_tokens=2048" in out
+    assert "截断" in out and "max_tokens=8192" in out
     assert provider.get_summary()["truncated"] == 1
 
 
@@ -193,7 +192,7 @@ def test_structured_output_uses_json_schema(monkeypatch):
     sent = calls[0]
     assert sent["response_format"]["type"] == "json_schema"
     assert sent["response_format"]["json_schema"]["strict"] is True
-    assert sent["max_tokens"] == 1024          # structured 档(原 256 会截断结构化输出)
+    assert sent["max_tokens"] == 4096          # structured 档(原 256 会截断结构化输出)
     assert json.loads(json.dumps(sent))  # 可序列化(没有被塞进奇怪对象)
 
 
@@ -232,7 +231,7 @@ def test_json_schema_rejected_by_endpoint_degrades_and_is_remembered(monkeypatch
     assert sent[0]["response_format"]["type"] == "json_schema"
     assert "response_format" not in sent[1], sent[1]   # 降级=去掉该字段
     assert provider.response_format_downgrades == 1
-    assert sent[1]["max_tokens"] == 1024   # structured 档已从 256 抬到 1024
+    assert sent[1]["max_tokens"] == 4096   # structured 档已从 256 抬到 1024
     # 能力记忆:第一次撞过 400 之后,后续调用**不再发** response_format(别每次白费两次请求)
     sent.clear()
     provider.completion("hi", return_type=IntResponse, retry=1)

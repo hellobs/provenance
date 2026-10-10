@@ -194,16 +194,26 @@ def test_ethan_external_provider_from_env(monkeypatch, tmp_path):
     assert "api(mini-1@" in bridge.ethan_backend
 
 
-def test_ethan_external_unreachable_is_hard_failure(monkeypatch, tmp_path):
-    """配了外部 API 却连不通 ⇒ **报错停这一局**,绝不悄悄退回本地模型。"""
+def test_ethan_external_unreachable_warns_but_still_external(monkeypatch, tmp_path, capsys):
+    """探测不通 ⇒ **报警但仍用外部 provider**,绝不悄悄退回本地(2026-10-10 改)。
+
+    之前是直接 RuntimeError 把整局连同 5010 一起关掉,一次网络抖动就让平台打不开,
+    代价远大于收益。底线不变:仍然注入外部 provider,调用失败会大声报错,不会换 local。
+    """
     _install_stub_provider(monkeypatch)
     bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
     monkeypatch.setattr(type(bridge), "_remote_reachable",
                         staticmethod(lambda *a, **k: False))
     monkeypatch.setenv("CASE01_ETHAN_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("CASE01_ETHAN_MODEL", "mini-1")
-    with pytest.raises(RuntimeError):
-        bridge._build_mavis()
+    bridge._build_mavis()
+    out = capsys.readouterr().out
+    assert "探测不通" in out and "绝不退回本地" in out, out[:300]
+    # 关键:仍然是外部 provider,不是本地
+    ethan_cfg = bridge.config["agents"][DEFAULT_ROLES[1]]
+    assert ethan_cfg["think"]["llm"]["provider"] == "openai"
+    assert ethan_cfg["think"]["llm"]["base_url"] == "https://api.example.com/v1"
+    assert bridge.ethan_backend == "api(mini-1@https://api.example.com/v1)"
 
 
 def test_ethan_external_half_configured_is_hard_failure(monkeypatch, tmp_path):
