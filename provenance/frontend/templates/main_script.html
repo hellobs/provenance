@@ -431,6 +431,8 @@
 	// 顶部横幅是 DOM 覆盖层(不是 Phaser 画的),原来在结束时糊在画面正中,
 	// 挡着小镇。改成一个开关,想恢复把 SHOW_DONE_BANNER 改回 true 即可。
 	const SHOW_DONE_BANNER = false;
+	// 事件横幅(【price】/【media】/【disclosure】…)。同样默认关闭,理由见使用处。
+	const SHOW_EVENT_BANNER = false;
 
 	function showDoneBanner(reason, extra) {
 		if (!SHOW_DONE_BANNER) return;
@@ -646,7 +648,11 @@
 			} else if (msg.type === "story") {
 				// Story event injection: highlight in console + red banner flash
 				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));
-				var banner = document.getElementById("story-banner");
+				// 2026-10-10 用户要求:事件横幅(【price】当日收盘…)也**默认关闭**。
+				// 事件本身不会丢 —— 上面那行 devLog 已经把【类型】内容 → 目标 记进
+				// 开发者控制台,右栏"结果记录"里也有事件列表;横幅只是浮在画面正中的
+				// 一层 DOM 覆盖层,会挡住小镇。想恢复把 SHOW_EVENT_BANNER 改 true。
+				var banner = SHOW_EVENT_BANNER ? document.getElementById("story-banner") : null;
 				if (banner) {
 					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#ffe0e0;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
 					banner.style.display = "block";
