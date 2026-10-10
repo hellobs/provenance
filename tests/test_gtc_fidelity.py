@@ -85,7 +85,7 @@ def test_branch_to_timeline_mapping():
 def test_t0_event_is_the_hcm_rumour():
     """S1:39/54:T0 的标的是 HCM 的「120-150 亿元潜在订单」传闻。"""
     blob = json.dumps(TL.T0_EVENTS, ensure_ascii=False)
-    assert "120-150" in blob and "HCM" in blob, blob[:200]
+    assert "12-15 billion" in blob and "HCM" in blob, blob[:200]
 
 
 def test_timeline_prices_match_source():

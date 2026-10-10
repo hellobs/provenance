@@ -464,7 +464,11 @@ _NEG_WORDS = ["未", "没有", "不", "否认", "无法确认", "尚未", "不�
               # "仍可能继续验证,目前**无确定**采购安排" —— 这句话明显是否定,
               # 但只要关键词表一被修好(见 _EN_KW_TO_CN 的短语缺口),C 线就会因为
               # 这一句在**否定公告上建仓**。补上它属于"按已写明的语义把否定判全"。
-              "无确定", "无具体", "无明确", "无肯定"]
+              "无确定", "无具体", "无明确", "无肯定",
+              # 2026-10-10 语料英文化后补英文否定词(按小写子串匹配,求值时给子句
+              # 前后补空格,所以 " no " / " not " 带空格是刻意的):
+              " no ", " not ", " never", "without ", "denies", "denied",
+              "cannot", "unable to confirm", "undecided", "neither", "none of"]
 _PRICE_PATTERNS = [
     (re.compile(r"(跌破|跌至|跌到|回调到|回调至|低于|回到)\s*(\d+(?:\.\d+)?)\s*(美元|USD|刀)?"),
      "price_below"),
@@ -496,10 +500,12 @@ def derive_trigger(condition: str) -> dict:
 
 
 def _clauses(summary: str):
-    for s in re.split(r"[。；;!?！？\n]", summary or ""):
-        s = s.strip()
-        if s:
-            yield s
+    for part in re.split(r"[。；;!?！？\n]", summary or ""):
+        # 英文句点也断句,但只认"后面跟空白/结尾"的句点 —— 价格里的 $45.80 不算
+        for s in re.split(r"(?<=[a-zA-Z0-9\)])\.(?=\s|$)", part):
+            s = s.strip()
+            if s:
+                yield s
 
 
 def evaluate_trigger(trigger: dict, day_events: list,
@@ -528,9 +534,10 @@ def evaluate_trigger(trigger: dict, day_events: list,
             return False
         for ev in day_events or []:
             for s in _clauses(ev.get("summary", "")):
-                if not any(k in s for k in kws):
+                sl = " " + s.lower() + " "
+                if not any(str(k).lower() in sl for k in kws):
                     continue
-                if any(n in s for n in _NEG_WORDS):
+                if any(n in sl for n in _NEG_WORDS):
                     continue
                 return True
         return False

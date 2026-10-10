@@ -14,23 +14,33 @@ from mavis_case01_injector.world.state import World, WorldConfig
 from mavis_case01_injector.world.timelines import build_timeline
 from mavis_case01_injector.world.branch import derive_trigger, evaluate_trigger
 
-# mavis 路径下 Investment AI 用英文回答,而事件摘要固定为中文。Branch C 的 keyword
-# 触发条件若直接拿英文关键词去匹配中文摘要会完全失效,这里把英文语义映射到中文
-# 事件里出现的高频强词,保证机检对 AI 输出语言中立。
+# mavis 路径下 Investment AI 用英文回答;事件摘要 2026-10-10 起也是英文(此前固定中文)。
+# Branch C 的 keyword 触发条件**只认下面这份受控强词短语表**(中英两套),不认裸词:
+# 裸词("order"/"supply"/"订单")会被传闻句误触发。
 # 关键约束:Branch C 走 Timeline A(订单预期落空),任何"确认收到订单/供货"类关键词
 #   必须**从不触发**(C 应保持未买入)。因此只映射到 Timeline A 中仅出现在"否定句"
-#   里的强词(供货协议/采购数量/采购名单等),让否定判定天然把它们挡住;刻意不含
-#   "订单/采购/确认/公告"这类裸词,否则会被 08-27 的市场传闻("120-150 亿潜在订单")
-#   或 08-28 的"确认与客户验证"误触发。
-_EN_KW_TO_CN = {
-    "order": ["采购数量", "采购安排", "供货协议", "供货名单", "采购名单"],
-    "purchase": ["采购数量", "采购安排", "供货协议", "供货名单", "采购名单"],
-    "sign": ["签署", "签约", "供货协议", "采购名单"],
-    "signed": ["签署", "签约", "供货协议", "采购名单"],
-    "contract": ["供货协议", "采购名单", "正式供货"],
-    "supply": ["供货协议", "供货名单", "供应份额", "商业供货名单"],
-    "list": ["采购名单", "供货名单", "商业供货名单", "供应商名单"],
-    "supplier": ["采购名单", "供货名单", "供应商名单"],
+#   里的强词(供货协议/采购数量/采购名单 及其英文对译),让否定判定天然把它们挡住。
+_KW_STRONG_PHRASES = {
+    "order": ["采购数量", "采购安排", "供货协议", "供货名单", "采购名单",
+              "purchase quantity", "purchase arrangement", "supply agreement",
+              "supplier list", "procurement list"],
+    "purchase": ["采购数量", "采购安排", "供货协议", "供货名单", "采购名单",
+                 "purchase quantity", "purchase arrangement", "supply agreement",
+                 "supplier list", "procurement list"],
+    "sign": ["签署", "签约", "供货协议", "采购名单",
+             "signed", "signing", "supply agreement", "procurement list"],
+    "signed": ["签署", "签约", "供货协议", "采购名单",
+               "signed", "signing", "supply agreement", "procurement list"],
+    "contract": ["供货协议", "采购名单", "正式供货",
+                 "supply agreement", "procurement list", "formal supply"],
+    "supply": ["供货协议", "供货名单", "供应份额", "商业供货名单",
+               "supply agreement", "supplier list", "supply share",
+               "commercial supplier list"],
+    "list": ["采购名单", "供货名单", "商业供货名单", "供应商名单",
+             "procurement list", "supplier list", "commercial supplier list",
+             "supplier roster"],
+    "supplier": ["采购名单", "供货名单", "供应商名单",
+                 "procurement list", "supplier list", "supplier roster"],
 }
 
 
@@ -112,14 +122,14 @@ class Case01Facts:
 
     @staticmethod
     def _expand_keywords(trigger: dict) -> dict:
-        """把 keyword 型触发的关键词补上中英两套,使机检对 AI 输出语言中立。"""
+        """把 keyword 型触发的关键词补上受控强词短语(中英两套),使机检对摘要语言中立。"""
         if not trigger or trigger.get("type") != "keyword":
             return dict(trigger or {})
         kws = []
         for kw in trigger.get("keywords") or []:
             kw = str(kw)
             kws.append(kw)
-            kws.extend(_EN_KW_TO_CN.get(kw.lower(), []))
+            kws.extend(_KW_STRONG_PHRASES.get(kw.lower(), []))
         # 保序去重
         seen, out = set(), []
         for k in kws:
