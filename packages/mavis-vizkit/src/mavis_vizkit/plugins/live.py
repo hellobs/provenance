@@ -23,10 +23,15 @@ import asyncio
 import logging
 import os
 import threading
+import time
 from typing import Dict, List, Optional
 
 from .. import Visualizer, register
 from .town import scenario_coords
+
+# 重开请求受理后等多久还没新一局开跑就算它没兑现(秒)。
+# 宁可让人多点一次,也不要因为上一次没兑现把人锁死在门外。
+_RESTART_PENDING_TTL = 45.0
 
 log = logging.getLogger("mavis_vizkit.live")
 
@@ -99,6 +104,8 @@ class LiveVisualizer(Visualizer):
         # 已经受理过一次重开、还没等到新一局开跑 —— 这期间按钮不该再给,
         # 服务端也要挡住重复请求(用户:"既然重开了一次,重开按钮就应该被禁用")。
         self._restart_pending: bool = False
+        # 上一次重开请求被受理的时刻(用于"没兑现就自动失效",见 /control/restart)
+        self._restart_at: float = 0.0
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
         self._server = None
@@ -464,9 +471,20 @@ class LiveVisualizer(Visualizer):
                     payload = {}
                 # 已经受理过一次、还没等到新一局开跑:挡住重复请求
                 # (用户:"既然重开了一次,重开按钮就应该被禁用")
+                #
+                # ⚠ 2026-10-10 用户反馈"一直重开不了":上一次请求受理后**新一局始终没开始**
+                # (回调没兑现 / 服务已换实例),于是这个标记永远为真 ⇒ 按钮永久锁死。
+                # 自愈:受理超过 _RESTART_PENDING_TTL 秒还没有新一局开跑,就认为上一次
+                # 请求没兑现,清掉它重新受理 —— 宁可让人多点一次,不要把人锁死在门外。
                 if self._restart_pending:
-                    return {"ok": False,
-                            "error": "已经重开过一次了:等新一局开始(或这一局结果出来)再点"}
+                    waited = (time.time() - self._restart_at
+                              if self._restart_at > 0 else 0.0)
+                    if waited > _RESTART_PENDING_TTL:
+                        log.info("上一次重开请求过了 %.0f 秒仍没有新一局开跑,自动失效", waited)
+                        self._restart_pending = False
+                    else:
+                        return {"ok": False,
+                                "error": "已经重开过一次了:等新一局开始(或这一局结果出来)再点"}
                 try:
                     res = await asyncio.get_running_loop().run_in_executor(
                         None, lambda: self.on_restart(payload))
@@ -476,6 +494,7 @@ class LiveVisualizer(Visualizer):
                 if isinstance(res, dict) and res.get("ok") is False:
                     return res
                 self._restart_pending = True
+                self._restart_at = time.time()
                 if isinstance(res, dict):
                     res.setdefault("ok", True)
                     return res

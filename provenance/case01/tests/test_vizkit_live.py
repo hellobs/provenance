@@ -238,10 +238,11 @@ def test_second_restart_request_is_refused_until_the_next_run_starts():
     live = _live(port=5077, on_restart=lambda payload: calls.append(payload) or {"ok": True})
     c = TestClient(live.app)
     assert c.get("/health").json()["restart_pending"] is False
-    assert c.post("/control/restart", json={"branch": "A"}).json()["ok"] is True
+    # 2026-10-10:预设分支已全部剔除,请求里**不能再带 branch** ⇒ 这里发空 body
+    assert c.post("/control/restart", json={}).json()["ok"] is True
     assert c.get("/health").json()["restart_pending"] is True
     # 再来一次:被拒(页面此时也不该有按钮,因为 restart_ready 已被清)
-    r2 = c.post("/control/restart", json={"branch": "B"}).json()
+    r2 = c.post("/control/restart", json={}).json()
     assert r2["ok"] is False and "已经重开过一次" in r2["error"]
     assert len(calls) == 1, "第二次请求不该再交给回调"
     # 新一局开跑 → 解除
@@ -486,3 +487,24 @@ def test_canvas_face_ships_no_experiment_vocabulary():
     # 注:case00 专有的那几块 JS(治理/时间轴/重开)仍会随整块模板发出 ——
     # 那是模板共用的结构问题,按 chrome=0 摘 script 需要浏览器复核,
     # 已记在《0924 下一步方向》第九轮 P2。
+
+
+def test_restart_pending_self_heals_when_the_request_was_never_honoured():
+    """上一次重开请求没兑现(新一局始终没开始)⇒ 超时后自动失效,不能把人锁死在门外。
+
+    用户 2026-10-10 反馈"在这里一直重开不了":标记设了之后从没被清过。
+    """
+    import time as _t
+    from fastapi.testclient import TestClient
+    from mavis_vizkit.plugins.live import _RESTART_PENDING_TTL
+
+    calls = []
+    live = _live(port=5078, on_restart=lambda payload: calls.append(payload) or {"ok": True})
+    c = TestClient(live.app)
+    assert c.post("/control/restart", json={}).json()["ok"] is True
+    # 立刻再点:仍然挡住(去重逻辑还在)
+    assert c.post("/control/restart", json={}).json()["ok"] is False
+    # 假装过了 TTL 还没开跑:自动失效,可以再点
+    live._restart_at = _t.time() - (_RESTART_PENDING_TTL + 1)
+    assert c.post("/control/restart", json={}).json()["ok"] is True
+    assert len(calls) == 2, "自愈之后这次请求应当真的交给回调"
