@@ -291,7 +291,12 @@
     // 而 esc 里是 String(x) ⇒ 对象变成字面量 "[object Object]"(用户 2026-10-10 截图)。
     // 这里:字符串原样;对象/数组转**可读 JSON**(缩进两格)。宁可多显示一点内容,
     // 也不要显示一句没用的占位符。
-    var _sum = body.summary;
+    // ⚠ 「摘要」这块装的是**引擎跑批统计**(node_count / interaction_started / retries /
+    // elapsed_s),不是 GTC 会议口径的四大类(基础信息/对话记录/反思结果/问题分流)——
+    // 属于开发者看的工程信息(2026-10-10 用户看过真实内容后确认)。所以**演示面板里隐藏**,
+    // 与「事件」板块同样处置。想恢复把下面这行改回 true。
+    const SHOW_RUN_SUMMARY = false;
+    var _sum = SHOW_RUN_SUMMARY ? body.summary : null;
     if (_sum && typeof _sum !== "string") {
       try { _sum = JSON.stringify(_sum, null, 2); } catch (e) { _sum = String(_sum); }
     }
