@@ -487,7 +487,14 @@ def start(case, args):
         # 子进程留在本开关的进程组里,开关退出后终端的一次 Ctrl+C 会连带把 5010 打死 ——
         # 而 5010 的设计是"跑完还在保持,供人翻记录"。Windows 侧走 DETACHED_PROCESS。
         kwargs = {} if IS_WIN else {"start_new_session": True, "stdin": subprocess.DEVNULL}
-        subprocess.Popen(cmd, cwd=HERE, stdout=fo, stderr=fe,
+        # 子进程必须**用 UTF-8 写 stdout**:Windows 上 Python 默认按 GBK 写,
+        # 于是 live_*.out 落的是 GBK,而 --follow 按 UTF-8 读 ⇒ 满屏乱码
+        # (用户 2026-10-10 贴的 "[case01.llm] !! �˵�ܾ�" 就是这个)。
+        # 只影响日志编码,不改任何行为。
+        child_env = dict(os.environ)
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env.setdefault("PYTHONUTF8", "1")
+        subprocess.Popen(cmd, cwd=HERE, stdout=fo, stderr=fe, env=child_env,
                          creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), **kwargs)
     print("  已起 {} :{}  -> {}".format(case, LIVE[case], " ".join(cmd)))
     print("  日志:{}".format(log))
