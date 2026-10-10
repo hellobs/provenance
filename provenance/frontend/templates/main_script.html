@@ -97,7 +97,9 @@
 		return segs;
 	}
 
-	function setBubble(name, speaker, text) {
+	function setBubble(name, speaker, text, explicitPartner) {
+		// explicitPartner:事件里带的"对话对象"(引擎将来会给)。没有就靠推断。
+		var bubble_explicit_partner = explicitPartner || "";
 		if (!(name in pronunciatios)) return;
 		let t = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
 		if (!t) return;
@@ -125,11 +127,25 @@
 		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
 		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
 		// 正在打的那段已经显示出来了就留着不回退。
-		for (let i = bubble_queue.length - 1; i >= 0; i--) {
-			if (bubble_queue[i].name === name) bubble_queue.splice(i, 1);
+		var partner = _resolvePartner(name, bubble_explicit_partner);
+		if (partner) {
+			bubble_partner[name] = partner;
+			bubble_partner[partner] = name;
 		}
-		for (let i = 0; i < segs.length; i++) {
-			bubble_queue.push({ name: name, text: segs[i], sp: sp, more: i < segs.length - 1 });
+		if (name) bubble_last_speaker = name;
+		var gkey = partner ? _bubbleGroupKey(name, partner) : name;
+		var grp = bubble_groups[gkey];
+		if (!grp) {
+			grp = { lines: [], wait: 0 };
+			bubble_groups[gkey] = grp;
+			bubble_group_keys.push(gkey);
+		}
+		// 同一角色**还没轮到**的旧段作废(已被新台词取代)。
+		for (var gi = grp.lines.length - 1; gi >= 0; gi--) {
+			if (grp.lines[gi].name === name) grp.lines.splice(gi, 1);
+		}
+		for (var i = 0; i < segs.length; i++) {
+			grp.lines.push({ name: name, text: segs[i], sp: sp, more: i < segs.length - 1 });
 		}
 	}
 
@@ -155,10 +171,26 @@
 		if (!bubble_active) {
 			if (bubble_rest_acc < bubble_rest_need) return;   // 还在停顿(换气 / 段间留白)
 			// 取队首。那条若已被同一角色的更新台词顶掉(身份戳对不上),丢掉。
-			while (bubble_queue.length > 0) {
-				let item = bubble_queue[0];
-				if ((bubble_spoken[item.name] || "") !== item.sp) { bubble_queue.shift(); continue; }
-				bubble_queue.shift();
+			// 从**轮转指针**之后开始找第一条有货的对话组(2026-10-10 多角色铺路)。
+			// 只有一个组时轮转退化成原来的全局 FIFO ⇒ **2 角色下行为与之前完全一致**。
+			let item = null, gkey = "";
+			for (let n = 0; n < bubble_group_keys.length; n++) {
+				const idx = (bubble_rr + n) % bubble_group_keys.length;
+				const k = bubble_group_keys[idx];
+				const g = bubble_groups[k];
+				if (!g) continue;
+				// 队首若已被同一角色的新台词顶掉(身份戳对不上),丢掉。
+				while (g.lines.length > 0 && (bubble_spoken[g.lines[0].name] || "") !== g.lines[0].sp) {
+					g.lines.shift();
+				}
+				if (g.lines.length > 0) {
+					item = g.lines.shift();
+					gkey = k;
+					bubble_rr = (idx + 1) % bubble_group_keys.length;
+					break;
+				}
+			}
+			if (item) {
 				// 同一时刻**只留当前发言人的框**:把其它角色屏幕上残留的字清掉。
 				// 两个人同时挂着框,框就得互相让位,而让位必然把某个框甩离它的主人
 				// (2026-10-10 用户截图:Investment AI 的框跑到画面右上角)。
@@ -174,7 +206,7 @@
 				bubble_full[item.name] = item.text;
 				bubble_shown[item.name] = 0;
 				bubble_rest_acc = 0;
-				break;
+
 			}
 			if (!bubble_active) return;
 			return;                      // 这一 tick 只开新段,下一 tick 才开始吐字
@@ -188,7 +220,11 @@
 		if (shown >= full.length) {
 			// 这段念完了:停够再叫下一段。**同一句话还有下一段**时留 2 秒
 			// (用户要求"先留着原本的两秒");换人说话只停 BUBBLE_REST_MS。
-			let nxt = bubble_queue[0];
+			let nxt = null;
+			if (bubble_active_group) {
+				const g = bubble_groups[bubble_active_group];
+				nxt = g && g.lines.length ? g.lines[0] : null;
+			}
 			let sameUtterance = nxt && nxt.name === name && (bubble_spoken[name] || "") === nxt.sp;
 			bubble_rest_need = sameUtterance ? BUBBLE_CHUNK_HOLD_MS : BUBBLE_REST_MS;
 			bubble_rest_acc += BUBBLE_TYPE_MS;
@@ -283,11 +319,34 @@
 	const BUBBLE_CHUNK_HOLD_MS = 2000; // 同一句话被字数上限切成多段时,段与段之间的留白
 	                                  // (2026-10-10 用户:"先留着原本的两秒,再清空气泡框接着说")
 	var bubble_type_acc = 0;          // 打字机计时累加器(ms)
-	var bubble_queue = [];            // 待念的台词,按到达顺序 [{name, text}]
 	var bubble_active = "";           // 当前正在念的那句的说话人(一次只念一句)
+	// ---- 按"对话对"分组的队列(2026-10-10,为多角色铺路) ----
+	// 为什么分组:mavis 的对话是**两两**进行的,A×B 在聊时不该被 C×D 的积压拖死。
+	// 但**同一时刻只能有一个气泡可见**(两个框同屏就会互相让位,把框甩离主人)。
+	// 所以"并行"只体现在排队维度:每段对话一条独立队列,显示哪一条由轮转仲裁。
+	// 只有一个对话组时,轮转退化成原来的全局 FIFO ⇒ **行为与之前完全一致**。
+	var bubble_groups = {};           // key -> {lines: []}
+	var bubble_group_keys = [];       // 组的存在顺序(轮转用)
+	var bubble_rr = 0;                // 轮转指针
+	var bubble_partner = {};          // 角色 -> 它的对话对象
+	var bubble_last_speaker = "";     // 没有显式 listener 字段时的推断依据
+
+	function _bubbleGroupKey(a, b) {
+		return a < b ? a + "\u0001" + b : b + "\u0001" + a;
+	}
+
+	// 取"这句话属于哪段对话"。优先用事件里的显式字段(引擎将来会给),
+	// 没有就退回"最近的不同说话人"——两人对话时这永远正确。
+	function _resolvePartner(name, explicit) {
+		if (explicit) return explicit;
+		if (bubble_last_speaker && bubble_last_speaker !== name) return bubble_last_speaker;
+		return bubble_partner[name] || "";
+	}
+
 	var bubble_rest_acc = 0;          // 一段念完后的停顿累计(ms)
 	var bubble_rest_need = 0;          // 这次要停够多久才开下一段(换气 vs 段间 2 秒)
 	var bubble_active_text = "";       // 当前正在念的那一段的全文
+	var bubble_active_group = "";      // 当前这段属于哪段对话(分组队列用)
 	var bubble_active_sp = "";         // 当前那一段的身份戳(认"已被新台词顶掉")
 	var bubble_spoken = {};            // 角色 -> 他这一整段话的身份戳(认"被顶掉的旧段")
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)

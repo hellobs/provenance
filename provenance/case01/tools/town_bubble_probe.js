@@ -54,6 +54,26 @@ const mk = () => ({ _t: '', setText(v) { this._t = v; } });
 sandbox.pronunciatios['B'] = mk();
 sandbox.pronunciatios['C'] = mk();
 
+function resetBubbles() {
+  sandbox.bubble_group_keys.length = 0;
+  for (const k in sandbox.bubble_groups) delete sandbox.bubble_groups[k];
+  sandbox.bubble_rr = 0;
+  sandbox.bubble_active = ''; sandbox.bubble_active_text = '';
+  sandbox.bubble_active_sp = ''; sandbox.bubble_active_group = '';
+  sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+  sandbox.bubble_last_speaker = ''; sandbox.bubble_partner = {};
+}
+
+function allLines(name) {
+  const out = [];
+  for (const k of sandbox.bubble_group_keys) {
+    for (const q of (sandbox.bubble_groups[k] || {}).lines || []) {
+      if (q.name === name) out.push(q);
+    }
+  }
+  return out;
+}
+
 // 1) 存全文
 sandbox.setBubble('B', 'Ethan Lin', '你好世界');
 ok(sandbox.bubble_full['B'] === '你好世界', 'setBubble 存全文');
@@ -86,7 +106,7 @@ const SENTENCES = 'The company officially confirmed validation talks with an int
   + 'I cannot confirm the rumour and therefore do not recommend buying now. ';
 const full = SENTENCES.repeat(3);
 sandbox.setBubble('B', 'Ethan Lin', full);
-const segs = sandbox.bubble_queue.filter((q) => q.name === 'B');
+const segs = allLines('B');
 const joined = segs.map((q) => q.text).join(' ');
 ok(joined.replace(/\s+/g, '') === full.replace(/\s+/g, ''),
    '各段拼起来必须等于原文(一个字都不丢),实得 ' +
@@ -101,9 +121,7 @@ ok(segs.every((q) => !/\s$/.test(q.text)),
 // 4b) 同一角色又开口时,**正在念的那一段不能从头重打**
 //     (2026-10-10 用户:"说话说到一半突然来了属于它自己的新的一段话,他会突然打断,
 //      然后重复原来说的一般的话之后再继续往下说")
-sandbox.bubble_queue.length = 0;
-sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
-sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+resetBubbles();
 sandbox.setBubble('B', 'Ethan Lin', '第一句话很长很长很长很长很长很长很长很长很长。');
 for (let i = 0; i < 6; i++) { sandbox.bubble_type_acc = 999; sandbox.tickBubbles(16.67); }
 const beforeNew = sandbox.pronunciatios['B']._t;
@@ -119,11 +137,10 @@ ok(sandbox.pronunciatios['B']._t.length > beforeNew.length
    sandbox.pronunciatios['B']._t + '" 接在 "' + beforeNew + '" 之后');
 
 // 4c) 价格里的**小数点不是句号**(2026-10-10 用户反馈"$47.30 被拆掉了")
-sandbox.bubble_queue.length = 0;
-sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
+resetBubbles();
 const MONEY = 'The closing price was $47.30 on Tuesday. It then moved to $48.05. ';
 sandbox.setBubble('B', 'Ethan Lin', MONEY.repeat(4));
-const mseg = sandbox.bubble_queue.filter((q) => q.name === 'B');
+const mseg = allLines('B');
 ok(mseg.every((q) => !/\$\d+\.?$/.test(q.text)),
    '任何一段都不能以 "$47." 这样半个价格收尾(小数点被当句号),实得各段末: ' +
    mseg.map((q) => q.text.slice(-6)).join(' | '));
@@ -132,9 +149,7 @@ ok(mseg.map((q) => q.text).join(' ').includes('$47.30')
    '两个价格都必须完整出现在某一段里');
 
 // 5) 新句覆盖(没有正在念的段时,新句从头开始吐)
-sandbox.bubble_queue.length = 0;
-sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
-sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+resetBubbles();
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');
 ok(sandbox.bubble_full['B'] === '新的一句' && sandbox.bubble_shown['B'] === 0,
    '没有正在念的段时,新句从头开始吐');
@@ -151,9 +166,7 @@ ok(sandbox.bubble_full['C'] === '发呆' && sandbox.bubble_shown['C'] === 2,
 // 8) 一次只念一句(2026-10-10 用户:"Ethan 打字机效果说完之后,AI Investor 才应该
 //    开始打字机,这才拟真")。原来 `tickBubbles` 把所有角色一起吐 ⇒ 两人同时打字。
 // 前面的块留下了 active 段,这里先清干净,各块互不串味
-sandbox.bubble_queue.length = 0;
-sandbox.bubble_active = ''; sandbox.bubble_active_text = ''; sandbox.bubble_active_sp = '';
-sandbox.bubble_rest_acc = 0; sandbox.bubble_rest_need = 0;
+resetBubbles();
 sandbox.setBubble('B', 'Ethan Lin', '一二三四五');
 sandbox.setBubble('C', 'Investment AI', 'ABCDEFG');
 let both = 0, bDoneAt = -1, cStartAt = -1;
