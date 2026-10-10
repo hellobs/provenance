@@ -65,6 +65,7 @@ class MavisBridge:
         visualizers: Optional[List[object]] = None,
         c_plan_file: str = "",
         debug_note: str = "",
+        node_cap: int = 0,
         judge_llm: Optional[object] = None,
         backend_kind: str = "",
         think_workers: int = 0,
@@ -73,7 +74,13 @@ class MavisBridge:
         self.nodes = list(nodes or [])
         # 调用方给的序列长度就是它要的步数(冒烟/收时间窗用的截断也在这里)。
         # judge 模式下换时间线时要按它重新截,否则"只跑前 N 个节点"会被换回完整序列。
-        self._node_cap = len(self.nodes)
+        #
+        # ⚠ 2026-10-10 修:剔除预设分支后,判定前的种子节点改成 **只排 T0 那天**
+        # (`default_nodes("undetermined")`),于是 `len(self.nodes)` 只有 1~2 —— 而
+        # 判定后 `_decide_branch_from_t0` 会用 `self._node_cap` 把换回来的完整时间线
+        # **砍到只剩 1~2 个节点**,表现为"推演半分钟就结束、0/2 节点"。
+        # 所以:**显式传 node_cap 才截断**;0 = 不截断(默认)。
+        self._node_cap = max(0, int(node_cap))
         self.roles = tuple(roles)
         # 并行思考线程数。0 = 按角色数(今天的行为)。
         # 为什么这跟"可复现"有关:引擎那 15 个 `random.*` 走的是**进程全局** RNG,

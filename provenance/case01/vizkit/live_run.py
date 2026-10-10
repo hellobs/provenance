@@ -267,16 +267,16 @@ def main(argv=None):
             restart_flag.clear()
             # 分支**只能由 T0 回答判定**(预设已全部剔除,2026-10-10):
             # 这里只排 T0 那一天,判定落地后由桥把后续节点整段换成该分支的时间线。
+            # 判定前只排 T0 那天(分支还没判出来),完整时间线由桥在判定后换上。
+            # ⚠ 这里**不能**对 T0-only 的种子做 `nodes[:N]` 截断 —— 那样 N 会变成
+            # "整局只有 N 个节点"。截断改由 `node_cap` 传给桥,在判定换完时间线之后再截。
             nodes = default_nodes("undetermined", roles=list(roles))
             debug_note = ""
-            if args.nodes > 0:
-                if args.nodes < len(nodes):
-                    # 截断会把"末节点"变成最终反馈节点(1 节点跑时 T0 就是末节点,
-                    # Ethan 张口就是"我没买…"),这种跑只适合自测 → 记录里必须标出来。
-                    debug_note = ("--nodes {} 截断了节点序列({}→{}):末节点被当成最终反馈节点"
-                                  .format(args.nodes, len(nodes), args.nodes))
-                    print("**调试跑**:" + debug_note)
-                nodes = nodes[:args.nodes]
+            node_cap = int(args.nodes or 0)
+            if node_cap > 0:
+                debug_note = ("--nodes {} 截断了整局节点序列:末节点被当成最终反馈节点"
+                              .format(node_cap))
+                print("**调试跑**:" + debug_note)
             # 每跑一次就该有一个能唯一定位的名字:**日期在最前**(便于按时间排序)、
             # 带 case 与引擎、实跑再带 HHMM(同一天跑多次也不撞)。名字里的日期是
             # **真实运行时间**;记录里的 start_date/end_date 是模拟剧情日期,不是一回事。
@@ -338,7 +338,7 @@ def main(argv=None):
                 pass
             bridge = MavisBridge(
                 nodes=nodes, roles=roles, scenario_dir=scenario,
-                run_id=run_id,
+                run_id=run_id, node_cap=node_cap,
                 dry_run=False, max_retries=args.max_retries,
                 debug_note=debug_note,
                 visualizers=[live],
