@@ -14,7 +14,7 @@ from case01.tests._fakes import FakeLLM
 ROLES = ("Investment AI", "Ethan Lin")
 
 
-def _bridge(branch="A", mode="judge", llm=None):
+def _bridge(mode="judge", llm=None):
     b = MavisBridge(nodes=[], roles=ROLES, scenario_dir="", run_id="r-judge",
                     dry_run=True, branch=branch, branch_mode=mode)
     b.c_plan_llm = llm or FakeLLM('{"branch": "B", "reason": "cautious"}')
@@ -34,7 +34,7 @@ def test_judge_mode_does_not_claim_preset_before_t0():
     """
     from case01.injector.nodes import NodeSpec
 
-    b = _bridge(branch="B", mode="judge")
+    b = _bridge(mode="judge")
     assert b.run_record()["branch_source"] == "", "T0 之前应为空(待判定)"
 
     raw = {"schema_version": "injector-0.1", "run_id": "r-pending", "mode": "mavis",
@@ -45,28 +45,23 @@ def test_judge_mode_does_not_claim_preset_before_t0():
                       "dialogue": [{"x": [["Investment AI", "unclear"]]}],
                       "world_state": {"date": "2026-08-27", "branch": "B"}}],
            "world_audit": [], "summary": {"node_count": 1}, "c_plan": {}}
-    ba = run_pipeline(branch="B", raw_record=raw, dry_run=True)["branch_action"]
+    ba = run_pipeline(raw_record=raw, dry_run=True)["branch_action"]
     assert ba["source"] == "judge" and ba["pending"] is True
     assert "待 T0 判定" in ba["judge"]
 
     b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
     assert b.branch_source == "judge" and b.judge_info.get("detected") == "B"
-    after = run_pipeline(branch="B",
-                         raw_record=dict(raw, branch_source="judge",
+    after = run_pipeline(raw_record=dict(raw, branch_source="judge",
                                          judge_info=b.judge_info), dry_run=True)
     assert after["branch_action"]["pending"] is False
     assert after["branch_action"]["source"] == "judge"
 
 
-def test_default_mode_is_preset():
-    assert MavisBridge(nodes=[], roles=ROLES, scenario_dir="", dry_run=True).branch_mode == "preset"
 
-
-def test_bad_mode_is_rejected():
-    with pytest.raises(ValueError):
-        MavisBridge(nodes=[], roles=ROLES, scenario_dir="", dry_run=True,
-                    branch_mode="whatever")
-
+# 2026-10-10 用户"绝对不允许预设,预设的板块全部剔除"⇒ 删掉两条纯预设用例:
+#   - test_default_mode_is_preset(断言默认 branch_mode=="preset")
+#   - test_bad_mode_is_rejected(断言 branch_mode 非法值要报错)
+# branch_mode 这个档位本身已从 bridge / 清单 / CLI 里删除,没有可断言的对象了。
 
 def test_judge_sets_branch_and_source():
     """judge:分支由 T0 回答判定,并记下判定依据(不许静默)。"""
@@ -105,7 +100,7 @@ def test_judge_llm_failure_retries_then_stops():
             raise RuntimeError("ollama unavailable")
 
     llm = _Boom()
-    b = _bridge(branch="B", llm=llm)
+    b = _bridge(llm=llm)
     from case01.injector.nodes import NodeSpec
 
     b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
@@ -123,7 +118,7 @@ def test_judge_invalid_text_never_silently_becomes_c():
             return 'Analysis without valid JSON; perhaps "branch":"C"'
 
     llm = _Bad()
-    b = _bridge(branch="A", llm=llm)
+    b = _bridge(llm=llm)
     from case01.injector.nodes import NodeSpec
 
     b._decide_branch_from_t0(_rec(), NodeSpec(node_id="node-1", date="2026-08-27"))
@@ -172,7 +167,7 @@ def test_mapping_uses_judged_branch_and_stamps_source():
                                           "I would not recommend buying now."]]}],
                       "world_state": {"date": "2026-08-27", "branch": "B"}}],
            "world_audit": [], "summary": {"node_count": 1}, "c_plan": {}}
-    rec = run_pipeline(branch="A", raw_record=raw, dry_run=True, branch_source="judge")
+    rec = run_pipeline(raw_record=raw, dry_run=True, branch_source="judge")
     assert rec["branch"] == "B"
     assert rec["branch_action"]["source"] == "judge"
     assert rec["branch_action"]["judge_info"]["detected"] == "B"
