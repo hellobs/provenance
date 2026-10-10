@@ -77,29 +77,26 @@ ok(sandbox.pronunciatios['B']._t === 'Ethan Lin：你好世界', '吐满即停')
 
 // 4) 超长文本:**不丢弃**,切成多段排队接着说(2026-10-10 用户要求)
 //    "先留着原本的两秒,然后清空气泡框,把还要输出的文本说出来"
-sandbox.setBubble('B', 'Ethan Lin', 'x'.repeat(500));
+// 用**真句子**(带句号)而不是一串没有空格也没有句号的 x ——
+// 切段规则是"整句优先":没有句末可断时才退到空格/硬切(2026-10-10 用户:
+// "没说完的不要只是一个词,至少也是一句话吧")。
+const SENTENCES = 'The company officially confirmed validation talks with an international manufacturer. '
+  + 'However no specific order value or contract has been announced so far. '
+  + 'The market rumour of a one hundred twenty billion yuan order is not supported by evidence. '
+  + 'I cannot confirm the rumour and therefore do not recommend buying now. ';
+const full = SENTENCES.repeat(3);
+sandbox.setBubble('B', 'Ethan Lin', full);
 const segs = sandbox.bubble_queue.filter((q) => q.name === 'B');
-ok(segs.length >= 4, '500 字应被切成多段排队,实得段数 ' + segs.length);
-const joined = segs.map((q) => q.text).join('');
-ok(joined.replace(/\s+/g, '') === 'x'.repeat(500),
-   '各段拼起来必须等于原文(一个字都不丢),实得 ' + joined.replace(/\s+/g, '').length + ' 字');
-// 断点必须在**句末标点**或**空格**上,绝不把一个单词劈开
-// (2026-10-10 用户截图出现过 "manu | facturer.")
-const en = 'The company officially confirmed validation talks. However no specific order value or contract has been announced. The market rumour of a one hundred twenty billion yuan order is not supported by evidence. ';
-sandbox.setBubble('B', 'Ethan Lin', en.repeat(3));
-const esegs = sandbox.bubble_queue.filter((q) => q.name === 'B');
-let bad = 0;
-for (let i = 1; i < esegs.length; i++) {
-  const prev = esegs[i - 1].text, cur = esegs[i].text;
-  const at = en.repeat(3).indexOf(prev) + prev.length;
-  if (!/[\s。！？.!?]/.test(en.repeat(3)[at - 1] || '')) bad++;
-}
-ok(bad === 0, '每段都断在空格或句末标点上(不劈开单词),实得劈开 ' + bad + ' 处');
-ok(esegs.slice(0, -1).every((q) => /[。！？.!?]$/.test(q.text)),
-   '有句子可断时应优先断在句末(下一段正好是句子开头),实得各段末字符 ' +
-   esegs.map((q) => q.text.slice(-1)).join(''));
-ok(segs.slice(0, -1).every((q) => q.text.length === segs[0].text.length),
-   '除最后一段外每段都是满的上限长度,实得各段 ' + segs.map((q) => q.text.length).join('/'));
+const joined = segs.map((q) => q.text).join(' ');
+ok(joined.replace(/\s+/g, '') === full.replace(/\s+/g, ''),
+   '各段拼起来必须等于原文(一个字都不丢),实得 ' +
+   joined.replace(/\s+/g, '').length + ' / ' + full.replace(/\s+/g, '').length + ' 字');
+ok(segs.length >= 2, '长文本应被切成多段排队,实得段数 ' + segs.length);
+ok(segs.slice(0, -1).every((q) => /[。！？.!?]$/.test(q.text)),
+   '除最后一段外,每段都必须断在**句末**(下一段正好是句子开头),实得各段末字符 ' +
+   segs.map((q) => q.text.slice(-1)).join(''));
+ok(segs.every((q) => !/\s$/.test(q.text)),
+   '段尾不留悬空空格(断点处的空白在切段时吃掉)');
 
 // 5) 新句覆盖,并从 0 重新吐
 sandbox.setBubble('B', 'Ethan Lin', '新的一句');

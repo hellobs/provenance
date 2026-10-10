@@ -362,6 +362,11 @@ def main(argv=None):
                 print("运行完成:", json.dumps(record.get("summary") or {}, ensure_ascii=False))
                 print("  分支:{} (source={}) run_id={}".format(
                     record.get("branch"), record.get("branch_source"), run_id))
+                # 谁写的 Ethan 的台词 —— 必须一眼可见(2026-10-10 用户:"这个字段也要显示啊")。
+                # 之前这个信息只埋在 run.json 里,页面上完全看不出来。
+                _eb = record.get("ethan_backend") or "unknown"
+                _warn = "" if _eb.startswith("api(") else "   ← 警告:不是外部 API!"
+                print("  Ethan 后端: {}{}".format(_eb, _warn))
                 bridge.save(out)
                 print("记录已保存 ->", out)
                 # 派生参数随记录同目录留痕(不动 run.json 的键集)

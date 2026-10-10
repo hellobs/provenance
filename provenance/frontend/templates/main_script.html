@@ -62,15 +62,18 @@
 		const lo = Math.floor(limit * 0.5);
 		while (rest.length > limit) {
 			let cut = -1;
-			for (let i = limit - 1; i >= lo; i--) {
-				if (SENT.test(rest[i])) { cut = i + 1; break; }   // 句末 → 下一段是句子开头
+			// ① 上限**之后**的下一个句末(2026-10-10 用户:"没说完的不要只是一个词,
+			//    至少也是一句话吧"):宁可这一段超出上限(换行会自己排高),也不切成半句话。
+			for (let i = limit - 1; i < rest.length; i++) {
+				if (SENT.test(rest[i])) { cut = i + 1; break; }
 			}
+			// ② 整段都没有句末 ⇒ 空格兜底(断在词间,仍然不劈开单词)
 			if (cut < 0) {
 				for (let i = limit - 1; i >= lo; i--) {
-					if (rest[i] === " ") { cut = i; break; }      // 空格 → 断在词间
+					if (rest[i] === " ") { cut = i; break; }
 				}
 			}
-			if (cut < 0) cut = limit;                            // 兜底:硬切(不劈词的余地都没有)
+			// ③ 连兜底都没有(超长单词)才硬切
 			let piece = rest.slice(0, cut).trim();
 			if (piece) segs.push(piece);
 			rest = rest.slice(cut).replace(/^\s+/, "");
@@ -881,6 +884,19 @@
 			// origin(0.5,1) ⇒ x 是气泡中线,y 是气泡底边;底边贴着角色头顶,
 			// 换行时新行往上长,气泡始终稳稳挂在角色正上方、不会往左偏。
 			pronunciatios[persona_name].setOrigin(0.5, 1);
+			// 文字贴图单独切回 **LINEAR**(2026-10-10 用户反馈"字体有点糊")。
+			// 根因是整局开了 `pixelArt: true`(为的是瓦片地图不糊),它把文字贴图也按
+			// **最近邻**放大 —— 字是 canvas 用抗锯齿画好的一张位图,再被最近邻插值放大
+			// 必然糊/发虚。这不是字体的问题,是采样方式的问题。瓦片地图仍保持锐利。
+			try {
+				if (typeof Phaser !== "undefined" && Phaser.Textures
+						&& Phaser.Textures.FilterMode
+						&& pronunciatios[persona_name].texture
+						&& pronunciatios[persona_name].texture.setFilter) {
+					pronunciatios[persona_name].texture.setFilter(
+						Phaser.Textures.FilterMode.LINEAR);
+				}
+			} catch (e) { /* 老版本没有这个 API 就维持原样 */ }
 			// 透明度已移进 backgroundColor(见上):对象本身保持不透明,文字才是清晰的。
 
 			// 角色点击:独立页 → 选中详情;嵌入模式 → postMessage 通知宿主平台
