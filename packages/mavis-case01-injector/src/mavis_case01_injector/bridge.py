@@ -594,10 +594,20 @@ class MavisBridge:
             self._pin_for_interaction(node)
 
     def _pin_for_interaction(self, node: NodeSpec) -> None:
-        """强制交互前把两个角色放到同一格、清空路径、必要时补日程。
+        """强制交互前:清空路径、必要时补日程 —— **默认不再把两人钉到同一格**。
 
-        mavis 的对话前置条件看的是运行时状态（agent.path / agent.action / daily_schedule）,
-        只改 config 不够;这里用既有公开方法（move / make_schedule）把状态摆好,不改框架。
+        为什么不再钉同址(2026-10-10):`meeting_coord` 未显式给出时,原实现把两个角色
+        一起 `move` 到 `roles[0]` 所在的格子,于是场景配置里的初始距离
+        (`injector/scenario/agents/<role>/agent.json` 的 `coord`)在第一个交互节点就被抹掉 ——
+        画面上两人从一开始就是叠在一起的,而且相向而行时互相推,
+        出现"一个人一直在原地踏步/反过来走"。
+
+        查实 mavis 的对话前置条件(`Agent._chat_with_locked`)只要求:
+          ①双方已生成 daily_schedule;②`_skip_react` 为假(非睡眠 / 非"待开始");
+          ③`other.path` 为空;④当前不在"对话"事件里;⑤冷却(forced 时跳过)。
+        **没有一条与"是否同一格"有关** —— 同址从来不是必要条件,原注释把
+        "运行时状态"读窄了。真正要摆的只有日程与空路径,下面照旧做。
+        调用方显式传了 `meeting_coord`(就是要"在某处碰面")时,仍然照它 move。
 
         越界声明（见 `docs/case01_触点白名单.md` 第三、四节）:下面两处碰了 mavis 的
         半公开/内部状态,暂留并已登记收编计划:
@@ -605,11 +615,7 @@ class MavisBridge:
         - 直写 `agent.path = []`,因为清空运行时路径没有公开入口。
         两处都只影响 case01 自己的进程,不改 mavis 语义;收编放到 mavis 下次动扩展面时。
         """
-        coord = self.meeting_coord
-        if coord is None and self.roles:
-            first = self.roles[0]
-            if first in (self.game.agents or {}):
-                coord = list(self.game.get_agent(first).coord)
+        coord = self.meeting_coord      # 显式指定碰面位置时才动位置
         for name in self.roles:
             agent = (self.game.agents or {}).get(name)
             if agent is None:
@@ -617,7 +623,7 @@ class MavisBridge:
             try:
                 # [越界·半公开] schedule.daily_schedule 是子对象内部字段。
                 # 归属演示/编排层(见 docs/case01_触点白名单.md §〇):只为"节点时刻
-                # 需要一段对话"而钉角色同址;只影响是否生成日程,不改 agent 决定。
+                # 需要一段对话"而保证日程已生成;只影响是否生成日程,不改 agent 决定。
                 # make_schedule() 幂等,重复调用由框架自行判断,无需读内部字段——
                 # 但这里需在"未生成"时才调,保留读取以最小化对既有行为的影响。
                 if len(getattr(agent.schedule, "daily_schedule", []) or []) < 1:
@@ -632,8 +638,8 @@ class MavisBridge:
                     self.game.logger.warning(
                         "pin: move failed for {}: {}".format(name, e))
             # [越界·内部状态] 清空运行时路径:没有公开入口,只能直写。
-            # 同上属演示/编排层:mavis 的对话前置条件看运行时 path,同址且空路径
-            # 才可能触发交互;这项只影响"能否触发对话",不经手 agent 的台词。
+            # mavis 的对话前置条件看运行时 path,清空才可能触发交互;
+            # 这项只影响"能否触发对话",不经手 agent 的台词。
             agent.path = []
             cfg = self.config.get("agents", {}).get(name)
             if cfg is not None and coord is not None:
@@ -695,21 +701,49 @@ class MavisBridge:
             print("[case01] 初始坐标取不到,第一段移动可能仍是直线: {}".format(e), flush=True)
             return {}
 
+    def _blocked_by_agents(self, name: str) -> set:
+        """当前**别的角色**正站着的格子,给可视路径当临时障碍。
+
+        2026-10-10 用户指出:"走不到对应的位置因为有人挡住,BFS 这里换条路不就好了吗"。
+        查实:引擎自己的 `Agent.find_path` 早就把"别人站的格子"当临时障碍了
+        (`mavisframework/core/agent_core.py` 的 `_blocked_by_agents` / `_next_step_blocked`),
+        但 case01 实时面走的是本模块的 `_visual_path` —— 它原来是**不带 blocked 的裸 BFS**,
+        于是前端拿到的路径会笔直撞进人身上(实测两人同向走同一段时,后面那个一路顶住前面
+        那个的背,表现为"一直在走却被挡住")。这里补齐同一口径:绕开别人,而不是硬顶。
+        """
+        blocked = set()
+        for other, coord in (self._last_visual_coord or {}).items():
+            if other != name and coord:
+                blocked.add(tuple(coord))
+        return blocked
+
     def _visual_path(self, name, dst):
         """给前端的**可视路径**:从上一次画到的格子走到目标格子,走迷宫的正交路线。
 
-        为什么要单独算:mavis 侧 pin 之后 `agent.path` 被清空(同址且静止才可能触发交互),
+        为什么要单独算:mavis 侧 pin 之后 `agent.path` 被清空(不 pin 时也常为空),
         前端拿不到路径就只能沿直线滑过去 —— 于是**斜着穿格**(2026-09-19 用户实测反馈
         "有的AI走斜线,而不是横着竖着走的")。这里用迷宫 BFS 补一条正交路径,
-        只影响画面,不改 mavis 语义(交互仍按"同址 + 空路径"判定)。
+        只影响画面,不改 mavis 语义(交互仍按"空路径"判定)。
 
-        寻不到路(不可达/同格)返回 None,由调用方回退成直线 —— 但会留一行日志,不静默。
+        绕人:把别的角色当前站的格子当临时障碍(见 `_blocked_by_agents`)。
+        全被挡死时退回不带 blocked 的 BFS —— 与引擎 `Agent.find_path` 同一套兜底,
+        宁可挤过去也别僵住。
+
+        返回值(=给前端的走法):
+          `[]`   无需移动(已经在目标格 / 还没有起点 / 拿不到迷宫);
+          `path` 一条正交路径(逐格);
+          `None` **真的走不过去** —— 调用方据此让角色**停在原地**
+                (2026-10-10 用户:"要是实在过不去,BFS 都给出无解了那就应该要停下!")。
+                此前这里返回 None 后前端会退化成"沿直线滑到目标格",那会穿墙;
+                而且 `src` 还没算出来就先把 `_last_visual_coord` 记成了目标格 ——
+                一次走不通,后面每一步的起点都是错的。现在**走得到才更新**起点。
         """
         src = self._last_visual_coord.get(name)
-        if dst:
+        if not dst:
+            return []
+        if not src or list(src) == list(dst):
             self._last_visual_coord[name] = list(dst)
-        if not src or not dst or list(src) == list(dst):
-            return None
+            return []
         try:
             agents = getattr(self.game, "agents", None) or {}
             agent = agents.get(name)
@@ -717,23 +751,29 @@ class MavisBridge:
                 agent = self.game.get_agent(name)
             maze = getattr(agent, "maze", None) if agent is not None else None
             if maze is None:
-                return None
-            path = maze.find_path(list(src), list(dst))
+                return []
+            blocked = self._blocked_by_agents(name)
+            path = maze.find_path(list(src), list(dst), blocked=blocked) if blocked else None
+            if not path:
+                # 没绕开(全被堵死,或绕路反而算不出):退回裸 BFS
+                path = maze.find_path(list(src), list(dst))
             if path:
+                self._last_visual_coord[name] = list(dst)   # 走得到才更新"当前所在格"
                 return [[int(c[0]), int(c[1])] for c in path]
-            # 不可达:前端只能直线走过去(可能穿墙)——必须留痕,但不重复刷同一对格子
+            # 真的无解:不动 `_last_visual_coord`(起点保持原样),返回 None 让调用方停下。
+            # 必须留痕但不重复刷同一对格子。
             key = (name, tuple(src), tuple(dst))
             if key not in self._visual_path_warned and self.game is not None:
                 self._visual_path_warned.add(key)
                 self.game.logger.warning(
-                    "visual path: {} 从 {} 到 {} 不可达,前端只能直线走过去".format(
+                    "visual path: {} 从 {} 到 {} 无解(BFS 绕不开),停在原地".format(
                         name, list(src), list(dst)))
             return None
         except Exception as e:  # noqa: BLE001 - 画不出来不该打断推演,但要说一声
             if self.game is not None:
                 self.game.logger.warning(
                     "visual path failed for {} {}->{}: {}".format(name, src, dst, e))
-            return None
+            return []
 
     def _emit_agent(self, name, state, sim_time):
         """可视化侧:发一条 agent 事件给 fanout(适配器转发;不需要 step)。"""
@@ -750,7 +790,17 @@ class MavisBridge:
         # 否则前端会沿直线斜穿格子。
         path = state.get("path") or []
         if not path:
-            path = self._visual_path(name, coord) or []
+            path = self._visual_path(name, coord)
+            if path is None:
+                # BFS 无解 ⇒ **停在原地**(2026-10-10 用户要求)。把 coord 换成
+                # "最后一次真正走到的那一格",前端 moveAgent 就地认为已到达,
+                # 一步也不会走 —— 此前这里退化成沿直线滑过去,会穿墙。
+                held = self._last_visual_coord.get(name)
+                if held:
+                    coord = list(held)
+                path = []
+            else:
+                path = path or []
         else:
             if coord:
                 self._last_visual_coord[name] = list(coord)
