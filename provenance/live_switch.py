@@ -585,6 +585,30 @@ def start(case, args):
     return 0
 
 
+# 这些行在窗口里**必须扎眼** —— 服务进程自己的 stdout 是重定向进日志文件的
+# (不是终端),所以染色只能做在"跟随日志读出来再写控制台"这一环
+# (2026-10-10 用户要求"报错那行染红")。
+_HOT = re.compile(
+    r"(运行失败|服务已退出|Traceback \(most recent call last\)|"
+    r"\[case01\.llm\] !!|\[case01\] \[warn\]|\[FAIL\]|\bERROR\b)")
+
+
+def _highlight(chunk):
+    """给错误行染红。**不是终端就不染** —— 免得把 ANSI 写进别的地方。"""
+    try:
+        if not sys.stdout.isatty():
+            return chunk
+    except Exception:  # noqa: BLE001
+        return chunk
+    out = []
+    for line in chunk.splitlines(True):
+        if _HOT.search(line):
+            out.append("\x1b[1;31m" + line.rstrip("\n") + "\x1b[0m\n")
+        else:
+            out.append(line)
+    return "".join(out)
+
+
 def _follow(log, err, interval=1.0):
     """跟读实时面日志。文件还没生成就先等;被截断/轮转则重开。"""
     import time as _t
@@ -611,7 +635,7 @@ def _follow(log, err, interval=1.0):
                 chunk = fh.read()
                 if chunk:
                     pos[path] = fh.tell()
-                    sys.stdout.write(chunk)
+                    sys.stdout.write(_highlight(chunk))
                     sys.stdout.flush()
             except Exception:  # noqa: BLE001
                 try:

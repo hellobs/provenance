@@ -33,7 +33,7 @@ if not exist "%PY%" (
 rem --- tunables (edit if needed) ---------------------------------------------
 set NODES=0
 set HOLD=1800
-set SEED=
+set SEED=20261015
 set RUN_ID=
 rem ---------------------------------------------------------------------------
 
