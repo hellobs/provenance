@@ -111,9 +111,8 @@
 		// (2 秒)**,再清空气泡框接着说下一段 —— 说话有停顿,不是一口气全倒出来。
 		let segs = _splitForBubble(t, BUBBLE_MAX_CHARS);
 		if (segs.length === 0) segs.push(t);
-		// 这一整段话的身份戳:队列里靠它认出"已被新台词顶掉的旧段",直接丢掉。
+		// 这一整段话的身份戳:同一句话被切成多段时,段与段之间靠它认"是同一句"。
 		let sp = t.slice(0, 24) + "#" + segs.length;
-		bubble_spoken[name] = sp;
 		// bubble_full 记**整段话**(给 setActionBubble / flushBubble 判断"有没有对话");
 		// 真正在打的是哪一段由 tickBubbles 推进。
 		bubble_full[name] = t;
@@ -131,8 +130,8 @@
 		if (!nameIsSpeaking) bubble_shown[name] = 0;
 		// 排队:同一时刻**只念一段**,后来到的排到队尾(2026-10-10 用户:
 		// "Ethan 打字机效果说完之后,AI Investor 才应该开始打字机,这才拟真")。
-		// 同一个角色再次开口:他**还没轮到**的旧段全部作废(已被新台词取代),
-		// 正在打的那段已经显示出来了就留着不回退。
+		// 同一角色再开口时**不撤销他还没念到的旧段** —— 队列是台词的字幕,
+		// 撤掉就等于把说过的话抹掉(2026-10-10 用户:"AI 的第二段话似乎被取消掉了")。
 		_preseedRooms();
 		var partner = _resolvePartner(name, bubble_explicit_partner);
 		if (partner) {
@@ -163,10 +162,7 @@
 				bubble_group_keys.splice(mk, 1);
 			}
 		}
-		// 同一角色**还没轮到**的旧段作废(已被新台词取代)。
-		for (var gi = grp.lines.length - 1; gi >= 0; gi--) {
-			if (grp.lines[gi].name === name) grp.lines.splice(gi, 1);
-		}
+		// 同一角色的新台词**追加**在旧段之后(见上方注释:队列是字幕,不是草稿)。
 		for (var i = 0; i < segs.length; i++) {
 			grp.lines.push({ name: name, text: segs[i], sp: sp, more: i < segs.length - 1 });
 		}
@@ -306,9 +302,6 @@
 			if (!g) continue;
 			if (!g.active) {
 				if (g.rest_acc < g.rest_need) continue;      // 还在停顿(换气 / 段间留白)
-				while (g.lines.length > 0 && (bubble_spoken[g.lines[0].name] || "") !== g.lines[0].sp) {
-					g.lines.shift();                        // 已被新台词顶掉,丢掉
-				}
 				if (g.lines.length === 0) continue;
 				_startLine(g, g.lines.shift());
 				continue;                                   // 这一 tick 只开新段,下一 tick 才开始吐字
@@ -318,9 +311,11 @@
 			var full = g.active_text || "";
 			var shown = bubble_shown[name] || 0;
 			if (shown >= full.length) {
-				// 念完了:停够再念下一段。同一句话还有下一段时留 2 秒。
+				// 念完了:停够再念下一段。同一句话还有下一段时留 2 秒
+				// (身份戳要比的是**正在念的这一句**:若比"该角色最后一句",
+				//  这句之后角色又开过口,段间留白就会错取 0.42 秒的换人间隔)。
 				var nxt = g.lines.length ? g.lines[0] : null;
-				var sameUtterance = nxt && nxt.name === name && (bubble_spoken[name] || "") === nxt.sp;
+				var sameUtterance = nxt && nxt.name === name && nxt.sp === g.active_sp;
 				g.rest_need = sameUtterance ? BUBBLE_CHUNK_HOLD_MS : BUBBLE_REST_MS;
 				g.rest_acc += BUBBLE_TYPE_MS;
 				if (g.rest_acc >= g.rest_need) {
@@ -437,7 +432,6 @@
 		return bubble_partner[name] || "";
 	}
 
-	var bubble_spoken = {};            // 角色 -> 他这一整段话的身份戳(认"被顶掉的旧段")
 	var bubble_seq = {};              // 角色 -> 最近一次说话的序号(决定气泡左右摆放的次序)
 	var bubble_seq_counter = 0;
 	// 地图尺寸(create 里填):气泡要钳在画面内,否则站在边上时框会被画布裁掉一半
