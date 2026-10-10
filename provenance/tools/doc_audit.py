@@ -61,45 +61,19 @@ STATE_PARA_RE = re.compile(
 # `GTC/archive/provenance_docs_261010/`,不登记、不生成状态块。
 STATUS = {
     # —— 现行(权威) ——
-    "docs/架构总览与对接指南.md": ("现行", "**治理平台对接的权威口径**(§11 嵌入面与数据接口;2026-09-21)"),
-    "case01/docs/case01_触点白名单.md": ("现行", "case01 侧触碰 mavis 半公开面的白名单,越界要有登记"),
-    "case00/README.md": ("现行", "case00 已冻结;只作对照与展示"),
-    "case01/README.md": ("现行", "case01 子包说明(端口/入口/契约见 `../docs/` 现存 5 份交付文档)"),
-    "case01/injector/README.md": ("现行", "注入器说明"),
     "../../mavis/README.md": ("现行", "mavis 框架说明(英文)"),
     "../../mavis/README_zh.md": ("现行", "mavis 框架说明(中文)"),
     "../../mavis/docs/tutorial-extension.md": ("现行", "接入方可依赖的稳定扩展面(与 1.2.1 对齐)"),
     "../../mavis/docs/tutorial-extension-en.md": ("现行", "扩展面教程(英文)"),
-    "config_tool/README.md": ("现行", "provenance 内置的角色/场景/运行方式配置工具说明"),
-    "config_tool/角色字段清单.md": ("现行", "config_tool 角色表单字段清单(必填/选填口径)"),
     # —— 仓库根 / 本地包 / 工具(2026-09-27 起纳入治理) ——
     # 这 12 份此前在 PKG 之外,既无状态块也不在索引里(见 0923 体检报告之后的补检)。
     # 只给结论明确的标状态;仓库根 docs/ 那 7 份需人工判断归属,先留「待核对」由索引点名。
     "../README.md": ("现行", "provenance 平台总览(英文);本仓入口"),
     "../README_zh.md": ("现行", "provenance 平台总览(中文);本仓入口"),
-    "../packages/mavis-vizkit/README.md": ("现行", "可视化插件包说明(挂 mavis 插件面,与案例解耦)"),
-    "../packages/mavis-case01-injector/README.md": ("现行", "case01 注入器包说明"),
-    "../tools/tilemap_to_maze_README.md": ("现行", "Tiled 地图转 maze.json 的 CLI 工具说明"),
-    "../tools/README.md": ("现行", "仓根 tools/ 与内层 provenance/tools/ 的分工(装新机/起面/打包/搬迁 vs 体检/探针/审计)"),
-    "tools/README.md": ("现行", "内层 tools/ 的体检与探针工具清单(含与仓根 tools/ 的边界)"),
     # —— 已被取代 ——
-    "case01/docs/Governance平台对接说明.md": ("参考(5002 面)", "5002 历史参考；对接使用 5010 契约，审核执行规则以《平台对接契约_5010唯一入口》§三/§四 为准"),
-    "docs/平台对接契约_5010唯一入口.md": ("现行", "**交给治理平台的唯一口径**:嵌入面 + 数据接口 + 质检口径 + 信息边界 + 运维(2026-09-21 起)"),
-    "case01/docs/转接_给下一棒_20260926.md": ("现行", "**当前权威交接**:基线 + 四个方向(行为层证据/GTC 演示/工程收尾/LoRA)+ 坑清单"),
-    "case01/docs/LoRA预准备_20260924.md": ("现行", "LoRA 线预准备:标记→训练 JSONL 管道+校验门已就绪(0 标记,闸门在专家数据侧);环境体检与 Runbook"),
-    "case01/docs/内化与敏感性_定量分析_20260924.md": ("现行", "IVD 定量证据第一批:内化位移 11/12 为正、双模型 Router 敏感性、人工校验框架;工具在 case01/tools/"),
     # 2026-10-08:这条必须与 `case01/docs/金融背景资料库.md` 文首的状态行**逐字一致**——
     # needs_banner 只比 状态/说明 两个值,表里没有这份文件就按兜底 ("待核对","尚未人工核对状态")
     # 判,于是作者写的"现行"永远对不上,doc_audit --check 直接 rc=1(实测合并 origin/main 后红的那条)。
-    "case01/docs/金融背景资料库.md": ("现行", "100 条外部公司资料的导入、可选检索、分段和审计方式。"),
-    "case01/docs/问题清单_20260925.md": ("部分过时", "**现行但部分过时**:六条待修问题清单;问题 2/3/4/6 已修、问题 1 已缓解(待 Branch C 重录)、问题 5 待外部数据(状态见文首)"),
-    "docs/核验主张与证据说明书.md": ("草稿", "GTC 10/15 提交件:五部分(项目概况/评估标准/演示计划/主张登记表/主张与证据对应)。数字全部实测可复跑;含【待填】团队信息与专家署名,提交前删〇节内部须知"),
-    "docs/10月15日演示_运行手册.md": ("现行", "GTC 10/15 现场演示操作手册:启动(一条命令 tools/serve_all.py / 二方案)/三标签/15 分钟走查/故障回退(三级兜底)/口径话说(评委追问标准答法);命令一律 PowerShell 写法"),
-    "case01/docs/GTC侧文档口径补充_拟稿_20260918.md": ("待人工贴入", "拟稿,等研究侧确认后贴进 0904doc 三份 .docx(不可回滚,不在本仓改)"),
-    "case01/docs/case01_可插拔可视化设计.md": ("参考", "可插拔可视化设计(仍有效)"),
-    "case01/docs/框架层级图_LLM接入节点.md": ("参考", "框架层级与 LLM 接入节点;仍有效"),
-    "case01/injector/scenario/README.md": ("现行", "注入器场景(生成物)说明"),
-    "case00/scenario/README.md": ("现行", "case00_village 的运行期素材说明(关系/剧情);2026-10-08 从 `scenarios/investment/` 归并到 cases/ 下"),
 }
 
 # 文件名模式兜底
@@ -222,7 +196,11 @@ SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              # ../.trae/documents/*.md、../.trae/skills/*/SKILL.md 会让外层
              # tests/test_docs_status.py 本地红(CI 绿,因为 CI 机器上没这目录)。
              # 注意 .gitignore 管不到这里 —— 本函数按文件系统 walk,不按 git 索引。
-             ".workbuddy", ".trae")
+             ".workbuddy", ".trae",
+             # 2026-10-10:GTC/ 是文档外迁的落点(已 gitignore)。本函数按文件系统 walk、
+             # 不看 gitignore,不排掉就会把外迁过去的文档扫成"缺状态块"。
+             # 三处名单要一起改:本处、tests/test_docs_status.py、仓库根 .gitignore。
+             "GTC")
 
 
 def md_files(root):

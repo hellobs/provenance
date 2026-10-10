@@ -166,7 +166,13 @@ def _assert_index_dates_match_git(idx):
         if real and real != date:
             bad.append((rel, date, real))
 
-    assert checked > 20, "索引里可核对的日期太少({}),测试没真正生效".format(checked)
+    # floor **从仓内真实存在的 md 数派生**,不写死数字。
+    # 2026-10-10 文档外迁后仓里只剩根两份 README,写死 20 会变成"文档一少就假红";
+    # 而完全不设 floor 又会让测试在"索引空了"时静默通过 —— 两者都不行。
+    _n_md = len(da.md_files(_PKG))     # 用 doc_audit 自己的 walker:它已排掉 venv/
+    floor = min(20, _n_md)             # .pytest_cache/ 等非本仓文档
+    assert checked >= floor, "索引里可核对的日期太少({}<{}),测试没真正生效".format(
+        checked, floor)
     assert not bad, "索引日期与 git 提交日不符(mtime 冒充):\n" + "\n".join(
         "  {} 索引={} git={}".format(*b) for b in bad[:10])
 

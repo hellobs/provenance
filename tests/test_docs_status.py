@@ -31,7 +31,12 @@ SKIP_DIRS = (".git", "node_modules", "__pycache__", "venv", "_shared",
              # 实测:别人在这台机器上跑出来的 .trae/**/*.md 让本文件三条断言本地红
              # (CI 绿 —— CI 机器上没有这个目录)。同机制:tools/doc_audit.py、仓库根
              # .gitignore —— 三处的名单要一起改,只改一处就出现"工具说干净、测试说脏"。
-             ".workbuddy", ".trae")
+             ".workbuddy", ".trae",
+             # 2026-10-10:GTC/ 是赛题材料/文档外迁的落点,已 gitignore。
+             # 不排掉的话本工具会去扫外迁过来的文档 —— 它们没有本仓的状态块约定,
+             # 于是"工具说脏、其实不是本仓的东西"。三处名单要一起改(第三处是
+             # 仓库根 .gitignore)。
+             "GTC")
 BANNER = re.compile(r"^>\s*\*\*(状态|Status)\*\*", re.M)
 # 仓库根两个 README 是入口文档,只留「状态」/「说明」,不带「最后核对」日期(2026-10-01 起);
 # 英文版 README 用英文键 `> **Status**`。
