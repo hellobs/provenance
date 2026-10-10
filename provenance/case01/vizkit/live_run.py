@@ -208,7 +208,7 @@ def main(argv=None):
 
     scenario = args.scenario_dir or SCENARIO
     # 页面上的"重开一局"按钮(用户要求:推演结束后决定要不要重开)。
-    # 回调只做一件事:把重开请求(含页面上选的分支)记下来;真正的重开由下面的主循环执行
+    # 回调只做一件事:校验请求、把"要重开"记下来;真正的重开由下面的主循环执行
     # (不能在回调里直接跑推演,那是 HTTP 线程池的活)。
     restart_flag = threading.Event()
 

@@ -4,7 +4,7 @@
 > **最后核对**:2026-09-27
 > **说明**:注入器说明
 
-归档说明(2026-10-08):本文点名的 `case01_over_mavis_执行计划.md`／`case01_over_mavis_设计说明.md` 已连同其余历史文档移出本仓,原件在需求方机器 `GTC/archive/provenance_docs_261008/case01/docs/`(逐文件哈希见该目录 README);正文里『见 X 第 N 节』这类句子按此查,仓内现行口径看 `docs/文档索引.md`。
+归档说明(2026-10-08):本文点名的 `case01_over_mavis_执行计划.md`／`case01_over_mavis_设计说明.md` 已连同其余历史文档移出本仓,原件在需求方机器 `GTC/archive/provenance_docs_261008/case01/docs/`(逐文件哈希见该目录 README);正文里『见 X 第 N 节』这类句子按此查,仓内现行口径看《平台对接契约_5010唯一入口》(接口口径)与《10月15日演示_运行手册》(怎么起)——`docs/文档索引.md` 那份已于 2026-10-10 退仓。
 
 把 case01 的节点剧本作为"mavis 上的一套事件参数约束"注入。设计依据见
 `../docs/case01_over_mavis_设计说明.md`，执行步骤见 `../docs/case01_over_mavis_执行计划.md`。

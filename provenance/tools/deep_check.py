@@ -267,8 +267,8 @@ for p in mds:
     if len(re.findall(r"^> \*\*状态\*\*", t, re.M)) > 1:
         dups.append(os.path.relpath(p, PKG))
 say("docs", not dups, "状态块重复的文件:{}".format(dups or "无"))
-idx = os.path.join(PKG, "docs", "文档索引.md")
-say("docs", os.path.isfile(idx), "文档索引存在")
+# 这里原本还数一条 `docs/文档索引.md` 是否存在 —— 那份已于 2026-10-10 退仓(提交 f21e4b7,
+# 用户要求 docs/ 只留交付相关的 5 份),守一件故意不存在的东西只会让体检永远带一个 ⚠。
 
 print("=" * 88)
 print("H. 守卫脚本")
