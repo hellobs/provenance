@@ -39,10 +39,14 @@
 	let shown_chats = {};             // chat time keys already shown (dedup)
 
 	// Append dialogue lines (speaker highlighted, auto-scroll)
+	// ⚠ 台词/行动文本是**模型写的**:10 月这一批里 105 句对话含字面 "<br>"、
+	// 347 句含 "<"。直接拼进 innerHTML 会被当标签解析(面板断行、吞掉后文,
+	// 极端情况还能执行),而头顶气泡(Phaser 纯文本)又是照原样显示的 —— 两边对不上。
+	// 所以进 innerHTML 前一律 goalsEscape(),面板与气泡同一份可见文本。
 	function appendChatLine(speaker, text) {
 		let el = document.getElementById("chat-content");
 		if (!el) return;
-		el.innerHTML += `<div style="margin:2px 0;"><span style="font-weight:bold; color:#2d6cdf;">${speaker}</span>：${text}</div>`;
+		el.innerHTML += `<div style="margin:2px 0;"><span style="font-weight:bold; color:#2d6cdf;">${goalsEscape(speaker)}</span>：${goalsEscape(text)}</div>`;
 		el.scrollTop = el.scrollHeight;
 	}
 
@@ -354,13 +358,13 @@
 			line = line.trim();
 			if (!line) continue;
 			if (line.startsWith("Location:")) {
-				html += `<div style="color:#aaa; font-size:12px; margin:2px 0;">${line.slice(9)}</div>`;
+				html += `<div style="color:#aaa; font-size:12px; margin:2px 0;">${goalsEscape(line.slice(9))}</div>`;
 			} else {
 				let idx = line.indexOf(": ");
 				if (idx > 0) {
 					let speaker = line.slice(0, idx);
 					let content = line.slice(idx + 2);
-					html += `<div style="margin:3px 0;"><span style="font-weight:bold; color:#2d6cdf;">${speaker}</span>: ${content}</div>`;
+					html += `<div style="margin:3px 0;"><span style="font-weight:bold; color:#2d6cdf;">${goalsEscape(speaker)}</span>: ${goalsEscape(content)}</div>`;
 					let sp_persona = speaker;
 					if (!(sp_persona in pronunciatios)) {
 						for (let pn in pronunciatios) {
@@ -369,7 +373,7 @@
 					}
 					if (sp_persona in pronunciatios) setBubble(sp_persona, speaker, content);
 				} else {
-					html += `<div style="margin:3px 0;">${line}</div>`;
+					html += `<div style="margin:3px 0;">${goalsEscape(line)}</div>`;
 				}
 			}
 		}
@@ -522,7 +526,7 @@
 		else if (cat === "error") color = "#f44";
 		else if (cat === "sys") color = "#888";
 		var div = document.createElement("div");
-		div.innerHTML = "<span style='color:#888;'>[" + ts + "]</span> <span style='color:" + color + ";'>" + cat + "</span> " + text;
+		div.innerHTML = "<span style='color:#888;'>[" + ts + "]</span> <span style='color:" + color + ";'>" + cat + "</span> " + goalsEscape(text);
 		body.appendChild(div);
 		// Keep at most 300 lines, drop the oldest
 		while (body.children.length > 300) body.removeChild(body.firstChild);
@@ -796,7 +800,7 @@
 				// 一层 DOM 覆盖层,会挡住小镇。想恢复把 SHOW_EVENT_BANNER 改 true。
 				var banner = SHOW_EVENT_BANNER ? document.getElementById("story-banner") : null;
 				if (banner) {
-					banner.innerHTML = "【" + (msg.event_type || "event") + "】" + msg.content + "<br><small style='color:#ffe0e0;'>Affects: " + (msg.targets || []).join(", ") + " @ " + (msg.time || "") + "</small>";
+					banner.innerHTML = "【" + goalsEscape(msg.event_type || "event") + "】" + goalsEscape(msg.content) + "<br><small style='color:#ffe0e0;'>Affects: " + goalsEscape((msg.targets || []).join(", ")) + " @ " + goalsEscape(msg.time || "") + "</small>";
 					banner.style.display = "block";
 					// 闪烁强调(三次),然后保持显示 12 秒
 					banner.style.animation = "none";
@@ -872,8 +876,8 @@
 			let act = (a.action || "").trim();
 			setActionBubble(name, act);
 			if (document.getElementById("agent_desc__" + name)) {
-				document.getElementById("current_action__" + name).innerHTML = act;
-				document.getElementById("target_address__" + name).innerHTML = a.location || "";
+				document.getElementById("current_action__" + name).innerHTML = goalsEscape(act);
+				document.getElementById("target_address__" + name).innerHTML = goalsEscape(a.location || "");
 			}
 		}
 		if (time) setCurrentTime(time);
@@ -910,9 +914,9 @@
 		setActionBubble(name, act);
 
 		if (document.getElementById("agent_desc__" + name)) {
-			if (currently) document.getElementById("agent_desc__" + name).innerHTML = currently;
-			document.getElementById("current_action__" + name).innerHTML = act;
-			document.getElementById("target_address__" + name).innerHTML = location || "";
+			if (currently) document.getElementById("agent_desc__" + name).innerHTML = goalsEscape(currently);
+			document.getElementById("current_action__" + name).innerHTML = goalsEscape(act);
+			document.getElementById("target_address__" + name).innerHTML = goalsEscape(location || "");
 		}
 	}
 
