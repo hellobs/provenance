@@ -109,7 +109,11 @@ body { margin: 0; }
 </div><!-- /#left-col -->
 
 <!-- Story event banner (shown when an event is injected) -->
-<div id="story-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px); left: 50%; transform: translateX(-50%);
+<!-- 居中方式从 `left:50% + translateX(-50%)` 改成 `left:0; right:0; margin:auto`:
+     前者会把元素放到**半像素**上(宽度是奇数时 -50% 是 .5px),浏览器在该层
+     用半像素栅格化文字 ⇒ 整块字发虚(2026-10-10 用户截图)。不透明度/动画照旧。 -->
+<div id="story-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px);
+    left: 0; right: 0; margin-left: auto; margin-right: auto; width: fit-content;
     z-index: 300; background: rgba(220,30,30,0.92); border: 2px solid #fff; border-radius: 8px;
     padding: 10px 18px; font-size: 14px; color: #fff; font-weight: bold; display: none;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 70%; text-align: center;"></div>
@@ -117,7 +121,8 @@ body { margin: 0; }
 <!-- 推演结束的醒目提示(**用户明确要求"推演结束后要有提示"**)。
      状态块那行小字不够——跑完是最该被看见的时刻,所以给一条居中的大横幅:
      结束原因、节点数、以及"结果记录还在生成,约 1-2 分钟"。 -->
-<div id="done-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px); left: 50%; transform: translateX(-50%);
+<div id="done-banner" style="position: fixed; top: calc(var(--top-offset, 0px) + 16px);
+    left: 0; right: 0; margin-left: auto; margin-right: auto; width: fit-content;
     z-index: 320; border: 2px solid #fff; border-radius: 10px; padding: 12px 20px;
     font-size: 14px; color: #fff; font-weight: bold; display: none; max-width: 70%;
     text-align: center; box-shadow: 0 6px 26px rgba(0,0,0,0.35); line-height: 1.6;"></div>

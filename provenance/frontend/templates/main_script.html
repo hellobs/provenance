@@ -328,6 +328,23 @@
 			}
 		};
 		game = new Phaser.Game(config);
+		// 画布尺寸**跟着容器走**(2026-10-10 用户反复反馈"气泡里的字还是糊"):
+		// 画布的后备存储是创建时按容器宽度定的,而 5010 页面右边挂着"结果记录"卡片,
+		// 它加载/折叠/展开都会改容器宽度 ⇒ 画布被 CSS 拉伸 ⇒ 整张图(含文字)发虚。
+		// 这里监听容器尺寸,变了就让 Phaser 重建同样大小的画布,而不是让 CSS 去拉它。
+		// 用阈值避免 resize 事件与自身触发的布局抖动互相追逐。
+		if (isEmbedScene && typeof ResizeObserver !== "undefined" && container) {
+			let lastW = 0, lastH = 0;
+			try {
+				new ResizeObserver(() => {
+					const w = Math.max(320, Math.floor(container.clientWidth) || 864);
+					const h = Math.max(240, Math.floor(window.innerHeight) || 768);
+					if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+					lastW = w; lastH = h;
+					if (game && game.scale) game.scale.resize(w, h);
+				}).observe(container);
+			} catch (e) { /* 老浏览器没有就维持原样 */ }
+		}
 	}
 	let cursors;
 	let player;
