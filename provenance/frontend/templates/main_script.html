@@ -1110,6 +1110,10 @@
 		let bubbles = [];
 		for (let i = 0; i < names.length; i++) {
 			let t = pronunciatios[names[i]];
+			// 没字就**整个藏掉**。Phaser 的 Text 即使内容为空也会照画背景色块
+			// (padding + borderRadius),于是开局每个角色头顶都挂着一枚空黄条
+			// (2026-10-10 用户反馈"文字为空的时候,不应该有显示")。
+			t.setVisible(!!t.text);
 			t.x = chars[i].x + chars[i].w / 2;      // 正上方:对准角色**绘制**的中线
 			t.y = chars[i].y - BUBBLE_GAP;          // 底边贴住头顶
 			if (!t.text) continue;
