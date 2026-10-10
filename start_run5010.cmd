@@ -43,6 +43,19 @@ if not "%HOLD%"==""   set EXTRA=%EXTRA% --hold %HOLD%
 if not "%SEED%"==""   set EXTRA=%EXTRA% --seed %SEED%
 if not "%RUN_ID%"=="" set EXTRA=%EXTRA% --run-id %RUN_ID%
 
+rem --- config tool (mavis config_tool, port 8060) ---------------------------
+rem 5010 顶栏有"配置"链接指向 8060,但它是**独立进程**,没人起它就是死链。
+rem 这里顺手起一份(后台、日志重定向到文件);路径用相对定位,不写死盘符。
+set CFG=%~dp0..\mavis\config_tool
+if exist "%CFG%\app.py" (
+  if not exist "%TEMP%\dsh_srv" mkdir "%TEMP%\dsh_srv" 2>nul
+  start "config_tool 8060" /min "%PY%" "%CFG%\app.py" > "%TEMP%\dsh_srv\config_tool.out" 2>&1
+  echo config tool: http://127.0.0.1:8060/   (log: %TEMP%\dsh_srv\config_tool.out)
+) else (
+  echo config tool: [skip] not found at %CFG%  (顶栏"配置"链接会点不开)
+)
+rem ---------------------------------------------------------------------------
+
 echo interpreter: %PY%
 echo mode: FULL RUN (branch decided by the AI's T0 answer)
 echo entry: http://127.0.0.1:5010/
