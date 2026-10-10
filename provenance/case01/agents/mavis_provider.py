@@ -115,7 +115,13 @@ class Case01SafeProvider:
     def _complete(self, prompt, return_type, temperature=0.5,
                   caller="llm_normal", max_tokens=None, **_kwargs):
         response_format = None
-        if return_type is not None:
+        # ⚠ 2026-10-10 修「该角色每句只剩『嗯』」:mavis 的 prompt 结果里
+        # `return_type` **常常是一个函数**(如 `generate_chat`),不是 pydantic 模型。
+        # 原代码只要 `return_type is not None` 就去取 `.model_json_schema()` ⇒
+        # AttributeError ⇒ 异常被 completion() 吞掉 ⇒ 每次都走 failsafe,
+        # 而 `prompt_generate_chat` 的 failsafe 恰好就是字符串「嗯」。
+        # 所以只有**真的是 pydantic 模型**时才设 json_schema。
+        if return_type is not None and hasattr(return_type, "model_json_schema"):
             response_format = {
                 "type": "json_schema",
                 "json_schema": {
