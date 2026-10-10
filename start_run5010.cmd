@@ -47,14 +47,19 @@ rem --- config tool (mavis config_tool, port 8060) ---------------------------
 rem The 5010 top nav links to 8060, but that is a SEPARATE process nobody starts,
 rem so the link is dead. Start it here (background, output redirected to a file).
 rem Path is relative on purpose -- do NOT hard-code a drive letter.
+rem
+rem !! Never put ( or ) inside an echo that sits in a parenthesised block:
+rem    the ) closes the if/else early and BOTH branches run (2026-10-10: the first
+rem    real run of this file printed "config tool: ...8060/" AND "[skip] not found"
+rem    one after the other). Keep the echo text paren-free.
 rem NOTE: keep this block ASCII-only (see the header note about the ANSI code page).
 set CFG=%~dp0..\mavis\config_tool
 if exist "%CFG%\app.py" (
   if not exist "%TEMP%\dsh_srv" mkdir "%TEMP%\dsh_srv" 2>nul
   start "config_tool 8060" /min "%PY%" "%CFG%\app.py" > "%TEMP%\dsh_srv\config_tool.out" 2>&1
-  echo config tool: http://127.0.0.1:8060/   (log: %TEMP%\dsh_srv\config_tool.out)
+  echo config tool: http://127.0.0.1:8060/  log: %TEMP%\dsh_srv\config_tool.out
 ) else (
-  echo config tool: [skip] not found at %CFG%  (the top-nav link will not open)
+  echo config tool: [skip] not found at %CFG% -- the top-nav link will not open
 )
 rem ---------------------------------------------------------------------------
 
