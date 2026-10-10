@@ -835,9 +835,22 @@ function auditExtra(x) {
   return parts.length ? parts.join(" · ") : "(这条没有再带其他字段)";
 }
 
+// 只列**引擎侧**的交互留痕,与"审计"徽标同一口径(见 BADGE_ROWS 里的 audit 行)。
+// 事实层记账(release_event 单数 / set_branch)是 T0 一次性算出的世界事实,不经过引擎,
+// 2026-10-10 用户两次指出:"最一开始审计里面还是有脏东西"——开局 0 节点时它们就在,
+// 于是徽标写着 0、下面却列着行,看着像脏数据。开局列出的应当是空态。
+const ENGINE_AUDIT = new Set(["release_events", "interaction"]);
+
 function paneAudit(d) {
-  const a = d.audit || [];
-  if (!a.length) return '<div class="card"><div class="empty">无审计记录</div></div>';
+  const all = d.audit || [];
+  const a = all.filter((x) => ENGINE_AUDIT.has(x.action));
+  if (!a.length) {
+    const facts = all.length
+      ? '<div class="empty">本局还没有引擎侧交互留痕(释放事件 / 交互);' +
+        all.length + ' 条事实层记账(公告/媒体/价格/分支判定)不计入审计徽标。</div>'
+      : '<div class="empty">无审计记录</div>';
+    return '<div class="card">' + facts + '</div>';
+  }
   return `<div class="card"><table><thead><tr><th>时间</th><th>动作</th><th>类型</th><th>摘要</th></tr></thead>
     <tbody>${a.map(x => `<tr><td class="num">${esc(x.t)}</td><td>${esc(x.action)}</td>
       <td>${esc(x.kind || "—")}</td><td>${esc(x.summary || auditExtra(x))}</td></tr>`).join("")}</tbody></table></div>`;
