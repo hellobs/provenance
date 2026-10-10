@@ -412,7 +412,7 @@ python live_fastapi.py --name stock-en6 --resume --step 0 --port 5010
   没有密钥痕迹。路径穿越守卫见 `live/netguard.py` 与 mavis 的 `config_tool/_safe_agent_name()`。
 
 代码位置:`live/netguard.py`(绑定与白名单策略)、`tests/test_netguard.py`(行为断言)。
-对接细节见 `provenance/docs/平台对接契约_5010唯一入口.md`,体检结论见 `provenance/provenance/docs/核验主张与证据说明书.md`。
+对接细节见 `provenance/docs/平台对接契约_5010唯一入口.md`,体检结论见 `核验主张与证据说明书.md`**（提交件，不随仓发布；副本在 `GTC/archive/`）**。
 
 ## 13. 校验与交付
 
@@ -427,13 +427,13 @@ python provenance/tools/verify_demo_sync.py --require-zip   # ③ 交付件一�
 
 `--require-zip` 是关键:不加它,**压缩包缺失**会被报成"不适用",于是"删掉包"看起来像通过。
 重打是一条命令(`python tools/make_demo_zip.py`,先加 `--dry-run` 可以只看条目);
-按顺序的交付清单在 `provenance/docs/10月15日演示_运行手册.md`。
+按顺序的交付清单在 `10月15日演示_运行手册.md`**（提交件，不随仓发布；副本在 `GTC/archive/`）**。
 
 **克隆下来没有的东西**:`data/case01/runs/` 与 `data/case00/state/`
 是**故意 gitignore 的**(体积大,且曾经误提交过),所以本仓带的是**派生分析**
 (`provenance/results/analysis/`,已入库),**不含其背后的原始记录**。
 因此依赖原始记录的主张**无法只靠一次克隆复算** —— 这条边界连同"复现三档口径"写在
-`provenance/provenance/docs/核验主张与证据说明书.md` 里。
+`核验主张与证据说明书.md`**（提交件，不随仓发布；副本在 `GTC/archive/`）** 里。
 
 ## 许可证
 

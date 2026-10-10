@@ -184,7 +184,7 @@ cd ../provenance
 
 # 2.2 Create the environment (uv or conda; Python 3.12)
 #     Create it at provenance/.venv-live — in-repo tooling looks for the interpreter
-#     there (tools/run_live_watchdog.ps1, docs/10月15日演示_运行手册.md,
+#     there (tools/run_live_watchdog.ps1, docs/10月15日演示_运行手册.md**（提交件，不随仓发布；副本在 `GTC/archive/`）**,
 #     case01/tools/batch_run.py). tools/setup_all.py does the same by default.
 uv venv provenance/.venv-live --python 3.12
 #   conda users: conda create -n provenance python=3.12 && conda activate provenance
@@ -550,7 +550,7 @@ python provenance/tools/verify_demo_sync.py --require-zip   # 3) bundle consiste
 `--require-zip` matters: without it a **missing** archive is reported as "not applicable", so
 deleting the zip would look like a pass. Repacking is one command
 (`python tools/make_demo_zip.py`, add `--dry-run` to just list the entries first); the ordered
-delivery checklist is `provenance/docs/10月15日演示_运行手册.md`.
+delivery checklist is `10月15日演示_运行手册.md`**（提交件，不随仓发布；副本在 `GTC/archive/`）**.
 
 **What a clone does not contain.** `data/case01/runs/` and
 `data/case00/state/` are deliberately gitignored (large, and once committed by
@@ -558,7 +558,7 @@ accident), so this repository ships the **derived analysis**
 (`provenance/results/analysis/`, tracked) but **not the raw run records behind it**. Claims
 that need those records therefore cannot be recomputed from a fresh clone alone — that
 boundary, with the three reproducibility tiers, is written down in
-`provenance/docs/核验主张与证据说明书.md` and `provenance/docs/核验主张与证据说明书.md`.
+`核验主张与证据说明书.md`**（提交件，不随仓发布；副本在 `GTC/archive/`）**.
 
 ## License
 
