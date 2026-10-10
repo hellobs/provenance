@@ -1,17 +1,25 @@
 # -*- coding: utf-8 -*-
-"""一条命令配好外部 API key(含 Router 用的独立模型),并**联网自检**。
+"""**接外部 API 的唯一入口**:一条命令配好 key 与后端,并**联网自检**。
 
 为什么有它:密钥原本要么设环境变量、要么手写 .secrets.json —— 对第一次接触项目的人
 都不直观(实测:新人卡在这一步)。这里把"写 key + 选定后端 + 验证真能用"合成一条命令。
-配好之后**跑批/起面不用再设任何环境变量**:`case01` 的 Router 会从 `.secrets.json`
-读 `router_provider`(env 仍可临时覆盖,用于对照与排障)。
 
-后端名单(deepseek / bigmodel / openrouter / vllm)与默认端点、默认模型、取 key 的
-键名顺序都取自注入器的 `ROUTER_PROVIDERS` —— 与跑批用的是**同一张表**,这里不抄第二份。
+**只有一个入口**(2026-10-10 拍板:"最后要只保留一个接 api 的入口,其他的得丢弃"):
+    写 = 本工具;存储 = 仓库根 `.secrets.json`(gitignore、0600、合并写);
+    读 = 注入器里那张 `ROUTER_PROVIDERS` 表 + 这一份文件。
+以下**并行填法已经从解析里删除**,别再往这些位置写(环境里留着旧值会打 `[!]` 报警,
+不静默失灵):`CASE01_ROUTER_BASE_URL` / `CASE01_ROUTER_MODEL` / `CASE01_ROUTER_API_KEY`、
+厂商自己的 `DEEPSEEK_API_KEY` / `BIGMODEL_API_KEY` / `OPENROUTER_API_KEY`(OpenRouter 例外:
+它还有引擎侧 N4/N5 在用的历史回落,命中会明确说明)。唯一保留的环境变量是
+`CASE01_ROUTER_PROVIDER` —— 它不写密钥,是一次性对照/排障开关。
+
+后端名单(deepseek / bigmodel / openrouter / vllm)、各家默认端点、默认模型、key 的
+**那一个**键名,都取自注入器的 `ROUTER_PROVIDERS` —— 与跑批用的是同一张表,这里不抄第二份。
+`--show` 就把这张表打成"要填什么"清单(不联网、不打印 key)。
 
 用法::
 
-    # 演示主力:DeepSeek(模型名取该 key 真的服务的那两个之一,见下表注释)
+    # 演示主力:DeepSeek(默认模型 deepseek-flash 就是这把 key 真的服务的那个)
     python provenance/tools/setup_api.py --router deepseek --key <DeepSeek key>
 
     # 备选:BigModel 的独立模型(04 §五 / 06 §七 要求 Router 不是本地 Investment AI 自己)
@@ -22,16 +30,20 @@
 
     # 只自检**当前生效**的那个后端(不写文件):手册 §一 第 6 行拿这句当演示闸门
     python provenance/tools/setup_api.py --check
-    python provenance/tools/setup_api.py --show         # 现在配的是谁(不打印 key)
+    python provenance/tools/setup_api.py --router bigmodel --check   # 点名测一家,不改配置
+    python provenance/tools/setup_api.py --show         # 现在配的是谁 + 能填哪些字段
 
     # 现场演示/无网:显式声明"这次故意用本地"(产物里记 local_by_config,不冒充外部)
     python provenance/tools/setup_api.py --router local
 
-    # 自托管 OpenAI 兼容端点(vLLM 等):必须给 --base-url 与 --model
+    # 自托管 OpenAI 兼容端点(vLLM 等):这一家没有默认值,必须给 --base-url 与 --model
     python provenance/tools/setup_api.py --router vllm --base-url http://127.0.0.1:8101/v1 \
         --model qwen3-8b --key 随便填
 
-    # 兼容旧用法:只配 OpenRouter 的 key
+    # 换某一家默认之外的模型:还是这条命令(--base-url/--model 写进 .secrets.json)
+    python provenance/tools/setup_api.py --router deepseek --model deepseek-v4-pro --key <key>
+
+    # 兼容旧用法:只配 OpenRouter 的 key(后端不变时沿用当前生效那个)
     python provenance/tools/setup_api.py --key sk-xxxx
     python provenance/tools/setup_api.py                # 交互式输入(不回显)
 
@@ -104,17 +116,26 @@ def _merge_repo_secrets(patch: dict) -> str:
     return p
 
 
-def _env_overrides(skip=()) -> list:
-    """此刻会**压过**本文件的环境变量(排障用,优先级最高)。
+def _env_notes(skip=()) -> None:
+    """把环境里那些"看起来像配置"的东西一次说清 —— 静默失灵是本仓反复栽的坑。
 
-    为什么要单独报:跑批解析顺序是 env → `.secrets.json` → 表的默认值,所以在 shell 里
-    留着一个 `CASE01_ROUTER_MODEL` 就会让"我明明改了文件"变成"改了不生效"。
-    `skip` 用来排除**本工具自己**临时设的那个(见 `_self_check`,不排除就会误导人)。
+    两类:`CASE01_ROUTER_PROVIDER` 仍然生效(一次性对照,优先级压过文件);
+    其余 `CASE01_ROUTER_BASE_URL`/`_MODEL`/`_API_KEY`、厂商 `<X>_API_KEY` **对 N7 已删除读取**
+    (10-10"只保留一个入口"),留着旧值的机器若不说一句,就会变成"我明明设了却没生效"。
+    ⚠ 说"对 N7"不说"全局":`BIGMODEL_API_KEY` 之类在别处还有消费者
+    (case01/tools/branch_judge_eval.py 拿它判分支),那不是这张表的事。
     """
     skip = set(skip)
-    return [n for n in ("CASE01_ROUTER_PROVIDER", "CASE01_ROUTER_BASE_URL",
-                        "CASE01_ROUTER_MODEL")
+    live = [n for n in ("CASE01_ROUTER_PROVIDER",)
             if n not in skip and os.environ.get(n, "").strip()]
+    if live:
+        print("[!] 这些环境变量正压过 .secrets.json:{}".format(",".join(live)))
+    from case01.agents.llm import deprecated_config_env
+    dead = deprecated_config_env()
+    if dead:
+        print("[!] 这些环境变量**已废弃、对 N7(Router)不再生效**(接 API 只有一个入口:"
+              "setup_api.py 那一条命令写进 .secrets.json):{}"
+              .format(",".join(dead)))
 
 
 def _configured_provider() -> str:
@@ -169,9 +190,7 @@ def _self_check(provider: str = "") -> int:
         if named and prev and prev != provider:
             print("  (跑批用的仍是 .secrets.json/env 里那个 {};"
                   "这句只是把本次自检指到 {})".format(prev, provider))
-        ov = _env_overrides(skip)
-        if ov:
-            print("[!] 这些环境变量会压过 .secrets.json:{}".format(",".join(ov)))
+        _env_notes(skip)
         try:
             out = client.chat([{"role": "user",
                                 "content": 'Reply with JSON only: {"ok": true}'}],
@@ -195,10 +214,11 @@ def _self_check(provider: str = "") -> int:
 
 
 def _show() -> int:
-    """现在配的是谁 + **要给平台填的那张表** —— 全程不联网(联网自检是 `--check` 的事)。
+    """现在配的是谁 + **要填哪些字段** —— 全程不联网(联网自检是 `--check` 的事)。
 
-    端点/模型是 env → .secrets.json → 表的默认值 三层按序取,所以这里**逐层列出**而不是
-    只报赢家:这里再算一遍优先级就是第三份实现,而这张表的教训正是"两处各写一份会漂"。
+    写这条的缘由:10-10 用户点明"这个接口到时候要对接平台,平台需要去填写来接入 API"
+    —— 字段清单只活在代码里就等于没清单,所以打出来;而它必须与跑批读同一张表,
+    否则又是一处会漂的第二份。
     """
     from case_engine.llm import openrouter_source
     PROV = _providers()
@@ -206,43 +226,44 @@ def _show() -> int:
     eff = _configured_provider()
     print("Router 后端(router_provider):{}".format(
         eff or "(未配 ⇒ Router 回落本地,产物里是 local_fallback)"))
-    # 下面这块是给对接方看的"填哪几个字段"清单:逐家列 key 的 json 键名/环境变量名/
-    # 默认端点与模型。写这条的缘由:10-10 用户点明"这个接口到时候要对接平台,
-    # 平台需要去填写来接入 API" —— 名单在代码里而对接方只能读文档,那就必须打得出来。
+    print("唯一入口:setup_api.py --router <名字> --key <key> → 仓库根 .secrets.json"
+          "(已 gitignore、0600、合并写);人不手改这文件,也不再设 CASE01_ROUTER_* 那套")
     print("\n可填的 Router 后端({} 个,**按演示优先级排**;{}=故意用本地,不接外部):"
           .format(len(PROV), LOCAL))
     for name, s in PROV.items():
         print("  --router {} —— {}".format(name, s.get("role", "")))
-        print("     端点默认:{}".format(s["base"] or "(无默认 ⇒ 必须给 --base-url)"))
-        print("     模型默认:{}".format(s["model"] or "(无默认 ⇒ 必须给 --model)"))
-        print("     key 写进 .secrets.json:{}".format("/".join(s["key_json"])))
-        print("     key 也可用环境变量:{}".format("/".join(s["key_env"])))
-    print("     换端点/模型:--base-url/--model(落到 .secrets.json 的 "
-          "router_base_url/router_model),或 env CASE01_ROUTER_BASE_URL/_MODEL(压过文件)")
+        print("     端点默认:{}  模型默认:{}".format(
+            s["base"] or "(无默认 ⇒ 必须给 --base-url)",
+            s["model"] or "(无默认 ⇒ 必须给 --model)"))
+        print("     key 的键名(唯一一个,写进 .secrets.json):{}".format(
+            "/".join(s["key_json"])))
+    print("     要用这家默认之外的端点/模型:还是这条命令加 --base-url/--model"
+          "(落到 router_base_url/router_model,只给 N7 用)")
     print("\n同一张表还服务 N3(Ethan 的台词):设 CASE01_ETHAN_PROVIDER=<上面任一名字> 即可,"
-          "端点/模型/key 照这套取;要逐项覆盖就用 CASE01_ETHAN_BASE_URL/_MODEL/_API_KEY"
-          "(它们优先级最高,且**不**读 CASE01_ROUTER_* 那几个 N7 专用覆盖项)。")
+          "端点/模型/key 照这套取。表里没有你要的端点时才用逃生口 "
+          "CASE01_ETHAN_BASE_URL/_MODEL/_API_KEY(它配的是 N3、优先级最高,且**不**读上面那两个 "
+          "router_* 键 —— 否则给 Router 换端点会把 Ethan 的台词一起换掉)。")
     spec = PROV.get(eff)
     if spec:
-        print("\n当前生效那个后端的三层取值:")
-        print("  取 key 的顺序:{}".format(
-            " → ".join(list(spec["key_env"]) + list(spec["key_json"]))))
-        for label, env_name, json_key, default in (
-                ("端点", "CASE01_ROUTER_BASE_URL", "router_base_url", spec["base"]),
-                ("模型", "CASE01_ROUTER_MODEL", "router_model", spec["model"])):
-            print("  {}:env={} .secrets.json={} 默认={}".format(
-                label, os.environ.get(env_name, "").strip() or "-",
-                str(sec.get(json_key, "")).strip() or "-", default or "(无默认,必填)"))
+        print("\n当前生效那个后端的两层取值(.secrets.json > 表默认):")
+        print("  key:{} = {}".format("/".join(spec["key_json"]),
+                                     "已配" if any(str(sec.get(n, "")).strip()
+                                                   for n in spec["key_json"]) else "未配"))
+        for label, json_key, default in (
+                ("端点", "router_base_url", spec["base"]),
+                ("模型", "router_model", spec["model"])):
+            print("  {}: .secrets.json={} 默认={}".format(
+                label, str(sec.get(json_key, "")).strip() or "-",
+                default or "(无默认,必填)"))
     elif eff and eff != LOCAL:
         print("[!] router_provider={!r} 不在名单里 ⇒ 跑批会当场 ValueError、"
               "不静默回落本地(配错要看得见)。自检走不出这一步,先改回名单内的名字".format(eff))
     print("\nkey 落盘情况(只看有没有值,绝不打印):")
     for name in sorted({n for s in PROV.values() for n in s["key_json"]}):
         print("  {}:{}".format(name, "已配" if str(sec.get(name, "")).strip() else "未配"))
-    print("  OpenRouter key 解析来源:{}".format(openrouter_source() or "(未配置)"))
-    ov = _env_overrides()
-    if ov:
-        print("[!] 这些环境变量会压过 .secrets.json:{}".format(",".join(ov)))
+    print("  OpenRouter 另有一条历史回落(引擎侧 N4/N5 也在用,不是 Router 的入口):{}".format(
+        openrouter_source() or "(未配置)"))
+    _env_notes()
     return 0
 
 
@@ -318,9 +339,7 @@ def main(argv=None) -> int:
         base or spec["base"] or "(未配)", model or spec["model"] or "(未配)"))
     if not base and not model:
         print("  (没点 --base-url/--model ⇒ 用该后端默认值,并清掉了 .secrets.json 里的旧覆盖)")
-    ov = _env_overrides()
-    if ov:
-        print("[!] 这些环境变量会压过刚写的 .secrets.json:{}".format(",".join(ov)))
+    _env_notes()
 
     print("自检中(走跑批那份解析,一次最小真实调用)…")
     rc = _self_check(provider)

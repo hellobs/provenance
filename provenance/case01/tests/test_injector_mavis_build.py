@@ -4,6 +4,7 @@
 用 stub LLM provider 替换 mavis 的 provider 工厂,不联网、不起 Ollama;
 只验证装配、条件注册、事件注入与回调接线（跑完整 think 属于阶段 2 收尾）。
 """
+import json
 import os
 
 import pytest
@@ -199,24 +200,34 @@ def test_ethan_provider_name_reuses_the_same_backend_table(monkeypatch, tmp_path
 
     10-10 统一配置面:N7(Router)先成了表驱动,而 N3(Ethan)仍要人手抄
     BASE_URL/MODEL/API_KEY 三行 —— 同一个后端在两处写法不同,对接方得记两套。
-    顺带钉住一条优先级:`CASE01_ROUTER_BASE_URL` 是**给 N7 的**对照开关,
-    不该决定 Ethan 的台词由谁写(那样"换了 Router"会悄悄换掉整个对话的模型)。
+    当晚又收了一道:**接 API 只剩一条入口**(`tools/setup_api.py` 写 `.secrets.json`),
+    所以 key 的来源必须就是"那一条命令落的那个文件";已废弃的那些环境变量和本机
+    真配置都挡在外面,否则"在我机器上过"就成了唯一的证据。
+    ⚠ 顺带钉住优先级:文件里的 `router_base_url`/`router_model` 是**给 N7 的**,
+    不该决定 Ethan 的台词由谁写(那样"给 Router 换个端点"会连对话模型一起换掉)。
     """
+    from mavis_case01_injector import llm as L
     _install_stub_provider(monkeypatch)
+    store = tmp_path / ".secrets.json"
+    store.write_text(json.dumps({
+        "deepseek_api_key": "sk-from-store",
+        "router_base_url": "http://127.0.0.1:9/v1",   # 只该管 N7
+        "router_model": "n7-only-model",              # 同上
+    }), encoding="utf-8")
+    monkeypatch.setattr(L, "_secrets_files", lambda: [str(store)])
     bridge, _nodes = _bridge(monkeypatch=monkeypatch, tmp_path=tmp_path)
     monkeypatch.setattr(type(bridge), "_remote_reachable",
                         staticmethod(lambda *a, **k: True))
     for n in ("CASE01_ETHAN_BASE_URL", "CASE01_ETHAN_MODEL", "CASE01_ETHAN_API_KEY",
-              "CASE01_ROUTER_MODEL", "DEEPSEEK_API_KEY", "CASE01_ROUTER_API_KEY"):
+              "CASE01_ROUTER_BASE_URL", "CASE01_ROUTER_MODEL",
+              "CASE01_ROUTER_API_KEY", "DEEPSEEK_API_KEY", "BIGMODEL_API_KEY"):
         monkeypatch.delenv(n, raising=False)
     monkeypatch.setenv("CASE01_ETHAN_PROVIDER", "deepseek")
-    monkeypatch.setenv("CASE01_ROUTER_BASE_URL", "http://127.0.0.1:9/v1")  # 只该管 N7
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ethan-table")
     bridge._build_mavis()
     llm = bridge.config["agents"][DEFAULT_ROLES[1]]["think"]["llm"]
     assert llm["base_url"] == "https://api.deepseek.com/v1", llm
     assert llm["model"] == "deepseek-flash", llm
-    assert llm["api_key"] == "sk-ethan-table"
+    assert llm["api_key"] == "sk-from-store"
 
 
 def test_ethan_external_unreachable_warns_but_still_external(monkeypatch, tmp_path, capsys):

@@ -1062,9 +1062,10 @@ class MavisBridge:
                 # 显式点名"这次 Ethan 就要本地":与"没配"区分,但走的是同一条如实记录
                 self.ethan_backend = "local(CASE01_ETHAN_PROVIDER={})".format(provider)
                 return
-            # router_overrides=False:N7 那个 CASE01_ROUTER_BASE_URL 不该决定 Ethan 的台词
+            # router_store=False:`.secrets.json` 那两个 router_* 覆盖键是给 N7 的,
+            # 不该决定 Ethan 的台词由谁写(否则"给 Router 换个端点"会连 N3 一起换掉)。
             base_url, model = provider_endpoint(provider, base_url, model,
-                                                router_overrides=False)
+                                                router_store=False)
             key = key or provider_key(provider)
             if not key:
                 raise RuntimeError(

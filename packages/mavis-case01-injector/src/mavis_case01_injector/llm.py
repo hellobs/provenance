@@ -620,10 +620,20 @@ OPENROUTER_ROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 # bigmodel/openrouter/vllm,于是它只能借 `vllm`(=自托管)那一路配 —— 敲的人以为自己在配
 # 自建端点;而 `setup_api.py` 另有一份表且和这里不同步,它的 `--check` 又不读
 # `router_provider`,所以闸门测的后端和跑批用的后端可以不是一个(当天就是这么发现的)。
+#
+# **只有一个入口**(2026-10-10 用户拍板:"最后要只保留一个接 api 的入口,其他的得丢弃"):
+#   写 = `python provenance/tools/setup_api.py --router <名字> --key <key>`;
+#   存储 = 仓库根 `.secrets.json`(gitignore、0600、由工具合并写,人不手改);
+#   读 = 下面这张表 + `_secrets_files()` 那一份文件。
+# 以前还有三条并行的填法(端点/模型/key 的 `CASE01_ROUTER_*` 环境变量、各家自己的
+# `<厂商>_API_KEY`、以及 key 的旧别名键),同一次配置能在四处写、读的时候按链条撞运气
+# —— 那才是"两套配置面"的真根源。**这些通道已从解析里删除**;留着旧值的环境变量会被
+# `deprecated_config_env()` 检出来报警(不静默失效,本仓反复栽在"改了不生效")。
+# 唯一还留着的环境变量是 `CASE01_ROUTER_PROVIDER`:它不写密钥、是一次性对照开关。
 # 字段:
-#   base/model    默认端点与模型名。`CASE01_ROUTER_BASE_URL`/`_MODEL`(或 `.secrets.json` 的
-#                 `router_base_url`/`router_model`)对**所有** provider 通用,换模型不用改代码;
-#   key_env/key_json 取 key 的先后顺序(元组按序试,第一个非空算 —— 旧键名继续认,别逼人已配的机器重配);
+#   base/model    这一家的默认端点与模型名(要换模型用 `--model`,工具写进
+#                 `.secrets.json` 的 `router_model`,不必改代码);
+#   key_json      **唯一一个**键名 —— key 只从 `.secrets.json` 取(不再认别名键/厂商 env);
 #   client        "openai"=OpenRouterClient(只聊天,不掺 embed)/ "vllm"=VLLMClient(自托管,embed 同模型);
 #   extra_body    显式"不许思考"的写法。拆问题是短 JSON 任务,开着推理会把正文挤出 max_tokens
 #                 ⇒ 端点回 HTTP 200 但正文为空,而空正文等于"拆不出问题"(当天实测:9753 字反思
@@ -634,7 +644,7 @@ OPENROUTER_ROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 #   needs_base    没有有意义的默认端点(自托管)⇒ 不填就报错而不是猜。
 #   role          这一家在**演示里的定位**(10-10 用户口径:deepseek 是演示主力、
 #                 bigmodel 的 GLM 是备选、OpenRouter 是最最后备选)。写进表里而不是只写
-#                 在文档里,是为了 `--show` 那份"给平台填的清单"和手册不会各说一套;
+#                 在文档里,是为了 `--show` 那份"要填什么"清单和手册不会各说一套;
 #                 表的本体顺序就是这个优先级(`--show` 按插入顺序打,不按字母序)。
 # 默认模型名取的是**这家端点当下真的服务什么**(2026-10-10 用配置里那份 key 打 /models:
 # 只有 `deepseek-flash` / `deepseek-v4-pro`)。别照公开文档写 `deepseek-chat` —— 那个名字
@@ -643,29 +653,43 @@ ROUTER_PROVIDERS = {
     "deepseek": {
         "role": "演示主力",
         "base": "https://api.deepseek.com/v1", "model": "deepseek-flash",
-        "key_env": ("DEEPSEEK_API_KEY", "CASE01_ROUTER_API_KEY"),
-        "key_json": ("deepseek_api_key", "router_api_key"),
+        "key_json": ("deepseek_api_key",),
         "client": "openai",
         "extra_body": {"thinking": {"type": "disabled"}}},
     "bigmodel": {
         "role": "备选(免费池会整段 429:10-09 晚连续、10-10 下午一次;隔十几分钟又可用)",
         "base": BIGMODEL_BASE_URL, "model": BIGMODEL_ROUTER_MODEL,
-        "key_env": ("BIGMODEL_API_KEY",), "key_json": ("bigmodel_api_key",),
+        "key_json": ("bigmodel_api_key",),
         "client": "openai",
         "extra_body": {"thinking": {"type": "disabled"}}},
     "openrouter": {
         "role": "最最后备选(10-10 两次实测这把 key 被拒:HTTP 403 / Key limit exceeded)",
         "base": "https://openrouter.ai/api/v1", "model": OPENROUTER_ROUTER_MODEL,
-        "key_env": ("OPENROUTER_API_KEY",), "key_json": ("openrouter_api_key",),
+        "key_json": ("openrouter_api_key",),
         "client": "openai", "extra_body": None},
     "vllm": {
         "role": "自托管/内网 OpenAI 兼容端点(必须给端点与模型名)",
         "base": "", "model": "",
-        "key_env": ("CASE01_ROUTER_API_KEY",), "key_json": ("router_api_key",),
+        "key_json": ("router_api_key",),
         "client": "vllm", "needs_base": True,
         "extra_body": {"chat_template_kwargs": {"enable_thinking": False},
                        "thinking": {"type": "disabled"}}},
 }
+
+# 已删除的配置通道(检出来只报警,不再当配置用)。列在这里是因为**别让人静默失灵**:
+# shell/`case01.local.cmd` 里留着这些变量的机器,过去靠它们生效,现在不生效。
+# ⚠ 措辞要说清"对 N7 不生效":`BIGMODEL_API_KEY` 这类厂商变量在**别处**还在用
+#   (例如 case01/tools/branch_judge_eval.py 拿它判分支),不是全局作废。
+#   `OPENROUTER_API_KEY` 不在名单里 —— OpenRouter 作为最最后备选保留了一条历史回落
+#   (env / .env / case01/.secrets.json),因为引擎侧 N4/N5 也走那条链;命中它会另外打一行说明。
+DEPRECATED_CONFIG_ENV = ("CASE01_ROUTER_BASE_URL", "CASE01_ROUTER_MODEL",
+                         "CASE01_ROUTER_API_KEY", "DEEPSEEK_API_KEY",
+                         "BIGMODEL_API_KEY")
+
+
+def deprecated_config_env() -> list:
+    """此刻环境里留着、但**对 N7(Router)已不再生效**的那些变量名。"""
+    return [n for n in DEPRECATED_CONFIG_ENV if os.environ.get(n, "").strip()]
 
 
 def _host_of(base: str) -> str:
@@ -688,36 +712,37 @@ def provider_spec(name: str) -> dict:
 
 
 def provider_endpoint(name: str, base: str = "", model: str = "",
-                      router_overrides: bool = True):
-    """这一家实际用哪个端点/模型:显式给的 > (Router 那层的覆盖) > 表默认值。
+                      router_store: bool = True):
+    """这一家实际用哪个端点/模型:显式给的 > `.secrets.json`(那一条命令写的) > 表默认值。
 
-    `base`/`model` 是调用方**已经定下来**的值(比如 Ethan 那侧的 CASE01_ETHAN_*)。
-    `router_overrides=True` 时才去试 `CASE01_ROUTER_BASE_URL`/`_MODEL` 与
-    `.secrets.json` 的 `router_base_url`/`router_model` —— 那两个键是**给 N7 用的**,
-    N3(Ethan)不要它们:否则"今天拿 CASE01_ROUTER_BASE_URL 对照了一下 Router"会把
-    Ethan 的台词也写到那个端点上去,而两件事在产物里都叫"外部 API"。
+    `base`/`model` 是调用方**已经定下来**的值(只有 Ethan 那侧的 CASE01_ETHAN_* 会传,
+    它是"表里没有这个端点"时的逃生口,配的是 N3,不是 N7)。
+    `router_store=True` 时才去读 `.secrets.json` 的 `router_base_url`/`router_model` ——
+    那两个键**是给 N7 的**:N3 若也跟着走,那"今天给 Router 换了个端点"就把 Ethan 的
+    台词也写到那个端点上,而两件事在产物里都叫"外部 API",分不出来。
+    ⚠ 这里**不再读** `CASE01_ROUTER_BASE_URL`/`_MODEL` 那两条环境变量:它们和文件是
+    同一件事的第二种填法,10-10 已删(留着旧值的机器由 `deprecated_config_env()` 报警)。
     """
     spec = provider_spec(name)
-    env_b = "CASE01_ROUTER_BASE_URL" if router_overrides else ""
-    env_m = "CASE01_ROUTER_MODEL" if router_overrides else ""
     b = (str(base or "").strip()
-         or os.environ.get(env_b, "").strip()
-         or (_secret_value("", "router_base_url") if router_overrides else "")
+         or (_secret_value("", "router_base_url") if router_store else "")
          or spec["base"])
     m = (str(model or "").strip()
-         or os.environ.get(env_m, "").strip()
-         or (_secret_value("", "router_model") if router_overrides else "")
+         or (_secret_value("", "router_model") if router_store else "")
          or spec["model"])
     return b, m
 
 
 def provider_key(name: str, env_first=()) -> str:
-    """这一家的 key:`env_first` 里的环境变量名先试,再按表里 key_env → key_json 的顺序。
+    """这一家的 key:只从 `.secrets.json` 取(键名就是表里那一个,不再认别名)。
 
-    只回长度不为 0 的值,**任何情况下都不要打印它**(见 tools/setup_api.py 的同一条政策)。
+    `env_first` 只服务 N3 那个逃生口(CASE01_ETHAN_API_KEY)——它配的是 Ethan,不是 Router。
+    OpenRouter 额外保留 `_openrouter_key()` 那条**历史**回落(env/.env/`case01/.secrets.json`),
+    因为那三条链同时被引擎侧的 N4/N5 用着;命中它会打一行说明,不静默当"正常配置"。
+    任何情况下都只回值、**绝不打印**。
     """
     spec = provider_spec(name)
-    for n in tuple(env_first) + tuple(spec["key_env"]):
+    for n in tuple(env_first):
         v = os.environ.get(n, "").strip()
         if v:
             return v
@@ -725,7 +750,26 @@ def provider_key(name: str, env_first=()) -> str:
         v = _secret_value("", n)
         if v:
             return v
+    if name == "openrouter":
+        v = _openrouter_key()
+        if v:
+            _warn_legacy_openrouter_key()
+            return v
     return ""
+
+
+_LEGACY_OPENROUTER_KEY_WARNED = []
+
+
+def _warn_legacy_openrouter_key() -> None:
+    """一次就够:这把 key 不是从那一条入口来的。"""
+    if _LEGACY_OPENROUTER_KEY_WARNED:
+        return
+    _LEGACY_OPENROUTER_KEY_WARNED.append(1)
+    print("[!] OpenRouter 的 key 命中的是历史路子(OPENROUTER_API_KEY / .env / "
+          "case01/.secrets.json)。现在唯一的填法是 "
+          "`python provenance/tools/setup_api.py --router openrouter --key <key>`"
+          "(写进仓库根 .secrets.json);建议迁过去,否则换机器就会消失。")
 
 
 def _secrets_files() -> List[str]:
@@ -812,8 +856,12 @@ def router_client_from_env():
     **`ROUTER_PROVIDERS` 这一张表**里(`deepseek` / `bigmodel` / `openrouter` / `vllm`),
     本函数与 `tools/setup_api.py` 共用它 —— 以前是两处各写一份,于是 setup 的自检
     能测到一个不存在的后端上去(10-10 就是这么发现的)。
-    覆盖项(对所有 provider 通用):`CASE01_ROUTER_MODEL`、`CASE01_ROUTER_BASE_URL`、
-    `CASE01_ROUTER_TIMEOUT`(或 `.secrets.json` 的 `router_model`/`router_base_url`)。
+    覆盖项:**只有那一条命令**(`tools/setup_api.py --router … [--base-url … --model …]
+    --key …`)写进 `.secrets.json` 的 `router_base_url`/`router_model`/各家的 key 键。
+    `CASE01_ROUTER_PROVIDER` 仍可用作一次性对照(它不写密钥);
+    `CASE01_ROUTER_BASE_URL`/`_MODEL`/`_API_KEY` 与厂商 `<X>_API_KEY` 这些**并行填法已删除**
+    (10-10"只保留一个接 api 的入口"),环境里留着旧值会由 `deprecated_config_env()` 报警。
+    `CASE01_ROUTER_TIMEOUT` 是运行参数(不是配置面),继续用环境变量。
     """
     provider = router_provider_name()
     if provider in LOCAL_ROUTER_PROVIDERS or not provider:
@@ -829,20 +877,17 @@ def router_client_from_env():
         raise ValueError(
             "Router provider={} 需要端点(这一家没有有意义的默认值)。一条命令配好:"
             "`python provenance/tools/setup_api.py --router {} "
-            "--base-url http://…/v1 --model <名字> --key …`(或设 CASE01_ROUTER_BASE_URL)"
-            .format(provider, provider))
+            "--base-url http://…/v1 --model <名字> --key <key>`".format(provider, provider))
     if spec.get("needs_base") and not model:
         raise ValueError("Router provider={} 需要模型名"
                          "(这个后端没有有意义的默认模型名)".format(provider))
-    # OpenRouter 的 key 走它自己那条更宽的回落(env → case01/.secrets.json → 引擎统一解析),
-    # 比表里的两个键名管得多;其他家按 provider_key 的次序。
-    key = _openrouter_key() if provider == "openrouter" else provider_key(provider)
+    key = provider_key(provider)
     if not key:
         raise RuntimeError(
-            "Router provider={} 但取不到 key(试过 env {} 与 .secrets.json 的 {})。"
-            "一条命令配好:`python provenance/tools/setup_api.py --router {} --key <key>`"
-            "(写进 .secrets.json,已 gitignore;不打印 key)".format(
-                provider, "/".join(spec["key_env"]), "/".join(spec["key_json"]), provider))
+            "Router provider={} 但 `.secrets.json` 里没有 {}。一条命令配好:"
+            "`python provenance/tools/setup_api.py --router {} --key <key>`"
+            "(写进仓库根 .secrets.json,已 gitignore;不打印 key)".format(
+                provider, "/".join(spec["key_json"]), provider))
     extra = spec.get("extra_body")
     if spec["client"] == "vllm":
         client = VLLMClient(base_url=base, chat_model=model, embed_model=model,
