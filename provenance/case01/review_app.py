@@ -248,6 +248,10 @@ def live_record(safe: int = 0):
     from .injector.record import to_case01_record
     rec = to_case01_record(raw, branch=raw.get("branch", ""),
                            run_id=raw.get("run_id", "") or _LIVE["run_id"])
+    # **谁写的 Ethan 的台词必须透出到面板**(2026-10-10 用户两次追问"确定现在接了外部
+    # API 了吗")。它挂在桥的 run_record() 上,而本函数会再过一层 to_case01_record(),
+    # 不显式带过去就被丢了 —— 于是面板永远看不到,只能靠猜。
+    rec["ethan_backend"] = raw.get("ethan_backend") or ""
     rec["live"] = True
     # 表头要显示"哪条剧情线(含义)"。branch_summary 不在记录里,是服务端推导的
     # (与 5002 契约同源),成品记录那边由 _brief 补,实时这条在这里补。
