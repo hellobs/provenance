@@ -145,7 +145,7 @@ def test_mixed_candidates_and_triage_are_both_preserved(record):
 def test_legacy_field_and_failed_reflection(record):
     issue = record["router"]["issues"][0]
     issue.pop("expert_category_id")
-    issue["field"] = "信息与证据核验"
+    issue["field"] = "Evidence & Source Verification"
     assert build_review_package(record, "r1")["status"] == "ready"
     record["reflection"]["quality"] = {"status": "error"}
     out = build_review_package(record, "r1")

@@ -1,63 +1,159 @@
 {
   "version": "1.0",
   "name": "GTC Case01 expert category pool",
-  "description": "Case01 初始专家类别目录；治理平台可通过 CASE01_EXPERT_POOL_PATH 注入自己的目录。这里只定义类别，不虚构具体专家人员。",
+  "description": "GTC Case01 expert category pool (English; category names are used as the Router routing field).",
   "categories": [
     {
       "id": "E1",
-      "name": "信息与证据核验",
-      "description": "核验公告、传闻、媒体与研究来源的真实性、独立性、时效性和证据等级。",
-      "aliases": ["事实核查", "信息验证", "来源可靠性", "证据分级"],
-      "keywords": ["传闻", "公告", "来源", "证据", "交叉验证", "事实"]
+      "name": "Evidence & Source Verification",
+      "description": "Verify the authenticity, independence, recency and evidence grade of disclosures, rumours, media and research sources.",
+      "aliases": [
+        "事实核查",
+        "信息验证",
+        "来源可靠性",
+        "证据分级"
+      ],
+      "keywords": [
+        "传闻",
+        "公告",
+        "来源",
+        "证据",
+        "交叉验证",
+        "事实"
+      ]
     },
     {
       "id": "E2",
-      "name": "财务与估值",
-      "description": "审查财报、订单金额、收入利润影响、预测假设和估值方法。",
-      "aliases": ["财务分析", "会计", "估值建模", "盈利预测"],
-      "keywords": ["财报", "收入", "利润", "订单金额", "估值", "现金流"]
+      "name": "Financials & Valuation",
+      "description": "Review financial statements, order value, revenue and profit impact, forecast assumptions and valuation methods.",
+      "aliases": [
+        "财务分析",
+        "会计",
+        "估值建模",
+        "盈利预测"
+      ],
+      "keywords": [
+        "财报",
+        "收入",
+        "利润",
+        "订单金额",
+        "估值",
+        "现金流"
+      ]
     },
     {
       "id": "E3",
-      "name": "行业与商业",
-      "description": "分析供应链、客户关系、采购周期、商业模式、竞争格局和行业趋势。",
-      "aliases": ["行业研究", "商业分析", "供应链", "客户关系"],
-      "keywords": ["行业", "供应链", "客户", "采购", "商业模式", "竞争"]
+      "name": "Industry & Business",
+      "description": "Analyse supply chain, customer relationships, procurement cycles, business model, competitive landscape and industry trends.",
+      "aliases": [
+        "行业研究",
+        "商业分析",
+        "供应链",
+        "客户关系"
+      ],
+      "keywords": [
+        "行业",
+        "供应链",
+        "客户",
+        "采购",
+        "商业模式",
+        "竞争"
+      ]
     },
     {
       "id": "E4",
-      "name": "市场与交易风险",
-      "description": "审查价格、波动、流动性、仓位、止损和交易执行风险。",
-      "aliases": ["交易风险", "市场风险", "量化交易", "仓位管理"],
-      "keywords": ["股价", "波动", "流动性", "仓位", "止损", "交易"]
+      "name": "Market & Trading Risk",
+      "description": "Review price, volatility, liquidity, position sizing, stop-loss and trade-execution risk.",
+      "aliases": [
+        "交易风险",
+        "市场风险",
+        "量化交易",
+        "仓位管理"
+      ],
+      "keywords": [
+        "股价",
+        "波动",
+        "流动性",
+        "仓位",
+        "止损",
+        "交易"
+      ]
     },
     {
       "id": "E5",
-      "name": "法律与合规",
-      "description": "审查信息披露、合同效力、证券法规、投顾义务和合规边界。",
-      "aliases": ["证券合规", "合同法律", "信息披露", "投顾合规"],
-      "keywords": ["法律", "合规", "合同", "披露", "监管", "责任"]
+      "name": "Legal & Compliance",
+      "description": "Review disclosure obligations, contract validity, securities regulation, advisory duties and compliance boundaries.",
+      "aliases": [
+        "证券合规",
+        "合同法律",
+        "信息披露",
+        "投顾合规"
+      ],
+      "keywords": [
+        "法律",
+        "合规",
+        "合同",
+        "披露",
+        "监管",
+        "责任"
+      ]
     },
     {
       "id": "E6",
-      "name": "客户适当性与投顾",
-      "description": "评估用户资金状况、目标、风险承受能力以及建议是否适合该用户。",
-      "aliases": ["客户适当性", "投资顾问", "用户风险", "投资者保护"],
-      "keywords": ["用户", "资金", "风险承受", "适当性", "投资目标", "个性化"]
+      "name": "Client Suitability & Advisory",
+      "description": "Assess the client's capital, objectives and risk tolerance, and whether the advice suits that client.",
+      "aliases": [
+        "客户适当性",
+        "投资顾问",
+        "用户风险",
+        "投资者保护"
+      ],
+      "keywords": [
+        "用户",
+        "资金",
+        "风险承受",
+        "适当性",
+        "投资目标",
+        "个性化"
+      ]
     },
     {
       "id": "E7",
-      "name": "行为金融与利益冲突",
-      "description": "审查认知偏差、市场情绪、媒体激励和利益相关方动机。",
-      "aliases": ["行为金融", "市场心理", "利益冲突", "认知偏差"],
-      "keywords": ["情绪", "偏差", "动机", "利益冲突", "叙事", "从众"]
+      "name": "Behavioural Finance & Conflicts of Interest",
+      "description": "Review cognitive bias, market sentiment, media incentives and stakeholder motives.",
+      "aliases": [
+        "行为金融",
+        "市场心理",
+        "利益冲突",
+        "认知偏差"
+      ],
+      "keywords": [
+        "情绪",
+        "偏差",
+        "动机",
+        "利益冲突",
+        "叙事",
+        "从众"
+      ]
     },
     {
       "id": "E8",
-      "name": "AI模型与治理",
-      "description": "审查模型幻觉、推理失真、信息边界、可追溯性和系统性模型风险。",
-      "aliases": ["模型风险", "AI治理", "算法审计", "幻觉"],
-      "keywords": ["模型", "幻觉", "推理", "信息边界", "审计", "可追溯"]
+      "name": "AI Model & Governance",
+      "description": "Review model hallucination, reasoning distortion, information boundaries, traceability and systemic model risk.",
+      "aliases": [
+        "模型风险",
+        "AI治理",
+        "算法审计",
+        "幻觉"
+      ],
+      "keywords": [
+        "模型",
+        "幻觉",
+        "推理",
+        "信息边界",
+        "审计",
+        "可追溯"
+      ]
     }
   ]
 }

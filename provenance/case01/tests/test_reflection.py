@@ -199,7 +199,7 @@ class TestRouterParse:
             def chat(self, messages, **kw):
                 self.messages.append(messages)
                 return ('[{"summary":"S","evidence_sentence_ids":["S001"],'
-                        '"field":"信息与证据核验","expert_category_id":"E1",'
+                        '"field":"Evidence & Source Verification","expert_category_id":"E1",'
                         '"risk_note":"N","risk":"High","routing_reason":"R"}]')
         llm = _Fake()
         out = run_router(llm, "一段反思包含反思原句")
@@ -210,7 +210,7 @@ class TestRouterParse:
         assert out["issues"][0]["model_evidence_quote"] == ""
         assert out["expert_pool_version"] == "1.0"
         assert out["postprocess"]["final_issue_count"] == 1
-        assert "E8 | AI模型与治理" in llm.messages[0][1]["content"]
+        assert "E8 | AI Model & Governance" in llm.messages[0][1]["content"]
         assert "[S001] 一段反思包含反思原句" in llm.messages[0][1]["content"]
 
     def test_sentence_ids_resolve_to_exact_source_text(self):
@@ -250,7 +250,7 @@ class TestRouterParse:
         assert issue["suggested_field"] == "火星经济学"
 
     def test_secondary_experts_are_deduplicated_and_validated(self):
-        text = ('[{"summary":"S","field":"信息与证据核验",'
+        text = ('[{"summary":"S","field":"Evidence & Source Verification",'
                 '"expert_category_id":"E1",'
                 '"secondary_expert_category_ids":["E5","E5","BAD","E1"],'
                 '"risk":"High","routing_reason":"R"}]')
@@ -261,22 +261,22 @@ class TestRouterParse:
         """2026-10-05:h120seed-011 实测模型把类别写成「规范名（ID）」一体,
         原解析只做精确比对 → field 落空 → test_router_issues_are_reviewable 红。
         全角/半角括号都要认。"""
-        for label in ("市场与交易风险（E4）", "市场与交易风险(E4)"):
+        for label in ("Market & Trading Risk（E4）", "Market & Trading Risk(E4)"):
             raw = ('[{"summary":"S","field":"' + label + '","risk":"High",'
                    '"routing_reason":"R"}]')
             issue = _parse_router_json(raw)[0]
             assert issue["expert_category_id"] == "E4", label
-            assert issue["field"] == "市场与交易风险", label
+            assert issue["field"] == "Market & Trading Risk", label
             assert issue["match_status"] == "matched", label
 
     def test_expert_category_key_is_accepted_as_field_alias(self):
         """同批实测:模型只给了 `expert_category` 键,没有 `field`。
         原先 field 落空 → 缺 field 直接红守卫。"""
         issue = _parse_router_json(
-            '[{"summary":"S","expert_category":"行为金融与利益冲突（E7）",'
+            '[{"summary":"S","expert_category":"Behavioural Finance & Conflicts of Interest（E7）",'
             '"risk":"High","routing_reason":"R"}]')[0]
         assert issue["expert_category_id"] == "E7"
-        assert issue["field"] == "行为金融与利益冲突"
+        assert issue["field"] == "Behavioural Finance & Conflicts of Interest"
         assert issue["match_status"] == "matched"
 
     def test_parenthesised_unmatched_stays_unmatched(self):
@@ -299,7 +299,7 @@ class TestExpertPool:
 
     def test_prompt_catalog_exposes_ids_and_unmatched_rule(self):
         prompt = prompt_catalog()
-        assert "E1 | 信息与证据核验" in prompt
+        assert "E1 | Evidence & Source Verification" in prompt
         assert "UNMATCHED" in prompt
 
 
