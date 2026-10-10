@@ -565,7 +565,54 @@ def start(case, args):
         extra = "  实例数={}".format(j["n_inst"]) if j["n_inst"] else ""
         print("  {:<6} :{:<5} {}{}".format(c, j["port"], _state(j), extra))
     print("\n平台入口(一个): http://<host>:5010/  (当前选中的 case 在此;case00 首页权重面板,case01 小镇+结果)")
+    if not args.no_follow:
+        # 2026-10-10 用户反馈"都按任意键继续了,为什么后续还会有日志打印出来":
+        # 服务是 DETACHED 起的、输出重定向到日志文件,所以**启动器退出后窗口就是死壳**,
+        # 而日志还在那个文件里继续长 —— 设计如此,但没告诉人在哪儿看。
+        # 这里默认跟读日志(像 tail -f);Ctrl+C 只停跟随,**不杀服务**。
+        print("\n---- 跟随日志(Ctrl+C 停止跟随,服务继续跑)----")
+        try:
+            _follow(log, err)
+        except KeyboardInterrupt:
+            print("\n[已停止跟随] 服务仍在跑:`python live_switch.py --stop {}`".format(case))
     return 0
+
+
+def _follow(log, err, interval=1.0):
+    """跟读实时面日志。文件还没生成就先等;被截断/轮转则重开。"""
+    import time as _t
+    handles, pos = {}, {}
+    for path in (log, err):
+        try:
+            fh = open(path, "r", encoding="utf-8", errors="replace")
+            handles[path] = fh
+            pos[path] = fh.seek(0, 2)          # 从末尾开始,不打已经写过的历史
+        except Exception:  # noqa: BLE001 - 文件还没生成就等下一轮
+            pass
+    while True:
+        _t.sleep(interval)
+        for path, fh in list(handles.items()):
+            try:
+                fh.seek(pos[path])
+                chunk = fh.read()
+                if chunk:
+                    pos[path] = fh.tell()
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+            except Exception:  # noqa: BLE001
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+                handles.pop(path, None)
+        for path in (log, err):
+            if path not in handles and os.path.exists(path):
+                try:
+                    fh = open(path, "r", encoding="utf-8", errors="replace")
+                    handles[path] = fh
+                    pos[path] = fh.seek(0, 2)
+                except Exception:  # noqa: BLE001
+                    pass
 
 
 def _lan_ip() -> str:
@@ -671,6 +718,8 @@ def main():
     ap.add_argument("--stride", type=int, default=2, help="case00:步长(分钟)")
     ap.add_argument("--no-sim", action="store_true",
                     help="case00:只服务 Web 层不跑模拟(不算实时面,但仍占端口)")
+    ap.add_argument("--no-follow", dest="no_follow", action="store_true",
+                    help="启动后不跟读日志(默认跟读,像 tail -f;Ctrl+C 只停跟随不杀服务)")
     ap.add_argument("--no-map", dest="no_map", action="store_true",
                     help="case01:跑完不自动映射成成品记录(默认自动映射)")
     ap.add_argument("--review-only", dest="review_only", action="store_true",
