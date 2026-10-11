@@ -253,7 +253,7 @@ async def get_goals():
             all_iv = json.load(open(iv_path, encoding="utf-8"))
             interventions = [x for x in all_iv if x.get("simulation") == current_sim]
         except Exception as e:
-            log.warning("读取 interventions.json 失败: {}".format(e))
+            log.warning("failed to read interventions.json: {}".format(e))
             interventions = []
     # embedding 稳定性健康度(后果反馈降级监控)
     embedding_health = {}
@@ -263,7 +263,7 @@ async def get_goals():
             if engine is not None and hasattr(engine, "health"):
                 embedding_health = engine.health()
         except Exception as e:
-            log.warning("读取 embedding 健康度失败: {}".format(e))
+            log.warning("failed to read the embedding health status: {}".format(e))
             embedding_health = {}
     return JSONResponse({
         "ok": True,
@@ -291,7 +291,7 @@ async def _json_body(request: Request):
     ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if ctype and ctype != "application/json":
         return None, JSONResponse(
-            {"ok": False, "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+            {"ok": False, "errors": ["Content-Type: application/json is required (form submissions are not accepted)"]},
             status_code=415)
     try:
         body = await request.json()
@@ -337,9 +337,9 @@ def _wrap_intervention_result(strategy_id: str, res) -> JSONResponse:
     不静默包成 "null" 响应体让调用方猜。
     """
     if res is None:
-        log.error("干预策略 {!r} 返回 None(策略实现漏 return?)".format(strategy_id))
+        log.error("intervention strategy {!r} returned None (a missing return in the strategy?)".format(strategy_id))
         return JSONResponse({"ok": False,
-                             "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
+                             "errors": ["intervention strategy {!r} returned an empty result (implementation defect)".format(
                                  strategy_id)]}, status_code=500)
     if isinstance(res, _interventions.InterventionResult):
         return JSONResponse(dict(res), status_code=res.status)
@@ -360,7 +360,7 @@ async def run_intervention(strategy_id: str, request: Request):
     if not _interventions.known(strategy_id):
         return JSONResponse(
             {"ok": False,
-             "errors": ["未知干预策略: {!r};已注册: {}".format(
+             "errors": ["unknown intervention strategy: {!r}; registered: {}".format(
                  strategy_id, " / ".join(_interventions.all_ids()))]},
             status_code=404)
     res = _interventions.get(strategy_id)().apply(_intervention_ctx(), body)
@@ -407,14 +407,14 @@ async def explain_agent(agent: str = ""):
     server = state.server
     agent = agent.strip()
     if not agent:
-        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
+        return JSONResponse({"ok": False, "errors": ["the agent name is missing"]})
 
     # ---- 运行中 agent 的内存状态(最准) ----
     live_agent = None
     if server is not None and getattr(server, "game", None) is not None:
         live_agent = server.game.agents.get(agent)
     if live_agent is None:
-        return JSONResponse({"ok": False, "errors": ["角色不在运行中的模拟里: {}".format(agent)]})
+        return JSONResponse({"ok": False, "errors": ["the agent is not in the running simulation: {}".format(agent)]})
 
     # ① 构成分解
     vt = live_agent.get_tendency() or {}
@@ -543,14 +543,14 @@ async def explain_agent(agent: str = ""):
                     key=state.intervention_sort_key,
                 )
             except Exception as e:
-                log.warning("explain 读取 interventions.json 失败: {}".format(e))
+                log.warning("explain: failed to read interventions.json: {}".format(e))
                 my_ivs = []
         # 对每次干预:记录干预前最近倾向 + 干预后 2 小时倾向(量化内化滞后)
         for iv in my_ivs:
             try:
                 ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
             except (ValueError, TypeError) as e:
-                log.warning("explain 干预时间非法,跳过干预(agent={}, sim_time={}): {}".format(agent, iv.get("sim_time"), e))
+                log.warning("explain: invalid intervention time, skipping it (agent={}, sim_time={}): {}".format(agent, iv.get("sim_time"), e))
                 continue
             before = None
             after = None
@@ -645,7 +645,7 @@ async def timeline_data():
                 key=state.intervention_sort_key,
             )
         except Exception as e:
-            log.warning("timeline 读取 interventions.json 失败: {}".format(e))
+            log.warning("timeline: failed to read interventions.json: {}".format(e))
             ivs = []
     # 每角色倾向序列(一次加载,事件按 agent 取)
     series_by_agent = {}
@@ -729,7 +729,7 @@ async def export_chart(agent: str = ""):
 
     agent = agent.strip()
     if not agent:
-        return JSONResponse({"ok": False, "errors": ["缺少角色名"]})
+        return JSONResponse({"ok": False, "errors": ["the agent name is missing"]})
 
     ckpt_dir = state.current_ckpt_dir()
     cur_sim = state.current_sim_name()
@@ -739,7 +739,7 @@ async def export_chart(agent: str = ""):
     png = render_tendency_png(ckpt_dir, agent,
                               constraints=None, my_ivs=ivs, cur_sim=cur_sim)
     if png is None:
-        return JSONResponse({"ok": False, "errors": ["该角色暂无倾向数据(或 matplotlib 不可用)"]})
+        return JSONResponse({"ok": False, "errors": ["this agent has no tendency data yet (or matplotlib is unavailable)"]})
 
     # 中文文件名需 RFC 5987 编码(starlette 头仅支持 latin-1)
     fname = "tendency_{}.png".format(agent)
@@ -774,7 +774,7 @@ async def list_reflections():
             try:
                 concepts = agent.associate.retrieve_thoughts()
             except Exception as e:
-                log.warning("retrieve_thoughts 失败(agent={}): {}".format(name, e))
+                log.warning("retrieve_thoughts failed (agent={}): {}".format(name, e))
                 continue
             for c in concepts:
                 if c.node_id in marked_ids:
@@ -827,10 +827,10 @@ async def export_reflections_jsonl():
 def _render_reflections_page() -> HTMLResponse:
     """反思标记面板(独立 HTML,无 Phaser;自连 /api/reflections)。"""
     html = """<!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>反思标记 · 人机协同</title>
+<title>Reflection marking · expert in the loop</title>
 <style>
   body { margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #f4f6f5; color: #223; }
   header { background: #1d3a2f; color: #fff; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; }
@@ -859,17 +859,17 @@ def _render_reflections_page() -> HTMLResponse:
 </head>
 <body>
 <header>
-  <h1>反思标记 · 人机协同闭环</h1>
-  <a href="/api/reflections/export.jsonl">导出 JSONL(LoRA 线)⇩</a>
+  <h1>Reflection marking · the expert-in-the-loop closed circuit</h1>
+  <a href="/api/reflections/export.jsonl">Export JSONL (LoRA line)⇩</a>
 </header>
 <main>
-  <h2>待标记反思</h2>
-  <div id="pending"><div class="empty">加载中...</div></div>
-  <h2>已标记</h2>
-  <div id="marked"><div class="empty">暂无</div></div>
+  <h2>Reflections awaiting a mark</h2>
+  <div id="pending"><div class="empty">Loading...</div></div>
+  <h2>Marked</h2>
+  <div id="marked"><div class="empty">None yet</div></div>
 </main>
 <script>
-const VERDICTS = [["correct","✓ 正确"],["incorrect","✗ 错误"],["partial","◐ 部分正确"]];
+const VERDICTS = [["correct","✓ correct"],["incorrect","✗ incorrect"],["partial","◐ partially correct"]];
 // 转义helper(2026-10-06 修):本节的反思正文/角色名/专家纠正文本此前直接拼进 innerHTML ——
 // 模型产物里出现 `<`、`&` 会被当标签解析,专家在纠正框里输入 `<` 同样会破坏渲染。
 const esc = s => String(s == null ? "" : s)
@@ -881,7 +881,7 @@ async function refresh() {
   const r = await fetch("/api/reflections");
   const d = await r.json();
   const box = document.getElementById("pending");
-  if (!d.ok || !d.pending.length) { box.innerHTML = '<div class="empty">暂无待标记反思(模拟运行并产生反思后出现)</div>'; }
+  if (!d.ok || !d.pending.length) { box.innerHTML = '<div class="empty">no reflections awaiting a mark yet (they appear once the run produces reflections)</div>'; }
   else {
     box.innerHTML = "";
     for (const p of d.pending) {
@@ -891,8 +891,8 @@ async function refresh() {
         <div class="thought">${esc(p.text)}</div>
         <div class="actions">${VERDICTS.map(([v, t]) =>
           `<button class="${v === "correct" ? "ok" : v === "incorrect" ? "bad" : "part"}" data-v="${v}">${t}</button>`).join("")}</div>
-        <textarea placeholder="纠正文本(错误/部分正确时必填)..." style="display:none"></textarea>
-        <div class="actions"><button data-v="__submit" style="display:none;background:#2d6cdf;color:#fff;">提交标记</button></div>`;
+        <textarea placeholder="Correction text (required for incorrect / partially correct)..." style="display:none"></textarea>
+        <div class="actions"><button data-v="__submit" style="display:none;background:#2d6cdf;color:#fff;">Submit the mark</button></div>`;
       const ta = card.querySelector("textarea");
       const submit = card.querySelector('[data-v="__submit"]');
       card.querySelectorAll(".actions button").forEach(b => {
@@ -911,7 +911,7 @@ async function refresh() {
     }
   }
   const mbox = document.getElementById("marked");
-  if (!d.marked.length) { mbox.innerHTML = '<div class="empty">暂无已标记</div>'; }
+  if (!d.marked.length) { mbox.innerHTML = '<div class="empty">Nothing marked yet</div>'; }
   else {
     mbox.innerHTML = "";
     for (const m of d.marked.slice().reverse()) {
@@ -919,7 +919,7 @@ async function refresh() {
       card.className = "card marked";
       card.innerHTML = `<div class="meta"><b>${esc(m.agent)}</b> · ${esc(m.sim_time)} · <span class="badge ${esc(m.verdict)}">${esc(m.verdict)}</span></div>
         <div class="thought">${esc(m.thought)}</div>` +
-        (m.correction ? `<div class="corr">纠正: ${esc(m.correction)}</div>` : "");
+        (m.correction ? `<div class="corr">Correction: ${esc(m.correction)}</div>` : "");
       mbox.appendChild(card);
     }
   }
@@ -931,7 +931,7 @@ async function submitMark(p, correction) {
                  text: p.text, verdict, correction };
   const r = await fetch("/api/reflections/mark", { method: "POST",
     headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
-  if (r.ok) { await refresh(); } else { alert("标记失败: " + (await r.text())); }
+  if (r.ok) { await refresh(); } else { alert("Marking failed: " + (await r.text())); }
 }
 
 refresh();

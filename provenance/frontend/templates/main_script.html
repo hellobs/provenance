@@ -787,8 +787,8 @@
 				setCurrentTime(msg.time);
 			} else if (msg.type === "snapshot") {
 				devLog("sys", "Snapshot: " + Object.keys(msg.agents || {}).length + " agents, time " + msg.time
-					+ (msg.synthesized ? "(按最近状态合成)" : ""));
-				if (!sim_running) { sim_running = true; setSimStatus("running", "推演进行中"); }
+					+ (msg.synthesized ? "(synthesized from the latest state)" : ""));
+				if (!sim_running) { sim_running = true; setSimStatus("running", "Simulation running"); }
 				if (wantScene) applySnapshot(msg.agents, msg.time);
 				else if (msg.time) setCurrentTime(msg.time);
 			} else if (msg.type === "done") {
@@ -801,19 +801,19 @@
 				// /health,若从这里无条件轮询会一直打 404(体检发现)。
 				if (document.getElementById("restart-box")) watchRestartReady();
 				if (reason.indexOf("error") === 0) {
-					setSimStatus("error", "推演出错:" + reason.replace(/^error:?/, ""));
+					setSimStatus("error", "Simulation error: " + reason.replace(/^error:?/, ""));
 				} else if (reason === "interrupted") {
-					setSimStatus("finished", "推演被中断(服务保持中)");
+					setSimStatus("finished", "Simulation interrupted (the server stays up)");
 				} else if (reason === "review_only") {
 					// 5010 的 --review-only:只服务界面、根本没在推演。
-					setSimStatus("finished", "仅审阅模式:未在推演(右栏可翻结果记录)");
+					setSimStatus("finished", "Review-only mode: no simulation is running (results are in the right column)");
 				} else {
-					setSimStatus("finished", "推演已结束(服务保持中,可查看结果)");
+					setSimStatus("finished", "Simulation finished (the server stays up, results are viewable)");
 				}
 			} else if (msg.type === "error") {
 				devLog("event", "Error: " + (msg.message || ""));
 				sim_error = msg.message || "Simulation error";
-				setSimStatus("error", "推演出错:" + (msg.message || ""));
+				setSimStatus("error", "Simulation error: " + (msg.message || ""));
 			} else if (msg.type === "story") {
 				// Story event injection: highlight in console + red banner flash
 				devLog("event", "【" + (msg.event_type || "event") + "】" + (msg.content || "").slice(0, 50) + " → " + (msg.targets || []).join(","));
@@ -1699,7 +1699,7 @@
 		if (!body) return;
 		var agents = Object.keys(goalsData).sort();
 		if (agents.length === 0) {
-			body.innerHTML = '<div style="color:#999;">未配置角色。</div>';
+			body.innerHTML = '<div style="color:#999;">No roles configured.</div>';
 			return;
 		}
 		if (!selectedAgent || goalsData[selectedAgent] === undefined) selectedAgent = agents[0];
@@ -1721,7 +1721,7 @@
 		var isAITool = roleTypes[a] === "ai_tool";
 		html += '<div style="display:flex; align-items:center; gap:6px;">';
 		html += '<div style="font-weight:bold; color:#333;">' + goalsEscape(a) + '</div>';
-		html += '<span style="font-size:9px; padding:0 6px; border-radius:8px; ' + (isAITool ? 'background:#e8f0fe; color:#2d6cdf;' : 'background:#f0f0f0; color:#666;') + ';">' + (isAITool ? "AI 工具·制度内建" : "人·体验形成") + '</span>';
+		html += '<span style="font-size:9px; padding:0 6px; border-radius:8px; ' + (isAITool ? 'background:#e8f0fe; color:#2d6cdf;' : 'background:#f0f0f0; color:#666;') + ';">' + (isAITool ? "AI tool · set by the rules" : "Human · formed by experience") + '</span>';
 		html += '</div>';
 		// 核心观测:价值倾向(内化)演变曲线(大图,支持横向滚动)
 		// canvas 固定高度,宽度按数据点数动态撑开,外层容器横向滚动
@@ -1729,12 +1729,12 @@
 		// 曲线图例
 		html += '<div style="font-size:10px; color:#666; margin:0 0 4px; line-height:1.5;" data-tend-legend-for="' + goalsEscape(a) + '"></div>';
 		// 导出按钮 + 解释面板按钮
-		html += '<div style="text-align:right; margin:0 0 4px;"><button data-export-chart-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #ccc; border-radius:4px; background:#fafafa; color:#555; cursor:pointer;">导出图片</button> <button data-explain-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #2d6cdf; border-radius:4px; background:#eef3ff; color:#2d6cdf; cursor:pointer;">解释倾向成因</button></div>';
+		html += '<div style="text-align:right; margin:0 0 4px;"><button data-export-chart-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #ccc; border-radius:4px; background:#fafafa; color:#555; cursor:pointer;">Export image</button> <button data-explain-for="' + goalsEscape(a) + '" style="padding:2px 10px; font-size:10px; border:1px solid #2d6cdf; border-radius:4px; background:#eef3ff; color:#2d6cdf; cursor:pointer;">Explain this tendency</button></div>';
 		// 倾向成因解释面板(可解释性:构成分解 + 窗口明细 + 干预因果链)
 		html += '<div data-explain-panel-for="' + goalsEscape(a) + '" style="display:none; margin:4px 0; border:1px solid #dbe4f5; border-radius:6px; background:#f7f9ff; padding:6px 8px; font-size:10px;"></div>';
 		// 信息区:约束(制度期望) vs 倾向(内化现状) 对照
 		html += '<div style="font-size:10px; margin:4px 0; border-top:1px dashed #e0e0e0; padding-top:4px;">';
-		html += '<div style="color:#888; margin-bottom:2px;">约束(期望) vs 倾向(内化)对照:</div>';
+		html += '<div style="color:#888; margin-bottom:2px;">Constraint (expected) vs tendency (internalized):</div>';
 		for (var ci = 0; ci < names.length; ci++) {
 			var g = names[ci];
 			var w = goals[g] || 0;
@@ -1747,8 +1747,8 @@
 			html += '<span style="flex:0 0 130px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555;" title="' + goalsEscape(g) + '"><span style="color:' + color + ';">■</span> ' + goalsEscape(g) + '</span>';
 			// 约束条(灰) + 倾向条(彩色) 并排
 			html += '<div style="flex:1; display:flex; flex-direction:column; gap:1px;">';
-			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:#999; font-size:9px;">约束</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div style="width:' + wbar + '%; height:7px; background:#bbb; border-radius:3px;"></div></div><span style="flex:0 0 30px; text-align:right; color:#777; font-size:9px;">' + wbar + '%</span></div>';
-			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 34px; color:' + color + '; font-size:9px;">倾向</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div data-tend-fill-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="width:' + tvbar + '%; height:7px; background:' + color + '; border-radius:3px;"></div></div><span data-tend-pct-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 30px; text-align:right; font-size:9px; color:#333;">' + (tv !== null ? tvbar + '%' : '--') + '</span></div>';
+			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 62px; color:#999; font-size:9px;">constraint</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div style="width:' + wbar + '%; height:7px; background:#bbb; border-radius:3px;"></div></div><span style="flex:0 0 30px; text-align:right; color:#777; font-size:9px;">' + wbar + '%</span></div>';
+			html += '<div style="display:flex; align-items:center; gap:4px;"><span style="flex:0 0 62px; color:' + color + '; font-size:9px;">tendency</span><div style="flex:1; height:7px; background:#f0f0f0; border-radius:3px;"><div data-tend-fill-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="width:' + tvbar + '%; height:7px; background:' + color + '; border-radius:3px;"></div></div><span data-tend-pct-for="' + goalsEscape(a) + '_' + goalsEscape(g) + '" style="flex:0 0 30px; text-align:right; font-size:9px; color:#333;">' + (tv !== null ? tvbar + '%' : '--') + '</span></div>';
 			html += '</div>';
 			// Δ 变化量
 			if (tv !== null) {
@@ -1768,14 +1768,14 @@
 			html += '<span style="flex:1 1 100px; min-width:60px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; text-align:left; line-height:1.3;" title="' + goalsEscape(g2) + '">' + goalsEscape(g2) + '</span>';
 			html += '<input type="range" min="0" max="100" value="' + w2 + '" style="width:64px; flex:0 0 auto;" data-agent="' + goalsEscape(a) + '" data-goal="' + goalsEscape(g2) + '">';
 			html += '<span style="width:30px; text-align:right; color:#333; flex:0 0 auto;" data-weight-for="' + goalsEscape(g2) + '">' + w2 + '%</span>';
-			html += '<button class="del-btn" style="margin-left:auto; padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g2) + '" data-del-agent="' + goalsEscape(a) + '">移除</button>';
+			html += '<button class="del-btn" style="margin-left:auto; padding:1px 6px; font-size:10px; flex:0 0 auto;" data-del-goal="' + goalsEscape(g2) + '" data-del-agent="' + goalsEscape(a) + '">Remove</button>';
 			html += '</div>';
 		}
 		html += '<div style="margin-top:4px; display:flex; gap:4px;">';
-		html += '<input type="text" placeholder="添加目标" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
+		html += '<input type="text" placeholder="Add a goal" style="flex:1; padding:2px 6px; font-size:11px;" data-new-goal="' + goalsEscape(a) + '">';
 		html += '<button class="del-btn" style="background:#2d6cdf; padding:2px 8px; font-size:10px;" data-add-goal="' + goalsEscape(a) + '">+</button>';
 		html += '</div>';
-		html += '<div style="font-size:10px; color:#888;">合计: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
+		html += '<div style="font-size:10px; color:#888;">Total: <span data-sum-for="' + goalsEscape(a) + '"></span></div>';
 		html += '</div>';
 		body.innerHTML = html;
 		goalsUpdateSums();
@@ -1838,7 +1838,7 @@
 			var note = "";
 			try {
 				var noNote = new URLSearchParams(location.search).get("no-note") === "1";
-				if (!noNote) note = window.prompt("干预理由(可选,将记录到干预审计与时间轴):\n例:监管新规,上调风控权重", "") || "";
+				if (!noNote) note = window.prompt("Reason for this intervention (optional; it goes into the intervention audit and onto the timeline):\nExample: new regulation, raise the risk-control weight", "") || "";
 			} catch (err) { note = ""; }
 			fetch("/api/goals", {
 				method: "POST",
@@ -1928,7 +1928,7 @@
 		else { ctx.clearRect(0, 0, w, h); }
 		if (hist.length === 0) {
 			ctx.fillStyle = "#888"; ctx.font = "12px sans-serif";
-			ctx.fillText("等待倾向数据...", 8, 18);
+			ctx.fillText("Waiting for tendency data...", 8, 18);
 			return;
 		}
 		// 绘图区:导出模式顶部留标题,底部留图例
@@ -1960,11 +1960,11 @@
 		// 导出模式:标题行(角色名 + 时间范围)
 		if (opts.export) {
 			ctx.fillStyle = "#333"; ctx.font = "bold 15px sans-serif";
-			ctx.fillText(agentName + " — 价值倾向演变(内化)", 4, 22);
+			ctx.fillText(agentName + " — value tendency over time (internalized)", 4, 22);
 			ctx.font = "11px sans-serif"; ctx.fillStyle = "#777";
 			var t0 = String(hist[0].t || "").slice(9);
 			var t1 = String(hist[n - 1].t || "").slice(9);
-			ctx.fillText("时间: " + t0 + " ~ " + t1, 4, 40);
+			ctx.fillText("Time: " + t0 + " ~ " + t1, 4, 40);
 		}
 		// 约束期望虚线:每个目标一条(同色虚线,表示制度期望基准)
 		for (var cg = 0; cg < names.length; cg++) {
@@ -1994,7 +1994,7 @@
 						ctx.beginPath(); ctx.moveTo(ivx, top - 4); ctx.lineTo(ivx, h - bottom); ctx.stroke();
 						ctx.setLineDash([]);
 						ctx.fillStyle = "#8a8a8a"; ctx.font = "bold 9px sans-serif";
-					ctx.fillText("干预", ivx + 3, top - 6);
+					ctx.fillText("intervention", ivx + 3, top - 6);
 					break;
 				}
 			}
@@ -2066,7 +2066,7 @@
 				var lgoal = names[lg];
 				legendItems.push({ color: colors[lgoal], text: " " + lgoal, dashed: false });
 			}
-			legendItems.push({ color: "#888", text: " 约束期望", dashed: true });
+			legendItems.push({ color: "#888", text: " constraint (expected)", dashed: true });
 			for (var li = 0; li < legendItems.length; li++) {
 				var item = legendItems[li];
 				var iw = 13 + ctx.measureText(item.text).width + 16;
@@ -2133,7 +2133,7 @@
 				}
 				// 该时刻是否有干预
 				for (var ivj = 0; ivj < _ivs.length; ivj++) {
-					if (String(_ivs[ivj].sim_time) === pt) { toolLines.push("▲ 干预时刻"); break; }
+					if (String(_ivs[ivj].sim_time) === pt) { toolLines.push("▲ intervention"); break; }
 				}
 				// 绘制 tooltip 白底框
 				var tctx = _cv.getContext("2d");
@@ -2177,8 +2177,8 @@
 		for (var i = 0; i < names.length; i++) {
 			parts.push('<span style="color:' + colors[names[i]] + ';">■</span> ' + goalsEscape(names[i]));
 		}
-		parts.push('<span style="color:#999;">┅</span> 约束期望');
-		leg.innerHTML = parts.join("　");
+		parts.push('<span style="color:#999;">┅</span> constraint (expected)');
+		leg.innerHTML = parts.join("&nbsp;&nbsp;&nbsp;");
 	}
 
 	// 导出倾向曲线 PNG:后端 matplotlib 渲染(含完整历史 + 分段约束阶梯 + 干预竖线)
@@ -2186,7 +2186,7 @@
 	function exportTendencyChart(agentName) {
 		var a = document.createElement("a");
 		a.href = "/api/export-chart?agent=" + encodeURIComponent(agentName);
-		a.download = "倾向演变_" + agentName + ".png";
+		a.download = "tendency_" + agentName + ".png";
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -2194,13 +2194,13 @@
 
 	// 倾向成因解释面板:构成分解 + 窗口明细 + 干预因果链(可解释性)
 	function renderExplainPanel(agentName, panelEl) {
-		panelEl.innerHTML = '<div style="color:#888;">加载解释数据…</div>';
+		panelEl.innerHTML = '<div style="color:#888;">Loading the explanation…</div>';
 		fetch("/api/explain?agent=" + encodeURIComponent(agentName)).then(function(r) { return r.json(); }).then(function(d) {
 			if (!d.ok) { panelEl.innerHTML = '<div style="color:#a00;">' + goalsEscape((d.errors || []).join("; ")) + '</div>'; return; }
 			var h = "";
 			// ① 构成分解:倾向 = α×底色 + (1-α)×体验
-			h += '<div style="font-weight:bold; color:#2d6cdf; margin-bottom:2px;">① 倾向构成分解(为什么是这个值)</div>';
-			h += '<div style="color:#666; margin-bottom:3px;">倾向 = α×人物底色 + (1-α)×体验窗口均值 · α=' + d.alpha + '(累计体验 ' + d.experience_count + ' 次,窗口 ' + d.window_size + ' 条)</div>';
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin-bottom:2px;">① What makes up this tendency (why this value)</div>';
+			h += '<div style="color:#666; margin-bottom:3px;">Tendency = α×character baseline + (1-α)×experience-window mean · α=' + d.alpha + ' (experiences so far: ' + d.experience_count + ', window of ' + d.window_size + ' entries)</div>';
 			var goals = d.constraints || {};
 			var gnames = Object.keys(goals);
 			for (var i = 0; i < gnames.length; i++) {
@@ -2211,33 +2211,33 @@
 				h += '<div style="display:flex; align-items:center; gap:5px; margin:2px 0; flex-wrap:wrap;">';
 				h += '<span style="flex:0 0 110px; color:#555;" title="' + goalsEscape(g) + '"><span style="color:' + color + ';">■</span> ' + goalsEscape(g) + '</span>';
 				h += '<span style="color:#333; font-weight:bold;">' + Math.round(dec.tendency * 1000) / 10 + '%</span>';
-				h += '<span style="color:#999;">= 底色 ' + Math.round(dec.base_component * 1000) / 10 + '% + 体验 ' + Math.round(dec.experience_component * 1000) / 10 + '%</span>';
+				h += '<span style="color:#999;">= baseline ' + Math.round(dec.base_component * 1000) / 10 + '% + experience ' + Math.round(dec.experience_component * 1000) / 10 + '%</span>';
 				// 原始占比(未归一化)单独写:以前把它直接当分量显示,屏幕上会出现
 				// "48.4% = 底色 2.5% + 体验 13.3%"这种加不起来的等式(第十一轮体检)。
-				h += '<span style="color:#bbb;">(拆解依据:α×底色 ' + Math.round(dec.base_value * 1000) / 10 + '% / (1-α)×窗口均值 ' + Math.round(dec.window_mean * 1000) / 10 + '%';
+				h += '<span style="color:#bbb;">(raw split before normalizing: α×baseline ' + Math.round(dec.base_value * 1000) / 10 + '% / (1-α)×window mean ' + Math.round(dec.window_mean * 1000) / 10 + '%';
 				if (d.normalization && Math.abs(d.normalization.factor - 1) > 0.001) {
-					h += ';两项按 Σ=' + d.normalization.raw_total + ' 归一化后相加=100%';
+					h += '; the two parts are normalized against Σ=' + d.normalization.raw_total + ', so they add up to 100%';
 				}
 				h += ')</span>';
 				h += '</div>';
 			}
 			// ② 窗口明细:最近体验(行动 → 对齐度 → 反馈)
-			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">② 体验窗口明细(最近 ' + d.window_details.length + ' 条,从早到晚)</div>';
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">② Experience window detail (latest ' + d.window_details.length + ' entries, oldest first)</div>';
 			if (d.window_details.length === 0) {
-				h += '<div style="color:#999;">暂无体验记录(模拟刚开始或该角色无行动)。</div>';
+				h += '<div style="color:#999;">No experience records yet (the run just started, or this role has not acted).</div>';
 			} else {
 				h += '<div style="overflow-x:auto;"><table style="border-collapse:collapse; width:100%; font-size:9px;">';
-				h += '<tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">模拟时间</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">行动</th>';
+				h += '<tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Sim time</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Action</th>';
 				var gnames2 = Object.keys(goals);
 				for (var j = 0; j < gnames2.length; j++) {
-					h += '<th style="padding:2px 4px; border-bottom:1px solid #ddd;">' + goalsEscape(gnames2[j]) + ' 反馈</th>';
+					h += '<th style="padding:2px 4px; border-bottom:1px solid #ddd;">' + goalsEscape(gnames2[j]) + ' feedback</th>';
 				}
 				h += '</tr>';
 				for (var k = 0; k < d.window_details.length; k++) {
 					var w = d.window_details[k];
 					var wtime = w.time ? w.time.replace(/^(\d{4})(\d{2})(\d{2})-/, "$1-$2-$3 ") : "–";
 					h += '<tr><td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#888; white-space:nowrap;">' + goalsEscape(wtime) + '</td>';
-					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + goalsEscape(w.action) + '">' + goalsEscape(w.action || "(无行动描述)") + '</td>';
+					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + goalsEscape(w.action) + '">' + goalsEscape(w.action || "(no action described)") + '</td>';
 					for (var jj = 0; jj < gnames2.length; jj++) {
 						var fb = w.feedback[gnames2[jj]];
 						h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; text-align:center; color:' + (fb !== undefined && fb > 0.1 ? "#2f9e44" : "#999") + ';">' + (fb !== undefined ? Math.round(fb * 1000) / 10 + '%' : "–") + '</td>';
@@ -2245,14 +2245,14 @@
 					h += '</tr>';
 				}
 				h += '</table></div>';
-				h += '<div style="color:#999; margin-top:2px;">反馈 = 行动与目标语义对齐度(相对占比)× 约束权重;绿色为强反馈。</div>';
+				h += '<div style="color:#999; margin-top:2px;">Feedback = how closely the action aligns semantically with the goal (relative share) × constraint weight; green marks strong feedback.</div>';
 			}
 			// ③ 干预因果链:干预 → 约束跳变 → 倾向滞后收敛
-			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">③ 干预因果链(价值可被人为改变的证据)</div>';
+			h += '<div style="font-weight:bold; color:#2d6cdf; margin:8px 0 2px;">③ Intervention causal chain (evidence that a value can be changed deliberately)</div>';
 			if (!d.intervention_chain || d.intervention_chain.length === 0) {
-				h += '<div style="color:#999;">该角色暂无干预记录。</div>';
+				h += '<div style="color:#999;">This role has no interventions yet.</div>';
 			} else {
-				h += '<table style="border-collapse:collapse; width:100%; font-size:9px;"><tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">模拟时间</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预前倾向</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">干预后 2h 倾向</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">迁移量</th></tr>';
+				h += '<table style="border-collapse:collapse; width:100%; font-size:9px;"><tr style="color:#888;"><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Sim time</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Intervention</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Tendency before</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Tendency 2h after</th><th style="text-align:left; padding:2px 4px; border-bottom:1px solid #ddd;">Shift</th></tr>';
 				for (var m = 0; m < d.intervention_chain.length; m++) {
 					var iv = d.intervention_chain[m];
 					var ivt = iv.sim_time || "";
@@ -2272,10 +2272,10 @@
 					h += '<td style="padding:2px 4px; border-bottom:1px solid #f0f0f0; color:#e07b39;">' + goalsEscape(ivShift.join(", ")) + '</td></tr>';
 				}
 				h += '</table>';
-				h += '<div style="color:#999; margin-top:2px;">迁移量 = 干预后 2 小时倾向 − 干预前倾向(内化滞后收敛的量化证据)。</div>';
+				h += '<div style="color:#999; margin-top:2px;">Shift = tendency 2 hours after the intervention minus the tendency before it (quantified evidence of the lagged internalization).</div>';
 			}
 			panelEl.innerHTML = h;
-		}).catch(function() { panelEl.innerHTML = '<div style="color:#a00;">解释数据加载失败。</div>'; });
+		}).catch(function() { panelEl.innerHTML = '<div style="color:#a00;">Failed to load the explanation.</div>'; });
 	}
 
 	// =============== 干预时间轴(底部横条 / /embed/timeline) ===============
@@ -2309,7 +2309,7 @@
 			if (!d.ok) { body.innerHTML = '<div style="color:#a00;">' + goalsEscape((d.errors || []).join("; ")) + '</div>'; return; }
 			timelineEvents = d.events || [];
 			timelineRender(body, d.start_time || "", d.cur_sim_time || "");
-		}).catch(function() { body.innerHTML = '<div style="color:#a00;">时间轴加载失败。</div>'; });
+		}).catch(function() { body.innerHTML = '<div style="color:#a00;">Failed to load the timeline.</div>'; });
 	}
 
 	function tlFmtMD(t) { // Date → "02/13"
@@ -2327,7 +2327,7 @@
 			? st
 			: (evTimes.length ? new Date(Math.min.apply(null, evTimes.map(function(d) { return d.getTime(); }))) : null);
 		if (!tMin) {
-			body.innerHTML = '<div style="color:#999;">暂无干预记录——专家调整右侧治理约束后,干预将出现在时间轴上。</div>';
+			body.innerHTML = '<div style="color:#999;">No interventions yet — once the expert adjusts the governance constraints on the right, they appear on the timeline.</div>';
 			return;
 		}
 		var tMax = now && now.getTime() > tMin.getTime() ? now : new Date(Math.max(tMin.getTime(), (evTimes.length ? Math.max.apply(null, evTimes.map(function(d) { return d.getTime(); })) : tMin.getTime())));
@@ -2369,15 +2369,15 @@
 			legend += '<span style="margin-right:7px;display:inline-flex;align-items:center;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + timelineAgentColor(agents[ai]) + ';margin-right:2px;"></span>' + goalsEscape(agents[ai]) + '</span>';
 		}
 		// 事件形态图例(独立于角色颜色)
-		legend += '<span style="margin-right:7px;display:inline-flex;align-items:center;margin-left:4px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#bbb;margin-right:2px;"></span>已撤销</span>';
-		legend += '<span style="display:inline-flex;align-items:center;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;margin-right:2px;"></span>撤销动作</span>';
+		legend += '<span style="margin-right:7px;display:inline-flex;align-items:center;margin-left:4px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#bbb;margin-right:2px;"></span>Revoked</span>';
+		legend += '<span style="display:inline-flex;align-items:center;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;margin-right:2px;"></span>Undo action</span>';
 		var rangeTxt = tlFmtMD(tMin) + ' ' + tlFmtHM(tMin) + ' ~ ' + tlFmtMD(tMax) + ' ' + tlFmtHM(tMax);
 		var h = '<style>#timeline-body [data-tl-idx]{transition:transform .12s ease;}#timeline-body [data-tl-idx]:hover{transform:scale(1.7);z-index:9;}</style>';
 		h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">';
-		h += '<div style="color:#888;font-size:10px;">共 ' + evs.length + ' 次干预 · ' + goalsEscape(rangeTxt) + '</div>';
+		h += '<div style="color:#888;font-size:10px;">Total ' + evs.length + ' interventions · ' + goalsEscape(rangeTxt) + '</div>';
 		h += '<div>' + legend + '</div></div>';
 		// 操作提示行:解释交互方式(颜色=角色,点击圆点看详情/撤销)
-		h += '<div style="font-size:10px;color:#2d6cdf;background:#eef3ff;border-radius:4px;padding:3px 8px;margin-bottom:4px;">点击彩色圆点 = 查看该次干预详情(权重变化/倾向迁移/备注),详情内可撤销回滚;圆点颜色 = 该角色(见右侧图例)。</div>';
+		h += '<div style="font-size:10px;color:#2d6cdf;background:#eef3ff;border-radius:4px;padding:3px 8px;margin-bottom:4px;">Click a colored dot = details of that intervention (weight change / tendency shift / note); from the details you can undo it. Dot colour = the role (see the legend on the right).</div>';
 
 		// 轨道:事件列垂直错开堆叠;轨道更高,时间标签在上方引导线区
 		h += '<div style="overflow-x:auto;padding:2px 0 4px;"><div style="position:relative;width:' + W + 'px;height:64px;">';
@@ -2410,25 +2410,25 @@
 				var isRevoked = !!ev.revoked;
 				var col = timelineAgentColor(ev.agent);
 				// 同刻多条:序号标注(第 k+1/N 条),title 区分各条内容
-				var seqTxt = N > 1 ? ' · 第 ' + (k + 1) + '/' + N + ' 条' : '';
+				var seqTxt = N > 1 ? ' · #' + (k + 1) + '/' + N + '' : '';
 				var ts = goalsEscape(ev.agent + ' ' + ev.sim_time + seqTxt);
 				if (isUndo) {
-					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="撤销事件 ' + ts + '"></div>';
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;border:2px solid #8a8a8a;background:#fff;cursor:pointer;" title="Undo event ' + ts + '"></div>';
 				} else if (isRevoked) {
-					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:10px;color:#fff;font-size:9px;" title="已撤销: ' + ts + '">✕</div>';
+					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 6) + 'px;top:' + (cy - 6) + 'px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;text-align:center;line-height:10px;color:#fff;font-size:9px;" title="Revoked: ' + ts + '">✕</div>';
 				} else {
 					h += '<div data-tl-idx="' + idx + '" style="position:absolute;left:' + (gx - 5) + 'px;top:' + (cy - 5) + 'px;width:10px;height:10px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';cursor:pointer;" title="' + ts + '"></div>';
 				}
 			}
 			if (N > shown) {
-				h += '<div data-tl-idx="' + g[shown] + '" style="position:absolute;left:' + (gx - 8) + 'px;top:' + (topBase - shown * stepY - 7) + 'px;min-width:16px;height:14px;border-radius:7px;background:#555;color:#fff;font-size:8px;line-height:14px;text-align:center;padding:0 3px;cursor:pointer;" title="该时刻共 ' + N + ' 条干预,展示前 ' + shown + ' 条">+' + (N - shown) + '</div>';
+				h += '<div data-tl-idx="' + g[shown] + '" style="position:absolute;left:' + (gx - 8) + 'px;top:' + (topBase - shown * stepY - 7) + 'px;min-width:16px;height:14px;border-radius:7px;background:#555;color:#fff;font-size:8px;line-height:14px;text-align:center;padding:0 3px;cursor:pointer;" title="This moment has ' + N + ' interventions, showing the first ' + shown + '">+' + (N - shown) + '</div>';
 			}
 		}
 		// 当前时间标记(右端)
 		var nx = padL + innerW;
 		h += '<div style="position:absolute;left:' + nx + 'px;top:26px;text-align:left;">';
 		h += '<div style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #c2255c;margin:2px 0 2px 2px;"></div>';
-		h += '<div style="font-size:9px;color:#c2255c;font-weight:bold;white-space:nowrap;">现在<br>' + goalsEscape(tlFmtMD(tMax) + ' ' + tlFmtHM(tMax)) + '</div></div>';
+		h += '<div style="font-size:9px;color:#c2255c;font-weight:bold;white-space:nowrap;">Now<br>' + goalsEscape(tlFmtMD(tMax) + ' ' + tlFmtHM(tMax)) + '</div></div>';
 		h += '</div>'; // 关轨道容器(height:64)
 		// 底部刻度:按跨度自适应步长;跨天处(00:00)标日期分隔
 		// (置于 overflow-x:auto 滚动容器内,与轨道同步横向滚动对齐)
@@ -2514,21 +2514,21 @@
 		var isRevoked = !!ev.revoked;
 		var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
 		h += '<div style="font-weight:bold;color:' + (isRevoked ? "#8a8a8a" : timelineAgentColor(ev.agent)) + ';">' + goalsEscape(ev.agent) + ' · ' + goalsEscape(ev.sim_time)
-			+ (isUndo ? ' · <span style="color:#8a8a8a;">撤销事件</span>'
-			  : isRevoked ? ' · <span style="color:#8a8a8a;">已撤销(回滚)</span>'
-			  : ' · <span style="color:#2d6cdf;">干预</span>') + '</div>';
+			+ (isUndo ? ' · <span style="color:#8a8a8a;">Undo event</span>'
+			  : isRevoked ? ' · <span style="color:#8a8a8a;">Revoked (rolled back)</span>'
+			  : ' · <span style="color:#2d6cdf;">Intervention</span>') + '</div>';
 		h += '<button data-tl-close style="border:none;background:none;cursor:pointer;color:#999;font-size:13px;line-height:1;">✕</button></div>';
-		if (ev.note) h += '<div style="color:#555;margin-bottom:4px;background:#f4f6fa;padding:3px 6px;border-radius:4px;">备注:' + goalsEscape(ev.note) + '</div>';
-		if (ev.real_time) h += '<div style="color:#999;font-size:10px;margin-bottom:4px;">真实操作时间:' + goalsEscape(ev.real_time) + '</div>';
-		h += '<table style="border-collapse:collapse;font-size:10px;margin-bottom:4px;"><tr style="color:#888;"><th style="text-align:left;padding:1px 6px 1px 0;">目标</th><th style="text-align:right;padding:1px 6px;">干预前</th><th style="text-align:right;padding:1px 6px;">干预后</th><th></th></tr>' + rows.join("") + '</table>';
-		h += '<div style="color:#555;font-size:10px;margin-bottom:2px;">干预后 2h 倾向迁移:' + (shiftRows.length ? shiftRows.join("") : '<span style="color:#999;">暂无数据</span>') + '</div>';
+		if (ev.note) h += '<div style="color:#555;margin-bottom:4px;background:#f4f6fa;padding:3px 6px;border-radius:4px;">Note: ' + goalsEscape(ev.note) + '</div>';
+		if (ev.real_time) h += '<div style="color:#999;font-size:10px;margin-bottom:4px;">Real time of the action: ' + goalsEscape(ev.real_time) + '</div>';
+		h += '<table style="border-collapse:collapse;font-size:10px;margin-bottom:4px;"><tr style="color:#888;"><th style="text-align:left;padding:1px 6px 1px 0;">Goal</th><th style="text-align:right;padding:1px 6px;">Before</th><th style="text-align:right;padding:1px 6px;">After</th><th></th></tr>' + rows.join("") + '</table>';
+		h += '<div style="color:#555;font-size:10px;margin-bottom:2px;">Tendency shift 2h after the intervention: ' + (shiftRows.length ? shiftRows.join("") : '<span style="color:#999;">no data</span>') + '</div>';
 		if (!isUndo && !isRevoked && ev.real_time) {
 			// 沙盒场景不给"撤销(回滚)"入口:后果属于角色的经历,不允许倒带。
 			// 判定由服务端给(window.__UNDO_ALLOWED__);真发请求也会被 403 拒。
 			if (window.__UNDO_ALLOWED__ === false) {
-				h += '<div style="margin-top:6px;text-align:right;color:#8a8a8a;font-size:10px;">沙盒场景不提供回滚(干预后果不可倒带)</div>';
+				h += '<div style="margin-top:6px;text-align:right;color:#8a8a8a;font-size:10px;">no rollback in the sandbox scenario (the consequences of an intervention cannot be rewound)</div>';
 			} else {
-				h += '<div style="margin-top:6px;text-align:right;"><button data-tl-undo="' + goalsEscape(ev.agent) + '" data-tl-undo-time="' + goalsEscape(ev.real_time) + '" style="padding:3px 10px;font-size:10px;border:1px solid #e8590c;border-radius:4px;background:#fff7f4;color:#e8590c;cursor:pointer;">撤销此干预(回滚)</button></div>';
+				h += '<div style="margin-top:6px;text-align:right;"><button data-tl-undo="' + goalsEscape(ev.agent) + '" data-tl-undo-time="' + goalsEscape(ev.real_time) + '" style="padding:3px 10px;font-size:10px;border:1px solid #e8590c;border-radius:4px;background:#fff7f4;color:#e8590c;cursor:pointer;">Undo this intervention (rollback)</button></div>';
 			}
 		}
 		d.innerHTML = h;
@@ -2549,8 +2549,8 @@
 			if (timelineEvents[i].agent === agent && timelineEvents[i].real_time === realTime
 				&& timelineEvents[i].operator !== "undo" && !timelineEvents[i].revoked) { ev = timelineEvents[i]; break; }
 		}
-		if (!ev) { alert("找不到对应干预记录"); return; }
-		if (!confirm("确定撤销 " + agent + " 于 " + ev.sim_time + " 的干预?约束将回滚到干预前状态,并记录一条撤销审计。")) return;
+		if (!ev) { alert("No matching intervention record found"); return; }
+		if (!confirm("Undo the intervention by " + agent + "'s intervention at " + ev.sim_time + "? The constraints roll back to the state before it, and an undo audit entry is recorded.")) return;
 		fetch("/api/undo-intervention", {
 			method: "POST",
 			headers: {"Content-Type": "application/json"},
@@ -2565,11 +2565,11 @@
 						if (g.ok) { goalsData = g.goals; tendencyData = g.tendency || {}; roleTypes = g.role_types || {}; goalsRender(); }
 					}).catch(function() {});
 				}
-				devLog("ok", "已撤销干预:" + agent + " @" + ev.sim_time);
+				devLog("ok", "Undid intervention: " + agent + " @" + ev.sim_time);
 			} else {
-				alert((out.errors || ["撤销失败"]).join("; "));
+				alert((out.errors || ["undo failed"]).join("; "));
 			}
-		}).catch(function(e) { alert("撤销请求失败:" + e); });
+		}).catch(function(e) { alert("Undo request failed: " + e); });
 	}
 
 	function timelineRefresh() {
@@ -2622,7 +2622,7 @@
 				tlHideDetail(); // 点头部收/展时先关掉残留的详情浮层(它可能盖住面板)
 				var isCollapsed = body2.style.display === "none";
 				body2.style.display = isCollapsed ? "block" : "none";
-				if (toggle) toggle.textContent = isCollapsed ? "收起 ▾" : "展开 ▸";
+				if (toggle) toggle.textContent = isCollapsed ? "Collapse ▾" : "Expand ▸";
 				if (embedMode === "timeline") {
 					panel.style.minHeight = isCollapsed ? "0px" : "340px";
 				} else {
@@ -2633,7 +2633,7 @@
 				}
 				if (isCollapsed) timelinePollStart();
 			};
-			toggle.textContent = "收起 ▾";
+			toggle.textContent = "Collapse ▾";
 		}
 		if (embedMode === "timeline") {
 			// 独立嵌入页:面板高度由内容撑开,横向滚动条由 timeline-body 内部处理
@@ -2681,10 +2681,10 @@
 				// 这个页面没有治理约束接口(比如 case01 的 5010:那是 case00 的面板)。
 				// 以前这里静默什么都不做,面板就永远停在 "Loading goals..." —— 看起来像坏了。
 				// **不允许静默**:收起它并说明原因。
-				goalsUnavailable("本页面没有 /api/goals:治理约束面板只适用于 case00 的实时面");
+				goalsUnavailable("This page has no /api/goals: the governance panel only applies to the case00 stock face");
 			}
 		}).catch(function(err) {
-			goalsUnavailable("治理约束取不到(" + (err && err.message ? err.message : err) + ")");
+			goalsUnavailable("Could not load the governance constraints (" + (err && err.message ? err.message : err) + ")");
 		});
 		// event delegation on goals-body
 		var body = document.getElementById("goals-body");

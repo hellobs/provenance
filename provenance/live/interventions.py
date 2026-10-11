@@ -648,7 +648,7 @@ async def _read_body(request: Request):
     if ctype and ctype != "application/json":
         return None, JSONResponse(
             {"ok": False,
-             "errors": ["需要 Content-Type: application/json(不支持表单提交)"]},
+             "errors": ["Content-Type: application/json is required (form submissions are not accepted)"]},
             status_code=415)
     try:
         body = await request.json()
@@ -660,9 +660,9 @@ async def _read_body(request: Request):
 def _wrap(strategy_id: str, res) -> JSONResponse:
     if res is None:
         from live.state import log
-        log.error("干预策略 {!r} 返回 None(策略实现漏 return?)".format(strategy_id))
+        log.error("intervention strategy {!r} returned None (a missing return in the strategy?)".format(strategy_id))
         return JSONResponse({"ok": False,
-                             "errors": ["干预策略 {!r} 返回空结果(实现缺陷)".format(
+                             "errors": ["intervention strategy {!r} returned an empty result (implementation defect)".format(
                                  strategy_id)]}, status_code=500)
     if isinstance(res, InterventionResult):
         # dict(res):InterventionResult 是 dict 子类,body 存在字典本体里(不是 .body
@@ -680,7 +680,7 @@ async def dispatch(strategy_id: str, request: Request):
     if not known(strategy_id):
         return JSONResponse(
             {"ok": False,
-             "errors": ["未知干预策略: {!r};已注册: {}".format(
+             "errors": ["unknown intervention strategy: {!r}; registered: {}".format(
                  strategy_id, " / ".join(all_ids()))]}, status_code=404)
     res = get(strategy_id)().apply(_http_ctx(request.app), body)
     return _wrap(strategy_id, res)

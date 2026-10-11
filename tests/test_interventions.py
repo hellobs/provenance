@@ -298,7 +298,7 @@ class TestGenericDispatch:
     def test_unknown_strategy_404_with_listing(self, client):
         r = client.post("/api/intervention/nope", json={})
         assert r.status_code == 404
-        assert "已注册" in r.json()["errors"][0]
+        assert "registered" in r.json()["errors"][0]
 
     def test_json_only_guard_applies(self, client):
         r = client.post("/api/intervention/goals", data={"x": "1"},
@@ -383,7 +383,7 @@ class TestStrategyHardening:
             c = TestClient(_app)
             r = c.post("/api/intervention/test-buggy-x9", json={})
             assert r.status_code == 500
-            assert "返回空结果" in r.json()["errors"][0]
+            assert "empty result" in r.json()["errors"][0]
         finally:
             ivm.STRATEGIES.pop("test-buggy-x9", None)
             ivm._INTERVENTIONS.pop("test-buggy-x9", None)
@@ -432,7 +432,7 @@ class TestBothFaces:
         assert c.post("/api/reflections/mark", json={}).status_code == 200
         # 统一分发口未知策略 404 带清单
         r = c.post("/api/intervention/nope", json={})
-        assert r.status_code == 404 and "已注册" in r.json()["errors"][0]
+        assert r.status_code == 404 and "registered" in r.json()["errors"][0]
 
     def test_case01_face_undo_sandbox_403(self, monkeypatch):
         """沙盒 undo 的 403 必须原样透出(case01 面走共享 router 的 `_wrap`)。
