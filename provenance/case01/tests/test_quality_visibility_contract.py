@@ -123,7 +123,7 @@ def test_quality_lookup_failure_is_reported_not_disguised_as_ok(monkeypatch):
     q = lh._quality_of({"run_id": "r-1"})
     assert q["quality"] == "unverified"
     assert q["reason"], "降级必须留痕:静默 unverified 会让读者以为是记录没有戳"
-    assert "取不到" in q["reason"]
+    assert "could not be read" in q["reason"]
 
 
 def test_expert_safe_view_does_not_leak_manifest_or_branch_truth():

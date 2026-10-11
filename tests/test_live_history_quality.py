@@ -389,7 +389,7 @@ def test_empty_checkpoint_is_not_silently_served_as_a_normal_record(monkeypatch,
     bare = tmp_path / "ck-bare"
     bare.mkdir()
     d2 = _call(H.run_detail("checkpoint", "ck-bare"))
-    assert "快照" in d2["incomplete"] and "conversation.json" in d2["incomplete"], d2["incomplete"]
+    assert "snapshot" in d2["incomplete"] and "conversation.json" in d2["incomplete"], d2["incomplete"]
 
 
 def test_compressed_rows_say_they_are_index_only(monkeypatch):

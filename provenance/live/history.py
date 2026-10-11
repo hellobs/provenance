@@ -254,9 +254,9 @@ def _brief_checkpoint(name: str) -> dict:
             n_turns = 0
     missing = []
     if not has_conv:
-        missing.append("缺 conversation.json(没有对话记录)")
+        missing.append("conversation.json is missing (no dialogue records)")
     if not shots:
-        missing.append("没有任何快照")
+        missing.append("no snapshots at all")
     out = {
         "source": "checkpoint",
         "run_id": name,
@@ -295,7 +295,7 @@ def _brief_review(run_id: str) -> dict:
                 "n_turns": 0, "n_reflections": 0, "has_graph": False,
                 "quality": "unverified", "consistency": "unverified",
                 "branch_source": "", "debug": "",
-                "error": "读 run.json 失败: {}".format(exc)}
+                "error": "failed to read run.json: {}".format(exc)}
     router_data = data.get("router") or {}
     n_runs = len(data.get("turns") or [])
     q = _quality_of(data)
@@ -331,7 +331,7 @@ def _brief_unreadable(run_id: str) -> dict:
             "n_turns": 0, "n_reflections": 0, "has_graph": False,
             "quality": "unreadable", "consistency": "unverified",
             "branch_source": "", "debug": "",
-            "error": "run 目录存在但没有 run.json(该次 run 未跑成或未落盘)"}
+            "error": "the run directory exists but run.json is missing (that run never finished or never wrote its record)"}
 
 
 def _quality_of(rec: dict) -> dict:
@@ -361,7 +361,7 @@ def _quality_of(rec: dict) -> dict:
                 "manifest_warnings": q.get("manifest_warnings", [])}
     except Exception:  # noqa: BLE001 - 引擎侧缺席时不能假装"没问题"
         return {"quality": "unverified", "consistency": "unverified",
-                "reason": "取不到 case01 质检判定", "branch_source": "", "debug": "",
+                "reason": "the case01 quality verdict could not be read", "branch_source": "", "debug": "",
                 "deprecated": False, "deprecated_reason": "",
                 # 读不到判定 ≠ 清单是空的:如实写 unverified,免得平台把"没查"当"没警告"
                 "manifest_status": "unverified", "manifest_warning_count": 0,
@@ -369,7 +369,7 @@ def _quality_of(rec: dict) -> dict:
 
 
 # 默认不给平台的质检类别(与 5002 `serve.list_runs` 同口径):
-#   questionable = 预设分支与 AI 的 T0 立场自相矛盾,或判定失败(run 停在 T0)
+#   questionable = 反思没生成；或判定失败(run 停在 T0)；或记录的分支与 AI 在 T0 的立场矛盾
 #   debug        = 调试跑(内容不完整)
 #   deprecated   = 记录被显式标废弃(样本作废;2026-09-24 加 —— 一条自洽的废弃样本同样是废的,
 #                  以前它只要恰好判成 ok 就会被静默发给平台)
@@ -489,7 +489,7 @@ def _brief_compressed(name: str) -> dict:
             # 统一字段:不是 case01 成品就没有一致性戳 → unverified(判不了 ≠ 有问题)
             "quality": "unverified", "consistency": "unverified",
             "branch_source": "", "debug": "",
-            "incomplete": "压缩成品只给文件清单(无逐轮/逐日结构,不要当成品记录用)"}
+            "incomplete": "a compressed artifact only lists files (no per-turn / per-day structure; do not treat it as a finished record)"}
 
 
 @router.get("/api/runs")
@@ -599,27 +599,27 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
                        "source": source, "limit": limit, "offset": offset}}
     if ignored:
         body["ignored_params"] = ignored
-        body["ignored_note"] = "这些参数本接口不认(没生效):{}".format(",".join(ignored))
+        body["ignored_note"] = "this endpoint does not accept these parameters (they had no effect): {}".format(",".join(ignored))
     if bad_source:
         body["invalid_source"] = bad_source
         body["invalid_source_note"] = (
-            "`source` 这个参数只认 {} —— 收到的 {!r} 不是其中之一,仍照它过滤,所以必然 0 条。"
-            "0 条不代表没有数据:只要 case01 成品记录,用 `?source=review`。".format(
+            "the `source` parameter only accepts {} — {!r} is not one of them, and it is still used as a filter, so the result is necessarily 0 rows. "
+            "0 rows does not mean there is no data: for case01 finished records only, use `?source=review`.".format(
                 "/".join(_SOURCE_VALUES), bad_source))
     if source_errors:
         # 数据源解析失败(如相对根配置)不是"没数据",必须显式报出 ——
         # 否则平台看到 count=0 会以为"这个源本来就空"(2026-10-05 M2 推广)。
         body["source_errors"] = source_errors
         body["source_errors_note"] = (
-            "以下数据源因其根目录配置无法解析而**整块跳过**(不是没有数据):"
+            "these data sources were skipped **whole** because their root directory could not be resolved (this is not 'no data'):"
             + ";".join("{}={}".format(e["source"], e["error"]) for e in source_errors))
     if hidden:
         body["excluded"] = {
             "count": len(hidden), "runs": hidden,
-            "reason": "questionable=预设分支与 AI 的 T0 立场矛盾,或判定失败(停在 T0);"
-                      "debug=调试跑(内容不完整);deprecated=记录已被显式标废弃(样本作废);"
-                      "unreadable=有 run 目录但 run.json 不在(该次 run 未落盘)。"
-                      "加 ?include_questionable=1 取全量",
+            "reason": "questionable = no reflection was generated, or the branch judge failed (the run stops at T0, no timeline),"
+                      " or the recorded branch contradicts the AI's stance at T0; debug = a debug run (incomplete content);"
+                      " deprecated = explicitly marked deprecated (the sample is void); unreadable = a run directory exists but run.json does not (that run never wrote its record)."
+                      " Add ?include_questionable=1 to get every run.",
         }
     return JSONResponse(body)
 
@@ -628,14 +628,14 @@ async def list_all_runs(request: Request = None, include_questionable: bool = Fa
 async def explore_page(request: Request) -> HTMLResponse:
     """数据界面:纯数据浏览,不依赖运行状态;由 history.html 渲染。"""
     return templates.TemplateResponse(request, "history.html",
-                                      {"embed": "explore", "title": "历史数据",
+                                      {"embed": "explore", "title": "Historical data",
                                        "extra_nav_links": nav_links_for(request.app)})
 
 
 @router.get("/api/review-package/{run_id}", response_model=ReviewPackageResponse,
-            responses={404: {"description": "Run 不存在或路径非法"},
-                       422: {"description": "记录或类别目录格式错误"},
-                       503: {"description": "记录或类别目录暂不可读"}})
+            responses={404: {"description": "the run does not exist or its path is invalid"},
+                       422: {"description": "the record or category directory is malformed"},
+                       503: {"description": "the record or category directory is temporarily unreadable"}})
 async def review_package(run_id: str) -> JSONResponse:
     """平台建单用只读交接包；与实时 case 无关，不分配专家、不接收审核写回。"""
     from case01.review_export import build_review_package
@@ -678,7 +678,7 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
     按契约不得进专家视图。要原始全文(内部排查/引擎侧)加 `?raw=1`。
     """
     if not run_id or run_id in (".", "..") or "/" in run_id or "\\" in run_id:
-        return JSONResponse({"ok": False, "errors": ["非法 run_id: {}".format(run_id)]},
+        return JSONResponse({"ok": False, "errors": ["invalid run_id: {}".format(run_id)]},
                             status_code=404)
     if source == "review":
         root, rerr = _data_root_soft("CASE01_RUNS_ROOT", "case01", "runs")
@@ -686,13 +686,13 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
             return JSONResponse({"ok": False, "errors": [rerr]}, status_code=422)
         p = os.path.join(root, run_id, "run.json")
         if not os.path.isfile(p):
-            return JSONResponse({"ok": False, "errors": ["没有该 case01 成品: {}".format(run_id)]},
+            return JSONResponse({"ok": False, "errors": ["no such case01 finished record: {}".format(run_id)]},
                                 status_code=404)
         try:
             with open(p, "r", encoding="utf-8") as f:
                 rec = json.load(f)
         except Exception as exc:  # noqa: BLE001
-            return JSONResponse({"ok": False, "errors": ["读 run.json 失败: {}".format(exc)]},
+            return JSONResponse({"ok": False, "errors": ["failed to read run.json: {}".format(exc)]},
                                 status_code=500)
         if raw:
             return JSONResponse({"ok": True, "source": "review", "run_id": run_id,
@@ -706,7 +706,7 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
             return JSONResponse({"ok": False, "errors": [cerr]}, status_code=422)
         ck_root = os.path.join(ck_base, run_id)
         if not os.path.isdir(ck_root):
-            return JSONResponse({"ok": False, "errors": ["没有该 case00 痕迹: {}".format(run_id)]},
+            return JSONResponse({"ok": False, "errors": ["no such case00 trace: {}".format(run_id)]},
                                 status_code=404)
         conv = {}
         cpath = os.path.join(ck_root, "conversation.json")
@@ -716,16 +716,16 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
                 with open(cpath, "r", encoding="utf-8") as f:
                     conv = json.load(f) or {}
             except Exception:  # noqa: BLE001
-                conv = {"error": "conversation.json 不可读"}
-                missing.append("conversation.json 存在但读不出(已损坏?)")
+                conv = {"error": "conversation.json is unreadable"}
+                missing.append("conversation.json exists but could not be parsed (corrupted?)")
         else:
             # 不静默(2026-09-24 第十轮体检):以前这里回 `conversation: {}` + `shots: []`,
             # 200 正常响应 —— 平台点开一条测试残留痕迹只会看到空白,不知道是"没有"还是"坏了"。
-            missing.append("缺 conversation.json(没有对话记录)")
+            missing.append("conversation.json is missing (no dialogue records)")
         shots = sorted(f for f in os.listdir(ck_root)
                        if f.startswith("simulate-") and f.endswith(".json"))
         if not shots:
-            missing.append("没有任何快照")
+            missing.append("no snapshots at all")
         body = {"ok": True, "source": "checkpoint", "run_id": run_id,
                 # view(2026-09-24):三种 source 的 data 形状**完全不同**,
                 # 客户端得有一个字段能判断自己在渲染哪一套;以前只有 review 带 view。
@@ -740,12 +740,12 @@ async def run_detail(source: str, run_id: str, raw: bool = False) -> JSONRespons
             return JSONResponse({"ok": False, "errors": [xerr]}, status_code=422)
         comp_root = os.path.join(comp_base, run_id)
         if not os.path.isdir(comp_root):
-            return JSONResponse({"ok": False, "errors": ["没有该压缩成品: {}".format(run_id)]},
+            return JSONResponse({"ok": False, "errors": ["no such compressed artifact: {}".format(run_id)]},
                                 status_code=404)
         files = sorted(f for f in os.listdir(comp_root))
         return JSONResponse({"ok": True, "source": "compressed", "run_id": run_id,
                              "view": "compressed-index",
-                             "incomplete": "压缩成品只给文件清单(无逐轮/逐日结构,不要当成品记录用)",
+                             "incomplete": "a compressed artifact only lists files (no per-turn / per-day structure; do not treat it as a finished record)",
                              "data": {"files": files}})
-    return JSONResponse({"ok": False, "errors": ["未知 source: {}".format(source)]},
+    return JSONResponse({"ok": False, "errors": ["unknown source: {}".format(source)]},
                         status_code=404)
