@@ -98,8 +98,8 @@ def _governance_unsupported(ctx: InterventionContext):
     if ctx.supports_governance:
         return None
     return InterventionResult({"ok": False, "errors": [
-        "本面引擎不挂治理约束(如 case01:Game(governance=None)),"
-        "写了 governance.json 也没有实例读它 ⇒ 拒绝执行,不返回成功假象。"]},
+        "this face's engine carries no governance constraints (case01 does Game(governance=None)): "
+        "writing governance.json would be read by nobody, so the intervention is refused rather than reported as success."]},
         status=409)
 
 
@@ -153,9 +153,9 @@ _INTERVENTIONS: Dict[str, type] = {}             # id -> 策略类
 def register(strategy_id: str, cls: type, meta: Dict[str, Any]) -> None:
     """注册一个干预策略。重复 id / 非法 id 直接抛错(与引擎注册表同口径)。"""
     if not strategy_id or not all(c.isalnum() or c in "-_" for c in strategy_id):
-        raise ValueError("非法干预策略 id: {!r}".format(strategy_id))
+        raise ValueError("invalid intervention strategy id: {!r}".format(strategy_id))
     if strategy_id in STRATEGIES:
-        raise ValueError("干预策略已注册: {!r}".format(strategy_id))
+        raise ValueError("intervention strategy already registered: {!r}".format(strategy_id))
     STRATEGIES[strategy_id] = dict(meta or {})
     _INTERVENTIONS[strategy_id] = cls
 
@@ -200,7 +200,7 @@ class InterventionStrategy:
         return self._apply(ctx, payload)
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> Any:
-        raise NotImplementedError("干预策略 {!r} 未实现 _apply".format(
+        raise NotImplementedError("intervention strategy {!r} does not implement _apply".format(
             self.strategy_id))
 
 
@@ -212,7 +212,7 @@ class WeightAdjustStrategy(InterventionStrategy):
     """专家设定期望目标权重(governance.json 制度层 + 运行中实例内存同步)。"""
 
     strategy_id = "goals"
-    name = "调整治理约束权重"
+    name = "adjust governance constraint weights"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         blocked = _governance_unsupported(ctx)
@@ -221,17 +221,17 @@ class WeightAdjustStrategy(InterventionStrategy):
         name = str(payload.get("name", "")).strip()
         goals = payload.get("goals")
         if not name:
-            return {"ok": False, "errors": ["缺少角色名"]}
+            return {"ok": False, "errors": ["the agent name is missing"]}
         if "/" in name or "\\" in name or ".." in name:
-            return {"ok": False, "errors": ["非法角色名(含路径分隔符): {!r}".format(name)]}
+            return {"ok": False, "errors": ["invalid agent name (contains path separators): {!r}".format(name)]}
         if not isinstance(goals, dict) or not goals:
-            return {"ok": False, "errors": ["约束应为非空 dict(目标:权重)"]}
+            return {"ok": False, "errors": ["constraints must be a non-empty dict (goal: weight)"]}
         # 角色名必须是这一局真实存在的角色:以前 {"name": "查无此人"} 会静默写进
         # governance.json,多出一个谁也用不到的角色。拿不到清单时(没在跑)不拦。
         known_roles = list(_agents_of(ctx).keys())
         if known_roles and name not in known_roles:
             return {"ok": False, "errors": [
-                "没有这个角色: {!r};本局角色: {}".format(
+                "no such agent in this run: {!r}; agents in this run: {}".format(
                     name, " / ".join(sorted(known_roles)))]}
         # 清洗:拒绝数字开头目标名(误输入)与 0 权重项(前端拖动产生的垃圾)
         import re as _re
@@ -248,20 +248,20 @@ class WeightAdjustStrategy(InterventionStrategy):
             # governance.json 落成非标准字面量,序列化响应时 500。
             if not math.isfinite(fv):
                 return {"ok": False, "errors": [
-                    "权重必须是有限数:目标 {!r} 收到 {}".format(gs, v)]}
+                    "weights must be finite numbers: goal {!r} received {}".format(gs, v)]}
             if fv <= 0:
                 continue
             cleaned[gs] = fv
         if not cleaned:
-            return {"ok": False, "errors": ["清洗后无有效目标(拒绝数字/0权重项)"]}
+            return {"ok": False, "errors": ["nothing is left after cleaning (numeric or 0-weight goals are rejected)"]}
         goals = cleaned
         try:
             total = sum(float(v) for v in goals.values())
         except (TypeError, ValueError):
-            return {"ok": False, "errors": ["约束权重值必须都是数字"]}
+            return {"ok": False, "errors": ["constraint weight values must all be numbers"]}
         if abs(total - 1.0) > 1e-6:
             return {"ok": False, "errors": [
-                "约束权重总和应为 1,得到 {}".format(round(total, 4))]}
+                "constraint weights must sum to 1, got {}".format(round(total, 4))]}
 
         # 1) 写 governance.json(制度层,非 AI 本体)
         from mavisframework.runtime.governance import Governance
@@ -295,7 +295,7 @@ class WeightAdjustStrategy(InterventionStrategy):
             })
         except Exception as e:
             from live.state import log
-            log.error("写入干预审计失败(agent={}): {}".format(name, e), exc_info=True)
+            log.error("failed to write the intervention audit (agent={}): {}".format(name, e), exc_info=True)
 
         return {"ok": True, "name": name, "constraints": goals}
 
@@ -314,7 +314,7 @@ def _case00_engine_id(base_dir: str) -> str:
             return getattr(load_yaml(p), "engine", None) or "sandbox-value"
     except Exception:  # noqa: BLE001 —— 回退必须留痕:场景坏了没人知道就等于没坏
         from live.state import log
-        log.warning("[embed] case00_village/scenario.yaml 读取失败,按 sandbox-value 处理",
+        log.warning("[embed] failed to read case00_village/scenario.yaml; treating it as sandbox-value",
                     exc_info=True)
     return "sandbox-value"
 
@@ -333,7 +333,7 @@ class UndoInterventionStrategy(InterventionStrategy):
     """撤销一次专家干预:约束回滚到该次干预的 old_constraints。"""
 
     strategy_id = "undo"
-    name = "撤销干预(权重回滚)"
+    name = "undo an intervention (weight rollback)"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> Any:
         blocked = _governance_unsupported(ctx)
@@ -341,24 +341,24 @@ class UndoInterventionStrategy(InterventionStrategy):
             return blocked
         if sandbox_rollback_blocked(ctx.base_dir):
             return InterventionResult({"ok": False, "errors": [
-                "沙盒场景不提供时间轴回滚:干预的后果属于角色的经历,回滚会把它抹掉"
-                "(决策→后果→反思→内化这条线不允许倒带)。如确需修正,请在治理面板重新干预。"
+                "the sandbox scenario offers no timeline rollback: an intervention's consequences belong to the agent's experience,"
+                " so rolling back would erase them (decision -> consequence -> reflection -> internalization cannot be rewound). To correct course, intervene again from the governance panel."
             ]}, status=403)
         agent = str(payload.get("agent", "")).strip()
         sim_time = str(payload.get("sim_time", "")).strip()
         rec_time = str(payload.get("time", "")).strip()  # 真实写入时间(区分同刻干预)
         if not agent or not sim_time or not rec_time:
-            return {"ok": False, "errors": ["缺少 agent/sim_time/time"]}
+            return {"ok": False, "errors": ["agent/sim_time/time are missing"]}
 
         audit_path = _audit_path(ctx)
         if not os.path.exists(audit_path):
-            return {"ok": False, "errors": ["interventions.json 不存在"]}
+            return {"ok": False, "errors": ["interventions.json does not exist"]}
         try:
             audit = json.load(open(audit_path, encoding="utf-8"))
         except Exception as e:
             from live.state import log
-            log.error("撤销读取 interventions.json 失败: {}".format(e), exc_info=True)
-            return {"ok": False, "errors": ["读取干预记录失败: {}".format(e)]}
+            log.error("undo: failed to read interventions.json: {}".format(e), exc_info=True)
+            return {"ok": False, "errors": ["failed to read the intervention records: {}".format(e)]}
 
         # 定位目标记录:agent+sim_time+time 三键匹配(同刻多次干预靠 time 区分)
         cur_sim = ctx.sim_name
@@ -372,15 +372,15 @@ class UndoInterventionStrategy(InterventionStrategy):
                 break
         if target_idx is None:
             return {"ok": False, "errors": [
-                "未找到匹配的干预记录(agent={} sim={} time={})".format(
+                "no matching intervention record (agent={} sim={} time={})".format(
                     agent, sim_time, rec_time)]}
         target = audit[target_idx]
         if target.get("operator") == "undo" or target.get("revoked"):
-            return {"ok": False, "errors": ["该干预已被撤销,不能重复撤销"]}
+            return {"ok": False, "errors": ["this intervention has already been undone; it cannot be undone twice"]}
 
         old_constraints = dict(target.get("old_constraints") or {})
         if not old_constraints:
-            return {"ok": False, "errors": ["该记录无 old_constraints,无法回滚"]}
+            return {"ok": False, "errors": ["the record has no old_constraints, so it cannot be rolled back"]}
         # 回滚目标必须仍在当前约束集;已被后续干预删除时拒绝(保守,不做隐式合并)
         from mavisframework.runtime.governance import Governance
 
@@ -388,7 +388,7 @@ class UndoInterventionStrategy(InterventionStrategy):
         gov = Governance(gov_path)   # 带路径构造(同 goals:修文件缺失边界)
         current = gov.get_constraints(agent)
         if not current:
-            return {"ok": False, "errors": ["该角色当前无治理约束,无法回滚"]}
+            return {"ok": False, "errors": ["this agent currently has no governance constraints, so there is nothing to roll back"]}
         rollback_goals = dict(old_constraints)
         # 归一化(old_constraints 理论 sum=1,防御旧数据)
         total = sum(float(v) for v in rollback_goals.values()) or 1.0
@@ -413,15 +413,15 @@ class UndoInterventionStrategy(InterventionStrategy):
                 "old_constraints": current,          # 撤销前的当前约束
                 "new_constraints": rollback_goals,   # 回滚到的状态
                 "operator": "undo",
-                "note": "撤销干预(回滚到 {} 干预前状态)".format(rec_time),
+                "note": "undo intervention (rolled back to the pre-intervention state of {})".format(rec_time),
                 "undo_of": {"time": target.get("time", ""), "sim_time": sim_time},
                 "intervention": self.strategy_id,
             })
             write_json_atomic(audit_path, audit)
         except Exception as e:
             from live.state import log
-            log.error("撤销审计写入失败(agent={}): {}".format(agent, e), exc_info=True)
-            return {"ok": False, "errors": ["回滚成功但审计写入失败: {}".format(e)]}
+            log.error("undo: failed to write the audit (agent={}): {}".format(agent, e), exc_info=True)
+            return {"ok": False, "errors": ["the rollback succeeded but the audit write failed: {}".format(e)]}
 
         return {"ok": True, "agent": agent, "constraints": rollback_goals,
                 "rollback_to": old_constraints}
@@ -435,7 +435,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
     """专家标记一条反思:verdict ∈ correct/incorrect/partial(+纠正文本)。"""
 
     strategy_id = "mark"
-    name = "反思标记(专家审核)"
+    name = "mark a reflection (expert review)"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         from live.reflections import (append_mark, mark_gate_errors, new_mark,
@@ -453,7 +453,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
         if errs:
             return {"ok": False, "errors": errs}
         if len(text) > 200_000:
-            return {"ok": False, "errors": ["text 超长(>200k 字符),疑似滥用"]}
+            return {"ok": False, "errors": ["text is too long (>200k characters), which looks like abuse"]}
         # 行为上下文:最近快照的倾向/对齐 + decisions.json 最后一条决策
         context = {}
         ckpt_dir = ctx.ckpt_dir
@@ -471,7 +471,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
                         context["goal_alignment"] = st.get("goal_alignment") or {}
                 except Exception as exc:  # noqa: BLE001 - 取不到留空但留痕(不静默)
                     from live.state import log
-                    log.warning("[reflections] 读 checkpoint 快照失败,倾向/对齐留空: %s", exc)
+                    log.warning("[reflections] failed to read the checkpoint snapshot; tendency/alignment left blank: %s", exc)
             if os.path.exists(dec_path):
                 try:
                     dec = json.load(open(dec_path, encoding="utf-8"))
@@ -485,7 +485,7 @@ class ReflectionMarkStrategy(InterventionStrategy):
                             break
                 except Exception as exc:  # noqa: BLE001 - 取不到留空但留痕
                     from live.state import log
-                    log.warning("[reflections] 读 decisions.json 失败,action 留空: %s", exc)
+                    log.warning("[reflections] failed to read decisions.json; action left blank: %s", exc)
 
         record = new_mark(agent=agent, simulation=ctx.sim_name,
                           sim_time=sim_time, node_id=node_id, thought=text,
@@ -509,28 +509,28 @@ class CorrectiveFeedbackStrategy(InterventionStrategy):
     """
 
     strategy_id = "corrective_feedback"
-    name = "纠正回流(写入 agent 记忆流)"
+    name = "corrective feedback reflow (written into the agent's memory stream)"
 
     def _apply(self, ctx: InterventionContext, payload: dict) -> dict:
         agent_name = str(payload.get("agent", "")).strip()
         correction = str(payload.get("correction", "") or "").strip()
         note = str(payload.get("note", "") or "").strip()
         if not agent_name:
-            return {"ok": False, "errors": ["缺少 agent"]}
+            return {"ok": False, "errors": ["agent is missing"]}
         if not correction:
-            return {"ok": False, "errors": ["缺少 correction(纠正文本)"]}
+            return {"ok": False, "errors": ["the correction text is missing"]}
         agents = _agents_of(ctx)
         if not agents:
-            return {"ok": False, "errors": ["当前没有运行中的模拟,无法回流纠正"]}
+            return {"ok": False, "errors": ["no simulation is running, so the correction cannot be reflowed"]}
         if agent_name not in agents:
             return {"ok": False, "errors": [
-                "没有这个角色: {!r};本局角色: {}".format(
+                "no such agent in this run: {!r}; agents in this run: {}".format(
                     agent_name, " / ".join(sorted(agents)))]}
         agent = agents[agent_name]
         inject = getattr(agent, "inject_story_event", None)
         if inject is None:
             return {"ok": False, "errors": [
-                "该 agent 不支持记忆注入(缺 inject_story_event)"]}
+                "this agent does not support memory injection (inject_story_event is missing)"]}
 
         import datetime
         ev = {
@@ -551,13 +551,13 @@ class CorrectiveFeedbackStrategy(InterventionStrategy):
                 "simulation": ctx.sim_name,
                 "agent": agent_name,
                 "operator": "expert",
-                "note": note or "纠正回流:{}".format(correction[:60]),
+                "note": note or "correction reflow: {}".format(correction[:60]),
                 "correction": correction,
                 "intervention": self.strategy_id,
             })
         except Exception as e:
             from live.state import log
-            log.error("纠正回流审计写入失败(agent={}): {}".format(agent_name, e),
+            log.error("correction reflow: failed to write the audit (agent={}): {}".format(agent_name, e),
                       exc_info=True)
         return {"ok": True, "agent": agent_name,
                 "injected": True, "correction": correction}
@@ -570,29 +570,29 @@ class CorrectiveFeedbackStrategy(InterventionStrategy):
 def _register_builtin() -> None:
     register("goals", WeightAdjustStrategy, {
         "name": WeightAdjustStrategy.name,
-        "scope": "制度层",
-        "payload": {"name": "角色名", "goals": "{目标: 权重} 且 Σ=1", "note": "干预理由(可选)"},
-        "desc": "调整治理约束权重:改后果反馈的加权,倾向滞后收敛(IVD 主干预手段)",
+        "scope": "institution layer",
+        "payload": {"name": "agent name", "goals": "{goal: weight} summing to 1", "note": "reason for the intervention (optional)"},
+        "desc": "adjust governance constraint weights: reweights the consequence feedback, and the tendency converges with a lag (the IVD main lever)",
     })
     register("undo", UndoInterventionStrategy, {
         "name": UndoInterventionStrategy.name,
-        "scope": "制度层",
-        "payload": {"agent": "角色名", "sim_time": "干预的模拟时刻", "time": "干预的真实写入时间"},
-        "desc": "撤销一次权重干预:回滚到 old_constraints(沙盒场景一律 403)",
+        "scope": "institution layer",
+        "payload": {"agent": "agent name", "sim_time": "sim time of the intervention", "time": "real write time of the intervention"},
+        "desc": "undo one weight intervention: rolls back to old_constraints (always 403 in the sandbox scenario)",
     })
     register("mark", ReflectionMarkStrategy, {
         "name": ReflectionMarkStrategy.name,
-        "scope": "case01 专家链",
-        "payload": {"agent": "角色名", "node_id": "反思节点", "text": "反思原文",
-                    "verdict": "correct|incorrect|partial", "correction": "纠正文本",
-                    "sim_time": "模拟时刻(可选)"},
-        "desc": "标记反思的质量判定,纠正文本进 LoRA 训练数据(SFT/DPO)",
+        "scope": "case01 expert chain",
+        "payload": {"agent": "agent name", "node_id": "reflection node", "text": "the reflection text",
+                    "verdict": "correct|incorrect|partial", "correction": "correction text",
+                    "sim_time": "sim time (optional)"},
+        "desc": "record the quality verdict of a reflection; the correction text goes into the LoRA training data (SFT/DPO)",
     })
     register("corrective_feedback", CorrectiveFeedbackStrategy, {
         "name": CorrectiveFeedbackStrategy.name,
-        "scope": "内容层",
-        "payload": {"agent": "角色名", "correction": "纠正文本", "note": "理由(可选)"},
-        "desc": "把专家纠正写进 agent 记忆流(可被反思检索);不改倾向,经正常体验管线起作用",
+        "scope": "content layer",
+        "payload": {"agent": "agent name", "correction": "correction text", "note": "reason (optional)"},
+        "desc": "write the expert correction into the agent's memory stream (retrievable by reflection); it does not change the tendency and works through the normal experience pipeline",
     })
 
 

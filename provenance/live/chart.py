@@ -30,7 +30,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
         try:
             cons = __import__("json").load(open(gov_path, encoding="utf-8")).get("roles", {}).get(agent, {})
         except Exception as e:
-            log.warning("export-chart 读取 governance.json 失败: {}".format(e))
+            log.warning("export-chart: failed to read governance.json: {}".format(e))
             cons = {}
     my_ivs = sorted(
         [x for x in my_ivs if x.get("agent") == agent and x.get("simulation") == cur_sim],
@@ -47,7 +47,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
         from matplotlib.ticker import FuncFormatter, FixedLocator
         from matplotlib.font_manager import FontProperties
     except Exception as e:
-        log.warning("matplotlib 不可用: {}".format(e))
+        log.warning("matplotlib is unavailable: {}".format(e))
         return None
 
     try:
@@ -70,7 +70,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
                 ts.append(t)
                 vs.append(vt[g])
         if ts:
-            ax.plot(ts, vs, color=color_of[g], linewidth=2.2, label="{} 倾向".format(g))
+            ax.plot(ts, vs, color=color_of[g], linewidth=2.2, label="{} tendency".format(g))
 
     # 约束分段阶梯虚线:起始段=最早图内干预前的 old(干预前的制度期望),
     # 之后每个干预时刻跳到 new;无图内干预时=当前 governance。
@@ -81,7 +81,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
         try:
             ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
         except (ValueError, TypeError) as e:
-            log.warning("export-chart 干预时间非法,跳过(agent={}, sim_time={}): {}".format(
+            log.warning("export-chart: invalid intervention time, skipping it (agent={}, sim_time={}): {}".format(
                 agent, iv.get("sim_time"), e))
             continue
         steps.append((ivt, dict(iv.get("new_constraints") or cons)))
@@ -117,13 +117,13 @@ def render_tendency_png(ckpt_dir: str, agent: str,
         try:
             ivt = _dt.datetime.strptime(str(iv.get("sim_time", "")), "%Y%m%d-%H:%M")
         except (ValueError, TypeError) as e:
-            log.warning("export-chart 干预时间非法,跳过干预竖线(agent={}, sim_time={}): {}".format(
+            log.warning("export-chart: invalid intervention time, skipping the intervention marker (agent={}, sim_time={}): {}".format(
                 agent, iv.get("sim_time"), e))
             continue
         if t0 <= ivt <= t1:
             ax.axvline(ivt, color="#e07b39", linewidth=1.6, linestyle=":", alpha=0.8)
 
-    ax.set_title("{} — 价值倾向演变(实线=内化, 虚线=约束期望, 橙线=干预)".format(agent),
+    ax.set_title("{} — value tendency over time (solid = internalized, dashed = constraint expected, orange = intervention)".format(agent),
                  fontproperties=FONT, fontsize=13)
     ax.set_ylim(0, 1.0)
     _time_abbr = lambda _x: _x.strftime("%m/%d %H:%M")
@@ -156,7 +156,7 @@ def render_tendency_png(ckpt_dir: str, agent: str,
     fig.autofmt_xdate(rotation=0)
     fig.tight_layout()
     # 标题携带日期区间,补足 X 轴只显时间时的日期上下文
-    ax.set_title("{} — 价值倾向演变(实线=内化, 虚线=约束期望, 橙线=干预)　{} ~ {}".format(
+    ax.set_title("{} — value tendency over time (solid = internalized, dashed = constraint expected, orange = intervention)  {} ~ {}".format(
         agent, _time_abbr(t0), _time_abbr(t1)),
         fontproperties=FONT, fontsize=13)
 

@@ -115,13 +115,13 @@ class TestRegistry:
             assert d["strategy"] == sid and d["name"] and d["desc"]
 
     def test_duplicate_rejected(self):
-        with pytest.raises(ValueError, match="已注册"):
+        with pytest.raises(ValueError, match="already registered"):
             ivm.register("goals", ivm.WeightAdjustStrategy, {})
 
     def test_bad_id_rejected(self):
-        with pytest.raises(ValueError, match="非法"):
+        with pytest.raises(ValueError, match="invalid"):
             ivm.register("../evil", ivm.WeightAdjustStrategy, {})
-        with pytest.raises(ValueError, match="非法"):
+        with pytest.raises(ValueError, match="invalid"):
             ivm.register("", ivm.WeightAdjustStrategy, {})
 
     def test_custom_strategy_extends(self):
@@ -152,18 +152,18 @@ class TestRegistry:
 class TestGoalsEndpoint:
     def test_missing_name(self, client):
         assert client.post("/api/goals", json={}).json() == {
-            "ok": False, "errors": ["缺少角色名"]}
+            "ok": False, "errors": ["the agent name is missing"]}
 
     def test_goals_not_dict(self, client):
         r = client.post("/api/goals", json={"name": "A", "goals": "x"}).json()
-        assert r["errors"] == ["约束应为非空 dict(目标:权重)"]
+        assert r["errors"] == ["constraints must be a non-empty dict (goal: weight)"]
 
     def test_unknown_role_rejected_when_server_present(self, client, sandbox_env):
         state.server = _FakeServer(_FakeGame(agents={"AI Advisor": _FakeAgent()}))
         try:
             r = client.post("/api/goals",
                             json={"name": "查无此人", "goals": {"A": 1.0}}).json()
-            assert "没有这个角色" in r["errors"][0]
+            assert "no such agent in this run" in r["errors"][0]
         finally:
             state.server = None
 
@@ -173,12 +173,12 @@ class TestGoalsEndpoint:
         r = client.post("/api/goals",
                         content='{"name": "A", "goals": {"A": NaN}}',
                         headers={"Content-Type": "application/json"}).json()
-        assert "权重必须是有限数" in r["errors"][0]
+        assert "weights must be finite numbers" in r["errors"][0]
 
     def test_sum_not_one_rejected(self, client):
         r = client.post("/api/goals",
                         json={"name": "A", "goals": {"A": 0.5, "B": 0.2}}).json()
-        assert "约束权重总和应为 1" in r["errors"][0]
+        assert "constraint weights must sum to 1" in r["errors"][0]
 
     def test_valid_goals_persist_and_audit(self, client, sandbox_env):
         r = client.post("/api/goals",
@@ -202,7 +202,7 @@ class TestGoalsEndpoint:
         # {"1": 1.0} 数字开头 = 误输入 → 清洗后为空 → 拒绝
         r = client.post("/api/goals",
                         json={"name": "A", "goals": {"1": 1.0}}).json()
-        assert "清洗后无有效目标" in r["errors"][0]
+        assert "nothing is left after cleaning" in r["errors"][0]
 
     def test_live_gov_synced_when_server_present(self, client, sandbox_env):
         """内存同步:agent._governance 指向 game.governance 同一对象,不更新则内化失效。"""
@@ -240,7 +240,7 @@ class TestUndoEndpoint:
     def test_missing_fields(self, client, sandbox_env):
         # experiment-eval 场景下才会走到字段校验(sandbox 场景在守卫处就 403)
         r = client.post("/api/undo-intervention", json={}).json()
-        assert r["errors"] == ["缺少 agent/sim_time/time"]
+        assert r["errors"] == ["agent/sim_time/time are missing"]
 
     def test_rollback_and_audit(self, client, sandbox_env):
         sim_time, rec_time = _seed_intervention(sandbox_env)
@@ -272,13 +272,13 @@ class TestUndoEndpoint:
         again = client.post("/api/undo-intervention",
                             json={"agent": "Mr. Zhou", "sim_time": sim_time,
                                   "time": rec_time}).json()
-        assert "重复撤销" in again["errors"][0]
+        assert "cannot be undone twice" in again["errors"][0]
 
     def test_no_match_reported(self, client, sandbox_env):
         _seed_intervention(sandbox_env, agent="someone-else")
         r = client.post("/api/undo-intervention",
                         json={"agent": "X", "sim_time": "t", "time": "t"}).json()
-        assert "未找到匹配" in r["errors"][0]
+        assert "no matching intervention record" in r["errors"][0]
 
     def test_sandbox_blocked_403(self, client, sandbox_env, monkeypatch):
         # 场景声明为 sandbox-value → undo 一律 403
@@ -287,7 +287,7 @@ class TestUndoEndpoint:
         r = client.post("/api/undo-intervention",
                         json={"agent": "X", "sim_time": "t", "time": "t"})
         assert r.status_code == 403
-        assert "不允许倒带" in r.json()["errors"][0]
+        assert "cannot be rewound" in r.json()["errors"][0]
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ class TestGenericDispatch:
     def test_corrective_feedback_requires_running_sim(self, client):
         r = client.post("/api/intervention/corrective_feedback",
                         json={"agent": "X", "correction": "y"}).json()
-        assert "没有运行中的模拟" in r["errors"][0]
+        assert "no simulation is running" in r["errors"][0]
 
     def test_correction_record_skipped_by_internalization_metrics(self,
                                                                   client,
@@ -367,7 +367,7 @@ class TestStrategyHardening:
         ctx = ivm.InterventionContext(server=None, base_dir=str(sandbox_env))
         for evil in (None, [], "str", 42):
             r = ivm.get("goals")().apply(ctx, evil)
-            assert r["ok"] is False and r["errors"] == ["缺少角色名"], (evil, r)
+            assert r["ok"] is False and r["errors"] == ["the agent name is missing"], (evil, r)
 
     def test_strategy_returning_none_gets_500(self, sandbox_env, monkeypatch):
         """策略漏 return → 显式 500 + log,不静默包成 "null" 响应体。"""
@@ -428,7 +428,7 @@ class TestBothFaces:
         # 此前它返回 ok:true 并把角色名落进仓根的追踪文件,现场看不出来是空操作。
         r = c.post("/api/goals", json={})
         assert r.status_code == 409, r.text
-        assert "不挂治理" in r.json()["errors"][0], r.text
+        assert "carries no governance constraints" in r.json()["errors"][0], r.text
         assert c.post("/api/reflections/mark", json={}).status_code == 200
         # 统一分发口未知策略 404 带清单
         r = c.post("/api/intervention/nope", json={})
@@ -572,6 +572,6 @@ class TestAdversarialPayloads:
             r = client.post("/api/reflections/mark", json={
                 "agent": "X", "node_id": "n", "text": "t" * 200_001,
                 "verdict": "correct"}).json()
-            assert r["ok"] is False and "超长" in r["errors"][0]
+            assert r["ok"] is False and "too long" in r["errors"][0]
         finally:
             refl.MARKS_PATH = old

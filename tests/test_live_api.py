@@ -165,7 +165,7 @@ class TestPostGoals:
         })
         assert r.status_code == 200
         assert r.json()["ok"] is False
-        assert any("总和" in e for e in r.json().get("errors", []))
+        assert any("must sum to 1" in e for e in r.json().get("errors", []))
 
     def test_rejects_zero_and_numeric_goals(self, client):
         r = client.post("/api/goals", json={
@@ -192,7 +192,7 @@ class TestPostGoals:
                         headers={"Content-Type": "application/json"})
         assert r.status_code == 200, "应当是可读的拒绝,不是 500"
         body = r.json()
-        assert body["ok"] is False and any("有限数" in e for e in body["errors"]), body
+        assert body["ok"] is False and any("finite numbers" in e for e in body["errors"]), body
         assert gov_path.read_text(encoding="utf-8") == before, "被拒的请求不许改 governance.json"
         assert "NaN" not in gov_path.read_text(encoding="utf-8")
 
@@ -202,7 +202,7 @@ class TestPostGoals:
                         headers={"Content-Type": "application/json"})
         assert r.status_code == 200
         assert r.json()["ok"] is False
-        assert any("有限数" in e for e in r.json()["errors"])
+        assert any("finite numbers" in e for e in r.json()["errors"])
 
     def test_rejects_unknown_role_instead_of_creating_it(self, client, tmp_path):
         """角色名必须是本局真实角色(2026-09-24 第十轮体检)。
@@ -216,7 +216,7 @@ class TestPostGoals:
         })
         assert r.status_code == 200
         body = r.json()
-        assert body["ok"] is False and any("没有这个角色" in e for e in body["errors"]), body
+        assert body["ok"] is False and any("no such agent in this run" in e for e in body["errors"]), body
         # 错误里要带上合法角色,省得调用方去猜
         assert "AI Advisor" in body["errors"][0]
         gov = json.loads((tmp_path / "governance.json").read_text(encoding="utf-8"))
@@ -418,7 +418,7 @@ class TestUndo:
             "agent": "AI Advisor", "sim_time": "20250213-12:00", "time": "2026-08-30 10:00:00",
         })
         assert r.status_code == 403, r.text
-        assert "沙盒" in r.json()["errors"][0]
+        assert "sandbox scenario" in r.json()["errors"][0]
         gov_after = gov_path.read_text(encoding="utf-8") if gov_path.exists() else ""
         assert gov_after == gov_before, "被拒绝的请求不该改治理文件"
         ivs = json.loads((tmp_path / "results" / "checkpoints" / "interventions.json")
