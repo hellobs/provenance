@@ -324,15 +324,15 @@ def manifest_view(rec: dict) -> dict:
 def quality_of(rec: dict) -> dict:
     """记录质量标记:分支来源 + T0 立场一致性 + 废弃标记 → 一个给平台看的 `quality` 字段。
 
-    为什么要有它(2026-09-19,另一个 AI 的体检清单问题 1/5):`preset` 分支不看 AI 说了什么,
+    为什么要有它(2026-09-19,另一个 AI 的体检清单问题 1/5):分支现在只由 AI 的 T0 回答判定(预设于 2026-10-10 剔除),但快筛与判官仍可能读反,
     于是可能出现"AI 说不能确认值得买、当事人却满仓买入"这种自相矛盾的记录。平台拿这些
     记录建 Expert Review Task 时,专家会直接看到矛盾内容。这里的约定是:
 
-    - ``quality="ok"``          分支由 AI 的 T0 回答判定(judge),或预设但与 AI 立场一致;
+    - ``quality="ok"``          一致性判为 consistent(快筛或判官认可记录里的分支);
     - ``quality="deprecated"``  记录被显式标了 ``deprecated``(样本作废,如
       "标 A 的原文实为 B 判据")。**它优先于其它判断**:一条自洽的废弃样本同样是废的
       (2026-09-24 体检:此前它只被 `excluded` 之外的口径漏过 —— 只要恰好判成 ok 就会发给平台);
-    - ``quality="questionable"``预设分支且与 AI 的 T0 立场不一致;或**判定失败**
+    - ``quality="questionable"``一致性判为 inconsistent(记录里的分支与 AI 在 T0 的立场矛盾);或**判定失败**
       (judge 三次都没给出 A/B/C → run 停在 T0,没有时间线,不能直接建专家任务);
       或**反思压根没生成**(2026-10-03 加:旧口径只看一致性,两条失败占位记录因
       quick_scan=unknown 落 unverified,而 unverified 默认照发平台 —— 专家打开
